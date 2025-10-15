@@ -17,17 +17,20 @@ func (m model) renderPreview(maxVisible int) string {
 	}
 
 	// Calculate visible range based on scroll position
+	totalLines := len(m.preview.content)
 	start := m.preview.scrollPos
-	end := start + maxVisible
-	if end > len(m.preview.content) {
-		end = len(m.preview.content)
-	}
-	if start > len(m.preview.content) {
+
+	// Ensure start is within bounds
+	if start < 0 {
 		start = 0
-		end = maxVisible
-		if end > len(m.preview.content) {
-			end = len(m.preview.content)
-		}
+	}
+	if start >= totalLines {
+		start = max(0, totalLines-maxVisible)
+	}
+
+	end := start + maxVisible
+	if end > totalLines {
+		end = totalLines
 	}
 
 	// Calculate available width for content (pane width - line number width - scrollbar - border - padding)
@@ -43,7 +46,6 @@ func (m model) renderPreview(maxVisible int) string {
 	}
 
 	// Render lines with line numbers and scrollbar
-	totalLines := len(m.preview.content)
 	for i := start; i < end; i++ {
 		// Use consistent 5-character width for line numbers (up to 9999 lines)
 		lineNum := fmt.Sprintf("%5d │ ", i+1)
