@@ -50,14 +50,17 @@ func (m model) renderPreview(maxVisible int) string {
 		lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 		s.WriteString(lineNumStyle.Render(lineNum))
 
-		// Truncate line to prevent wrapping
+		// Truncate or pad line to consistent width
 		line := m.preview.content[i]
 		if len(line) > availableWidth {
 			line = line[:availableWidth-3] + "..."
+		} else {
+			// Pad line to availableWidth so scrollbar aligns
+			line = line + strings.Repeat(" ", availableWidth-len(line))
 		}
 		s.WriteString(line)
 
-		// Add scrollbar on the right side
+		// Add scrollbar on the right side (now it will align consistently)
 		scrollbar := m.renderScrollbar(i-start, maxVisible, totalLines)
 		s.WriteString(scrollbar)
 		s.WriteString("\n")
