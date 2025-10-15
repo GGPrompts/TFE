@@ -158,6 +158,8 @@ func (m model) renderDualPane() string {
 	s.WriteString("\n")
 
 	// Calculate max visible for both panes
+	// title=1 + path+padding=2 + panes=maxVisible + status=1 + help=1 = m.height
+	// Therefore: maxVisible = m.height - 5
 	maxVisible := m.height - 5
 
 	// Get left pane content

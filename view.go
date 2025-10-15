@@ -35,9 +35,10 @@ func (m model) renderSinglePane() string {
 	s.WriteString("\n")
 
 	// File list - render based on current display mode
-	// Calculate maxVisible: m.height - (title=1 + path=1 + path_padding=1 + status=1 + help=1) = m.height - 5
-	// Note: pathStyle has PaddingBottom(1) which adds an extra rendered line
-	maxVisible := m.height - 5 // Reserve space for title, path (with padding), status, and help
+	// Calculate maxVisible to fit within terminal height:
+	// title=1 + path+padding=2 + filelist=maxVisible + spacer=1 + status=1 + help=1 = m.height
+	// Therefore: maxVisible = m.height - 6
+	maxVisible := m.height - 6 // Reserve space for all UI elements
 
 	switch m.displayMode {
 	case modeList:
