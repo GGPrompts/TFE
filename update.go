@@ -83,8 +83,59 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Handle command mode keys
+		if m.commandMode {
+			switch msg.String() {
+			case "esc":
+				// Exit command mode without executing
+				m.commandMode = false
+				m.commandInput = ""
+				return m, nil
+
+			case "enter":
+				// Execute command
+				if m.commandInput != "" {
+					cmd := m.commandInput
+					m.addToHistory(cmd)
+					m.commandMode = false
+					m.commandInput = ""
+					return m, runCommand(cmd, m.currentPath)
+				}
+				// Empty command, just exit command mode
+				m.commandMode = false
+				return m, nil
+
+			case "backspace":
+				// Delete last character
+				if len(m.commandInput) > 0 {
+					m.commandInput = m.commandInput[:len(m.commandInput)-1]
+				}
+
+			case "up":
+				// Navigate to previous command in history
+				m.commandInput = m.getPreviousCommand()
+
+			case "down":
+				// Navigate to next command in history
+				m.commandInput = m.getNextCommand()
+
+			default:
+				// Add typed character to command input
+				if len(msg.String()) == 1 {
+					m.commandInput += msg.String()
+				}
+			}
+			return m, nil
+		}
+
 		// Regular file browser keys
 		switch msg.String() {
+		case ":":
+			// Enter command mode
+			m.commandMode = true
+			m.commandInput = ""
+			m.historyPos = len(m.commandHistory)
+			return m, nil
 		case "q", "ctrl+c":
 			return m, tea.Quit
 
@@ -318,6 +369,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorFinishedMsg:
 		// Editor has closed, we're back in TFE
 		// Refresh file list in case file was modified
+		m.loadFiles()
+		// Force a refresh to reinitialize terminal state (including mouse support)
+		return m, tea.ClearScreen
+
+	case commandFinishedMsg:
+		// Command has finished, we're back in TFE
+		// Refresh file list in case command modified files
 		m.loadFiles()
 		// Force a refresh to reinitialize terminal state (including mouse support)
 		return m, tea.ClearScreen

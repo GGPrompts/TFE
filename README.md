@@ -9,6 +9,7 @@ A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE
 - **Dual-Pane Mode**: Split-screen layout with file browser and live preview
 - **File Preview**: View file contents with syntax highlighting and line numbers
 - **External Editor Integration**: Open files in Micro, nano, vim, or vi
+- **Command Prompt**: Execute shell commands directly from TFE
 - **Clipboard Integration**: Copy file paths to system clipboard
 - **Multiple Display Modes**: List, Grid, Detail, and Tree views
 - **Nerd Font Icons**: Visual file/folder indicators using file type detection
@@ -63,6 +64,7 @@ The file explorer will start in your current working directory.
 | `E` | Edit file in external editor (Micro preferred) |
 | `N` | Edit file in nano |
 | `y` / `c` | Copy file path to clipboard |
+| `:` | Enter command mode (type shell commands) |
 
 #### View Modes
 | Key | Action |
@@ -145,6 +147,39 @@ TFE offers three distinct interface modes:
 └────────────────────────────────────────────────────────────┘
 ```
 
+### Command Mode (:)
+
+Press `:` to enter command mode, similar to Midnight Commander. Type shell commands and press Enter to execute them in the current directory context. The command prompt replaces the help bar at the bottom:
+
+```
+┌─────────────────────────────────────────┐
+│ TFE - Terminal File Explorer            │
+│ /current/path/here                      │
+│                                         │
+│   ▸ folder1                             │
+│   ▸ folder2                             │
+│   • file1.txt                           │
+│                                         │
+│ 3 folders, 12 files • List             │
+│ /current/path/here $ ls -la█           │  ← Command prompt
+└─────────────────────────────────────────┘
+```
+
+**Command Mode Features:**
+- Execute any shell command in the current directory
+- TFE suspends while the command runs, then resumes automatically
+- File list refreshes automatically after command completes
+- Command history with up/down arrows
+- Press `Esc` to cancel without executing
+- Press `Backspace` to edit command
+
+**Example Commands:**
+- `:ls -la` - List files with details
+- `:touch newfile.txt` - Create a new file
+- `:mkdir testdir` - Create a new directory
+- `:git status` - Check git repository status
+- `:vim file.txt` - Open file in vim and return to TFE
+
 #### Key Interface Elements
 
 1. **Title Bar**: Application name and current mode
@@ -167,15 +202,16 @@ TFE offers three distinct interface modes:
 ```
 tfe/
 ├── main.go                 # Entry point (21 lines)
-├── types.go                # Type definitions (110 lines)
+├── types.go                # Type definitions (116 lines)
 ├── styles.go               # Lipgloss styles (36 lines)
 ├── model.go                # Model initialization & layout (64 lines)
-├── update.go               # Event handling (453 lines)
-├── view.go                 # View dispatcher (108 lines)
+├── update.go               # Event handling (520 lines)
+├── view.go                 # View dispatcher (120 lines)
 ├── render_file_list.go     # File list rendering (284 lines)
 ├── render_preview.go       # Preview rendering (266 lines)
 ├── file_operations.go      # File operations & formatting (329 lines)
 ├── editor.go               # External editor integration (72 lines)
+├── command.go              # Command prompt & execution (96 lines)
 ├── go.mod                  # Go module definition
 ├── go.sum                  # Dependency checksums
 ├── README.md               # User documentation
@@ -223,7 +259,7 @@ go get github.com/charmbracelet/bubbles
 
 ### Architecture
 
-TFE follows a modular architecture with 10 focused files:
+TFE follows a modular architecture with 11 focused files:
 - See **CLAUDE.md** for complete architecture documentation
 - See **docs/REFACTOR_PLAN.md** for refactoring history
 - See **PLAN.md** for development roadmap and future features

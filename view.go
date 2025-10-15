@@ -99,10 +99,22 @@ func (m model) renderSinglePane() string {
 	statusText := fmt.Sprintf("%s%s%s | %s", itemsInfo, hiddenIndicator, viewModeText, selectedInfo)
 	s.WriteString(statusStyle.Render(statusText))
 
-	// Help text
+	// Help text or command prompt
 	s.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
-	s.WriteString(helpStyle.Render("↑/↓: nav • enter: preview • E: edit • y/c: copy path • Tab: dual-pane • f: full • v: views • q: quit"))
+	if m.commandMode {
+		// Show command prompt with current directory and input
+		promptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).PaddingLeft(2)
+		inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+
+		s.WriteString(promptStyle.Render(m.currentPath + " $ "))
+		s.WriteString(inputStyle.Render(m.commandInput))
+		s.WriteString(cursorStyle.Render("█"))
+	} else {
+		// Regular help text
+		helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
+		s.WriteString(helpStyle.Render("↑/↓: nav • enter: preview • E: edit • y/c: copy path • Tab: dual-pane • f: full • v: views • :: command • q: quit"))
+	}
 
 	return s.String()
 }

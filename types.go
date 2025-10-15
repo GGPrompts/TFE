@@ -104,6 +104,11 @@ type model struct {
 	// Double-click detection
 	lastClickTime  time.Time
 	lastClickIndex int
+	// Command mode
+	commandMode    bool
+	commandInput   string
+	commandHistory []string
+	historyPos     int
 }
 
 // editorFinishedMsg is sent when external editor exits
