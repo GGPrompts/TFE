@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderPreview renders the preview pane content
+// renderPreview renders the preview pane content with scrollbar
 func (m model) renderPreview(maxVisible int) string {
 	var s strings.Builder
 
@@ -30,18 +30,20 @@ func (m model) renderPreview(maxVisible int) string {
 		}
 	}
 
-	// Calculate available width for content (pane width - line number width - border - padding)
+	// Calculate available width for content (pane width - line number width - scrollbar - border - padding)
 	// Line number is 8 chars: "9999 │ " (5 for number, 1 for space, 1 for │, 1 for space)
+	// Scrollbar takes 2 chars
 	// Borders take up 2-4 additional characters depending on lipgloss rendering
-	availableWidth := m.rightWidth - 15 // More conservative: line nums (8) + borders (4) + padding (3)
+	availableWidth := m.rightWidth - 17 // More conservative: line nums (8) + scrollbar (2) + borders (4) + padding (3)
 	if m.viewMode == viewFullPreview {
-		availableWidth = m.width - 15
+		availableWidth = m.width - 17
 	}
 	if availableWidth < 20 {
 		availableWidth = 20 // Minimum width
 	}
 
-	// Render lines with line numbers
+	// Render lines with line numbers and scrollbar
+	totalLines := len(m.preview.content)
 	for i := start; i < end; i++ {
 		// Use consistent 5-character width for line numbers (up to 9999 lines)
 		lineNum := fmt.Sprintf("%5d │ ", i+1)
@@ -54,10 +56,48 @@ func (m model) renderPreview(maxVisible int) string {
 			line = line[:availableWidth-3] + "..."
 		}
 		s.WriteString(line)
+
+		// Add scrollbar on the right side
+		scrollbar := m.renderScrollbar(i-start, maxVisible, totalLines)
+		s.WriteString(scrollbar)
 		s.WriteString("\n")
 	}
 
 	return s.String()
+}
+
+// renderScrollbar renders a scrollbar indicator for the current line
+func (m model) renderScrollbar(lineIndex, visibleLines, totalLines int) string {
+	// Don't show scrollbar if all content fits
+	if totalLines <= visibleLines {
+		return ""
+	}
+
+	// Calculate scrollbar position
+	// The scrollbar thumb should represent the visible portion of the content
+	scrollbarHeight := visibleLines
+	thumbSize := max(1, (visibleLines*scrollbarHeight)/totalLines)
+	thumbStart := (m.preview.scrollPos * scrollbarHeight) / totalLines
+
+	scrollbarStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	scrollbarThumbStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+
+	// Determine what to render for this line
+	if lineIndex >= thumbStart && lineIndex < thumbStart+thumbSize {
+		// This line is part of the scrollbar thumb
+		return scrollbarThumbStyle.Render(" ┃")
+	} else {
+		// This line is part of the scrollbar track
+		return scrollbarStyle.Render(" │")
+	}
+}
+
+// max returns the maximum of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // renderFullPreview renders the full-screen preview mode
