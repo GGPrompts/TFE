@@ -7,13 +7,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderListView renders files in a vertical list (current default view)
-func (m model) renderListView(maxVisible int) string {
-	var s strings.Builder
-
-	// Calculate visible range (simple scrolling)
-	start := 0
-	end := len(m.files)
+// getVisibleRange calculates the start and end indices for visible items in the file list
+func (m model) getVisibleRange(maxVisible int) (start, end int) {
+	start = 0
+	end = len(m.files)
 
 	if len(m.files) > maxVisible {
 		start = m.cursor - maxVisible/2
@@ -29,6 +26,15 @@ func (m model) renderListView(maxVisible int) string {
 			}
 		}
 	}
+	return start, end
+}
+
+// renderListView renders files in a vertical list (current default view)
+func (m model) renderListView(maxVisible int) string {
+	var s strings.Builder
+
+	// Calculate visible range (simple scrolling)
+	start, end := m.getVisibleRange(maxVisible)
 
 	for i := start; i < end; i++ {
 		file := m.files[i]
@@ -227,23 +233,7 @@ func (m model) renderTreeView(maxVisible int) string {
 
 	// For now, render a simplified tree view similar to list view
 	// In the future, this could show expanded subdirectories
-	start := 0
-	end := len(m.files)
-
-	if len(m.files) > maxVisible {
-		start = m.cursor - maxVisible/2
-		if start < 0 {
-			start = 0
-		}
-		end = start + maxVisible
-		if end > len(m.files) {
-			end = len(m.files)
-			start = end - maxVisible
-			if start < 0 {
-				start = 0
-			}
-		}
-	}
+	start, end := m.getVisibleRange(maxVisible)
 
 	for i := start; i < end; i++ {
 		file := m.files[i]

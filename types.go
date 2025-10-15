@@ -81,6 +81,7 @@ type previewModel struct {
 	isBinary   bool
 	tooLarge   bool
 	fileSize   int64
+	isMarkdown bool // Whether the file is markdown
 }
 
 // model represents the main application state

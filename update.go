@@ -1,7 +1,9 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -56,7 +58,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "down", "j":
 				// Scroll preview down
-				maxScroll := len(m.preview.content) - (m.height - 6)
+				totalLines := m.getWrappedLineCount()
+				maxScroll := totalLines - (m.height - 6)
 				if maxScroll < 0 {
 					maxScroll = 0
 				}
@@ -71,7 +74,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case "pagedown":
-				maxScroll := len(m.preview.content) - (m.height - 6)
+				totalLines := m.getWrappedLineCount()
+				maxScroll := totalLines - (m.height - 6)
 				if maxScroll < 0 {
 					maxScroll = 0
 				}
@@ -92,6 +96,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd := m.commandInput
 				m.addToHistory(cmd)
 				m.commandInput = ""
+				// Check for exit/quit commands
+				cmdLower := strings.ToLower(strings.TrimSpace(cmd))
+				if cmdLower == "exit" || cmdLower == "quit" {
+					return m, tea.Quit
+				}
 				return m, runCommand(cmd, m.currentPath)
 			}
 			// If no command input, handle Enter for file navigation (below)
@@ -181,8 +190,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					// Scroll preview down
 					// Calculate visible lines: m.height - 5 (header) - 2 (preview title) = m.height - 7
-			visibleLines := m.height - 7
-			maxScroll := len(m.preview.content) - visibleLines
+					visibleLines := m.height - 7
+					totalLines := m.getWrappedLineCount()
+					maxScroll := totalLines - visibleLines
 					if maxScroll < 0 {
 						maxScroll = 0
 					}
@@ -270,8 +280,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Page down in dual-pane mode (only works when right pane focused)
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 				// Calculate visible lines: m.height - 5 (header) - 2 (preview title) = m.height - 7
-			visibleLines := m.height - 7
-			maxScroll := len(m.preview.content) - visibleLines
+				visibleLines := m.height - 7
+				totalLines := m.getWrappedLineCount()
+				maxScroll := totalLines - visibleLines
 				if maxScroll < 0 {
 					maxScroll = 0
 				}
@@ -356,6 +367,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_ = copyToClipboard(path)
 			}
 
+		case "?":
+			// Show hotkeys reference
+			hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")
+			// Try to find HOTKEYS.md in the TFE directory
+			// First check if it exists in current directory
+			if _, err := os.Stat(hotkeysPath); os.IsNotExist(err) {
+				// Try executable directory
+				if exePath, err := os.Executable(); err == nil {
+					hotkeysPath = filepath.Join(filepath.Dir(exePath), "HOTKEYS.md")
+				}
+			}
+			// Load and show the hotkeys file if it exists
+			if _, err := os.Stat(hotkeysPath); err == nil {
+				m.loadPreview(hotkeysPath)
+				m.viewMode = viewFullPreview
+				return m, tea.ClearScreen
+			}
+
 		default:
 			// MC-style: any single character goes to command prompt
 			if len(msg.String()) == 1 {
@@ -395,7 +424,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.preview.scrollPos = 0
 				}
 			case tea.MouseButtonWheelDown:
-				maxScroll := len(m.preview.content) - (m.height - 6)
+				totalLines := m.getWrappedLineCount()
+				maxScroll := totalLines - (m.height - 6)
 				if maxScroll < 0 {
 					maxScroll = 0
 				}
@@ -429,15 +459,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 
-				// Calculate which item was clicked (accounting for header lines)
+				// Calculate which item was clicked (accounting for header lines and scrolling)
 				// Base offset: title(0) + path(1) + command(2) + separator(3) + file_list_starts(4) = 4 lines
 				// Detail mode adds 2 extra lines (column header + separator)
 				headerOffset := 4
 				if m.displayMode == modeDetail {
 					headerOffset += 2 // Add 2 for detail view's header and separator
 				}
-				clickedIndex := msg.Y - headerOffset
-				if clickedIndex >= 0 && clickedIndex < len(m.files) {
+
+				// Calculate visible range to account for scrolling
+				maxVisible := m.height - 6
+				if m.displayMode == modeDetail {
+					maxVisible -= 2 // Account for detail header
+				}
+				start, end := m.getVisibleRange(maxVisible)
+
+				// Convert clicked line to actual file index
+				clickedLine := msg.Y - headerOffset
+				clickedIndex := start + clickedLine
+
+				if clickedLine >= 0 && clickedIndex >= start && clickedIndex < end && clickedIndex < len(m.files) {
 					now := time.Now()
 
 					// Check for double-click: same item clicked within 500ms
@@ -499,7 +540,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 				// Scroll preview down when right pane focused (3 lines per tick)
 				visibleLines := m.height - 7
-				maxScroll := len(m.preview.content) - visibleLines
+				totalLines := m.getWrappedLineCount()
+				maxScroll := totalLines - visibleLines
 				if maxScroll < 0 {
 					maxScroll = 0
 				}

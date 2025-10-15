@@ -109,7 +109,10 @@ func (m model) renderSinglePane() string {
 	// View mode indicator
 	viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
 
-	statusText := fmt.Sprintf("%s%s%s | %s", itemsInfo, hiddenIndicator, viewModeText, selectedInfo)
+	// Help hint
+	helpHint := " • ?: help"
+
+	statusText := fmt.Sprintf("%s%s%s%s | %s", itemsInfo, hiddenIndicator, viewModeText, helpHint, selectedInfo)
 	s.WriteString(statusStyle.Render(statusText))
 
 	return s.String()

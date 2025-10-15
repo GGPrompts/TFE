@@ -4,8 +4,118 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
+
+// getWrappedLineCount calculates the total number of wrapped lines for the current preview
+func (m model) getWrappedLineCount() int {
+	if !m.preview.loaded {
+		return 0
+	}
+
+	// Calculate available width
+	availableWidth := m.rightWidth - 17
+	if m.viewMode == viewFullPreview {
+		availableWidth = m.width - 17
+	}
+	if availableWidth < 20 {
+		availableWidth = 20
+	}
+
+	// For markdown, we need to render it to count lines
+	if m.preview.isMarkdown {
+		markdownContent := strings.Join(m.preview.content, "\n")
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithStylePath("dark"),
+			glamour.WithWordWrap(availableWidth),
+		)
+		if err == nil {
+			rendered, err := renderer.Render(markdownContent)
+			if err == nil {
+				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+				return len(renderedLines)
+			}
+		}
+		// Fallback if glamour fails
+	}
+
+	// For regular text, count wrapped lines
+	totalLines := 0
+	for _, line := range m.preview.content {
+		wrapped := wrapLine(line, availableWidth)
+		totalLines += len(wrapped)
+	}
+	return totalLines
+}
+
+// wrapLine wraps a line of text to fit within the specified width
+func wrapLine(line string, width int) []string {
+	if width <= 0 {
+		return []string{line}
+	}
+
+	// Handle empty lines
+	if len(line) == 0 {
+		return []string{""}
+	}
+
+	var wrapped []string
+	currentLine := ""
+	currentWidth := 0
+
+	words := strings.Fields(line)
+	if len(words) == 0 {
+		// Line is only whitespace
+		return []string{line}
+	}
+
+	for i, word := range words {
+		wordWidth := visualWidth(word)
+		spaceWidth := 1
+
+		// Check if this word fits on the current line
+		if currentWidth == 0 {
+			// First word on line
+			if wordWidth <= width {
+				currentLine = word
+				currentWidth = wordWidth
+			} else {
+				// Word is too long, force break it
+				wrapped = append(wrapped, word[:width])
+				currentLine = ""
+				currentWidth = 0
+			}
+		} else if currentWidth+spaceWidth+wordWidth <= width {
+			// Word fits on current line
+			currentLine += " " + word
+			currentWidth += spaceWidth + wordWidth
+		} else {
+			// Word doesn't fit, start new line
+			wrapped = append(wrapped, currentLine)
+			if wordWidth <= width {
+				currentLine = word
+				currentWidth = wordWidth
+			} else {
+				// Word is too long, force break it
+				wrapped = append(wrapped, word[:width])
+				currentLine = ""
+				currentWidth = 0
+			}
+		}
+
+		// If this is the last word, add the current line
+		if i == len(words)-1 && currentLine != "" {
+			wrapped = append(wrapped, currentLine)
+		}
+	}
+
+	if len(wrapped) == 0 {
+		return []string{line}
+	}
+
+	return wrapped
+}
 
 // renderPreview renders the preview pane content with scrollbar
 func (m model) renderPreview(maxVisible int) string {
@@ -16,8 +126,70 @@ func (m model) renderPreview(maxVisible int) string {
 		return s.String()
 	}
 
+	// Calculate available width for content
+	availableWidth := m.rightWidth - 17 // line nums (8) + scrollbar (2) + borders (4) + padding (3)
+	if m.viewMode == viewFullPreview {
+		availableWidth = m.width - 17
+	}
+	if availableWidth < 20 {
+		availableWidth = 20 // Minimum width
+	}
+
+	// If markdown, render with Glamour
+	if m.preview.isMarkdown {
+		// Join content back to original markdown
+		markdownContent := strings.Join(m.preview.content, "\n")
+
+		// Create Glamour renderer with appropriate width
+		// Use "dark" theme for better contrast
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithStylePath("dark"),
+			glamour.WithWordWrap(availableWidth),
+		)
+
+		if err == nil {
+			rendered, err := renderer.Render(markdownContent)
+			if err == nil {
+				// Split rendered markdown into lines for scrolling
+				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+
+				// Calculate visible range based on scroll position
+				totalLines := len(renderedLines)
+				start := m.preview.scrollPos
+
+				if start < 0 {
+					start = 0
+				}
+				if start >= totalLines {
+					start = max(0, totalLines-maxVisible)
+				}
+
+				end := start + maxVisible
+				if end > totalLines {
+					end = totalLines
+				}
+
+				// Render visible lines without line numbers for markdown
+				for i := start; i < end; i++ {
+					s.WriteString(renderedLines[i])
+					s.WriteString("\n")
+				}
+
+				return s.String()
+			}
+		}
+		// If Glamour rendering fails, fall through to regular rendering
+	}
+
+	// Wrap all lines first
+	var wrappedLines []string
+	for _, line := range m.preview.content {
+		wrapped := wrapLine(line, availableWidth)
+		wrappedLines = append(wrappedLines, wrapped...)
+	}
+
 	// Calculate visible range based on scroll position
-	totalLines := len(m.preview.content)
+	totalLines := len(wrappedLines)
 	start := m.preview.scrollPos
 
 	// Ensure start is within bounds
@@ -31,18 +203,6 @@ func (m model) renderPreview(maxVisible int) string {
 	end := start + maxVisible
 	if end > totalLines {
 		end = totalLines
-	}
-
-	// Calculate available width for content (pane width - line number width - scrollbar - border - padding)
-	// Line number is 8 chars: "9999 │ " (5 for number, 1 for space, 1 for │, 1 for space)
-	// Scrollbar takes 2 chars
-	// Borders take up 2-4 additional characters depending on lipgloss rendering
-	availableWidth := m.rightWidth - 17 // More conservative: line nums (8) + scrollbar (2) + borders (4) + padding (3)
-	if m.viewMode == viewFullPreview {
-		availableWidth = m.width - 17
-	}
-	if availableWidth < 20 {
-		availableWidth = 20 // Minimum width
 	}
 
 	// Render lines with line numbers and scrollbar
@@ -59,16 +219,8 @@ func (m model) renderPreview(maxVisible int) string {
 		// Space after scrollbar
 		s.WriteString(" ")
 
-		// Content line - no need to pad since scrollbar is at fixed position
-		line := m.preview.content[i]
-		lineWidth := visualWidth(line)
-
-		if lineWidth > availableWidth {
-			// Truncate to fit and add "..."
-			line = truncateToWidth(line, availableWidth-3) + "..."
-		}
-
-		s.WriteString(line)
+		// Content line
+		s.WriteString(wrappedLines[i])
 		s.WriteString("\n")
 	}
 
@@ -121,15 +273,23 @@ func (m model) renderFullPreview() string {
 	if m.preview.tooLarge || m.preview.isBinary {
 		titleText += " [Cannot Preview]"
 	}
+	if m.preview.isMarkdown {
+		titleText += " [Markdown]"
+	}
 	s.WriteString(previewTitleStyle.Render(titleText))
 	s.WriteString("\n")
 
-	// File info line
-	infoText := fmt.Sprintf("Size: %s | Lines: %d | Scroll: %d-%d",
-		formatFileSize(m.preview.fileSize),
-		len(m.preview.content),
-		m.preview.scrollPos+1,
-		m.preview.scrollPos+m.height-4)
+	// File info line - update based on whether we're showing markdown or wrapped text
+	var infoText string
+	if m.preview.isMarkdown {
+		infoText = fmt.Sprintf("Size: %s | Markdown Rendered",
+			formatFileSize(m.preview.fileSize))
+	} else {
+		infoText = fmt.Sprintf("Size: %s | Lines: %d (wrapped) | Scroll: %d",
+			formatFileSize(m.preview.fileSize),
+			len(m.preview.content),
+			m.preview.scrollPos+1)
+	}
 	s.WriteString(pathStyle.Render(infoText))
 	s.WriteString("\n")
 
@@ -272,7 +432,9 @@ func (m model) renderDualPane() string {
 	} else {
 		focusInfo = " • [RIGHT focused]"
 	}
-	statusText := fmt.Sprintf("%s%s • %s%s", itemsInfo, hiddenIndicator, m.displayMode.String(), focusInfo)
+	// Help hint
+	helpHint := " • ?: help"
+	statusText := fmt.Sprintf("%s%s • %s%s%s", itemsInfo, hiddenIndicator, m.displayMode.String(), focusInfo, helpHint)
 	s.WriteString(statusStyle.Render(statusText))
 
 	return s.String()

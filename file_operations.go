@@ -244,6 +244,12 @@ func formatModTime(t time.Time) string {
 	return fmt.Sprintf("%dy ago", years)
 }
 
+// isMarkdownFile checks if a file is markdown
+func isMarkdownFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".md" || ext == ".markdown"
+}
+
 // isBinaryFile checks if a file is likely binary
 func isBinaryFile(path string) bool {
 	// Read first 512 bytes to check for binary content
@@ -386,6 +392,7 @@ func (m *model) loadPreview(path string) {
 	m.preview.loaded = false
 	m.preview.isBinary = false
 	m.preview.tooLarge = false
+	m.preview.isMarkdown = false
 
 	// Get file info
 	info, err := os.Stat(path)
@@ -432,7 +439,19 @@ func (m *model) loadPreview(path string) {
 		return
 	}
 
-	// Split into lines
+	// Check if markdown and render with Glamour
+	if isMarkdownFile(path) {
+		m.preview.isMarkdown = true
+		// Use Glamour to render markdown with appropriate width
+		// We'll set width in the render function based on available space
+		// For now, just store the raw content and mark as markdown
+		lines := strings.Split(string(content), "\n")
+		m.preview.content = lines
+		m.preview.loaded = true
+		return
+	}
+
+	// Split into lines for regular text files
 	lines := strings.Split(string(content), "\n")
 
 	// Limit number of lines
