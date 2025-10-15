@@ -204,15 +204,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor = 0
 					m.loadFiles()
 				} else {
-					// Preview file
-					if m.viewMode == viewDualPane {
-						// Already in dual-pane, just load preview
-						m.loadPreview(m.files[m.cursor].path)
-					} else {
-						// Enter full-screen preview
-						m.loadPreview(m.files[m.cursor].path)
-						m.viewMode = viewFullPreview
-					}
+					// Enter full-screen preview (regardless of current mode)
+					m.loadPreview(m.files[m.cursor].path)
+					m.viewMode = viewFullPreview
 				}
 			}
 
@@ -461,19 +455,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						now.Sub(m.lastClickTime) < doubleClickThreshold
 
 					if isDoubleClick {
-						// Double-click: navigate or preview
+						// Double-click: navigate or full-screen preview
 						if m.files[clickedIndex].isDir {
 							m.currentPath = m.files[clickedIndex].path
 							m.cursor = 0
 							m.loadFiles()
 						} else {
-							// Preview file (same as Enter key)
-							if m.viewMode == viewDualPane {
-								m.loadPreview(m.files[clickedIndex].path)
-							} else {
-								m.loadPreview(m.files[clickedIndex].path)
-								m.viewMode = viewFullPreview
-							}
+							// Enter full-screen preview (same as Enter key)
+							m.loadPreview(m.files[clickedIndex].path)
+							m.viewMode = viewFullPreview
 						}
 						// Reset click tracking after double-click
 						m.lastClickIndex = -1
