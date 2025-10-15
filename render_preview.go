@@ -208,6 +208,8 @@ func (m model) renderDualPane() string {
 	leftPaneStyle := lipgloss.NewStyle().
 		Width(m.leftWidth).
 		MaxWidth(m.leftWidth).
+		Height(maxVisible).
+		MaxHeight(maxVisible).
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderRight(true).
 		BorderForeground(lipgloss.Color(leftBorderColor))
@@ -215,6 +217,8 @@ func (m model) renderDualPane() string {
 	rightPaneStyle := lipgloss.NewStyle().
 		Width(m.rightWidth).
 		MaxWidth(m.rightWidth).
+		Height(maxVisible).
+		MaxHeight(maxVisible).
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderLeft(true).
 		BorderForeground(lipgloss.Color(rightBorderColor))
