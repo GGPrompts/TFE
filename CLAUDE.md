@@ -1,0 +1,284 @@
+# TFE Architecture & Development Guide
+
+This document describes the architecture of the TFE (Terminal File Explorer) project and provides guidelines for maintaining and extending the codebase.
+
+## Architecture Overview
+
+TFE follows a **modular architecture** where each file has a single, clear responsibility. This organization was established through a comprehensive refactoring that reduced `main.go` from 1668 lines to just 21 lines, distributing functionality across 9 focused modules.
+
+### Core Principle
+
+**When adding new features, always maintain this modular architecture by creating new files or extending existing modules rather than adding everything to `main.go`.**
+
+## File Structure
+
+```
+tfe/
+├── main.go (21 lines)           - Entry point ONLY
+├── types.go (110 lines)         - Type definitions & enums
+├── styles.go (36 lines)         - Lipgloss style definitions
+├── model.go (64 lines)          - Model initialization & layout calculations
+├── update.go (453 lines)        - Event handling (Init & Update functions)
+├── view.go (107 lines)          - View dispatcher & single-pane rendering
+├── render_preview.go (219)      - Preview rendering (full & dual-pane)
+├── render_file_list.go (284)    - File list views (List/Grid/Detail/Tree)
+├── file_operations.go (329)     - File operations & formatting
+└── editor.go (72 lines)         - External editor integration
+```
+
+## Module Responsibilities
+
+### 1. `main.go` - Application Entry Point
+**Purpose**: ONLY contains the main() function
+**Contents**:
+- Creates the Bubbletea program
+- Configures terminal options (alt screen, mouse support)
+- Runs the application loop
+- Handles top-level errors
+
+**Rule**: Never add business logic to this file. It should remain minimal.
+
+### 2. `types.go` - Type Definitions
+**Purpose**: All type definitions, structs, enums, and constants
+**Contents**:
+- `model` struct - main application state
+- `fileItem` struct - file/directory representation
+- `previewModel` struct - preview pane state
+- Enums: `displayMode`, `viewMode`, `focusPane`
+- Custom message types: `editorFinishedMsg`
+
+**When to extend**: Add new types here when introducing new data structures or state fields.
+
+### 3. `styles.go` - Visual Styling
+**Purpose**: All Lipgloss style definitions
+**Contents**:
+- `titleStyle` - application title
+- `pathStyle` - path display
+- `statusStyle` - status bar
+- `selectedStyle` - selected item
+- `folderStyle`, `fileStyle` - item styling
+
+**When to extend**: Add new styles here when introducing new visual components or changing color schemes.
+
+### 4. `model.go` - Model Management
+**Purpose**: Model initialization and layout calculations
+**Contents**:
+- `initialModel()` - creates the initial application state
+- `calculateGridLayout()` - computes grid column layout
+- `calculateLayout()` - computes dual-pane widths
+
+**When to extend**: Add new initialization logic or layout calculation functions here.
+
+### 5. `update.go` - Event Handling
+**Purpose**: All keyboard, mouse, and window event handling
+**Contents**:
+- `Init()` - Bubbletea initialization
+- `Update()` - main event loop
+- Key bindings for all modes (single-pane, dual-pane, preview)
+- Mouse event handlers (clicks, scrolling, double-clicks)
+- Window resize handling
+
+**When to extend**:
+- Add new keyboard shortcuts as new cases in the switch statements
+- Add new event types as new case branches
+- Keep event handling logic here, delegate complex operations to other modules
+
+### 6. `view.go` - View Rendering
+**Purpose**: Top-level view dispatching and single-pane rendering
+**Contents**:
+- `View()` - main render dispatcher
+- `renderSinglePane()` - single-pane mode rendering
+
+**When to extend**: Add new view modes here or modify single-pane layout.
+
+### 7. `render_preview.go` - Preview Rendering
+**Purpose**: File preview rendering for all preview modes
+**Contents**:
+- `renderPreview()` - preview pane content with line numbers
+- `renderFullPreview()` - full-screen preview mode
+- `renderDualPane()` - split-pane layout
+
+**When to extend**: Modify preview rendering logic, add preview features (syntax highlighting, etc.).
+
+### 8. `render_file_list.go` - File List Rendering
+**Purpose**: File list rendering in all display modes
+**Contents**:
+- `renderListView()` - simple list view
+- `renderGridView()` - grid layout view
+- `renderDetailView()` - detailed view with metadata
+- `renderTreeView()` - tree/hierarchical view
+
+**When to extend**: Add new display modes or modify existing view layouts.
+
+### 9. `file_operations.go` - File Operations
+**Purpose**: All file system operations and formatting
+**Contents**:
+- `loadFiles()` - reads directory contents
+- `loadPreview()` - loads file for preview
+- Icon mapping functions (`getFileIcon()`, `getIconForExtension()`)
+- Formatting functions (`formatFileSize()`, `formatModTime()`, `formatPermissions()`)
+- File type detection (`isBinaryFile()`, `getLanguage()`)
+
+**When to extend**:
+- Add new file operations (copy, move, delete) here
+- Add new file type detection logic
+- Add new formatting utilities
+
+### 10. `editor.go` - External Editor Integration
+**Purpose**: External editor launching and integration
+**Contents**:
+- `getAvailableEditor()` - finds available editors
+- `editorAvailable()` - checks if specific editor exists
+- `openEditor()` - launches editor
+- `copyToClipboard()` - clipboard integration
+
+**When to extend**: Add new editor support or clipboard features.
+
+## Development Guidelines
+
+### Adding New Features
+
+When adding new features, follow this decision tree:
+
+1. **Is it a new type or data structure?** → Add to `types.go`
+2. **Is it a visual style?** → Add to `styles.go`
+3. **Is it event handling (keyboard/mouse)?** → Add to `update.go`
+4. **Is it a rendering function?** → Add to `view.go`, `render_preview.go`, or `render_file_list.go`
+5. **Is it a file operation?** → Add to `file_operations.go`
+6. **Is it external tool integration?** → Add to `editor.go` or create new module
+7. **Is it complex enough to need its own module?** → Create a new file
+
+### Creating New Modules
+
+If a feature is substantial enough to warrant its own module:
+
+1. **Create a new `.go` file** with a descriptive name (e.g., `search.go`, `bookmarks.go`)
+2. **Keep it in `package main`** (all files share the same package)
+3. **Document the module's purpose** at the top of the file
+4. **Add it to this document** under "Module Responsibilities"
+
+Example structure for a new module:
+
+```go
+package main
+
+// Module: search.go
+// Purpose: File and content search functionality
+// Responsibilities:
+// - Search indexing
+// - Pattern matching
+// - Search result filtering
+
+import (
+    // ... imports
+)
+
+// ... implementation
+```
+
+### Code Organization Principles
+
+1. **Single Responsibility**: Each file should have one clear purpose
+2. **Keep main.go minimal**: Only the entry point belongs here
+3. **Group related functions**: Keep related functionality together
+4. **Separate concerns**: UI rendering separate from business logic
+5. **DRY (Don't Repeat Yourself)**: Extract common logic into helper functions
+6. **Clear naming**: File names should immediately convey their purpose
+
+### Testing Strategy
+
+When adding tests (future):
+- Create corresponding `*_test.go` files alongside each module
+- Test files should mirror the structure: `file_operations_test.go`, `render_preview_test.go`, etc.
+- Keep test files focused on their corresponding module
+
+## Common Patterns
+
+### Adding a New Keyboard Shortcut
+
+1. Go to `update.go`
+2. Find the appropriate switch statement (preview mode vs regular mode)
+3. Add a new case for your key
+4. Implement the logic or call a function from another module
+
+Example:
+```go
+case "s":
+    // Save bookmark
+    m.saveBookmark(m.files[m.cursor].path)
+```
+
+### Adding a New Display Mode
+
+1. Add the enum to `types.go`:
+```go
+const (
+    modeList displayMode = iota
+    modeGrid
+    modeDetail
+    modeTree
+    modeYourNewMode  // Add here
+)
+```
+
+2. Add rendering function to `render_file_list.go`:
+```go
+func (m model) renderYourNewMode(maxVisible int) string {
+    // Implementation
+}
+```
+
+3. Update the switch in `render_file_list.go` or `view.go` to call your renderer
+
+4. Add keyboard shortcut in `update.go` if needed
+
+### Adding a New File Operation
+
+1. Add the function to `file_operations.go`:
+```go
+func (m *model) yourNewOperation(path string) error {
+    // Implementation
+    return nil
+}
+```
+
+2. Add keyboard shortcut in `update.go` to call it:
+```go
+case "x":
+    if err := m.yourNewOperation(m.files[m.cursor].path); err != nil {
+        // Handle error
+    }
+```
+
+## Refactoring History
+
+This modular architecture was achieved through a systematic refactoring process:
+
+- **Original**: Single `main.go` file with 1668 lines
+- **Phases 1-4**: Extracted types, styles, file operations, editor integration (Commit: 9befa48)
+- **Phase 5**: Extracted file list rendering functions (Commit: 3d992c6)
+- **Phase 6**: Extracted preview rendering and view functions (Commit: 49d6ece)
+- **Phase 7**: Extracted Update and Init functions (Commit: 03efd5c)
+- **Phase 8**: Extracted model initialization and layout (Commit: 68d5a87)
+- **Final**: `main.go` reduced to 21 lines containing only `main()`
+
+## Benefits of This Architecture
+
+1. **Maintainability**: Easy to locate and modify specific functionality
+2. **Readability**: Each file is focused and easier to understand
+3. **Collaboration**: Multiple developers can work on different modules
+4. **Testing**: Isolated modules are easier to test
+5. **Scalability**: New features can be added without cluttering existing code
+6. **Navigation**: IDE features work better with smaller, focused files
+
+## Important Reminder
+
+**🚨 When adding new features, always maintain this modular architecture!**
+
+Do NOT add complex logic to `main.go`. Instead:
+- Identify which module the feature belongs to
+- Add it to that module, or create a new one
+- Keep files focused and organized
+- Update this document when creating new modules
+
+This architecture took significant effort to establish - let's maintain it! 🏗️
