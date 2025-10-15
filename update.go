@@ -207,6 +207,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Enter full-screen preview (regardless of current mode)
 					m.loadPreview(m.files[m.cursor].path)
 					m.viewMode = viewFullPreview
+					return m, tea.ClearScreen
 				}
 			}
 
@@ -257,6 +258,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.files) > 0 && !m.files[m.cursor].isDir {
 				m.loadPreview(m.files[m.cursor].path)
 				m.viewMode = viewFullPreview
+				return m, tea.ClearScreen
 			}
 
 		case "pageup":
@@ -464,8 +466,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							// Enter full-screen preview (same as Enter key)
 							m.loadPreview(m.files[clickedIndex].path)
 							m.viewMode = viewFullPreview
+							// Reset click tracking after double-click
+							m.lastClickIndex = -1
+							m.lastClickTime = time.Time{}
+							return m, tea.ClearScreen
 						}
-						// Reset click tracking after double-click
+						// Reset click tracking after double-click (for directory navigation)
 						m.lastClickIndex = -1
 						m.lastClickTime = time.Time{}
 					} else {
