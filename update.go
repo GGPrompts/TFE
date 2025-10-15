@@ -326,16 +326,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.viewMode == viewFullPreview {
 			switch msg.Button {
 			case tea.MouseButtonWheelUp:
-				if m.preview.scrollPos > 0 {
-					m.preview.scrollPos--
+				// Scroll 3 lines per wheel tick for smoother scrolling
+				m.preview.scrollPos -= 3
+				if m.preview.scrollPos < 0 {
+					m.preview.scrollPos = 0
 				}
 			case tea.MouseButtonWheelDown:
 				maxScroll := len(m.preview.content) - (m.height - 6)
 				if maxScroll < 0 {
 					maxScroll = 0
 				}
-				if m.preview.scrollPos < maxScroll {
-					m.preview.scrollPos++
+				// Scroll 3 lines per wheel tick for smoother scrolling
+				m.preview.scrollPos += 3
+				if m.preview.scrollPos > maxScroll {
+					m.preview.scrollPos = maxScroll
 				}
 			}
 			return m, nil
@@ -410,9 +414,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.MouseButtonWheelUp:
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
-				// Scroll preview up when right pane focused
-				if m.preview.scrollPos > 0 {
-					m.preview.scrollPos--
+				// Scroll preview up when right pane focused (3 lines per tick)
+				m.preview.scrollPos -= 3
+				if m.preview.scrollPos < 0 {
+					m.preview.scrollPos = 0
 				}
 			} else {
 				// Scroll file list
@@ -424,14 +429,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.MouseButtonWheelDown:
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
-				// Scroll preview down when right pane focused
+				// Scroll preview down when right pane focused (3 lines per tick)
 				visibleLines := m.height - 7
 				maxScroll := len(m.preview.content) - visibleLines
 				if maxScroll < 0 {
 					maxScroll = 0
 				}
-				if m.preview.scrollPos < maxScroll {
-					m.preview.scrollPos++
+				m.preview.scrollPos += 3
+				if m.preview.scrollPos > maxScroll {
+					m.preview.scrollPos = maxScroll
 				}
 			} else {
 				// Scroll file list

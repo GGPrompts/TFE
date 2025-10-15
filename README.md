@@ -166,11 +166,25 @@ TFE offers three distinct interface modes:
 
 ```
 tfe/
-├── main.go       # Main application code
-├── go.mod        # Go module definition
-├── go.sum        # Dependency checksums
-├── README.md     # This file
-└── tfe           # Compiled binary (after build)
+├── main.go                 # Entry point (21 lines)
+├── types.go                # Type definitions (110 lines)
+├── styles.go               # Lipgloss styles (36 lines)
+├── model.go                # Model initialization & layout (64 lines)
+├── update.go               # Event handling (453 lines)
+├── view.go                 # View dispatcher (108 lines)
+├── render_file_list.go     # File list rendering (284 lines)
+├── render_preview.go       # Preview rendering (266 lines)
+├── file_operations.go      # File operations & formatting (329 lines)
+├── editor.go               # External editor integration (72 lines)
+├── go.mod                  # Go module definition
+├── go.sum                  # Dependency checksums
+├── README.md               # User documentation
+├── PLAN.md                 # Development roadmap
+├── CLAUDE.md               # Architecture & development guide
+├── docs/                   # Additional documentation
+│   ├── REFACTOR_PLAN.md    # Refactoring history
+│   └── RESEARCH.md         # Background research
+└── tfe                     # Compiled binary (after build)
 ```
 
 ## Design Philosophy
@@ -181,13 +195,14 @@ TFE is designed to be simpler than full-featured file managers like Midnight Com
 - **Speed**: Fast startup and responsive navigation
 - **Clean UI**: Minimal visual clutter with clear information hierarchy
 - **Modern UX**: Mouse support and smooth scrolling for contemporary terminals
+- **Modularity**: Well-organized codebase split across focused modules (see CLAUDE.md)
 
 ## Development
 
 ### Running in Development Mode
 
 ```bash
-go run main.go
+go run .
 ```
 
 ### Building
@@ -205,6 +220,13 @@ go get github.com/charmbracelet/bubbletea
 go get github.com/charmbracelet/lipgloss
 go get github.com/charmbracelet/bubbles
 ```
+
+### Architecture
+
+TFE follows a modular architecture with 10 focused files:
+- See **CLAUDE.md** for complete architecture documentation
+- See **docs/REFACTOR_PLAN.md** for refactoring history
+- See **PLAN.md** for development roadmap and future features
 
 ## Roadmap
 

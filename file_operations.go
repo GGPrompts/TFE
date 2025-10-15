@@ -27,58 +27,121 @@ func isClaudeContextFile(name string) bool {
 	return false
 }
 
-// getFileIcon returns the appropriate icon based on file type
+// getFileIcon returns the appropriate emoji icon based on file type
 func getFileIcon(item fileItem) string {
 	if item.isDir {
 		if item.name == ".." {
-			return "↑" // Up arrow for parent dir
+			return "⬆️ " // Up arrow for parent dir
 		}
-		return "▸" // Triangle for folders
+		// Special folder icons
+		switch item.name {
+		case ".claude":
+			return "🤖" // Robot for Claude config
+		case ".git":
+			return "📦" // Package for git
+		case "node_modules":
+			return "📚" // Books for dependencies
+		case "docs", "documentation":
+			return "📖" // Open book
+		case "src", "source":
+			return "📂" // Open folder
+		case "test", "tests", "__tests__":
+			return "🧪" // Test tube
+		case "build", "dist", "out":
+			return "📦" // Package
+		case "public", "static", "assets":
+			return "🌐" // Globe
+		case "config", "configs", ".config":
+			return "⚙️ " // Gear
+		case "scripts":
+			return "📜" // Scroll
+		default:
+			return "📁" // Regular folder
+		}
 	}
 
 	// Get file extension
 	ext := strings.ToLower(filepath.Ext(item.name))
 
-	// Map extensions to simple text markers
+	// Map extensions to emoji icons
 	iconMap := map[string]string{
 		// Programming languages
-		".go":   "[GO]",
-		".py":   "[PY]",
-		".js":   "[JS]",
-		".ts":   "[TS]",
-		".jsx":  "[JSX]",
-		".tsx":  "[TSX]",
-		".rs":   "[RS]",
-		".c":    "[C]",
-		".cpp":  "[C++]",
-		".h":    "[H]",
-		".java": "[JAVA]",
-		".rb":   "[RB]",
-		".php":  "[PHP]",
-		".sh":   "[SH]",
-		".bash": "[SH]",
+		".go":   "🐹", // Gopher
+		".py":   "🐍", // Python snake
+		".js":   "🟨", // JavaScript yellow
+		".ts":   "🔷", // TypeScript blue diamond
+		".jsx":  "⚛️ ", // React atom
+		".tsx":  "⚛️ ", // React atom
+		".rs":   "🦀", // Rust crab
+		".c":    "©️ ", // C copyright symbol
+		".cpp":  "➕", // C++ plus
+		".h":    "📋", // Header clipboard
+		".java": "☕", // Java coffee
+		".rb":   "💎", // Ruby gem
+		".php":  "🐘", // PHP elephant
+		".sh":   "🐚", // Shell
+		".bash": "🐚", // Shell
+		".lua":  "🌙", // Lua moon
+		".r":    "📊", // R statistics
 
 		// Web
-		".html": "[HTML]",
-		".css":  "[CSS]",
-		".vue":  "[VUE]",
+		".html": "🌐", // HTML globe
+		".css":  "🎨", // CSS art palette
+		".scss": "🎨", // SCSS art palette
+		".sass": "🎨", // Sass art palette
+		".vue":  "💚", // Vue green heart
+		".svelte": "🧡", // Svelte orange heart
 
 		// Data/Config
-		".json": "[JSON]",
-		".yaml": "[YAML]",
-		".yml":  "[YAML]",
-		".toml": "[TOML]",
-		".xml":  "[XML]",
+		".json": "📊", // JSON chart
+		".yaml": "📄", // YAML document
+		".yml":  "📄", // YAML document
+		".toml": "📄", // TOML document
+		".xml":  "📰", // XML newspaper
+		".csv":  "📈", // CSV chart
+		".sql":  "🗄️ ", // SQL database
 
 		// Documents
-		".md":  "[MD]",
-		".txt": "[TXT]",
-		".pdf": "[PDF]",
+		".md":  "📝", // Markdown memo
+		".txt": "📄", // Text document
+		".pdf": "📕", // PDF red book
+		".doc": "📘", // DOC blue book
+		".docx": "📘", // DOCX blue book
 
 		// Archives
-		".zip": "[ZIP]",
-		".tar": "[TAR]",
-		".gz":  "[GZ]",
+		".zip": "🗜️ ", // ZIP compression
+		".tar": "📦", // TAR package
+		".gz":  "🗜️ ", // GZ compression
+		".7z":  "🗜️ ", // 7Z compression
+		".rar": "🗜️ ", // RAR compression
+
+		// Images
+		".png": "🖼️ ", // PNG frame
+		".jpg": "🖼️ ", // JPG frame
+		".jpeg": "🖼️ ", // JPEG frame
+		".gif": "🎞️ ", // GIF film
+		".svg": "🎨", // SVG palette
+		".ico": "🖼️ ", // ICO frame
+		".webp": "🖼️ ", // WebP frame
+
+		// Audio/Video
+		".mp3": "🎵", // MP3 music
+		".mp4": "🎬", // MP4 movie
+		".wav": "🎵", // WAV music
+		".avi": "🎬", // AVI movie
+		".mkv": "🎬", // MKV movie
+
+		// System/Config
+		".env":  "🔐", // ENV lock
+		".ini":  "⚙️ ", // INI gear
+		".conf": "⚙️ ", // CONF gear
+		".cfg":  "⚙️ ", // CFG gear
+		".lock": "🔒", // LOCK locked
+
+		// Build/Package
+		".gradle": "🐘", // Gradle elephant
+		".maven":  "📦", // Maven package
+		".npm":    "📦", // NPM package
 	}
 
 	// Check for icon mapping
@@ -89,25 +152,37 @@ func getFileIcon(item fileItem) string {
 	// Check for special files without extension
 	switch item.name {
 	case "CLAUDE.md", "CLAUDE.local.md":
-		return "[CLAUDE]"
-	case "Makefile", "makefile":
-		return "[MAKE]"
+		return "🤖" // Claude AI
+	case "Makefile", "makefile", "GNUmakefile":
+		return "🔨" // Build hammer
 	case "Dockerfile":
-		return "[DOCKER]"
+		return "🐳" // Docker whale
+	case "docker-compose.yml", "docker-compose.yaml":
+		return "🐳" // Docker whale
 	case "LICENSE", "LICENSE.txt", "LICENSE.md":
-		return "[LIC]"
+		return "📜" // License scroll
 	case "README", "README.md", "README.txt":
-		return "[README]"
-	case ".gitignore":
-		return "[GIT]"
-	case ".claude":
-		return "▸[CLAUDE]"
+		return "📖" // README book
+	case ".gitignore", ".gitattributes", ".gitmodules":
+		return "🔀" // Git branch
+	case "package.json":
+		return "📦" // NPM package
+	case "package-lock.json":
+		return "🔒" // Lock
+	case "tsconfig.json":
+		return "🔷" // TypeScript
 	case "go.mod", "go.sum":
-		return "[GO]"
+		return "🐹" // Go gopher
+	case "Cargo.toml", "Cargo.lock":
+		return "🦀" // Rust crab
+	case "requirements.txt":
+		return "🐍" // Python
+	case "Gemfile", "Gemfile.lock":
+		return "💎" // Ruby gem
 	}
 
 	// Default file marker
-	return "•"
+	return "📄" // Generic document
 }
 
 // formatFileSize returns a human-readable file size
@@ -192,6 +267,48 @@ func isBinaryFile(path string) bool {
 	}
 
 	return false
+}
+
+// visualWidth calculates the visual width of a string, accounting for tabs
+// This is important for consistent scrollbar alignment
+func visualWidth(s string) int {
+	width := 0
+	for _, ch := range s {
+		if ch == '\t' {
+			// Tabs typically expand to next multiple of 8
+			width += 8 - (width % 8)
+		} else {
+			// Regular characters count as 1
+			width++
+		}
+	}
+	return width
+}
+
+// truncateToWidth truncates a string to fit within a target visual width
+func truncateToWidth(s string, targetWidth int) string {
+	width := 0
+	result := ""
+
+	for _, ch := range s {
+		charWidth := 1
+		if ch == '\t' {
+			charWidth = 8 - (width % 8)
+		}
+
+		if width+charWidth > targetWidth {
+			// Can't fit this character
+			if targetWidth-width >= 3 {
+				return result + "..."
+			}
+			return result
+		}
+
+		width += charWidth
+		result += string(ch)
+	}
+
+	return result
 }
 
 // loadFiles loads the files from the current directory

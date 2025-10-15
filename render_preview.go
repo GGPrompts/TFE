@@ -52,13 +52,20 @@ func (m model) renderPreview(maxVisible int) string {
 		lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 		s.WriteString(lineNumStyle.Render(lineNum))
 
-		// Truncate or pad line to consistent width
+		// Truncate or pad line to consistent width using VISUAL width (not byte length)
 		line := m.preview.content[i]
-		if len(line) > availableWidth {
-			line = line[:availableWidth-3] + "..."
-		} else {
-			// Pad line to availableWidth so scrollbar aligns
-			line = line + strings.Repeat(" ", availableWidth-len(line))
+		lineWidth := visualWidth(line)
+
+		if lineWidth > availableWidth {
+			// Truncate to fit and add "..."
+			line = truncateToWidth(line, availableWidth-3) + "..."
+			lineWidth = availableWidth // Now it fits exactly
+		}
+
+		// Pad line to availableWidth so scrollbar aligns consistently
+		padding := availableWidth - lineWidth
+		if padding > 0 {
+			line = line + strings.Repeat(" ", padding)
 		}
 		s.WriteString(line)
 
