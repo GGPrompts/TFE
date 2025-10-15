@@ -113,7 +113,7 @@ func (m model) renderSinglePane() string {
 	} else {
 		// Regular help text
 		helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
-		s.WriteString(helpStyle.Render("↑/↓: nav • enter: preview • E: edit • y/c: copy path • Tab: dual-pane • f: full • v: views • :: command • q: quit"))
+		s.WriteString(helpStyle.Render("↑/↓: nav • enter: preview • E: edit • y/c: copy path • Tab: dual-pane • f: full • v: views • : command • q: quit"))
 	}
 
 	return s.String()
