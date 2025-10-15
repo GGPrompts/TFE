@@ -237,35 +237,49 @@ func (m model) calculateGridLayout() (columns int) {
 
 ---
 
-### Phase 2: Native Dual-Pane Preview (2-3 weeks)
+### Phase 2: Native Dual-Pane Preview ✅ COMPLETE
 
 **Goal:** Split-pane layout with integrated file preview
 
-**Features:**
-6. Split-pane layout
+**Status:** All core features implemented and debugged
+
+**Features Implemented:**
+6. Split-pane layout ✅
    - Toggle with `Space` or `Tab`
-   - Responsive 40/60 split (configurable)
-   - Left: File tree, Right: Preview/Context
-   - Use Lipgloss for horizontal layout
+   - Responsive 40/60 split
+   - Left: File tree, Right: Preview
+   - Lipgloss horizontal layout with proper width constraints
+   - Mouse click respects pane boundaries
+   - Visual focus indicators (bright blue border on focused pane)
+   - Status shows current focus: "[LEFT focused]" or "[RIGHT focused]"
 
-7. File preview pane
-   - Use `bubbles/textarea` (read-only mode)
-   - Line numbers
-   - Syntax highlighting (basic - by extension)
-   - Scroll support
-   - File metadata in header
+7. File preview pane ✅
+   - Read-only preview with line numbers
+   - Line truncation to prevent wrapping (maintains layout stability)
+   - Scroll support (arrow keys, PageUp/PageDown when right pane focused)
+   - File metadata in header (filename displayed in preview title)
+   - Handles large files (truncates long lines with "...")
+   - Binary file detection (shows "Binary file detected" message)
+   - Large file warning (>1MB shows "File too large to preview")
 
-8. External editor integration
-   - `E` → Edit in Micro
+8. External editor integration ✅
+   - `E` → Edit in Micro (preferred)
    - `N` → Edit in nano (fallback)
-   - Suspend TFE, launch editor, resume on exit
    - Auto-detect available editors
-   - Show message if neither installed
+   - Suspend TFE, launch editor, resume on exit
+   - File list refreshes after editing
 
-9. Quick viewer
-   - `V` → View with `bat` or `less`
-   - Good for logs, large files
-   - Fallback to `cat` if others unavailable
+9. Clipboard integration ✅
+   - `Y` or `C` → Copy file path to clipboard
+   - Multi-platform support (xclip, xsel, pbcopy, clip.exe)
+   - Works from both file browser and preview modes
+
+**Bug Fixes Completed:**
+- Fixed preview scrolling calculations (consistent visibleLines = height - 7)
+- Fixed large file rendering (line truncation prevents pane overflow)
+- Fixed mouse click accuracy (proper header offset for dual-pane mode)
+- Fixed clickable area boundaries (clicks in right pane don't select files)
+- Fixed go.mod and long-line file rendering (MaxWidth constraint + conservative width buffer)
 
 **Implementation Notes:**
 ```go
@@ -992,11 +1006,12 @@ github.com/otiai10/copy  // recursive copy
 
 ## Milestones & Timeline
 
-### Milestone 1: Usable File Manager ✅ IN PROGRESS
+### Milestone 1: Usable File Manager ✅ COMPLETE
 - ✅ Phase 1: Enhanced single-pane (COMPLETE)
-- 🔄 Phase 1.5: View modes (OPTIONAL - under consideration)
-- ⏭️ Phase 2: Dual-pane preview + editor integration (NEXT)
+- ✅ Phase 1.5: View modes (COMPLETE - List, Grid, Detail, Tree views)
+- ✅ Phase 2: Dual-pane preview + editor integration (COMPLETE)
 - **Goal:** Better than `ls`, can view/edit files
+- **Achievement:** Fully functional file manager with preview and editing
 
 ### Milestone 2: Unique Value Proposition (5-7 weeks)
 - Add Phase 3: Context Visualizer
@@ -1086,5 +1101,5 @@ github.com/otiai10/copy  // recursive copy
 ---
 
 **Last Updated:** 2025-10-15
-**Status:** Phase 1 Complete ✅
-**Next Step:** Begin Phase 2 (Dual-Pane Preview) or implement view modes
+**Status:** Milestone 1 Complete ✅ (Phases 1, 1.5, 2)
+**Next Step:** Consider refactoring for maintainability, then begin Phase 3 (Context Visualizer)

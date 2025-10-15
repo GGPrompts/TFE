@@ -6,10 +6,16 @@ A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE
 
 - **Clean Interface**: Minimalist design focused on usability
 - **Dual Navigation**: Both keyboard shortcuts and mouse support
-- **Nerd Font Icons**: Visual file/folder indicators using Nerd Fonts
+- **Dual-Pane Mode**: Split-screen layout with file browser and live preview
+- **File Preview**: View file contents with syntax highlighting and line numbers
+- **External Editor Integration**: Open files in Micro, nano, vim, or vi
+- **Clipboard Integration**: Copy file paths to system clipboard
+- **Multiple Display Modes**: List, Grid, Detail, and Tree views
+- **Nerd Font Icons**: Visual file/folder indicators using file type detection
 - **Smart Sorting**: Directories first, then files (alphabetically sorted)
 - **Scrolling Support**: Handles large directories with auto-scrolling
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
+- **Double-Click Support**: Double-click to navigate folders or preview files
 
 ## Installation
 
@@ -38,41 +44,115 @@ The file explorer will start in your current working directory.
 
 ### Keyboard Controls
 
+#### Navigation
 | Key | Action |
 |-----|--------|
-| `↑` / `k` | Move cursor up |
-| `↓` / `j` | Move cursor down |
-| `Enter` / `Space` | Open selected folder |
+| `↑` / `k` | Move cursor up (or scroll preview when right pane focused) |
+| `↓` / `j` | Move cursor down (or scroll preview when right pane focused) |
 | `h` / `←` | Navigate to parent directory |
-| `q` / `Esc` / `Ctrl+C` | Quit application |
+| `PageUp` | Scroll preview up one page (when right pane focused) |
+| `PageDown` | Scroll preview down one page (when right pane focused) |
+
+#### File Operations
+| Key | Action |
+|-----|--------|
+| `Enter` | Open folder or preview file |
+| `Space` | Toggle dual-pane mode on/off |
+| `Tab` | Toggle dual-pane mode / switch between panes |
+| `f` | Full-screen preview of selected file |
+| `E` | Edit file in external editor (Micro preferred) |
+| `N` | Edit file in nano |
+| `y` / `c` | Copy file path to clipboard |
+
+#### View Modes
+| Key | Action |
+|-----|--------|
+| `v` | Cycle through display modes |
+| `1` | Switch to List view |
+| `2` | Switch to Grid view |
+| `3` | Switch to Detail view |
+| `4` | Switch to Tree view |
+| `.` / `Ctrl+h` | Toggle hidden files |
+
+#### Exit
+| Key | Action |
+|-----|--------|
+| `q` / `Ctrl+C` | Quit application |
+| `Esc` | Exit dual-pane/preview mode (or quit from single-pane) |
 
 ### Mouse Controls
 
-- **Left Click**: Select and open item
-- **Scroll Wheel Up/Down**: Navigate through list
+- **Left Click**: Select and open item (or switch pane focus in dual-pane mode)
+- **Double Click**: Navigate into folder or preview file
+- **Scroll Wheel Up/Down**: Navigate through file list
 
 ## Interface
 
-The TFE interface consists of three main sections:
+TFE offers three distinct interface modes:
+
+### Single-Pane Mode (Default)
 
 ```
 ┌─────────────────────────────────────────┐
 │ TFE - Terminal File Explorer            │
 │ /current/path/here                      │
 │                                         │
-│   📁 folder1                            │
-│   📁 folder2                            │
-│   📄 file1.txt                          │
-│   📄 file2.go                           │
+│   ▸ folder1                             │
+│   ▸ folder2                             │
+│   • file1.txt                           │
+│   [GO] file2.go                         │
 │                                         │
-│ ↑/↓: navigate • enter: open • h: back  │
+│ ↑/↓: nav • Tab: dual-pane • q: quit    │
 └─────────────────────────────────────────┘
 ```
 
-1. **Title Bar**: Application name
+### Dual-Pane Mode (Tab or Space)
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ TFE - Terminal File Explorer [Dual-Pane]                   │
+│ /current/path/here                                         │
+├───────────────────────┬────────────────────────────────────┤
+│                       │ Preview: file2.go                  │
+│   ▸ folder1           │ ────────────────────               │
+│   ▸ folder2           │     1 │ package main              │
+│   • file1.txt         │     2 │                           │
+│ ► [GO] file2.go       │     3 │ import "fmt"              │
+│                       │     4 │                           │
+│                       │     5 │ func main() {             │
+│                       │     6 │     fmt.Println("...")    │
+│                       │                                    │
+├───────────────────────┴────────────────────────────────────┤
+│ [LEFT focused] • Tab: switch • Space: exit                 │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Full-Screen Preview Mode (F or Enter)
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Preview: file2.go                                          │
+│ Size: 1.2KB | Lines: 42 | Scroll: 1-20                    │
+│                                                            │
+│     1 │ package main                                       │
+│     2 │                                                    │
+│     3 │ import "fmt"                                       │
+│     4 │                                                    │
+│     5 │ func main() {                                      │
+│    ... (full screen content)                               │
+│                                                            │
+│ ↑/↓: scroll • PgUp/PgDown: page • E: edit • Esc: close    │
+└────────────────────────────────────────────────────────────┘
+```
+
+#### Key Interface Elements
+
+1. **Title Bar**: Application name and current mode
 2. **Path Display**: Shows current directory path
-3. **File List**: Scrollable list of folders and files
-4. **Help Bar**: Quick reference for keyboard shortcuts
+3. **File List**: Scrollable list of folders and files with type indicators
+4. **Preview Pane**: Live file preview with line numbers (dual-pane/full modes)
+5. **Status Bar**: File counts, view mode, and selection info
+6. **Help Bar**: Context-sensitive keyboard shortcuts
 
 ## Technical Details
 
@@ -128,15 +208,22 @@ go get github.com/charmbracelet/bubbles
 
 ## Roadmap
 
-Potential future features:
+### Completed Features ✅
+- ✅ File preview pane (dual-pane and full-screen modes)
+- ✅ External editor integration
+- ✅ File size and permissions display (Detail view)
+- ✅ Multiple display modes (List, Grid, Detail, Tree)
+- ✅ Clipboard integration
 
-- File operations (copy, move, delete)
+### Planned Features
+- File operations (copy, move, delete, rename)
 - File search functionality
-- Configurable color schemes
-- File preview pane
-- Bookmarks/favorites
+- Configurable color schemes and themes
+- Bookmarks/favorites system
 - Custom hidden file patterns
-- File size and permissions display
+- Syntax highlighting in preview
+- Archive file browsing (.zip, .tar.gz)
+- Git status indicators
 
 ## License
 
