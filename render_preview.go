@@ -47,31 +47,28 @@ func (m model) renderPreview(maxVisible int) string {
 
 	// Render lines with line numbers and scrollbar
 	for i := start; i < end; i++ {
-		// Use consistent 5-character width for line numbers (up to 9999 lines)
-		lineNum := fmt.Sprintf("%5d │ ", i+1)
+		// Line number (5 chars)
+		lineNum := fmt.Sprintf("%5d ", i+1)
 		lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 		s.WriteString(lineNumStyle.Render(lineNum))
 
-		// Truncate or pad line to consistent width using VISUAL width (not byte length)
+		// Scrollbar right after line number (replaces the │ separator)
+		scrollbar := m.renderScrollbar(i-start, maxVisible, totalLines)
+		s.WriteString(scrollbar)
+
+		// Space after scrollbar
+		s.WriteString(" ")
+
+		// Content line - no need to pad since scrollbar is at fixed position
 		line := m.preview.content[i]
 		lineWidth := visualWidth(line)
 
 		if lineWidth > availableWidth {
 			// Truncate to fit and add "..."
 			line = truncateToWidth(line, availableWidth-3) + "..."
-			lineWidth = availableWidth // Now it fits exactly
 		}
 
-		// Pad line to availableWidth so scrollbar aligns consistently
-		padding := availableWidth - lineWidth
-		if padding > 0 {
-			line = line + strings.Repeat(" ", padding)
-		}
 		s.WriteString(line)
-
-		// Add scrollbar on the right side (now it will align consistently)
-		scrollbar := m.renderScrollbar(i-start, maxVisible, totalLines)
-		s.WriteString(scrollbar)
 		s.WriteString("\n")
 	}
 
@@ -79,12 +76,8 @@ func (m model) renderPreview(maxVisible int) string {
 }
 
 // renderScrollbar renders a scrollbar indicator for the current line
+// Now renders in place of the separator between line numbers and content
 func (m model) renderScrollbar(lineIndex, visibleLines, totalLines int) string {
-	// Don't show scrollbar if all content fits
-	if totalLines <= visibleLines {
-		return ""
-	}
-
 	// Calculate scrollbar position
 	// The scrollbar thumb should represent the visible portion of the content
 	scrollbarHeight := visibleLines
@@ -96,11 +89,11 @@ func (m model) renderScrollbar(lineIndex, visibleLines, totalLines int) string {
 
 	// Determine what to render for this line
 	if lineIndex >= thumbStart && lineIndex < thumbStart+thumbSize {
-		// This line is part of the scrollbar thumb
-		return scrollbarThumbStyle.Render(" ┃")
+		// This line is part of the scrollbar thumb (bright blue)
+		return scrollbarThumbStyle.Render("│")
 	} else {
-		// This line is part of the scrollbar track
-		return scrollbarStyle.Render(" │")
+		// This line is part of the scrollbar track (dim gray)
+		return scrollbarStyle.Render("│")
 	}
 }
 

@@ -21,7 +21,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Exit preview mode
 				m.viewMode = viewSinglePane
 				m.calculateLayout()
-				return m, nil
+				return m, tea.ClearScreen
 
 			case "e", "E":
 				// Edit file in external editor from preview
@@ -319,7 +319,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Editor has closed, we're back in TFE
 		// Refresh file list in case file was modified
 		m.loadFiles()
-		return m, nil
+		// Force a refresh to reinitialize terminal state (including mouse support)
+		return m, tea.ClearScreen
 
 	case tea.MouseMsg:
 		// Handle mouse wheel scrolling in full-screen preview mode
@@ -423,7 +424,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Scroll file list
 				if m.cursor > 0 {
 					m.cursor--
-					// Don't auto-update preview on wheel scroll - only on explicit selection
+					// Update preview in dual-pane mode
+					if m.viewMode == viewDualPane && len(m.files) > 0 && !m.files[m.cursor].isDir {
+						m.loadPreview(m.files[m.cursor].path)
+					}
 				}
 			}
 
@@ -443,7 +447,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Scroll file list
 				if m.cursor < len(m.files)-1 {
 					m.cursor++
-					// Don't auto-update preview on wheel scroll - only on explicit selection
+					// Update preview in dual-pane mode
+					if m.viewMode == viewDualPane && len(m.files) > 0 && !m.files[m.cursor].isDir {
+						m.loadPreview(m.files[m.cursor].path)
+					}
 				}
 			}
 		}

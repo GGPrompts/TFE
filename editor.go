@@ -27,9 +27,12 @@ func getAvailableEditor() string {
 // openEditor opens a file in an external editor
 func openEditor(editor, path string) tea.Cmd {
 	c := exec.Command(editor, path)
-	return tea.ExecProcess(c, func(err error) tea.Msg {
-		return editorFinishedMsg{err}
-	})
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
 }
 
 // copyToClipboard copies text to the system clipboard
