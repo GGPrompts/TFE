@@ -249,7 +249,9 @@ func (m model) renderDualPane() string {
 	}
 	// Show focused pane info in status bar
 	focusInfo := ""
-	if m.focusedPane == leftPane {
+	if m.commandFocused {
+		focusInfo = " • [COMMAND focused]"
+	} else if m.focusedPane == leftPane {
 		focusInfo = " • [LEFT focused]"
 	} else {
 		focusInfo = " • [RIGHT focused]"

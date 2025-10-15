@@ -217,19 +217,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "tab":
-			// In dual-pane mode: switch focus between panes
+			// In dual-pane mode: cycle focus between left pane, right pane, and command prompt
 			// In single-pane mode: enter dual-pane mode
 			if m.viewMode == viewDualPane {
-				// Toggle focus between left and right panes
-				if m.focusedPane == leftPane {
+				// Cycle through: left → right → command → left
+				if m.commandFocused {
+					// From command prompt back to left pane
+					m.commandFocused = false
+					m.focusedPane = leftPane
+				} else if m.focusedPane == leftPane {
 					m.focusedPane = rightPane
 				} else {
-					m.focusedPane = leftPane
+					// From right pane to command prompt
+					m.commandFocused = true
 				}
 			} else if m.viewMode == viewSinglePane {
 				// Enter dual-pane mode
 				m.viewMode = viewDualPane
 				m.focusedPane = leftPane
+				m.commandFocused = false
 				m.calculateLayout()
 				// Load preview of current file
 				if len(m.files) > 0 && !m.files[m.cursor].isDir {
@@ -406,13 +412,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Handle clicks on command prompt (bottom line) to focus it
+		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+			// Command prompt is on the last line (m.height - 1)
+			if msg.Y >= m.height-1 {
+				m.commandFocused = true
+				return m, nil
+			}
+		}
+
 		// In dual-pane mode, detect which pane was clicked to switch focus
 		if m.viewMode == viewDualPane && msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
-			// Check if click is in left or right pane
-			if msg.X < m.leftWidth {
-				m.focusedPane = leftPane
-			} else if msg.X > m.leftWidth { // Account for separator
-				m.focusedPane = rightPane
+			// Check if click is in left or right pane (not in command prompt area)
+			if msg.Y < m.height-2 { // Ensure we're not clicking on status bar or command prompt
+				if msg.X < m.leftWidth {
+					m.focusedPane = leftPane
+					m.commandFocused = false
+				} else if msg.X > m.leftWidth { // Account for separator
+					m.focusedPane = rightPane
+					m.commandFocused = false
+				}
 			}
 		}
 
