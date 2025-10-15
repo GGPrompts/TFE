@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -33,12 +34,182 @@ var (
 
 	fileStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("252"))
+
+	statusStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			PaddingLeft(2)
+
+	claudeContextStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")) // Orange
 )
 
+// isClaudeContextFile checks if a file/folder is automatically loaded by Claude Code
+func isClaudeContextFile(name string) bool {
+	// Files that Claude Code automatically loads into context
+	claudeFiles := []string{
+		"CLAUDE.md",
+		"CLAUDE.local.md",
+		".claude",
+	}
+
+	for _, cf := range claudeFiles {
+		if name == cf {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getFileIcon returns the appropriate icon based on file type
+func getFileIcon(item fileItem) string {
+	if item.isDir {
+		if item.name == ".." {
+			return "↑"  // Up arrow for parent dir
+		}
+		return "▸"  // Triangle for folders
+	}
+
+	// Get file extension
+	ext := strings.ToLower(filepath.Ext(item.name))
+
+	// Map extensions to simple text markers
+	iconMap := map[string]string{
+		// Programming languages
+		".go":     "[GO]",
+		".py":     "[PY]",
+		".js":     "[JS]",
+		".ts":     "[TS]",
+		".jsx":    "[JSX]",
+		".tsx":    "[TSX]",
+		".rs":     "[RS]",
+		".c":      "[C]",
+		".cpp":    "[C++]",
+		".h":      "[H]",
+		".java":   "[JAVA]",
+		".rb":     "[RB]",
+		".php":    "[PHP]",
+		".sh":     "[SH]",
+		".bash":   "[SH]",
+
+		// Web
+		".html":   "[HTML]",
+		".css":    "[CSS]",
+		".vue":    "[VUE]",
+
+		// Data/Config
+		".json":   "[JSON]",
+		".yaml":   "[YAML]",
+		".yml":    "[YAML]",
+		".toml":   "[TOML]",
+		".xml":    "[XML]",
+
+		// Documents
+		".md":     "[MD]",
+		".txt":    "[TXT]",
+		".pdf":    "[PDF]",
+
+		// Archives
+		".zip":    "[ZIP]",
+		".tar":    "[TAR]",
+		".gz":     "[GZ]",
+	}
+
+	// Check for icon mapping
+	if icon, ok := iconMap[ext]; ok {
+		return icon
+	}
+
+	// Check for special files without extension
+	switch item.name {
+	case "CLAUDE.md", "CLAUDE.local.md":
+		return "[CLAUDE]"
+	case "Makefile", "makefile":
+		return "[MAKE]"
+	case "Dockerfile":
+		return "[DOCKER]"
+	case "LICENSE", "LICENSE.txt", "LICENSE.md":
+		return "[LIC]"
+	case "README", "README.md", "README.txt":
+		return "[README]"
+	case ".gitignore":
+		return "[GIT]"
+	case ".claude":
+		return "▸[CLAUDE]"
+	case "go.mod", "go.sum":
+		return "[GO]"
+	}
+
+	// Default file marker
+	return "•"
+}
+
+// formatFileSize returns a human-readable file size
+func formatFileSize(size int64) string {
+	const unit = 1024
+	if size < unit {
+		return fmt.Sprintf("%dB", size)
+	}
+	div, exp := int64(unit), 0
+	for n := size / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f%cB", float64(size)/float64(div), "KMGTPE"[exp])
+}
+
+// formatModTime returns a relative time string
+func formatModTime(t time.Time) string {
+	now := time.Now()
+	diff := now.Sub(t)
+
+	if diff < time.Minute {
+		return "just now"
+	} else if diff < time.Hour {
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1m ago"
+		}
+		return fmt.Sprintf("%dm ago", mins)
+	} else if diff < 24*time.Hour {
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1h ago"
+		}
+		return fmt.Sprintf("%dh ago", hours)
+	} else if diff < 7*24*time.Hour {
+		days := int(diff.Hours() / 24)
+		if days == 1 {
+			return "1d ago"
+		}
+		return fmt.Sprintf("%dd ago", days)
+	} else if diff < 30*24*time.Hour {
+		weeks := int(diff.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1w ago"
+		}
+		return fmt.Sprintf("%dw ago", weeks)
+	} else if diff < 365*24*time.Hour {
+		months := int(diff.Hours() / 24 / 30)
+		if months == 1 {
+			return "1mo ago"
+		}
+		return fmt.Sprintf("%dmo ago", months)
+	}
+	years := int(diff.Hours() / 24 / 365)
+	if years == 1 {
+		return "1y ago"
+	}
+	return fmt.Sprintf("%dy ago", years)
+}
+
 type fileItem struct {
-	name  string
-	path  string
-	isDir bool
+	name    string
+	path    string
+	isDir   bool
+	size    int64
+	modTime time.Time
+	mode    os.FileMode
 }
 
 type model struct {
@@ -46,6 +217,8 @@ type model struct {
 	files       []fileItem
 	cursor      int
 	height      int
+	width       int
+	showHidden  bool
 }
 
 func initialModel() model {
@@ -58,6 +231,8 @@ func initialModel() model {
 		currentPath: cwd,
 		cursor:      0,
 		height:      24,
+		width:       80,
+		showHidden:  false,
 	}
 
 	m.loadFiles()
@@ -87,15 +262,23 @@ func (m *model) loadFiles() {
 	var dirs, files []fileItem
 
 	for _, entry := range entries {
-		// Skip hidden files starting with .
-		if strings.HasPrefix(entry.Name(), ".") {
+		// Skip hidden files starting with . (unless showHidden is true)
+		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 
+		info, err := entry.Info()
+		if err != nil {
+			continue // Skip files we can't stat
+		}
+
 		item := fileItem{
-			name:  entry.Name(),
-			path:  filepath.Join(m.currentPath, entry.Name()),
-			isDir: entry.IsDir(),
+			name:    entry.Name(),
+			path:    filepath.Join(m.currentPath, entry.Name()),
+			isDir:   entry.IsDir(),
+			size:    info.Size(),
+			modTime: info.ModTime(),
+			mode:    info.Mode(),
 		}
 
 		if entry.IsDir() {
@@ -157,6 +340,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 				m.loadFiles()
 			}
+
+		case ".", "ctrl+h":
+			// Toggle hidden files
+			m.showHidden = !m.showHidden
+			m.loadFiles()
 		}
 
 	case tea.MouseMsg:
@@ -188,6 +376,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
+		m.width = msg.Width
 	}
 
 	return m, nil
@@ -229,13 +418,17 @@ func (m model) View() string {
 	for i := start; i < end; i++ {
 		file := m.files[i]
 
-		// Choose icon based on file type
-		icon := " "
+		// Get icon based on file type
+		icon := getFileIcon(file)
 		style := fileStyle
 
 		if file.isDir {
-			icon = " "
 			style = folderStyle
+		}
+
+		// Override with orange color if it's a Claude context file
+		if isClaudeContextFile(file.name) {
+			style = claudeContextStyle
 		}
 
 		// Build the line
@@ -252,10 +445,53 @@ func (m model) View() string {
 		s.WriteString("\n")
 	}
 
+	// Status bar
+	s.WriteString("\n")
+
+	// Count directories and files
+	dirCount, fileCount := 0, 0
+	for _, f := range m.files {
+		if f.name == ".." {
+			continue
+		}
+		if f.isDir {
+			dirCount++
+		} else {
+			fileCount++
+		}
+	}
+
+	// Selected file info
+	var selectedInfo string
+	if len(m.files) > 0 && m.cursor < len(m.files) {
+		selected := m.files[m.cursor]
+		if selected.isDir {
+			selectedInfo = fmt.Sprintf("Selected: %s (folder)", selected.name)
+		} else {
+			selectedInfo = fmt.Sprintf("Selected: %s (%s, %s)",
+				selected.name,
+				formatFileSize(selected.size),
+				formatModTime(selected.modTime))
+		}
+	}
+
+	itemsInfo := fmt.Sprintf("%d items", len(m.files))
+	if dirCount > 0 || fileCount > 0 {
+		itemsInfo = fmt.Sprintf("%d folders, %d files", dirCount, fileCount)
+	}
+
+	hiddenIndicator := ""
+	if m.showHidden {
+		hiddenIndicator = " • showing hidden"
+	}
+
+	statusText := fmt.Sprintf("%s%s | %s", itemsInfo, hiddenIndicator, selectedInfo)
+	s.WriteString(statusStyle.Render(statusText))
+
 	// Help text
 	s.WriteString("\n")
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
-	s.WriteString(helpStyle.Render("↑/↓: navigate • enter: open • h/←: parent • q: quit"))
+	s.WriteString(helpStyle.Render("↑/↓: navigate • enter: open • h/←: parent • .: toggle hidden • q: quit"))
 
 	return s.String()
 }
