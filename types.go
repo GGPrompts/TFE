@@ -104,11 +104,11 @@ type model struct {
 	// Double-click detection
 	lastClickTime  time.Time
 	lastClickIndex int
-	// Command mode
-	commandMode    bool
+	// Command prompt (always visible)
 	commandInput   string
 	commandHistory []string
 	historyPos     int
+	commandFocused bool // Whether command prompt has input focus
 }
 
 // editorFinishedMsg is sent when external editor exits

@@ -64,7 +64,6 @@ The file explorer will start in your current working directory.
 | `E` | Edit file in external editor (Micro preferred) |
 | `N` | Edit file in nano |
 | `y` / `c` | Copy file path to clipboard |
-| `:` | Enter command mode (type shell commands) |
 
 #### View Modes
 | Key | Action |
@@ -147,9 +146,9 @@ TFE offers three distinct interface modes:
 └────────────────────────────────────────────────────────────┘
 ```
 
-### Command Mode (:)
+### Command Prompt (Always Visible)
 
-Press `:` to enter command mode, similar to Midnight Commander. Type shell commands and press Enter to execute them in the current directory context. The command prompt replaces the help bar at the bottom:
+The command prompt is always visible at the bottom of the screen. Simply start typing any command and it will automatically focus and capture your input. Press Enter to execute commands in the current directory context:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -165,20 +164,22 @@ Press `:` to enter command mode, similar to Midnight Commander. Type shell comma
 └─────────────────────────────────────────┘
 ```
 
-**Command Mode Features:**
+**Command Prompt Features:**
+- Always visible at the bottom - no need to enter a special mode
+- Start typing any character to automatically focus the prompt
 - Execute any shell command in the current directory
 - TFE suspends while the command runs, then resumes automatically
 - File list refreshes automatically after command completes
-- Command history with up/down arrows
-- Press `Esc` to cancel without executing
-- Press `Backspace` to edit command
+- Command history with up/down arrows (stores last 100 commands)
+- Press `Esc` to unfocus and clear the prompt
+- Press `Backspace` to edit command text
 
 **Example Commands:**
-- `:ls -la` - List files with details
-- `:touch newfile.txt` - Create a new file
-- `:mkdir testdir` - Create a new directory
-- `:git status` - Check git repository status
-- `:vim file.txt` - Open file in vim and return to TFE
+- `ls -la` - List files with details
+- `touch newfile.txt` - Create a new file
+- `mkdir testdir` - Create a new directory
+- `git status` - Check git repository status
+- `vim file.txt` - Open file in vim and return to TFE
 
 #### Key Interface Elements
 
@@ -187,7 +188,7 @@ Press `:` to enter command mode, similar to Midnight Commander. Type shell comma
 3. **File List**: Scrollable list of folders and files with type indicators
 4. **Preview Pane**: Live file preview with line numbers (dual-pane/full modes)
 5. **Status Bar**: File counts, view mode, and selection info
-6. **Help Bar**: Context-sensitive keyboard shortcuts
+6. **Command Prompt**: Always-visible shell command input at the bottom
 
 ## Technical Details
 

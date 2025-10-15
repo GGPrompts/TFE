@@ -83,12 +83,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Handle command mode keys
-		if m.commandMode {
+		// Handle command prompt input when focused
+		if m.commandFocused {
 			switch msg.String() {
 			case "esc":
-				// Exit command mode without executing
-				m.commandMode = false
+				// Unfocus command prompt and clear input
+				m.commandFocused = false
 				m.commandInput = ""
 				return m, nil
 
@@ -97,12 +97,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.commandInput != "" {
 					cmd := m.commandInput
 					m.addToHistory(cmd)
-					m.commandMode = false
+					m.commandFocused = false
 					m.commandInput = ""
 					return m, runCommand(cmd, m.currentPath)
 				}
-				// Empty command, just exit command mode
-				m.commandMode = false
+				// Empty command, just unfocus
+				m.commandFocused = false
 				return m, nil
 
 			case "backspace":
@@ -130,12 +130,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Regular file browser keys
 		switch msg.String() {
-		case ":":
-			// Enter command mode
-			m.commandMode = true
-			m.commandInput = ""
-			m.historyPos = len(m.commandHistory)
-			return m, nil
 		case "q", "ctrl+c":
 			return m, tea.Quit
 
@@ -363,6 +357,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.files) > 0 {
 				path := m.files[m.cursor].path
 				_ = copyToClipboard(path)
+			}
+
+		default:
+			// Any other single character: focus command prompt and start typing
+			if len(msg.String()) == 1 {
+				m.commandFocused = true
+				m.commandInput = msg.String()
+				m.historyPos = len(m.commandHistory)
 			}
 		}
 
