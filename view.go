@@ -24,8 +24,7 @@ func (m model) View() string {
 func (m model) renderSinglePane() string {
 	var s strings.Builder
 
-	// Debug: Write file count to understand if something is off
-	// Title - ALWAYS render this
+	// Title
 	title := titleStyle.Render("TFE - Terminal File Explorer")
 	s.WriteString(title)
 	s.WriteString("\n")
@@ -34,9 +33,23 @@ func (m model) renderSinglePane() string {
 	s.WriteString(pathStyle.Render(m.currentPath))
 	s.WriteString("\n")
 
+	// Command prompt (left-aligned on its own line)
+	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
+	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+
+	s.WriteString(promptPrefix)
+	s.WriteString(inputStyle.Render(m.commandInput))
+	// Always show cursor (MC-style: command prompt is always active)
+	s.WriteString(cursorStyle.Render("█"))
+	s.WriteString("\n")
+
+	// Separator line between command prompt and file tree
+	s.WriteString("\n")
+
 	// File list - render based on current display mode
 	// Calculate maxVisible to fit within terminal height:
-	// title=1 + path+padding=2 + filelist=maxVisible + spacer=1 + status=1 + help=1 = m.height
+	// title=1 + path=1 + command=1 + separator=1 + filelist=maxVisible + spacer=1 + status=1 = m.height
 	// Therefore: maxVisible = m.height - 6
 	maxVisible := m.height - 6 // Reserve space for all UI elements
 
@@ -98,18 +111,6 @@ func (m model) renderSinglePane() string {
 
 	statusText := fmt.Sprintf("%s%s%s | %s", itemsInfo, hiddenIndicator, viewModeText, selectedInfo)
 	s.WriteString(statusStyle.Render(statusText))
-
-	// Command prompt (always visible at bottom)
-	s.WriteString("\n")
-	promptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).PaddingLeft(2)
-	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-
-	s.WriteString(promptStyle.Render(m.currentPath + " $ "))
-	s.WriteString(inputStyle.Render(m.commandInput))
-	if m.commandFocused {
-		s.WriteString(cursorStyle.Render("█"))
-	}
 
 	return s.String()
 }

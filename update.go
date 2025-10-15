@@ -83,49 +83,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Handle command prompt input when focused
-		if m.commandFocused {
-			switch msg.String() {
-			case "esc":
-				// Unfocus command prompt and clear input
-				m.commandFocused = false
+		// Handle command prompt input (MC-style: always active, no focus needed)
+		// Special keys that interact with command prompt
+		switch msg.String() {
+		case "enter":
+			// Execute command if there's input
+			if m.commandInput != "" {
+				cmd := m.commandInput
+				m.addToHistory(cmd)
+				m.commandInput = ""
+				return m, runCommand(cmd, m.currentPath)
+			}
+			// If no command input, handle Enter for file navigation (below)
+
+		case "backspace":
+			// Delete last character from command if there's input
+			if len(m.commandInput) > 0 {
+				m.commandInput = m.commandInput[:len(m.commandInput)-1]
+				return m, nil
+			}
+			// If no command input, backspace does nothing (could navigate up later)
+
+		case "esc":
+			// Clear command input if there's any
+			if m.commandInput != "" {
 				m.commandInput = ""
 				return m, nil
-
-			case "enter":
-				// Execute command
-				if m.commandInput != "" {
-					cmd := m.commandInput
-					m.addToHistory(cmd)
-					m.commandFocused = false
-					m.commandInput = ""
-					return m, runCommand(cmd, m.currentPath)
-				}
-				// Empty command, just unfocus
-				m.commandFocused = false
-				return m, nil
-
-			case "backspace":
-				// Delete last character
-				if len(m.commandInput) > 0 {
-					m.commandInput = m.commandInput[:len(m.commandInput)-1]
-				}
-
-			case "up":
-				// Navigate to previous command in history
-				m.commandInput = m.getPreviousCommand()
-
-			case "down":
-				// Navigate to next command in history
-				m.commandInput = m.getNextCommand()
-
-			default:
-				// Add typed character to command input
-				if len(msg.String()) == 1 {
-					m.commandInput += msg.String()
-				}
 			}
-			return m, nil
+			// If no command input, handle Esc for dual-pane exit (below)
 		}
 
 		// Regular file browser keys
@@ -140,7 +125,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.calculateLayout()
 			}
 
-		case "up", "k":
+		case "up":
+			// If command input exists, navigate command history
+			if m.commandInput != "" || len(m.commandHistory) > 0 {
+				m.commandInput = m.getPreviousCommand()
+				return m, nil
+			}
+			// Otherwise fall through to file navigation
+			fallthrough
+		case "k":
 			if m.viewMode == viewDualPane {
 				// In dual-pane mode, check which pane is focused
 				if m.focusedPane == leftPane {
@@ -165,7 +158,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "down", "j":
+		case "down":
+			// If command input exists or history available, navigate command history
+			if m.commandInput != "" || len(m.commandHistory) > 0 {
+				m.commandInput = m.getNextCommand()
+				return m, nil
+			}
+			// Otherwise fall through to file navigation
+			fallthrough
+		case "j":
 			if m.viewMode == viewDualPane {
 				// In dual-pane mode, check which pane is focused
 				if m.focusedPane == leftPane {
@@ -212,25 +213,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "tab":
-			// In dual-pane mode: cycle focus between left pane, right pane, and command prompt
+			// In dual-pane mode: cycle focus between left and right pane
 			// In single-pane mode: enter dual-pane mode
 			if m.viewMode == viewDualPane {
-				// Cycle through: left → right → command → left
-				if m.commandFocused {
-					// From command prompt back to left pane
-					m.commandFocused = false
-					m.focusedPane = leftPane
-				} else if m.focusedPane == leftPane {
+				// Cycle through: left → right → left
+				if m.focusedPane == leftPane {
 					m.focusedPane = rightPane
 				} else {
-					// From right pane to command prompt
-					m.commandFocused = true
+					m.focusedPane = leftPane
 				}
 			} else if m.viewMode == viewSinglePane {
 				// Enter dual-pane mode
 				m.viewMode = viewDualPane
 				m.focusedPane = leftPane
-				m.commandFocused = false
 				m.calculateLayout()
 				// Load preview of current file
 				if len(m.files) > 0 && !m.files[m.cursor].isDir {
@@ -362,10 +357,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		default:
-			// Any other single character: focus command prompt and start typing
+			// MC-style: any single character goes to command prompt
 			if len(msg.String()) == 1 {
-				m.commandFocused = true
-				m.commandInput = msg.String()
+				m.commandInput += msg.String()
 				m.historyPos = len(m.commandHistory)
 			}
 		}
@@ -374,15 +368,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Editor has closed, we're back in TFE
 		// Refresh file list in case file was modified
 		m.loadFiles()
-		// Force a refresh to reinitialize terminal state (including mouse support)
-		return m, tea.ClearScreen
+		// Force a refresh and re-enable mouse support (external editors disable it)
+		return m, tea.Batch(
+			tea.ClearScreen,
+			tea.EnableMouseCellMotion,
+		)
 
 	case commandFinishedMsg:
 		// Command has finished, we're back in TFE
 		// Refresh file list in case command modified files
 		m.loadFiles()
-		// Force a refresh to reinitialize terminal state (including mouse support)
-		return m, tea.ClearScreen
+		// Force a refresh and re-enable mouse support (shell commands may disable it)
+		return m, tea.Batch(
+			tea.ClearScreen,
+			tea.EnableMouseCellMotion,
+		)
 
 	case tea.MouseMsg:
 		// Handle mouse wheel scrolling in full-screen preview mode
@@ -408,25 +408,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Handle clicks on command prompt (bottom line) to focus it
-		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
-			// Command prompt is on the last line (m.height - 1)
-			if msg.Y >= m.height-1 {
-				m.commandFocused = true
-				return m, nil
-			}
-		}
-
 		// In dual-pane mode, detect which pane was clicked to switch focus
 		if m.viewMode == viewDualPane && msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
-			// Check if click is in left or right pane (not in command prompt area)
-			if msg.Y < m.height-2 { // Ensure we're not clicking on status bar or command prompt
+			// Check if click is in left or right pane (not in header or status bar)
+			if msg.Y >= 4 && msg.Y < m.height-1 { // Skip header (4 lines) and status bar (1 line)
 				if msg.X < m.leftWidth {
 					m.focusedPane = leftPane
-					m.commandFocused = false
 				} else if msg.X > m.leftWidth { // Account for separator
 					m.focusedPane = rightPane
-					m.commandFocused = false
 				}
 			}
 		}
@@ -441,9 +430,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				// Calculate which item was clicked (accounting for header lines)
-				// Base offset: title + path + spacing = 3 lines (both single and dual-pane)
+				// Base offset: title(0) + path(1) + command(2) + separator(3) + file_list_starts(4) = 4 lines
 				// Detail mode adds 2 extra lines (column header + separator)
-				headerOffset := 3
+				headerOffset := 4
 				if m.displayMode == modeDetail {
 					headerOffset += 2 // Add 2 for detail view's header and separator
 				}

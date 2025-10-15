@@ -157,8 +157,22 @@ func (m model) renderDualPane() string {
 	s.WriteString(pathStyle.Render(m.currentPath))
 	s.WriteString("\n")
 
+	// Command prompt (left-aligned on its own line)
+	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
+	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+
+	s.WriteString(promptPrefix)
+	s.WriteString(inputStyle.Render(m.commandInput))
+	// Always show cursor (MC-style: command prompt is always active)
+	s.WriteString(cursorStyle.Render("█"))
+	s.WriteString("\n")
+
+	// Separator line between command prompt and panes
+	s.WriteString("\n")
+
 	// Calculate max visible for both panes
-	// title=1 + path+padding=2 + panes=maxVisible + status=1 + help=1 = m.height
+	// title=1 + path=1 + command=1 + separator=1 + panes=maxVisible + status=1 = m.height
 	// Therefore: maxVisible = m.height - 5
 	maxVisible := m.height - 5
 
@@ -253,27 +267,13 @@ func (m model) renderDualPane() string {
 	}
 	// Show focused pane info in status bar
 	focusInfo := ""
-	if m.commandFocused {
-		focusInfo = " • [COMMAND focused]"
-	} else if m.focusedPane == leftPane {
+	if m.focusedPane == leftPane {
 		focusInfo = " • [LEFT focused]"
 	} else {
 		focusInfo = " • [RIGHT focused]"
 	}
 	statusText := fmt.Sprintf("%s%s • %s%s", itemsInfo, hiddenIndicator, m.displayMode.String(), focusInfo)
 	s.WriteString(statusStyle.Render(statusText))
-
-	// Command prompt (always visible at bottom)
-	s.WriteString("\n")
-	promptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).PaddingLeft(2)
-	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-
-	s.WriteString(promptStyle.Render(m.currentPath + " $ "))
-	s.WriteString(inputStyle.Render(m.commandInput))
-	if m.commandFocused {
-		s.WriteString(cursorStyle.Render("█"))
-	}
 
 	return s.String()
 }

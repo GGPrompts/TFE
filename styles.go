@@ -13,8 +13,7 @@ var (
 
 	pathStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
-			PaddingLeft(2).
-			PaddingBottom(1)
+			PaddingLeft(2)
 
 	selectedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("15")).
