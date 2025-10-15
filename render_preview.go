@@ -247,20 +247,27 @@ func (m model) renderDualPane() string {
 	if m.showHidden {
 		hiddenIndicator = " • hidden"
 	}
-	statusText := fmt.Sprintf("%s%s • %s", itemsInfo, hiddenIndicator, m.displayMode.String())
-	s.WriteString(statusStyle.Render(statusText))
-
-	// Help text
-	s.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
+	// Show focused pane info in status bar
 	focusInfo := ""
 	if m.focusedPane == leftPane {
-		focusInfo = "[LEFT focused]"
+		focusInfo = " • [LEFT focused]"
 	} else {
-		focusInfo = "[RIGHT focused]"
+		focusInfo = " • [RIGHT focused]"
 	}
-	s.WriteString(helpStyle.Render(fmt.Sprintf("%s • ↑/↓: scroll %s • Tab: switch pane • Space: exit • E: edit • y/c: copy", focusInfo,
-		map[bool]string{true: "list", false: "preview"}[m.focusedPane == leftPane])))
+	statusText := fmt.Sprintf("%s%s • %s%s", itemsInfo, hiddenIndicator, m.displayMode.String(), focusInfo)
+	s.WriteString(statusStyle.Render(statusText))
+
+	// Command prompt (always visible at bottom)
+	s.WriteString("\n")
+	promptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).PaddingLeft(2)
+	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+
+	s.WriteString(promptStyle.Render(m.currentPath + " $ "))
+	s.WriteString(inputStyle.Render(m.commandInput))
+	if m.commandFocused {
+		s.WriteString(cursorStyle.Render("█"))
+	}
 
 	return s.String()
 }
