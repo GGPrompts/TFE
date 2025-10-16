@@ -8,6 +8,7 @@ A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE
 - **Dual Navigation**: Both keyboard shortcuts and mouse support
 - **F-Key Controls**: Midnight Commander-style F1-F10 hotkeys for common operations
 - **Context Menu**: Right-click or F2 for quick access to file operations
+- **Quick CD**: Exit TFE and change shell directory to selected folder
 - **Dual-Pane Mode**: Split-screen layout with file browser and live preview
 - **File Preview**: View file contents with syntax highlighting and line numbers
 - **Text Selection**: Mouse text selection enabled in preview mode
@@ -29,6 +30,7 @@ A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE
 
 - Go 1.24 or higher
 - A terminal with Nerd Fonts installed (for proper icon display)
+- **For Termux users**: Install `termux-api` for clipboard support: `pkg install termux-api`
 
 ### Building from Source
 
@@ -38,10 +40,36 @@ cd tfe
 go build -o tfe
 ```
 
+### Setup (Required for Quick CD Feature)
+
+To enable the "Quick CD" feature that lets you exit TFE and automatically change your shell to a selected directory:
+
+1. Add the wrapper to your shell configuration:
+
+```bash
+echo 'source ~/tfe/tfe-wrapper.sh' >> ~/.bashrc
+```
+
+2. Reload your shell:
+
+```bash
+source ~/.bashrc
+```
+
+3. Update the wrapper path if you installed TFE in a different location:
+
+```bash
+# Edit tfe-wrapper.sh and change the TFE_BIN path to match your installation
+```
+
+**Note**: After setup, use `tfe` command instead of `./tfe` to launch the application.
+
 ### Running
 
 ```bash
-./tfe
+tfe    # If wrapper is installed (enables Quick CD)
+# or
+./tfe # Direct execution (Quick CD won't work)
 ```
 
 The file explorer will start in your current working directory.
@@ -103,9 +131,25 @@ The file explorer will start in your current working directory.
 
 - **Left Click**: Select item (or switch pane focus in dual-pane mode)
 - **Double Click**: Navigate into folder or preview file
-- **Right Click**: Open context menu for file operations
+- **Right Click**: Open context menu for file operations (includes Quick CD for folders)
 - **Scroll Wheel Up/Down**: Navigate through file list (or scroll context menu when open)
 - **Text Selection**: Enabled in preview mode - select and copy text with mouse
+
+### Context Menu Actions
+
+Right-click (or press F2) on any file or folder to access:
+
+**For Folders:**
+- 📂 **Open** - Navigate into the directory
+- 📂 **Quick CD** - Exit TFE and change shell to this directory (requires wrapper setup)
+- 📋 **Copy Path** - Copy full path to clipboard
+- ⭐/**☆ Favorite** - Add/remove from favorites
+
+**For Files:**
+- 👁 **Preview** - View file in full-screen preview
+- ✏ **Edit** - Open in external editor (micro/nano/vim)
+- 📋 **Copy Path** - Copy full path to clipboard
+- ⭐/**☆ Favorite** - Add/remove from favorites
 
 ## Interface
 
@@ -226,15 +270,17 @@ tfe/
 ├── types.go                # Type definitions (135 lines)
 ├── styles.go               # Lipgloss styles (36 lines)
 ├── model.go                # Model initialization & layout (75 lines)
-├── update.go               # Event handling (850+ lines)
+├── update.go               # Event handling (900+ lines)
 ├── view.go                 # View dispatcher (120 lines)
 ├── render_file_list.go     # File list rendering (440 lines)
 ├── render_preview.go       # Preview rendering (442 lines)
 ├── file_operations.go      # File operations & formatting (465 lines)
-├── editor.go               # External editor integration (72 lines)
-├── context_menu.go         # Context menu system (196 lines)
+├── editor.go               # External editor & clipboard (76 lines)
+├── command.go              # Command prompt execution (128 lines)
+├── context_menu.go         # Context menu system (205 lines)
 ├── favorites.go            # Favorites/bookmarks (115 lines)
 ├── helpers.go              # Helper functions (45 lines)
+├── tfe-wrapper.sh          # Shell wrapper for Quick CD
 ├── go.mod                  # Go module definition
 ├── go.sum                  # Dependency checksums
 ├── README.md               # User documentation
@@ -292,13 +338,16 @@ TFE follows a modular architecture with 13 focused files:
 - ✅ External editor integration
 - ✅ File size and permissions display (Detail view)
 - ✅ Multiple display modes (List, Grid, Detail, Tree)
-- ✅ Clipboard integration
+- ✅ Clipboard integration (with Termux support)
 - ✅ F-key hotkeys (Midnight Commander style)
 - ✅ Context menu (right-click and F2)
+- ✅ Quick CD feature (exit and change shell directory)
 - ✅ Favorites/bookmarks system
 - ✅ Text selection in preview mode
 - ✅ Markdown rendering with Glamour
 - ✅ Command history (last 100 commands)
+- ✅ Bracketed paste support (proper paste handling)
+- ✅ Special key filtering (no more literal "end", "home", etc.)
 
 ### Planned Features
 - File operations (copy, move, delete, rename) - F7/F8 placeholders ready

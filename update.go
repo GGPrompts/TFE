@@ -14,6 +14,46 @@ func (m model) Init() tea.Cmd {
 	return m.spinner.Tick
 }
 
+// isSpecialKey checks if a key string represents a special (non-printable) key
+// that should not be added to command input
+func isSpecialKey(key string) bool {
+	specialKeys := []string{
+		"up", "down", "left", "right",
+		"home", "end", "pageup", "pagedown", "pgup", "pgdn",
+		"delete", "insert",
+		"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+		"ctrl+c", "ctrl+h", "ctrl+d", "ctrl+z",
+		"alt+", "ctrl+", // Prefixes for modifier combinations
+		"shift+",
+	}
+
+	// Check exact matches
+	for _, special := range specialKeys {
+		if key == special {
+			return true
+		}
+		// Check if key starts with modifier prefix (like "ctrl+a", "alt+x")
+		if len(special) > 0 && special[len(special)-1] == '+' && len(key) > len(special) {
+			if key[:len(special)] == special {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// cleanBracketedPaste removes bracketed paste escape sequences from input
+// Bracketed paste sequences are: ESC[200~ (start) and ESC[201~ (end)
+func cleanBracketedPaste(s string) string {
+	// Remove common bracketed paste escape sequences
+	s = strings.ReplaceAll(s, "\x1b[200~", "")
+	s = strings.ReplaceAll(s, "\x1b[201~", "")
+	s = strings.ReplaceAll(s, "[200~", "")
+	s = strings.ReplaceAll(s, "[201~", "")
+	return s
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -160,10 +200,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// This allows typing 'e', 'v', 'f', etc. in commands
 		key := msg.String()
 
-		// Handle paste (multi-character input) or typing while command is active
+		// Handle typing while command is active
 		if len(m.commandInput) > 0 {
-			// Check if it's printable text (not a special key like arrow keys)
-			if len(key) > 0 {
+			// Check if it's printable text (not a special key)
+			if len(key) > 0 && !isSpecialKey(key) {
 				isPrintable := true
 				for _, r := range key {
 					if r < 32 || r == 127 { // Control characters
@@ -172,8 +212,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				if isPrintable {
-					m.commandInput += key
-					m.historyPos = len(m.commandHistory)
+					// Clean bracketed paste sequences before adding to input
+					cleanedKey := cleanBracketedPaste(key)
+					if cleanedKey != "" {
+						m.commandInput += cleanedKey
+						m.historyPos = len(m.commandHistory)
+					}
 					return m, nil
 				}
 			}
@@ -522,11 +566,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		default:
 			// MC-style: any printable character(s) go to command prompt
-			// This handles both typing and pasting (starting a new command)
+			// This handles typing (starting a new command)
 			key := msg.String()
-			if len(key) > 0 {
-				// Check if it's printable text (not a special key)
-				// Pasted text comes through as multi-character strings
+			if len(key) > 0 && !isSpecialKey(key) {
+				// Check if it's printable text (not a special key or control character)
 				isPrintable := true
 				for _, r := range key {
 					if r < 32 || r == 127 { // Control characters
@@ -535,8 +578,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				if isPrintable {
-					m.commandInput += key
-					m.historyPos = len(m.commandHistory)
+					// Clean bracketed paste sequences before adding to input
+					cleanedKey := cleanBracketedPaste(key)
+					if cleanedKey != "" {
+						m.commandInput += cleanedKey
+						m.historyPos = len(m.commandHistory)
+					}
 					return m, nil // Return to update the view
 				}
 			}

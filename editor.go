@@ -40,7 +40,10 @@ func copyToClipboard(text string) error {
 	var cmd *exec.Cmd
 
 	// Try different clipboard commands based on platform
-	if editorAvailable("xclip") {
+	if editorAvailable("termux-clipboard-set") {
+		// Termux (Android)
+		cmd = exec.Command("termux-clipboard-set")
+	} else if editorAvailable("xclip") {
 		cmd = exec.Command("xclip", "-selection", "clipboard")
 	} else if editorAvailable("xsel") {
 		cmd = exec.Command("xsel", "--clipboard", "--input")
@@ -51,7 +54,7 @@ func copyToClipboard(text string) error {
 		// Windows/WSL
 		cmd = exec.Command("clip.exe")
 	} else {
-		return fmt.Errorf("no clipboard utility found (install xclip, xsel, or use WSL)")
+		return fmt.Errorf("no clipboard utility found (install termux-api, xclip, xsel, or use WSL)")
 	}
 
 	pipe, err := cmd.StdinPipe()

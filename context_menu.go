@@ -9,6 +9,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -19,6 +21,17 @@ import (
 type contextMenuItem struct {
 	label  string
 	action string
+}
+
+// writeCDTarget writes the target directory to a file so the shell can cd after TFE exits
+func writeCDTarget(path string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	targetFile := filepath.Join(homeDir, ".tfe_cd_target")
+	return os.WriteFile(targetFile, []byte(path), 0644)
 }
 
 // getContextMenuItems returns the list of menu items for the current file
@@ -84,11 +97,10 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case "quickcd":
-		// Change to directory
+		// Quick CD: write directory to file and exit TFE so shell can cd
 		if m.contextMenuFile.isDir {
-			m.currentPath = m.contextMenuFile.path
-			m.cursor = 0
-			m.loadFiles()
+			_ = writeCDTarget(m.contextMenuFile.path)
+			return m, tea.Quit
 		}
 		return m, tea.ClearScreen
 
