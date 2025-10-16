@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"time"
+
+	"github.com/charmbracelet/bubbles/spinner"
 )
 
 // displayMode represents different view modes for displaying files
@@ -110,6 +112,9 @@ type model struct {
 	commandHistory []string
 	historyPos     int
 	commandFocused bool // Whether command prompt has input focus
+	// Loading spinner
+	spinner spinner.Model
+	loading bool
 }
 
 // editorFinishedMsg is sent when external editor exits

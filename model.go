@@ -1,12 +1,21 @@
 package main
 
-import "os"
+import (
+	"os"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/lipgloss"
+)
 
 func initialModel() model {
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "."
 	}
+
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#5fd7ff"})
 
 	m := model{
 		currentPath:    cwd,
@@ -24,6 +33,8 @@ func initialModel() model {
 		preview: previewModel{
 			maxPreview: 10000, // Max 10k lines
 		},
+		spinner: s,
+		loading: false,
 	}
 
 	m.loadFiles()

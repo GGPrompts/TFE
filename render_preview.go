@@ -264,8 +264,8 @@ func (m model) renderFullPreview() string {
 	// Title bar with file name
 	previewTitleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("15")).
-		Background(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
+		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Width(m.width).
 		Padding(0, 1)
 
@@ -357,7 +357,7 @@ func (m model) renderDualPane() string {
 		previewTitleText := fmt.Sprintf("Preview: %s", m.preview.fileName)
 		previewTitle := lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("39")).
+			Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#5fd7ff"}).
 			Render(previewTitleText)
 		separatorLine := strings.Repeat("─", len(previewTitleText))
 		rightContent = previewTitle + "\n" + separatorLine + "\n"
@@ -371,12 +371,12 @@ func (m model) renderDualPane() string {
 
 	// Create styled boxes for left and right panes using Lipgloss
 	// Highlight the focused pane with a brighter border color
-	leftBorderColor := "241"  // dim gray
-	rightBorderColor := "241" // dim gray
+	leftBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}  // dim gray
+	rightBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"} // dim gray
 	if m.focusedPane == leftPane {
-		leftBorderColor = "39" // bright blue for focused pane
+		leftBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"} // bright blue for focused pane
 	} else {
-		rightBorderColor = "39" // bright blue for focused pane
+		rightBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"} // bright blue for focused pane
 	}
 
 	leftPaneStyle := lipgloss.NewStyle().
@@ -386,7 +386,7 @@ func (m model) renderDualPane() string {
 		MaxHeight(maxVisible).
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderRight(true).
-		BorderForeground(lipgloss.Color(leftBorderColor))
+		BorderForeground(leftBorderColor)
 
 	rightPaneStyle := lipgloss.NewStyle().
 		Width(m.rightWidth).
@@ -395,7 +395,7 @@ func (m model) renderDualPane() string {
 		MaxHeight(maxVisible).
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderLeft(true).
-		BorderForeground(lipgloss.Color(rightBorderColor))
+		BorderForeground(rightBorderColor)
 
 	// Apply styles to content
 	leftPaneRendered := leftPaneStyle.Render(leftContent)

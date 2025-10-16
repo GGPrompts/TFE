@@ -16,15 +16,15 @@ var (
 			PaddingLeft(2)
 
 	selectedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("15")).
-			Background(lipgloss.Color("39")).
+			Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
+			Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 			Bold(true)
 
 	folderStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39"))
+			Foreground(lipgloss.AdaptiveColor{Light: "#005faf", Dark: "#5fd7ff"})
 
 	fileStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252"))
+			Foreground(lipgloss.AdaptiveColor{Light: "#444444", Dark: "#d0d0d0"})
 
 	statusStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
