@@ -572,6 +572,7 @@ func (m *model) populatePreviewCache() {
 				m.preview.cachedRenderedContent = rendered
 				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
 				m.preview.cachedLineCount = len(renderedLines)
+				m.preview.cachedWidth = availableWidth
 				m.preview.cacheValid = true
 			}
 		}
@@ -586,5 +587,6 @@ func (m *model) populatePreviewCache() {
 	}
 	m.preview.cachedWrappedLines = wrappedLines
 	m.preview.cachedLineCount = len(wrappedLines)
+	m.preview.cachedWidth = availableWidth
 	m.preview.cacheValid = true
 }

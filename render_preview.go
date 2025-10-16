@@ -14,11 +14,6 @@ func (m model) getWrappedLineCount() int {
 		return 0
 	}
 
-	// Use cached line count if available
-	if m.preview.cacheValid && m.preview.cachedLineCount > 0 {
-		return m.preview.cachedLineCount
-	}
-
 	// Calculate available width
 	availableWidth := m.rightWidth - 17
 	if m.viewMode == viewFullPreview {
@@ -26,6 +21,11 @@ func (m model) getWrappedLineCount() int {
 	}
 	if availableWidth < 20 {
 		availableWidth = 20
+	}
+
+	// Use cached line count if available and width matches
+	if m.preview.cacheValid && m.preview.cachedLineCount > 0 && m.preview.cachedWidth == availableWidth {
+		return m.preview.cachedLineCount
 	}
 
 	// For markdown, we need to render it to count lines
@@ -144,8 +144,8 @@ func (m model) renderPreview(maxVisible int) string {
 	if m.preview.isMarkdown {
 		var renderedLines []string
 
-		// Check if we have cached rendered content
-		if m.preview.cacheValid && m.preview.cachedRenderedContent != "" {
+		// Check if we have cached rendered content and width matches
+		if m.preview.cacheValid && m.preview.cachedRenderedContent != "" && m.preview.cachedWidth == availableWidth {
 			// Use cached rendered content
 			renderedLines = strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 		} else {
@@ -196,9 +196,9 @@ func (m model) renderPreview(maxVisible int) string {
 		// If Glamour rendering fails, fall through to regular rendering
 	}
 
-	// Wrap all lines first (use cache if available)
+	// Wrap all lines first (use cache if available and width matches)
 	var wrappedLines []string
-	if m.preview.cacheValid && len(m.preview.cachedWrappedLines) > 0 {
+	if m.preview.cacheValid && len(m.preview.cachedWrappedLines) > 0 && m.preview.cachedWidth == availableWidth {
 		// Use cached wrapped lines
 		wrappedLines = m.preview.cachedWrappedLines
 	} else {

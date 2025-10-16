@@ -1,1105 +1,445 @@
 # TFE Development Plan
 
 **Project:** TFE - Terminal File Explorer
-**Language:** Go
-**Framework:** Bubbletea + Lipgloss
-**Target Users:** Windows→WSL developers, Claude Code users, terminal power users
-**Updated:** 2025-10-15
+**Status:** v0.3.0 - Feature-complete file viewer/browser
+**Updated:** 2025-10-16
 
 ---
 
-## Project Vision
+## Current Status
 
-TFE is a modern, beginner-friendly terminal file explorer with a **unique Context Visualizer** that shows what Claude Code sees when launched from any directory. Unlike traditional file managers (Midnight Commander, ranger, yazi), TFE bridges Windows and Linux concepts while providing deep integration with AI coding workflows.
+### ✅ Completed (See CHANGELOG.md for details)
+- **Core File Browser** - Navigation, sorting, metadata display
+- **View Modes** - List, Grid, Detail, Tree views
+- **Dual-Pane System** - Split-screen with live preview
+- **File Preview** - Text, markdown (Glamour), binary detection
+- **External Editor** - Micro/nano/vim integration
+- **F-Key Hotkeys** - Midnight Commander style (F1-F10)
+- **Context Menu** - Right-click + F2 keyboard access
+- **Favorites System** - Bookmarks with F6 filter
+- **Command Prompt** - MC-style always-active shell
+- **Clipboard Integration** - Multi-platform path copying
+- **Mouse Support** - Click, double-click, scroll
+- **TUI Tool Launcher** - lazygit, lazydocker, lnav, htop
 
-### Unique Value Propositions
-
-1. **Context Visualizer** - The only tool that shows Claude Code's complete context hierarchy
-   - Which files are in context
-   - Token usage per file
-   - CLAUDE.md hierarchy chain
-   - Settings precedence visualization
-   - Optimization suggestions
-
-2. **Windows→Linux Bridge** - Explains Linux concepts in Windows terms
-   - "Shortcut (symlink)" not just "symlink"
-   - Visual permissions editor
-   - Plain English command translation
-
-3. **Hybrid Approach** - Like Midnight Commander
-   - Native dual-pane for fast browsing/preview
-   - External editor (Micro/nano) for full-featured editing
-   - Best of both worlds
-
----
-
-## Architecture Decisions
-
-### Core Technology Stack
-
-- **Language:** Go 1.24+
-- **TUI Framework:** Bubbletea (proven, excellent for building complex TUIs)
-- **Styling:** Lipgloss (for layout and styling)
-- **Components:** Bubbles (textarea for preview)
-- **Editor Integration:** External (Micro/nano via shell execution)
-
-### Layout Strategy: Hybrid Approach (CONFIRMED)
-
-**Native Dual-Pane for Preview:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│ TFE - Terminal File Explorer                                │
-├────────────────────────┬────────────────────────────────────┤
-│ 📁 Left Pane (40%)    │ 📄 Right Pane (60%)                │
-│ File Tree              │ Preview / Context View             │
-│                        │                                    │
-│ Navigate files         │ Quick preview                      │
-│ Browse directories     │ Context analysis                   │
-│ Toggle views           │ Token breakdown                    │
-└────────────────────────┴────────────────────────────────────┘
-```
-
-**External Editor for Editing:**
-- Press `E` → Suspend TFE → Launch Micro → Resume TFE
-- Full-featured editing without reinventing the wheel
-- Fallback to nano if Micro not installed
-
-**Why This Approach:**
-- ✅ Works without tmux (portable)
-- ✅ Fast integrated preview
-- ✅ Professional editing experience
-- ✅ Supports Context Visualizer (needs native panes)
-- ✅ Proven pattern (Midnight Commander uses this)
+### 🚧 Known Limitations
+- **F7/F8 are placeholders** - No create directory or delete file operations yet
+- **Silent error handling** - Some operations fail without user feedback
+- **No search** - Can't filter/find files within current directory
+- **No multi-select** - Operations limited to single files
+- **Large update.go** - 991 lines, needs refactoring
 
 ---
 
-## Development Roadmap
+## Roadmap
 
-### Phase 1: Enhanced Single-Pane ✅ COMPLETE
+### Phase 1: Complete File Operations 🎯 **HIGH PRIORITY**
 
-**Goal:** Improve foundation before adding dual-pane
+**Goal:** Make TFE a true file *manager*, not just a viewer
 
-**Status:** All features implemented and tested
+**Why:** F7/F8 are the most visible incomplete features. Users can press them and nothing happens.
 
-**Features Implemented:**
-1. File metadata display
-   - Size (formatted: 2.3KB, 1.5MB)
-   - Modified time (relative: "5m ago", "2h ago")
-   - Permissions in status bar
-   - Add fields to `fileItem` struct
+#### 1.1 Dialog System (NEW)
+**Create:** `dialog.go`
 
-2. Better file type icons ✅
-   - Extension-based icon mapping
-   - Categories: code, configs, images, archives, docs
-   - ASCII markers: `[GO]`, `[JS]`, `[MD]`, `[JSON]`, etc.
-   - Special markers for folders: `▸` and parent: `↑`
-   - Claude Code context files highlighted in orange (CLAUDE.md, .claude/)
-
-3. Toggle hidden files ✅
-   - Keybinding: `.` or `Ctrl+H`
-   - Dynamic toggle with `showHidden bool` in model
-   - Status bar indicates when showing hidden files
-
-4. Status/Info bar ✅
-   - Format: `3 folders, 12 files • showing hidden | Selected: config.js (2.3KB, 5m ago)`
-   - Shows file count, selected file info with size and relative time
-   - Hidden files indicator
-
-5. Window resize handling ✅
-   - Track terminal width and height
-   - Respond to `tea.WindowSizeMsg`
-   - Ready for dual-pane layout calculations
-
-**Implementation Notes:**
 ```go
-// Enhanced fileItem struct
-type fileItem struct {
-    name     string
-    path     string
-    isDir    bool
-    size     int64      // NEW
-    modTime  time.Time  // NEW
-    mode     os.FileMode // NEW
-}
+type dialogType int
+const (
+    dialogNone dialogType = iota
+    dialogInput       // For F7 (directory name)
+    dialogConfirm     // For F8 (yes/no delete)
+    dialogError       // For error messages
+    dialogSuccess     // For success messages
+)
 
-// Model additions
-type model struct {
-    // ... existing fields
-    width      int  // NEW - terminal width
-    showHidden bool // NEW - toggle dotfiles
+type dialogModel struct {
+    dialogType dialogType
+    title      string
+    message    string
+    input      string      // For text input
+    callback   func()      // Action on confirm
 }
 ```
-
-**Phase 1 Achievements:**
-- Fully functional file browser with metadata
-- Portable ASCII icons (work in any terminal)
-- Smart file type detection
-- Claude context file highlighting
-- Smooth navigation and window resize handling
-
----
-
-### Phase 1.5: View Modes (Optional Enhancement - 1 week)
-
-**Goal:** Add multiple view modes inspired by Windows Explorer
-
-**Motivation:** Windows Explorer offers different ways to view files (list, icons, details, tree). Adding view modes would make TFE more versatile and familiar to Windows users.
 
 **Features:**
-1. **List View** (current default)
-   - One file per line
-   - Vertical scrolling
-   - Shows icon/marker, filename
+- Text input dialog for directory names (F7)
+- Yes/No confirmation dialog for destructive operations (F8)
+- Error/Success toast notifications (auto-dismiss after 3s)
+- Overlay rendering (similar to context menu)
+- ESC to cancel, Enter to confirm
+- Input validation
 
-2. **Grid/Icon View**
-   - Multiple columns (responsive to terminal width)
-   - Icon-focused display
-   - Like Windows Explorer "Medium/Large icons" view
-   - Example layout:
-   ```
-   ┌──────────┬──────────┬──────────┬──────────┐
-   │ ▸ docs   │ ▸ src    │ [GO]     │ [MD]     │
-   │          │          │ main.go  │ README   │
-   ├──────────┼──────────┼──────────┼──────────┤
-   │ [JSON]   │ [MD]     │ • file   │          │
-   │ go.mod   │ PLAN.md  │          │          │
-   └──────────┴──────────┴──────────┴──────────┘
-   ```
+#### 1.2 F7: Create Directory
+**Location:** `update.go` + `file_operations.go`
 
-3. **Detail View**
-   - Columns: Name | Size | Modified | Type
-   - Sortable by column
-   - Like Windows Explorer "Details" view
-   - Example:
-   ```
-   Name          Size    Modified    Type
-   ▸ docs        -       1h ago      Folder
-   ▸ src         -       2d ago      Folder
-   [GO] main.go  2.3KB   5m ago      Go Source
-   [MD] README   1.8KB   1d ago      Markdown
-   ```
+**Implementation:**
+1. Detect F7 keypress → Show input dialog
+2. Get directory name from user
+3. Validate name (no /, \\, special chars)
+4. Call `os.Mkdir()` with 0755 permissions
+5. Handle errors gracefully (show error dialog)
+6. Refresh file list
+7. Move cursor to newly created directory
 
-4. **Tree View**
-   - Hierarchical folder structure
-   - Expandable/collapsible folders
-   - Like Windows Explorer left sidebar
-   - Example:
-   ```
-   ▾ home
-     ▾ matt
-       ▾ projects
-         ▾ TFE
-           ▸ docs
-           ▸ src
-           • main.go
-           • README.md
-   ```
+**Context Menu Integration:**
+- Add "New Folder..." option to context menu when in directory
 
-**View Mode Keybindings:**
-- `v` or `Tab` - Cycle through view modes
-- Or use numbers: `1` = list, `2` = grid, `3` = detail, `4` = tree
-- Current mode shown in status bar
+#### 1.3 F8: Delete File/Folder
+**Location:** `update.go` + `file_operations.go`
 
-**Implementation Notes:**
+**Implementation:**
+1. Detect F8 keypress → Show confirmation dialog
+2. Display: "Delete [filename]? This cannot be undone."
+3. If confirmed:
+   - For files: `os.Remove()`
+   - For empty directories: `os.Remove()`
+   - For non-empty directories: Show warning, require second confirmation, then `os.RemoveAll()`
+4. Handle errors (permissions, file in use, etc.)
+5. Show success message
+6. Refresh file list
+7. Move cursor to previous item (or next if was last)
+
+**Context Menu Integration:**
+- Add "Delete" option to context menu
+- Same behavior as F8
+
+**Safety Features:**
+- Always confirm before delete
+- Warn on non-empty directories
+- Clear error messages for permission issues
+- Don't delete if file doesn't exist anymore
+
+#### 1.4 Error Feedback System
+**Location:** `types.go`, `view.go`
+
+Add status message system:
 ```go
-type displayMode int
-const (
-    modeList displayMode = iota
-    modeGrid
-    modeDetail
-    modeTree
-)
-
-type model struct {
-    // ... existing fields
-    displayMode displayMode
-    gridColumns int  // Calculated based on terminal width
-    sortBy      string // For detail view: "name", "size", "modified"
-    sortAsc     bool
+type statusMessage struct {
+    text      string
+    isError   bool
+    timestamp time.Time
 }
 
-// Grid layout calculation
-func (m model) calculateGridLayout() (columns int) {
-    itemWidth := 12 // Estimated width per item
-    return max(1, m.width / itemWidth)
-}
+// In model:
+statusMsg *statusMessage  // Auto-dismiss after 3 seconds
 ```
 
-**Why This is Valuable:**
-- Makes TFE feel familiar to Windows users
-- Different views optimize for different tasks:
-  - List: Fast navigation
-  - Grid: Visual browsing (lots of files)
-  - Detail: Finding files by size/date
-  - Tree: Understanding folder structure
-- Differentiates TFE from other terminal file managers
-- Can combine with dual-pane (Phase 2): tree on left, grid/list on right
+Show in status bar:
+- Success: Green background, "✓ Directory created: project/"
+- Error: Red background, "✗ Permission denied: /root/folder"
+- Auto-dismiss after 3 seconds or ESC
+
+**Files to Update:**
+- `types.go` - Add dialog state, status message to model
+- `dialog.go` - NEW file for dialog system
+- `update.go` - Add F7/F8 handlers, dialog event handling
+- `view.go` - Render dialog overlay, status messages
+- `context_menu.go` - Add "New Folder" and "Delete" menu items
+- `file_operations.go` - Add mkdir and delete helper functions
+
+**Testing Checklist:**
+- [ ] F7 creates directory successfully
+- [ ] F7 handles invalid names (/, *, etc.)
+- [ ] F7 handles existing directory name
+- [ ] F7 ESC cancels without creating
+- [ ] F8 shows confirmation dialog
+- [ ] F8 deletes file after confirmation
+- [ ] F8 deletes empty directory
+- [ ] F8 warns on non-empty directory
+- [ ] F8 ESC cancels without deleting
+- [ ] Context menu "Delete" works
+- [ ] Context menu "New Folder" works
+- [ ] Error messages display correctly
+- [ ] Success messages display correctly
+
+**Estimated Time:** 4-6 hours
 
 ---
 
-### Phase 2: Native Dual-Pane Preview ✅ COMPLETE
+### Phase 2: Code Quality & Stability 🔧
 
-**Goal:** Split-pane layout with integrated file preview
+**Goal:** Improve maintainability and fix bugs
 
-**Status:** All core features implemented and debugged
+#### 2.1 Fix Silent Errors
+**Issue:** 4 locations where errors are ignored without user feedback
 
-**Features Implemented:**
-6. Split-pane layout ✅
-   - Toggle with `Space` or `Tab`
-   - Responsive 40/60 split
-   - Left: File tree, Right: Preview
-   - Lipgloss horizontal layout with proper width constraints
-   - Mouse click respects pane boundaries
-   - Visual focus indicators (bright blue border on focused pane)
-   - Status shows current focus: "[LEFT focused]" or "[RIGHT focused]"
+Fix locations:
+- `update.go:491` - Editor not available
+- `context_menu.go:136` - Quick CD write failure
+- `context_menu.go:167` - Clipboard copy failure
+- `update.go:91` - Clipboard copy failure in preview
 
-7. File preview pane ✅
-   - Read-only preview with line numbers
-   - Line truncation to prevent wrapping (maintains layout stability)
-   - Scroll support (arrow keys, PageUp/PageDown when right pane focused)
-   - File metadata in header (filename displayed in preview title)
-   - Handles large files (truncates long lines with "...")
-   - Binary file detection (shows "Binary file detected" message)
-   - Large file warning (>1MB shows "File too large to preview")
+**Solution:** Use new status message system from Phase 1.4
 
-8. External editor integration ✅
-   - `E` → Edit in Micro (preferred)
-   - `N` → Edit in nano (fallback)
-   - Auto-detect available editors
-   - Suspend TFE, launch editor, resume on exit
-   - File list refreshes after editing
+#### 2.2 Add Search Feature
+**Goal:** Filter files in current directory by name
 
-9. Clipboard integration ✅
-   - `Y` or `C` → Copy file path to clipboard
-   - Multi-platform support (xclip, xsel, pbcopy, clip.exe)
-   - Works from both file browser and preview modes
+**Keybinding:** `/` to enter search mode
 
-**Bug Fixes Completed:**
-- Fixed preview scrolling calculations (consistent visibleLines = height - 7)
-- Fixed large file rendering (line truncation prevents pane overflow)
-- Fixed mouse click accuracy (proper header offset for dual-pane mode)
-- Fixed clickable area boundaries (clicks in right pane don't select files)
-- Fixed go.mod and long-line file rendering (MaxWidth constraint + conservative width buffer)
-
-**Implementation Notes:**
+**Implementation:**
 ```go
-type viewMode int
-const (
-    modeSinglePane viewMode = iota
-    modeDualPane
-    modeContextView
-)
-
-type previewModel struct {
-    textarea   textarea.Model
-    filePath   string
-    content    string
-    scrollPos  int
-    lineCount  int
-}
-
-type model struct {
-    // ... existing fields
-    viewMode   viewMode
-    leftWidth  int
-    rightWidth int
-    preview    previewModel
-}
-
-// Layout calculation
-func (m model) calculateLayout() (leftWidth, rightWidth int) {
-    if m.viewMode == modeSinglePane {
-        return m.width, 0
-    }
-    leftWidth = m.width * 40 / 100
-    rightWidth = m.width - leftWidth
-    return
-}
-
-// External editor launch
-func (m model) launchEditor(path string) tea.Cmd {
-    return tea.ExecProcess(exec.Command("micro", path), func(err error) tea.Msg {
-        // Refresh file list on return
-        return refreshMsg{}
-    })
-}
+// In model:
+searchMode   bool
+searchQuery  string
+filteredFiles []fileItem  // Subset of m.files matching search
 ```
 
-**Key Bindings:**
-- `Space` / `Tab` - Toggle dual-pane mode
-- `Enter` - Preview file (dual-pane) / Navigate directory
-- `E` - Edit in Micro
-- `N` - Edit in nano
-- `V` - Quick view with bat/less
-- `Esc` - Close preview / Back to file tree
-- `Tab` (in dual-pane) - Switch focus left/right
+**Features:**
+- Type `/` to enter search mode
+- Incremental filtering as you type
+- ESC to clear search
+- Display: "Search: [query] (5 matches)"
+- Fuzzy matching optional
+
+**Files to Update:**
+- `types.go` - Add search fields to model
+- `update.go` - Add search mode key handling
+- `render_file_list.go` - Render filtered files
+- `file_operations.go` - Add search filtering function
+
+**Estimated Time:** 2-3 hours
+
+#### 2.3 Fix Grid View Bugs
+**Issue:** Potential off-by-one errors in click detection (update.go:762-768)
+
+**Problems:**
+- Uses `clickedRow` but should check `actualRow` in validation
+- No check for `clickedCol >= m.gridColumns`
+
+**Solution:** Add proper bounds checking
+
+**Estimated Time:** 30 minutes
+
+#### 2.4 Refactor update.go (OPTIONAL)
+**Issue:** 991 lines with 55+ case statements
+
+**Goal:** Split into focused handler files
+
+**New Structure:**
+```
+keyboard_handler.go  - All keyboard event cases
+mouse_handler.go     - All mouse event cases
+window_handler.go    - Window resize events
+spinner_handler.go   - Spinner/background task events
+```
+
+**Benefits:**
+- Easier to maintain
+- Better testability
+- Clear separation of concerns
+
+**Note:** This is optional - only do if codebase feels unmanageable
+
+**Estimated Time:** 3-4 hours
 
 ---
 
-### Phase 3: Context Visualizer (2-3 weeks) ⭐ KILLER FEATURE
+### Phase 3: Context Visualizer ⭐ **UNIQUE FEATURE**
 
 **Goal:** Show what Claude Code sees from current directory
 
-**Features:**
-10. Context file analyzer
-    - Press `C` to toggle Context View mode
-    - Show all project files with token counts
-    - Visual status indicators:
-      - ✅ Included in context
-      - ❌ Excluded (.gitignore, .claudeignore)
-      - ⚠️ Too large (preview only)
-      - 🔲 Optional (available but not auto-loaded)
-    - Display in right pane (dual-pane layout)
-    - Integrates with `/context` command data
+**Why:** This is TFE's killer feature - no other tool does this
 
-11. Config hierarchy viewer
-    - Press `Shift+C` for hierarchy view
-    - Walk up directory tree from current path
-    - Find all CLAUDE.md and CLAUDE.local.md files
-    - Show active settings files with precedence:
-      1. Enterprise managed-settings.json
-      2. Local project .claude/settings.local.json
-      3. Shared project .claude/settings.json
-      4. User global ~/.claude/settings.json
-    - Display as tree with token counts
+**Status:** Not started
 
-12. Token counter & optimizer
-    - Estimate tokens per file (~4 chars = 1 token)
-    - Recursive directory token counting
-    - Show total: `Token usage: 45K / 200K (22%)`
-    - Suggest files/folders to exclude
-    - Calculate token savings
-    - Generate .claudeignore entries
-    - "Add to .claudeignore" action
+#### Features:
+1. **Context Analyzer** (Press `Ctrl+K` or new F-key)
+   - Show all files with token estimates (~4 chars = 1 token)
+   - Visual indicators: ✅ Included, ❌ Excluded, ⚠️ Too large
+   - Display total tokens: "45K / 200K (22%)"
+   - Parse .gitignore and .claudeignore patterns
 
-**Implementation Notes:**
-```go
-// Context analysis types
-type contextStatus int
-const (
-    statusIncluded contextStatus = iota
-    statusExcluded
-    statusTooLarge
-    statusOptional
-)
+2. **Config Hierarchy Viewer** (Press `Ctrl+Shift+K`)
+   - Walk up directory tree finding CLAUDE.md files
+   - Show settings precedence (enterprise → local → shared → global)
+   - Display as tree with token counts
+   - Show which settings files are active
 
-type contextFile struct {
-    file          fileItem
-    status        contextStatus
-    tokens        int
-    excludeReason string // e.g., ".gitignore", "binary", "too large"
-}
+3. **Token Optimizer**
+   - Suggest files/folders to exclude
+   - Calculate token savings
+   - Generate .claudeignore entries
+   - "Add to .claudeignore" action
 
-type contextModel struct {
-    files         []contextFile
-    totalTokens   int
-    maxTokens     int // Claude's limit: 200K
-    suggestions   []string
-}
+**Implementation:**
+- Create `context_analyzer.go` module
+- Add context view mode to `viewMode` enum
+- Token estimation functions
+- .gitignore parser (use filepath.Match)
+- .claudeignore parser
+- Hierarchy walker (walk up to root)
 
-// Hierarchy types
-type memoryFile struct {
-    path   string
-    tokens int
-    level  int // Distance from current dir
-}
+**See:** Original PLAN.md lines 339-531 for detailed design
 
-type settingsFile struct {
-    path       string
-    precedence int // 1=highest, 5=lowest
-    active     bool
-}
-
-type hierarchyModel struct {
-    memoryFiles   []memoryFile
-    settingsFiles []settingsFile
-    currentPath   string
-}
-
-// Token estimation
-func estimateTokens(content string) int {
-    // Rough estimate: ~4 characters = 1 token
-    return len(content) / 4
-}
-
-// Directory walker (upward)
-func walkUpForClaudeFiles(startPath string) []memoryFile {
-    var files []memoryFile
-    current := startPath
-    level := 0
-
-    for current != "/" {
-        // Check for CLAUDE.md
-        claudePath := filepath.Join(current, "CLAUDE.md")
-        if _, err := os.Stat(claudePath); err == nil {
-            content, _ := os.ReadFile(claudePath)
-            files = append(files, memoryFile{
-                path:   claudePath,
-                tokens: estimateTokens(string(content)),
-                level:  level,
-            })
-        }
-
-        // Check for CLAUDE.local.md
-        localPath := filepath.Join(current, "CLAUDE.local.md")
-        if _, err := os.Stat(localPath); err == nil {
-            content, _ := os.ReadFile(localPath)
-            files = append(files, memoryFile{
-                path:   localPath,
-                tokens: estimateTokens(string(content)),
-                level:  level,
-            })
-        }
-
-        current = filepath.Dir(current)
-        level++
-    }
-
-    return files
-}
-
-// Ignore file parser
-func parseGitignore(path string) ([]string, error) {
-    // Parse .gitignore patterns
-    // Return list of glob patterns to exclude
-}
-
-func parseClaudeIgnore(path string) ([]string, error) {
-    // Parse .claudeignore patterns
-    // Return list of glob patterns to exclude
-}
-
-func isFileExcluded(filePath string, patterns []string) bool {
-    // Check if file matches any ignore pattern
-    // Use filepath.Match for glob pattern matching
-}
-```
-
-**Context View Display:**
-```
-┌─ Context Analysis ───────────────────────────────────────────┐
-│ Token Usage: 45.2K / 200K (22.6%)                            │
-├──────────────────────────────────────────────────────────────┤
-│ File                          Size    Tokens   Status         │
-│ ✅ main.go                    2.1KB   2,100    Included       │
-│ ✅ README.md                  1.8KB   1,800    Included       │
-│ ✅ docs/PLANNING.md           8.5KB   8,500    Included       │
-│ ✅ go.mod                     0.3KB     300    Included       │
-│ ❌ go.sum                     2.1KB     -      .gitignore     │
-│ ❌ .git/                      -        -       Hidden         │
-│ ⚠️  docs/RESEARCH.md          25KB    25,000   Preview only   │
-│                                                               │
-│ 💡 Optimization Suggestions:                                  │
-│   • Exclude docs/ to save ~33K tokens                        │
-│   • Add *.sum to .claudeignore to exclude checksums          │
-│                                                               │
-│ [I] Add to .claudeignore  [Enter] Preview  [Esc] Close       │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Hierarchy View Display:**
-```
-┌─ Claude Code Context Hierarchy ──────────────────────────────┐
-│                                                               │
-│ 📋 Memory Chain (CLAUDE.md files loaded)                     │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ / (root)                                   [not loaded] │ │
-│ │ └─ /home                                   [no file]    │ │
-│ │    └─ /home/matt                                        │ │
-│ │       ✅ CLAUDE.md                   1.2K tokens        │ │
-│ │       └─ /home/matt/projects          [no file]        │ │
-│ │          └─ /home/matt/projects/TFE  ← You are here    │ │
-│ │             ✅ CLAUDE.md              0.8K tokens       │ │
-│ │             ├─ .claude/                                 │ │
-│ │             │  ⚙️  settings.json      (active)         │ │
-│ │             │  ⚙️  settings.local.json (active)        │ │
-│ │             └─ docs/                                    │ │
-│ │                ✅ CLAUDE.md           0.5K tokens       │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                               │
-│ ⚙️  Active Settings (precedence order)                       │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ 1. [none] Enterprise managed-settings.json              │ │
-│ │ 2. ✅ .claude/settings.local.json (personal)            │ │
-│ │ 3. ✅ .claude/settings.json (team)                      │ │
-│ │ 4. ✅ ~/.claude/settings.json (global)                  │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                               │
-│ 📊 Total memory: 2.5K tokens                                 │
-│ [Enter] Preview file  [Esc] Close                            │
-└───────────────────────────────────────────────────────────────┘
-```
+**Estimated Time:** 2-3 weeks
 
 ---
 
-### Phase 4: Integrated Editor (Optional - 2-3 weeks)
+### Phase 4: File Operations (Extended)
 
-**Goal:** Built-in editing if we want more control
+**Goal:** Complete file management capabilities
 
-**Note:** This phase is optional. The hybrid approach (external editor) may be sufficient. Only implement if:
-- Users request integrated editing
-- Want more control over editor features
-- Need custom Claude Code integration in editor
+#### Features:
+- Copy file/directory
+- Move/rename file/directory
+- Batch operations (multi-select with Space)
+- Progress indicators for long operations
+- Undo/trash support (optional)
 
-**Features:**
-13. Built-in editor mode
-    - Switch from preview to edit mode
-    - Use `bubbles/textarea` for editing
-    - `Ctrl+S` to save
-    - Track modifications
-    - Confirm before closing unsaved
+**Note:** Lower priority than Phase 1-3
 
-14. Editor enhancements
-    - Undo/redo support
-    - Find/replace
-    - Basic syntax highlighting (via chroma library)
-    - Auto-save option
-    - Status indicators
+**Estimated Time:** 2-3 weeks
 
 ---
 
-### Phase 5: File Operations (2 weeks)
-
-**Goal:** Make TFE a functional file manager
-
-**Features:**
-15. File operations menu
-    - Press `D` for operations menu
-    - Copy, Move, Rename, Delete
-    - Confirmation dialogs before destructive operations
-    - Progress indicators for long operations
-
-16. Safe delete with trash
-    - Move to trash instead of permanent delete
-    - Option to permanently delete if needed
-    - Undo capability
-    - Trash management view
-
-17. Create new file/folder
-    - Press `N` for new menu
-    - Input dialogs with Bubbles text input
-    - Validation (no overwrite without confirm)
-    - Templates for common file types
-
-18. Batch operations
-    - Mark multiple files with `Space`
-    - Visual indication of marked files
-    - Apply operation to all marked files
-    - Confirm with file count
-
-**Implementation Notes:**
-```go
-type operation int
-const (
-    opCopy operation = iota
-    opMove
-    opDelete
-    opRename
-)
-
-type operationModel struct {
-    op          operation
-    sources     []string
-    destination string
-    inProgress  bool
-    error       error
-}
-
-// Trash directory
-var trashDir = filepath.Join(os.Getenv("HOME"), ".local/share/Trash/files")
-```
-
----
-
-### Phase 6: Windows-Friendly Features (1-2 weeks)
+### Phase 5: Windows-Friendly Features
 
 **Goal:** Bridge Windows and Linux concepts
 
-**Features:**
-19. Dual terminology mode
-    - Toggle to show Windows-equivalent terms
-    - "Shortcut (symlink)" not just "symlink"
-    - "Properties (chmod)" not just "permissions"
-    - Tooltip explanations
-    - Help overlay explaining concepts
+#### Features:
+- Dual terminology (e.g., "Shortcut (symlink)")
+- Visual permissions editor (checkbox UI)
+- Plain English command helper
+- Symlink indicators
 
-20. Visual permissions editor
-    - Open with `P` on selected file
-    - Checkbox UI for Owner/Group/Others
-    - Read/Write/Execute options
-    - Show octal notation (644, 755)
-    - Show Windows equivalent description
-    - Apply changes with confirmation
+**Note:** Nice-to-have, not critical
 
-21. Plain English command helper
-    - Show equivalent terminal commands
-    - "This will run: chmod +x filename"
-    - Learn while using
-    - Command history/examples
-
-**Visual Permissions Editor:**
-```
-┌─ Properties: main.go ─────────────────────────────────────┐
-│                                                            │
-│ Owner (you):  [x] Read  [x] Write  [ ] Execute           │
-│ Group:        [x] Read  [ ] Write  [ ] Execute           │
-│ Others:       [x] Read  [ ] Write  [ ] Execute           │
-│                                                            │
-│ Linux notation:   rw-r--r-- (644)                         │
-│ Windows equiv:    Read-only for others                    │
-│                                                            │
-│ This is a regular file, not executable.                   │
-│ To make executable: chmod +x main.go                      │
-│                                                            │
-│ [Apply] [Cancel]                                          │
-└────────────────────────────────────────────────────────────┘
-```
+**Estimated Time:** 1-2 weeks
 
 ---
 
-### Phase 7: Advanced Navigation (1-2 weeks)
+## Prioritized Next Steps
 
-**Goal:** Fast navigation and discovery
+### 🔥 Immediate (Do First)
+1. **Implement F7/F8** - Most visible gap
+   - Create dialog system
+   - F7 create directory
+   - F8 delete file/folder
+   - Add error feedback
 
-**Features:**
-22. Quick filter
-    - Press `/` to filter current directory
-    - Type to filter (fuzzy or exact)
-    - Incremental matching
-    - Clear filter with `Esc`
+2. **Fix Silent Errors** - Critical UX issue
+   - Add status message system
+   - Show all error messages
 
-23. Recursive file search
-    - Press `Ctrl+F` for recursive search
-    - Search by name in subdirectories
-    - Jump to found file
-    - Navigate through results
+3. **Add Search** - Highly valuable, quick to implement
+   - `/` to search
+   - Filter current directory
 
-24. Bookmarks/Favorites
-    - Press `B` to bookmark current directory
-    - Press `Shift+B` to view bookmarks
-    - Quick jump to favorites
-    - Edit/delete bookmarks
-    - Store in config file
+### ⭐ High Value (Do Soon)
+4. **Context Visualizer** - Unique differentiator
+   - This makes TFE special
+   - No other tool has this
 
-25. Command palette
-    - Press `:` for command mode
-    - Type commands: `goto`, `search`, `bookmark`, etc.
-    - Auto-complete suggestions
-    - Command history
+5. **Fix Grid View Bugs** - Prevent potential crashes
 
----
-
-### Phase 8: AI Integration (Future)
-
-**Goal:** AI-powered assistance
-
-**Features:**
-26. Ask Claude/Copilot
-    - Right-click or `Ctrl+A` → Ask AI menu
-    - "Explain this file"
-    - "What does this directory contain?"
-    - "Suggest improvements"
-    - Shell out to `copilot -p` or Claude API
-
-27. AI Scout mode
-    - Pre-filter with Copilot before launching Claude
-    - "Scout this directory"
-    - Get quick analysis
-    - Integration with context visualizer
-
-28. Launch Claude with context
-    - From Context View, press `Enter` to launch `claude`
-    - Pre-optimized context based on analysis
-    - Show command that will be run
-    - Option to edit before launch
+### 🔧 Nice to Have (Do Later)
+6. **Refactor update.go** - Only if feeling unwieldy
+7. **Extended File Ops** - Copy, move, batch operations
+8. **Windows Features** - Terminology, permissions editor
 
 ---
 
-## Key Bindings Reference
+## Design Principles
 
-### Navigation
-- `↑` / `k` - Move cursor up
-- `↓` / `j` - Move cursor down
-- `Enter` - Preview file / Navigate into directory
-- `h` / `←` - Go to parent directory
-- `q` / `Esc` / `Ctrl+C` - Quit application
+### Keep It Simple
+- Don't over-engineer
+- Ship working features quickly
+- Get feedback early
 
-### View Modes
-- `Space` / `Tab` - Toggle dual-pane mode
-- `C` - Context analyzer view
-- `Shift+C` - Context hierarchy view
-- `.` / `Ctrl+H` - Toggle hidden files
+### Maintainability First
+- Modular architecture (13 files, each with clear purpose)
+- See CLAUDE.md for architecture guidelines
+- Add new features to appropriate modules
 
-### File Operations
-- `E` - Edit in Micro
-- `N` - Edit in nano
-- `V` - Quick view (bat/less)
-- `D` - File operations menu
-- `P` - Properties/Permissions editor
-- `Space` (in file list) - Mark file for batch operation
+### User Experience
+- Always provide feedback (success/error messages)
+- Confirm destructive operations
+- Clear, helpful error messages
+- Keyboard shortcuts for everything
 
-### Search & Navigation
-- `/` - Quick filter
-- `Ctrl+F` - Recursive search
-- `B` - Bookmark current directory
-- `Shift+B` - View bookmarks
-- `:` - Command palette
-
-### Context View (when active)
-- `I` - Add file to .claudeignore
-- `O` - Show optimization suggestions
-- `Enter` - Preview file content
-- `Esc` - Return to file browser
-
----
-
-## Technical Implementation Details
-
-### Project Structure
-
-```
-TFE/
-├── main.go                  # Entry point, main model
-├── go.mod                   # Dependencies
-├── go.sum                   # Checksums
-├── README.md                # User documentation
-├── PLAN.md                  # This file
-├── .claude/
-│   ├── settings.json        # TFE project settings
-│   └── settings.local.json  # Local overrides
-├── docs/
-│   └── RESEARCH.md          # Background research notes
-├── internal/               # Internal packages
-│   ├── fileops/           # File operations
-│   ├── context/           # Context analyzer
-│   ├── preview/           # Preview pane
-│   ├── editor/            # Editor integration
-│   ├── icons/             # Icon mapping
-│   └── layout/            # Layout management
-└── pkg/                    # Public packages (if any)
-```
-
-### Module Breakdown
-
-**main.go** - Core application
-- Main model and update loop
-- Key binding handlers
-- View rendering coordination
-- Mode switching logic
-
-**internal/layout/** - Layout management
-- Calculate pane widths
-- Responsive layout
-- Split-pane rendering
-
-**internal/preview/** - Preview pane
-- Load file content
-- Syntax detection
-- Scroll handling
-- Line numbers
-
-**internal/context/** - Context analyzer
-- Token counting
-- Ignore file parsing
-- Hierarchy walker
-- Optimization suggestions
-
-**internal/fileops/** - File operations
-- Copy, move, delete, rename
-- Trash integration
-- Batch operations
-- Progress tracking
-
-**internal/editor/** - Editor integration
-- Launch external editors
-- Detect available editors
-- Process management
-
-**internal/icons/** - Icon mapping
-- Extension to icon mapping
-- File type detection
-- Nerd Font icon database
-
----
-
-## Dependencies
-
-### Current (from go.mod)
-```go
-require (
-    github.com/charmbracelet/bubbletea v1.3.10
-    github.com/charmbracelet/lipgloss v1.1.0
-    github.com/charmbracelet/bubbles v0.21.0
-)
-```
-
-### Additional Dependencies Needed
-
-**Phase 2 (Preview):**
-```go
-// Already included in bubbles
-github.com/charmbracelet/bubbles/textarea
-```
-
-**Phase 3 (Context Visualizer):**
-```go
-// For .gitignore parsing
-github.com/go-git/go-git/v5
-// OR use filepath.Match for simpler implementation
-```
-
-**Phase 4 (Integrated Editor - Optional):**
-```go
-// Syntax highlighting
-github.com/alecthomas/chroma/v2
-```
-
-**Phase 5 (File Operations):**
-```go
-// For safe file operations
-github.com/otiai10/copy  // recursive copy
-```
-
----
-
-## Configuration
-
-### User Configuration File
-**Location:** `~/.claude/tfe-settings.json`
-
-```json
-{
-  "tfe": {
-    "editor": "micro",
-    "fallback_editor": "nano",
-    "viewer": "bat",
-    "fallback_viewer": "less",
-    "show_hidden_by_default": false,
-    "dual_pane_by_default": false,
-    "left_pane_width_percent": 40,
-    "show_line_numbers": true,
-    "theme": "default",
-    "nerd_fonts_enabled": true,
-    "use_tmux_for_edit": false,
-    "max_preview_size_kb": 1024,
-    "token_estimate_divisor": 4,
-    "bookmarks": [
-      "/home/matt/projects",
-      "/home/matt/Documents"
-    ]
-  }
-}
-```
-
-### Project Configuration
-**Location:** `.claude/tfe-settings.json` (in project root)
-
-```json
-{
-  "tfe": {
-    "exclude_patterns": [
-      "node_modules/",
-      "*.pyc",
-      "__pycache__/"
-    ],
-    "context_optimization_enabled": true,
-    "auto_generate_claudeignore": false
-  }
-}
-```
-
----
-
-## Testing Strategy
-
-### Manual Testing Checklist
-
-**Phase 1 (Enhanced Single-Pane):** ✅ ALL COMPLETE
-- [x] File metadata displays correctly
-- [x] Icons match file types (ASCII markers)
-- [x] Hidden files toggle works (`.` key)
-- [x] Status bar updates accurately
-- [x] Window resize handled properly
-- [x] Claude context files highlighted in orange
-
-**Phase 2 (Dual-Pane):**
-- [ ] Toggle between single/dual pane
-- [ ] Preview shows file content
-- [ ] External editor launches and returns
-- [ ] Fallback editor works if primary missing
-- [ ] Quick viewer works
-
-**Phase 3 (Context Visualizer):**
-- [ ] Token counts are reasonable
-- [ ] .gitignore patterns respected
-- [ ] .claudeignore patterns respected
-- [ ] Hierarchy walks up correctly
-- [ ] Settings precedence shown correctly
-- [ ] Optimization suggestions helpful
-
-**Phase 5 (File Operations):**
-- [ ] Copy operation works
-- [ ] Move operation works
-- [ ] Delete moves to trash
-- [ ] Rename updates correctly
-- [ ] Batch operations process all files
-
-### Edge Cases to Test
-- Very long file paths
-- Files with special characters in names
-- Very large files (preview)
-- Very deep directory hierarchies (context)
-- Permissions errors
-- No Micro/nano installed
-- Terminal resize during operation
-
----
-
-## Performance Considerations
-
-### Optimization Priorities
-
-**Phase 1-2:**
-- Fast file listing (cache directory reads)
-- Responsive UI (never block on file I/O)
-- Efficient rendering (only redraw changed panes)
-
-**Phase 3:**
-- Lazy token counting (calculate on demand)
-- Cache token estimates (file hash + estimate)
-- Limit hierarchy walk depth (configurable max)
-- Background processing for large directories
-
-**Phase 5:**
-- Progress indicators for slow operations
-- Cancel capability for long-running ops
-- Batch operation chunking
-
-### Memory Management
-- Stream large files for preview (don't load entirely)
-- Limit preview to first N lines for huge files
-- Clean up resources when switching modes
+### Performance
+- Responsive UI (never block on I/O)
+- Cache where appropriate
+- Handle large directories gracefully
 
 ---
 
 ## Success Metrics
 
-### Phase 1-2 (Usable File Manager)
-- ✅ Can browse files faster than `ls`
-- ✅ Preview files without leaving TFE
-- ✅ Edit files comfortably
-- ✅ Use it daily instead of `cd` + `ls` + `micro`
+### Phase 1 Complete When:
+- ✅ F7 creates directories
+- ✅ F8 deletes files/folders safely
+- ✅ All errors show user feedback
+- ✅ Search works smoothly
 
-### Phase 3 (Unique Value)
-- ✅ Shows context that `/context` command doesn't
-- ✅ Saves time debugging context issues
-- ✅ Helps optimize token usage
-- ✅ Understand Claude Code's view instantly
+### Phase 3 Complete When:
+- ✅ Context view shows all files with token counts
+- ✅ Hierarchy view shows CLAUDE.md chain
+- ✅ Can identify context optimization opportunities
+- ✅ Faster than manually running `/context`
 
-### Phase 5+ (Full-Featured)
-- ✅ Replace `cp`, `mv`, `rm` commands with TFE
-- ✅ Daily driver for file management
-- ✅ Windows users understand Linux concepts better
-- ✅ Portfolio-worthy project
-
----
-
-## Milestones & Timeline
-
-### Milestone 1: Usable File Manager ✅ COMPLETE
-- ✅ Phase 1: Enhanced single-pane (COMPLETE)
-- ✅ Phase 1.5: View modes (COMPLETE - List, Grid, Detail, Tree views)
-- ✅ Phase 2: Dual-pane preview + editor integration (COMPLETE)
-- **Goal:** Better than `ls`, can view/edit files
-- **Achievement:** Fully functional file manager with preview and editing
-
-### Milestone 2: Unique Value Proposition (5-7 weeks)
-- Add Phase 3: Context Visualizer
-- **Goal:** The only tool showing Claude context breakdown
-
-### Milestone 3: Full-Featured (7-9 weeks)
-- Add Phase 5: File Operations
-- **Goal:** Daily driver file manager
-
-### Milestone 4: Polish & Differentiation (10-13 weeks)
-- Phase 6: Windows-friendly features
-- Phase 7: Advanced navigation
-- **Goal:** Unique, polished, portfolio-worthy
+### Daily Driver When:
+- ✅ Use it instead of `ls` + `cd`
+- ✅ Use it instead of `micro` (for opening files)
+- ✅ Use it instead of `mkdir` / `rm`
+- ✅ Use it for Claude Code context debugging
 
 ---
 
-## Open Questions & Decisions
+## Technical Debt
 
-### Resolved
-- ✅ Hybrid approach confirmed (native dual-pane + external editor)
-- ✅ Context Visualizer as killer feature
-- ✅ Go + Bubbletea as tech stack
-- ✅ Not relying on tmux (portable)
+### Current Issues:
+1. **Model too large** - 96 fields, mixed responsibilities
+   - Consider: PreviewModel, ContextMenuModel, CommandPromptModel sub-structs
 
-### To Decide
-- [ ] Default keybindings (vim-like vs arrow keys priority)
-- [ ] Theme support priority (Phase 6 or later?)
-- [ ] Syntax highlighting in preview (basic or advanced?)
-- [ ] Configuration format (JSON vs TOML vs YAML)
-- [ ] Build/release process (binaries, package managers)
+2. **Magic numbers** - Scattered throughout code
+   - Consider: config.go with all constants
 
----
+3. **Render side effects** - renderTreeView modifies model
+   - Move tree building to Update()
 
-## Future Enhancements (Post-MVP)
+4. **No tests** - Zero test coverage
+   - Add tests when codebase stabilizes
 
-### Potential Features
-- Multiple tabs (manage multiple directories)
-- Git integration (show git status in file list)
-- Archive browsing (browse .zip, .tar.gz contents)
-- FTP/SFTP support (browse remote files)
-- Plugin system (extend with custom features)
-- Themes and color schemes
-- Mouse support enhancements
-- File diff viewer
-- Hex viewer for binary files
+### Don't Fix Unless:
+- Code becomes hard to work with
+- Adding new features is slow
+- Bugs are frequent
 
-### Community Feedback
-- Gather user feedback after Phase 3
-- Prioritize based on actual usage
-- Consider Windows-specific features
-- Evaluate AI integration depth
+Right now: **Ship features first, refactor later**
 
 ---
 
-## Resources & References
+## Resources
 
 ### Documentation
 - [Bubbletea Tutorial](https://github.com/charmbracelet/bubbletea/tree/master/tutorials)
 - [Lipgloss Examples](https://github.com/charmbracelet/lipgloss/tree/master/examples)
-- [Bubbles Components](https://github.com/charmbracelet/bubbles)
 - [Claude Code Docs](https://docs.claude.com/en/docs/claude-code)
 
-### Inspiration (Existing File Managers)
+### Similar Projects (For Inspiration)
 - [Midnight Commander](https://github.com/MidnightCommander/mc) - Classic dual-pane
 - [Yazi](https://github.com/sxyazi/yazi) - Modern Rust TUI
-- [Ranger](https://github.com/ranger/ranger) - Python, powerful
-- [Felix](https://github.com/kyoheiu/felix) - Simple Rust
-- [Superfile](https://github.com/yorukot/superfile) - Eye-candy UI
+- [Ranger](https://github.com/ranger/ranger) - Python file manager
 
-### Tools We Integrate With
-- [Micro](https://github.com/zyedidia/micro) - Modern terminal editor
-- [Bat](https://github.com/sharkdp/bat) - Enhanced cat with syntax highlighting
-- [Claude Code](https://github.com/anthropics/claude-code) - AI coding assistant
+### Project Files
+- **README.md** - User documentation
+- **CLAUDE.md** - Architecture guide (READ THIS when adding features)
+- **HOTKEYS.md** - Keyboard reference (shown with F1)
+- **CHANGELOG.md** - Version history
+- **NEXT_SESSION.md** - Short-term session notes
 
 ---
 
 ## Notes
 
-- Focus on shipping Phase 1-2 first (usable file manager)
-- Context Visualizer (Phase 3) is the differentiator - perfect it
-- Don't over-engineer early phases
-- Get user feedback after each milestone
-- Keep it fast and responsive
-- Windows-friendly features make it unique vs ranger/yazi
-- Documentation as important as features
+- **Focus:** Ship F7/F8 next - most visible incomplete feature
+- **Differentiator:** Context Visualizer is what makes TFE unique
+- **Philosophy:** Hybrid approach (native preview + external editor)
+- **Target:** Windows→WSL developers, Claude Code users
+- **Keep:** Fast, simple, modular
 
 ---
 
-**Last Updated:** 2025-10-15
-**Status:** Milestone 1 Complete ✅ (Phases 1, 1.5, 2)
-**Next Step:** Consider refactoring for maintainability, then begin Phase 3 (Context Visualizer)
+**Last Updated:** 2025-10-16
+**Next Session:** Implement F7/F8 + Dialog System (Phase 1)

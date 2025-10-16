@@ -88,6 +88,7 @@ type previewModel struct {
 	cachedWrappedLines    []string // Cached wrapped text lines
 	cachedRenderedContent string   // Cached Glamour-rendered markdown
 	cachedLineCount       int      // Cached total line count after wrapping
+	cachedWidth           int      // Width the cache was computed for
 	cacheValid            bool     // Whether cache is valid
 }
 
