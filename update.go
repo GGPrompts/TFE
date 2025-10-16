@@ -576,8 +576,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Button {
 		case tea.MouseButtonLeft:
 			if msg.Action == tea.MouseActionRelease {
-				// Close context menu if open (clicking anywhere closes it)
+				// Handle context menu clicks if menu is open
 				if m.contextMenuOpen {
+					// Calculate menu bounds
+					menuItems := m.getContextMenuItems()
+					menuHeight := len(menuItems) + 2 // items + top/bottom border
+					// Calculate menu width from items
+					maxWidth := 0
+					for _, item := range menuItems {
+						width := visualWidth(item.label)
+						if width > maxWidth {
+							maxWidth = width
+						}
+					}
+					menuWidth := maxWidth + 4 + 2 // padding + borders
+
+					// Check if click is within menu bounds
+					if msg.X >= m.contextMenuX && msg.X <= m.contextMenuX+menuWidth &&
+						msg.Y >= m.contextMenuY && msg.Y <= m.contextMenuY+menuHeight {
+						// Click is inside menu - calculate which item was clicked
+						clickedItemIndex := msg.Y - m.contextMenuY - 1 // -1 for top border
+						if clickedItemIndex >= 0 && clickedItemIndex < len(menuItems) {
+							// Update cursor and execute the clicked item
+							m.contextMenuCursor = clickedItemIndex
+							return m.executeContextMenuAction()
+						}
+					}
+
+					// Click is outside menu - close it
 					m.contextMenuOpen = false
 					return m, tea.ClearScreen
 				}
@@ -705,6 +731,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.MouseButtonRight:
 			// Right-click: open context menu
 			if msg.Action == tea.MouseActionRelease {
+				// Close any existing menu first to prevent phantoms
+				if m.contextMenuOpen {
+					m.contextMenuOpen = false
+				}
+
 				// Don't open menu in preview mode or if in right pane
 				if m.viewMode == viewFullPreview {
 					break
