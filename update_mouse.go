@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -92,6 +93,11 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						m.commandInput = ""
 					}
 					return m, nil
+				}
+				// CellBlocks button [📦] (X=17-22)
+				if msg.X >= 17 && msg.X <= 22 {
+					// Launch CellBlocksTUI
+					return m, launchCellBlocksTUI()
 				}
 			}
 
@@ -580,4 +586,46 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// launchCellBlocksTUI launches the CellBlocksTUI application
+func launchCellBlocksTUI() tea.Cmd {
+	// Try to find cellblocks-tui in various locations
+	var cmdPath string
+
+	// First, try the PATH
+	if path, err := exec.LookPath("cellblocks-tui"); err == nil {
+		cmdPath = path
+	} else {
+		// Fallback to known locations
+		homeDir, _ := os.UserHomeDir()
+		possiblePaths := []string{
+			homeDir + "/bin/cellblocks-tui",
+			homeDir + "/projects/CellBlocksTUI/cellblocks-tui",
+			"/usr/local/bin/cellblocks-tui",
+		}
+
+		for _, path := range possiblePaths {
+			if _, err := os.Stat(path); err == nil {
+				cmdPath = path
+				break
+			}
+		}
+	}
+
+	if cmdPath == "" {
+		// Binary not found, return error message
+		return func() tea.Msg {
+			return "Error: cellblocks-tui not found in PATH or known locations"
+		}
+	}
+
+	c := exec.Command(cmdPath)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		// Return error as message if launch fails
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }

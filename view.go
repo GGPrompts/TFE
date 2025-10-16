@@ -85,6 +85,10 @@ func (m model) renderSinglePane() string {
 		s.WriteString(termStyle.Render(">_"))
 		s.WriteString(bracketStyle.Render("]"))
 	}
+	s.WriteString(" ")
+
+	// CellBlocks button
+	s.WriteString(homeButtonStyle.Render("[📦]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")

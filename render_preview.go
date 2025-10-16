@@ -367,6 +367,13 @@ func (m model) renderDualPane() string {
 		s.WriteString(termStyle.Render(">_"))
 		s.WriteString(bracketStyle.Render("]"))
 	}
+	s.WriteString(" ")
+
+	// CellBlocks button
+	cellblocksButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(cellblocksButtonStyle.Render("[📦]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
