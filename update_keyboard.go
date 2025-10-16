@@ -28,6 +28,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Exit preview mode (F10 replaces q)
 			m.viewMode = viewSinglePane
 			m.calculateLayout()
+			m.populatePreviewCache() // Refresh cache with new width
 			return m, tea.ClearScreen
 
 		case "f4":
@@ -220,9 +221,9 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.contextMenuOpen {
 		switch msg.String() {
 		case "esc", "q":
-			// Close context menu and clear screen to remove visual artifacts
+			// Close context menu
 			m.contextMenuOpen = false
-			return m, tea.ClearScreen
+			return m, nil
 
 		case "up", "k":
 			// Navigate up in menu, skipping separators
@@ -238,8 +239,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			// Clear screen to prevent ANSI overlay artifacts
-			return m, tea.ClearScreen
+			return m, nil
 
 		case "down", "j":
 			// Navigate down in menu, skipping separators
@@ -255,8 +255,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			// Clear screen to prevent ANSI overlay artifacts
-			return m, tea.ClearScreen
+			return m, nil
 
 		case "enter":
 			// Execute selected menu action
@@ -321,7 +320,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if isPrintable {
-				m.commandInput += text
+				// Strip ANSI codes to prevent pasted styled text from corrupting command line
+				m.commandInput += stripANSI(text)
 				m.historyPos = len(m.commandHistory)
 				return m, nil
 			}
@@ -335,10 +335,18 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "esc":
-		// Exit dual-pane mode if active
+		// Context-aware ESC behavior:
+		// 1. Exit dual-pane mode if active
+		// 2. Otherwise, go to parent directory (Windows-style back navigation)
 		if m.viewMode == viewDualPane {
 			m.viewMode = viewSinglePane
 			m.calculateLayout()
+			m.populatePreviewCache() // Refresh cache with new width
+		} else if m.currentPath != "/" {
+			// Go up one level
+			m.currentPath = filepath.Dir(m.currentPath)
+			m.cursor = 0
+			m.loadFiles()
 		}
 
 	case "up":
@@ -444,6 +452,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// File is in current directory, just preview it
 					m.loadPreview(currentFile.path)
 					m.viewMode = viewFullPreview
+					m.calculateLayout() // Update widths for full-screen
+					m.populatePreviewCache() // Repopulate cache with correct width
 					// Clear screen for clean rendering
 					return m, tea.ClearScreen
 				}
@@ -461,6 +471,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Enter full-screen preview (regardless of current mode)
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
+				m.calculateLayout() // Update widths for full-screen
+				m.populatePreviewCache() // Repopulate cache with correct width
 				// Clear screen for clean rendering
 				return m, tea.ClearScreen
 			}
@@ -500,6 +512,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if m.viewMode == viewDualPane {
 			m.viewMode = viewSinglePane
 			m.calculateLayout()
+			m.populatePreviewCache() // Refresh cache with new width
 		}
 
 	case "f3":
@@ -513,6 +526,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Open in full-screen preview
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
+				m.calculateLayout() // Update widths for full-screen
+				m.populatePreviewCache() // Repopulate cache with correct width
 				// Clear screen for clean rendering
 				return m, tea.ClearScreen
 			}
@@ -544,10 +559,75 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-	case "h", "left":
-		// Go to parent directory
+	case "left":
+		// In tree mode: collapse folder or go to parent
+		// In other modes: go to parent directory
+		if m.displayMode == modeTree {
+			if currentFile := m.getCurrentFile(); currentFile != nil {
+				if currentFile.isDir && currentFile.name != ".." {
+					// If directory is expanded, collapse it
+					if m.expandedDirs[currentFile.path] {
+						m.expandedDirs[currentFile.path] = false
+					} else {
+						// Already collapsed, go to parent
+						if m.currentPath != "/" {
+							m.currentPath = filepath.Dir(m.currentPath)
+							m.cursor = 0
+							m.loadFiles()
+						}
+					}
+				} else {
+					// Not a directory or is "..", go to parent
+					if m.currentPath != "/" {
+						m.currentPath = filepath.Dir(m.currentPath)
+						m.cursor = 0
+						m.loadFiles()
+					}
+				}
+			}
+		} else {
+			// Non-tree modes: go to parent directory
+			if m.currentPath != "/" {
+				m.currentPath = filepath.Dir(m.currentPath)
+				m.cursor = 0
+				m.loadFiles()
+			}
+		}
+
+	case "h":
+		// 'h' always goes to parent (vim-style)
 		if m.currentPath != "/" {
 			m.currentPath = filepath.Dir(m.currentPath)
+			m.cursor = 0
+			m.loadFiles()
+		}
+
+	case "right":
+		// In tree mode: expand folder or navigate into it
+		// In other modes: navigate into selected directory
+		if currentFile := m.getCurrentFile(); currentFile != nil && currentFile.isDir && currentFile.name != ".." {
+			if m.displayMode == modeTree {
+				// If directory is collapsed, expand it
+				if !m.expandedDirs[currentFile.path] {
+					m.expandedDirs[currentFile.path] = true
+				} else {
+					// Already expanded, navigate into it
+					m.currentPath = currentFile.path
+					m.cursor = 0
+					m.loadFiles()
+				}
+			} else {
+				// Non-tree modes: navigate into directory
+				m.currentPath = currentFile.path
+				m.cursor = 0
+				m.loadFiles()
+			}
+		}
+
+	case "l":
+		// 'l' always navigates into directory (vim-style)
+		if currentFile := m.getCurrentFile(); currentFile != nil && currentFile.isDir {
+			m.currentPath = currentFile.path
 			m.cursor = 0
 			m.loadFiles()
 		}
@@ -633,6 +713,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if _, err := os.Stat(hotkeysPath); err == nil {
 			m.loadPreview(hotkeysPath)
 			m.viewMode = viewFullPreview
+			m.calculateLayout() // Update widths for full-screen
+			m.populatePreviewCache() // Repopulate cache with correct width
 			// Clear screen for clean rendering
 			return m, tea.ClearScreen
 		}
@@ -719,7 +801,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if isPrintable {
-				m.commandInput += text
+				// Strip ANSI codes to prevent pasted styled text from corrupting command line
+				m.commandInput += stripANSI(text)
 				m.historyPos = len(m.commandHistory)
 				return m, nil
 			}

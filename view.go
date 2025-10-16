@@ -25,33 +25,7 @@ func (m model) View() string {
 	// Overlay context menu if open
 	if m.contextMenuOpen {
 		menu := m.renderContextMenu()
-		// Position menu using ANSI escape codes
-		// Move cursor to menu position and render
-		x, y := m.contextMenuX, m.contextMenuY
-
-		// Ensure menu stays on screen with proper margins
-		if x < 1 {
-			x = 1 // Minimum left margin to show border
-		}
-		if x > m.width-25 {
-			x = m.width - 25
-		}
-		if y < 1 {
-			y = 1 // Minimum top margin
-		}
-		if y > m.height-10 {
-			y = m.height - 10
-		}
-
-		// Replace newlines with newline + cursor positioning to maintain X coordinate
-		// This keeps the menu together while fixing the alignment issue
-		cursorToX := fmt.Sprintf("\n\033[%dG", x+1) // Move to column x+1 after each newline
-		menuPositioned := strings.ReplaceAll(menu, "\n", cursorToX)
-
-		// Position the start of the menu
-		// ANSI escape codes use 1-based indexing, so add 1 to coordinates
-		menuOverlay := fmt.Sprintf("\033[%d;%dH%s", y+1, x+1, menuPositioned)
-		baseView += menuOverlay
+		baseView = m.overlayContextMenu(baseView, menu)
 	}
 
 	// Overlay dialog if open
@@ -92,6 +66,8 @@ func (m model) renderSinglePane() string {
 	s.WriteString(inputStyle.Render(m.commandInput))
 	// Always show cursor (MC-style: command prompt is always active)
 	s.WriteString(cursorStyle.Render("█"))
+	// Explicitly reset styling after cursor to prevent ANSI code leakage
+	s.WriteString("\033[0m")
 	s.WriteString("\n")
 
 	// Separator line between command prompt and file tree
@@ -195,4 +171,89 @@ func (m model) renderSinglePane() string {
 	}
 
 	return s.String()
+}
+
+// overlayContextMenu embeds the context menu into the base view at the correct position
+// This approach works with Bubble Tea's diff-based rendering without needing tea.ClearScreen
+func (m model) overlayContextMenu(baseView, menuContent string) string {
+	x, y := m.contextMenuX, m.contextMenuY
+
+	// Ensure menu stays on screen with proper margins
+	if x < 1 {
+		x = 1
+	}
+	if x > m.width-25 {
+		x = m.width - 25
+	}
+	if y < 1 {
+		y = 1
+	}
+	if y > m.height-10 {
+		y = m.height - 10
+	}
+
+	// Split both views into lines
+	baseLines := strings.Split(baseView, "\n")
+	menuLines := strings.Split(strings.TrimSpace(menuContent), "\n")
+
+	// Ensure we have enough base lines
+	for len(baseLines) < m.height {
+		baseLines = append(baseLines, "")
+	}
+
+	// Overlay each menu line onto the base view
+	for i, menuLine := range menuLines {
+		targetLine := y + i
+		if targetLine < 0 || targetLine >= len(baseLines) {
+			continue
+		}
+
+		baseLine := baseLines[targetLine]
+
+		// We need to overlay menuLine at visual column x
+		// Use a string builder to construct the new line
+		var newLine strings.Builder
+
+		// Get the part of baseLine before position x
+		// We need to handle ANSI codes properly
+		visualPos := 0
+		bytePos := 0
+		inAnsi := false
+		baseRunes := []rune(baseLine)
+
+		// Scan through base line until we reach visual position x
+		for bytePos < len(baseRunes) && visualPos < x {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			}
+
+			if inAnsi {
+				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
+					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
+					inAnsi = false
+				}
+			} else {
+				visualPos++
+			}
+			bytePos++
+		}
+
+		// Add the left part of the base line (up to position x)
+		if bytePos > 0 && bytePos <= len(baseRunes) {
+			newLine.WriteString(string(baseRunes[:bytePos]))
+		}
+
+		// Pad with spaces if needed to reach position x
+		for visualPos < x {
+			newLine.WriteRune(' ')
+			visualPos++
+		}
+
+		// Add the menu line
+		newLine.WriteString(menuLine)
+
+		baseLines[targetLine] = newLine.String()
+	}
+
+	return strings.Join(baseLines, "\n")
 }

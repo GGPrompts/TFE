@@ -714,6 +714,9 @@ func (m *model) loadPreview(path string) {
 		lines := strings.Split(string(content), "\n")
 		m.preview.content = lines
 		m.preview.loaded = true
+
+		// Populate cache for smooth scrolling performance
+		m.populatePreviewCache()
 		return
 	}
 
@@ -752,7 +755,7 @@ func (m *model) populatePreviewCache() {
 	if m.preview.isMarkdown {
 		markdownContent := strings.Join(m.preview.content, "\n")
 		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("dark"),
+			glamour.WithStandardStyle("auto"),
 			glamour.WithWordWrap(availableWidth),
 		)
 		if err == nil {

@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # TFE Wrapper Script
 # This wrapper enables the "Quick CD" feature to change directories after exiting TFE
 #
@@ -8,8 +8,10 @@
 # Then use 'tfe' instead of './tfe' to launch the file explorer
 
 tfe() {
-    # Run TFE from the TFE directory
-    local TFE_BIN="$HOME/TFE/tfe"
+    # Auto-detect TFE binary location (works across all devices)
+    # The wrapper is in the same directory as the tfe binary
+    local WRAPPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local TFE_BIN="$WRAPPER_DIR/tfe"
     local CD_TARGET="$HOME/.tfe_cd_target"
 
     # Clear any previous cd target

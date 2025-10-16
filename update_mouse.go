@@ -101,7 +101,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 				// Click is outside menu - close it
 				m.contextMenuOpen = false
-				return m, tea.ClearScreen
+				return m, nil
 			}
 
 			// In dual-pane mode, only process file clicks if within left pane
@@ -390,6 +390,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 				m.contextMenuY = msg.Y
 
+				// Clear command input to remove any unwanted paste from terminal's right-click paste
+				// (Many terminals paste clipboard on right-click before sending the click event)
+				m.commandInput = ""
+
 				// Get the file item based on display mode
 				if m.displayMode == modeTree {
 					file := m.treeItems[clickedIndex].file
@@ -407,7 +411,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			if m.contextMenuCursor > 0 {
 				m.contextMenuCursor--
 			}
-			return m, tea.ClearScreen
+			return m, nil
 		}
 
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
@@ -436,7 +440,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			if m.contextMenuCursor < len(menuItems)-1 {
 				m.contextMenuCursor++
 			}
-			return m, tea.ClearScreen
+			return m, nil
 		}
 
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {

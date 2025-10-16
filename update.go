@@ -1,6 +1,8 @@
 package main
 
 import (
+	"regexp"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -17,6 +19,14 @@ import (
 
 func (m model) Init() tea.Cmd {
 	return m.spinner.Tick
+}
+
+// stripANSI removes ANSI escape codes from a string
+// This prevents pasted styled text from corrupting the command line
+func stripANSI(s string) string {
+	// Match ANSI escape sequences: ESC [ ... m (and other variants)
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	return ansiRegex.ReplaceAllString(s, "")
 }
 
 // isSpecialKey checks if a key string represents a special (non-printable) key

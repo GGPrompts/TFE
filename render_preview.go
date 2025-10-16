@@ -32,7 +32,7 @@ func (m model) getWrappedLineCount() int {
 	if m.preview.isMarkdown {
 		markdownContent := strings.Join(m.preview.content, "\n")
 		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("dark"),
+			glamour.WithStandardStyle("auto"),
 			glamour.WithWordWrap(availableWidth),
 		)
 		if err == nil {
@@ -142,33 +142,11 @@ func (m model) renderPreview(maxVisible int) string {
 
 	// If markdown, render with Glamour
 	if m.preview.isMarkdown {
-		var renderedLines []string
+		// ALWAYS use cached rendered content - no fallback rendering in render loop!
+		// Cache MUST be populated by populatePreviewCache() after loading file
+		if m.preview.cacheValid && m.preview.cachedRenderedContent != "" {
+			renderedLines := strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 
-		// Check if we have cached rendered content and width matches
-		if m.preview.cacheValid && m.preview.cachedRenderedContent != "" && m.preview.cachedWidth == availableWidth {
-			// Use cached rendered content
-			renderedLines = strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
-		} else {
-			// Join content back to original markdown
-			markdownContent := strings.Join(m.preview.content, "\n")
-
-			// Create Glamour renderer with appropriate width
-			// Use dark theme with standard styling
-			renderer, err := glamour.NewTermRenderer(
-				glamour.WithStandardStyle("dark"),
-				glamour.WithWordWrap(availableWidth),
-			)
-
-			if err == nil {
-				rendered, err := renderer.Render(markdownContent)
-				if err == nil {
-					renderedLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-				}
-			}
-		}
-
-		// If we successfully got rendered lines, display them
-		if len(renderedLines) > 0 {
 			// Calculate visible range based on scroll position
 			totalLines := len(renderedLines)
 			start := m.preview.scrollPos
@@ -193,7 +171,7 @@ func (m model) renderPreview(maxVisible int) string {
 
 			return s.String()
 		}
-		// If Glamour rendering fails, fall through to regular rendering
+		// If cache not valid, fall through to regular text rendering
 	}
 
 	// Wrap all lines first (use cache if available and width matches)
@@ -353,6 +331,8 @@ func (m model) renderDualPane() string {
 	s.WriteString(inputStyle.Render(m.commandInput))
 	// Always show cursor (MC-style: command prompt is always active)
 	s.WriteString(cursorStyle.Render("█"))
+	// Explicitly reset styling after cursor to prevent ANSI code leakage
+	s.WriteString("\033[0m")
 	s.WriteString("\n")
 
 	// Separator line between command prompt and panes

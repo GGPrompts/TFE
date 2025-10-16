@@ -345,6 +345,7 @@ Do NOT add complex logic to `main.go`. Instead:
 - Add it to that module, or create a new one
 - Keep files focused and organized
 - Update this document when creating new modules
+- When this document gains new architectural context, mirror the contributor-facing highlights in `AGENTS.md`
 
 This architecture took significant effort to establish - let's maintain it! 🏗️
 
@@ -367,7 +368,7 @@ These files live in the project root and should be kept concise:
 | **PLAN.md** | 400 | Current roadmap & planned features | Move completed items to CHANGELOG.md |
 | **CHANGELOG.md** | 300 | Recent changes & release notes | Archive old versions to `docs/archive/CHANGELOG_YYYY.md` |
 | **BACKLOG.md** | 300 | Ideas & future features (brainstorming) | Move refined ideas to PLAN.md or archive |
-| **HOTKEYS.md** | 200 | User-facing keyboard shortcuts | Should rarely grow |
+| **HOTKEYS.md** | - | User-facing keyboard shortcuts | Keep the list comprehensive and current |
 
 ### Documentation Workflow
 

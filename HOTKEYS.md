@@ -10,8 +10,8 @@
 | **F4** | Edit file in external editor |
 | **F5** | Copy file path to clipboard |
 | **F6** | Toggle favorites filter (show only favorites) |
-| **F7** | Create directory *(placeholder for future)* |
-| **F8** | Delete file/folder *(placeholder for future)* |
+| **F7** | Create new directory (prompts for name) |
+| **F8** | Delete file/folder (prompts for confirmation) |
 | **F9** | Cycle through display modes (List → Grid → Detail → Tree) |
 | **F10** | Quit TFE |
 
@@ -21,9 +21,13 @@
 |-----|--------|
 | **↑** / **k** | Move cursor up |
 | **↓** / **j** | Move cursor down |
-| **Enter** | Enter directory / Preview file (full-screen) |
+| **Enter** | Enter directory / Preview file (full-screen) / Toggle tree expansion |
 | **Double-Click** | Enter directory / Preview file (full-screen) |
-| **h** / **←** | Go to parent directory |
+| **←** | Tree: collapse folder OR go to parent / Other modes: go to parent |
+| **→** | Tree: expand folder OR enter directory / Other modes: enter directory |
+| **h** | Go to parent directory (vim-style) |
+| **l** | Enter directory (vim-style) |
+| **Esc** | Clear command → Exit dual-pane → Go back a directory level |
 | **Tab** | Toggle dual-pane mode / Switch focus (left ↔ right) |
 | **Space** | Toggle dual-pane mode on/off |
 
@@ -44,7 +48,7 @@
 |-----|--------|
 | **F3** | Open images/HTML in default browser OR full-screen preview of current file |
 | **Enter** | Open full-screen preview (when on a file) |
-| **Esc** | Exit full-screen preview / Exit dual-pane mode |
+| **Esc** | Exit full-screen preview / Exit dual-pane mode / Go back a level |
 | **↑** / **k** | Scroll preview up (in full-screen or dual-pane right) |
 | **↓** / **j** | Scroll preview down (in full-screen or dual-pane right) |
 | **PgUp** | Page up in preview |
@@ -58,6 +62,8 @@
 | **F4** | Edit file in external editor (Micro preferred, then nano/vim) |
 | **n** / **N** | Edit file in nano specifically |
 | **F5** | Copy file path to clipboard |
+| **F7** | Create new directory (prompts for name) |
+| **F8** | Delete selected file/folder (prompts for confirmation) |
 
 ## Context Menu
 
@@ -70,13 +76,18 @@
 | **Esc** / **q** | Close context menu |
 
 Context menu actions include:
+- 📂 Open / Quick CD (for directories)
 - 👁️ Preview file
 - 🌐 Open in browser (images/HTML files only)
 - ✏️ Edit file
 - 📋 Copy path to clipboard
-- ⭐ Toggle favorite
-- 📂 Quick CD (for directories)
+- 📁 New folder (for directories)
 - 🗑️ Delete file/folder
+- ⭐ Toggle favorite
+- 🌿 Git (lazygit) - if available
+- 🐋 Docker (lazydocker) - if available
+- 📜 Logs (lnav) - if available
+- 📊 Processes (htop) - if available
 
 ## Favorites
 
@@ -96,12 +107,12 @@ When in favorites mode, press Enter on a favorite to navigate to its location.
 | **Any letter/number** | Type into command prompt |
 | **Backspace** | Delete last character from command |
 | **Enter** | Execute command (or navigate if empty) |
-| **Esc** | Clear command prompt |
+| **Esc** | Clear command prompt (then other ESC behaviors) |
 | **↑** (with input) | Previous command in history |
 | **↓** (with input) | Next command in history |
 | **exit** / **quit** | Exit TFE (type and press Enter) |
 
-> **Note:** The command prompt is MC (Midnight Commander) style - you can start typing anywhere without pressing a special key. Your input appears at the top of the screen.
+> **Note:** The command prompt is MC (Midnight Commander) style - you can start typing anywhere without pressing a special key. Your input appears at the top of the screen. ANSI codes are automatically stripped from pasted text.
 
 ## Dual-Pane Mode
 
@@ -164,8 +175,10 @@ TFE uses emoji icons to indicate file types:
 5. **Fast Editing:** Press **F4** on any file to jump straight into Micro/nano editor
 6. **Copy Paths:** Press **F5** to copy file paths for pasting elsewhere
 7. **Command History:** Use ↑/↓ arrows when typing to recall previous commands
-8. **Context Menu:** Press **F2** or right-click for quick access to common actions
-9. **Favorites:** Press **s** to bookmark files/folders, then **F6** to filter by favorites
+8. **Context Menu:** Press **F2** or right-click for quick access to common actions (including TUI tools like lazygit!)
+9. **Favorites:** Use the context menu (F2/right-click) to bookmark files/folders, then **F6** to filter by favorites
+10. **Tree Navigation:** In tree view (4), use ← to collapse, → to expand folders (Windows Explorer style)
+11. **ESC to Go Back:** Press ESC to navigate back like Windows Explorer's back button
 
 ---
 
