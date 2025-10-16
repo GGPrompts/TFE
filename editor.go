@@ -35,6 +35,18 @@ func openEditor(editor, path string) tea.Cmd {
 	)
 }
 
+// openTUITool opens a TUI application in the specified directory
+func openTUITool(tool, dir string) tea.Cmd {
+	c := exec.Command(tool)
+	c.Dir = dir // Set working directory
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
 // copyToClipboard copies text to the system clipboard
 func copyToClipboard(text string) error {
 	var cmd *exec.Cmd

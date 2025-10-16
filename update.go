@@ -137,18 +137,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.ClearScreen
 
 			case "up", "k":
-				// Navigate up in menu
-				if m.contextMenuCursor > 0 {
-					m.contextMenuCursor--
+				// Navigate up in menu, skipping separators
+				menuItems := m.getContextMenuItems()
+				for {
+					if m.contextMenuCursor > 0 {
+						m.contextMenuCursor--
+					} else {
+						break
+					}
+					// Stop if we're not on a separator
+					if menuItems[m.contextMenuCursor].action != "separator" {
+						break
+					}
 				}
 				// Clear screen to prevent ANSI overlay artifacts
 				return m, tea.ClearScreen
 
 			case "down", "j":
-				// Navigate down in menu
+				// Navigate down in menu, skipping separators
 				menuItems := m.getContextMenuItems()
-				if m.contextMenuCursor < len(menuItems)-1 {
-					m.contextMenuCursor++
+				for {
+					if m.contextMenuCursor < len(menuItems)-1 {
+						m.contextMenuCursor++
+					} else {
+						break
+					}
+					// Stop if we're not on a separator
+					if menuItems[m.contextMenuCursor].action != "separator" {
+						break
+					}
 				}
 				// Clear screen to prevent ANSI overlay artifacts
 				return m, tea.ClearScreen

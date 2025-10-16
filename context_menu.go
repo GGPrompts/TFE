@@ -47,6 +47,40 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		items = append(items, contextMenuItem{"📂 Open", "open"})
 		items = append(items, contextMenuItem{"📂 Quick CD", "quickcd"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
+
+		// Add separator and TUI tools if available
+		hasTools := false
+		if editorAvailable("lazygit") {
+			if !hasTools {
+				items = append(items, contextMenuItem{"─────────", "separator"})
+				hasTools = true
+			}
+			items = append(items, contextMenuItem{"🌿 Git (lazygit)", "lazygit"})
+		}
+		if editorAvailable("lazydocker") {
+			if !hasTools {
+				items = append(items, contextMenuItem{"─────────", "separator"})
+				hasTools = true
+			}
+			items = append(items, contextMenuItem{"🐋 Docker (lazydocker)", "lazydocker"})
+		}
+		if editorAvailable("lnav") {
+			if !hasTools {
+				items = append(items, contextMenuItem{"─────────", "separator"})
+				hasTools = true
+			}
+			items = append(items, contextMenuItem{"📜 Logs (lnav)", "lnav"})
+		}
+		if editorAvailable("htop") {
+			if !hasTools {
+				items = append(items, contextMenuItem{"─────────", "separator"})
+				hasTools = true
+			}
+			items = append(items, contextMenuItem{"📊 Processes (htop)", "htop"})
+		}
+
+		// Add separator and favorites
+		items = append(items, contextMenuItem{"─────────", "separator"})
 		if m.isFavorite(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
 		} else {
@@ -137,6 +171,38 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Toggle favorite
 		m.toggleFavorite(m.contextMenuFile.path)
 		return m, tea.ClearScreen
+
+	case "separator":
+		// Separator is not selectable - shouldn't happen but handle gracefully
+		return m, tea.ClearScreen
+
+	case "lazygit":
+		// Launch lazygit in the selected directory
+		if m.contextMenuFile.isDir {
+			return m, openTUITool("lazygit", m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "lazydocker":
+		// Launch lazydocker in the selected directory
+		if m.contextMenuFile.isDir {
+			return m, openTUITool("lazydocker", m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "lnav":
+		// Launch lnav in the selected directory
+		if m.contextMenuFile.isDir {
+			return m, openTUITool("lnav", m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "htop":
+		// Launch htop (doesn't need directory context but launch from directory anyway)
+		if m.contextMenuFile.isDir {
+			return m, openTUITool("htop", m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
 	}
 
 	return m, tea.ClearScreen
@@ -168,24 +234,31 @@ func (m model) renderContextMenu() string {
 	// Build menu content with consistent width
 	var menuLines []string
 	for i, item := range items {
-		// Add padding to each line
-		line := fmt.Sprintf("  %s  ", item.label)
+		var line string
 
-		// Highlight selected item
-		if i == m.contextMenuCursor {
+		// Style separators differently
+		if item.action == "separator" {
+			// Separator: dim color, not selectable
+			separatorStyle := lipgloss.NewStyle().
+				Background(lipgloss.Color("236")).
+				Foreground(lipgloss.Color("240")).
+				Width(contentWidth)
+			line = separatorStyle.Render(fmt.Sprintf("  %s  ", item.label))
+		} else if i == m.contextMenuCursor {
+			// Highlighted selected item
 			selectedStyle := lipgloss.NewStyle().
 				Background(lipgloss.Color("39")).
 				Foreground(lipgloss.Color("0")).
 				Bold(true).
 				Width(contentWidth)
-			line = selectedStyle.Render(line)
+			line = selectedStyle.Render(fmt.Sprintf("  %s  ", item.label))
 		} else {
 			// Normal items also need a background to cover underlying text
 			normalStyle := lipgloss.NewStyle().
 				Background(lipgloss.Color("236")).
 				Foreground(lipgloss.Color("252")).
 				Width(contentWidth)
-			line = normalStyle.Render(line)
+			line = normalStyle.Render(fmt.Sprintf("  %s  ", item.label))
 		}
 		menuLines = append(menuLines, line)
 	}
