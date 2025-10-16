@@ -264,15 +264,16 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle command prompt input (MC-style: always active, no focus needed)
+	// Handle command prompt input (focus-based: only active when commandFocused)
 	// Special keys that interact with command prompt
 	switch msg.String() {
 	case "enter":
-		// Execute command if there's input
-		if m.commandInput != "" {
+		// Execute command if command prompt is focused and has input
+		if m.commandFocused && m.commandInput != "" {
 			cmd := m.commandInput
 			m.addToHistory(cmd)
 			m.commandInput = ""
+			m.commandFocused = false // Exit command mode after executing
 			// Check for exit/quit commands
 			cmdLower := strings.ToLower(strings.TrimSpace(cmd))
 			if cmdLower == "exit" || cmdLower == "quit" {
@@ -280,31 +281,43 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, runCommand(cmd, m.currentPath)
 		}
-		// If no command input, handle Enter for file navigation (below)
+		// If not in command mode or no input, handle Enter for file navigation (below)
 
 	case "backspace":
-		// Delete last character from command if there's input
-		if len(m.commandInput) > 0 {
+		// Delete last character from command if focused and has input
+		if m.commandFocused && len(m.commandInput) > 0 {
 			m.commandInput = m.commandInput[:len(m.commandInput)-1]
 			return m, nil
 		}
-		// If no command input, backspace does nothing (could navigate up later)
+		// If no command input, backspace does nothing
 
 	case "esc":
-		// Clear command input if there's any
+		// Exit command mode if focused
+		if m.commandFocused {
+			m.commandInput = ""
+			m.commandFocused = false
+			return m, nil
+		}
+		// If there's leftover command input (but not focused), clear it
 		if m.commandInput != "" {
 			m.commandInput = ""
 			return m, nil
 		}
 		// If no command input, handle Esc for dual-pane exit (below)
+
+	case ":":
+		// Enter command mode (vim-style)
+		if !m.commandFocused {
+			m.commandFocused = true
+			m.commandInput = ""
+			return m, nil
+		}
+		// If already in command mode, add the colon to input
 	}
 
-	// Check if user is typing/pasting in command prompt
-	// If commandInput has text, prioritize adding to it over hotkeys
-	// This allows typing 'e', 'v', 'f', etc. in commands
-
-	// Handle typing/pasting while command is active
-	if len(m.commandInput) > 0 {
+	// Handle typing/pasting while command prompt is focused
+	// Only capture input when commandFocused is true
+	if m.commandFocused {
 		// Use msg.Runes to get raw text (Bubble Tea handles escape sequences for us)
 		// This avoids the brackets that msg.String() adds around paste events
 		text := string(msg.Runes)
@@ -350,8 +363,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "up":
-		// If command input exists, navigate command history
-		if m.commandInput != "" || len(m.commandHistory) > 0 {
+		// If in command mode, navigate command history
+		if m.commandFocused && len(m.commandHistory) > 0 {
 			m.commandInput = m.getPreviousCommand()
 			return m, nil
 		}
@@ -384,8 +397,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "down":
-		// If command input exists or history available, navigate command history
-		if m.commandInput != "" || len(m.commandHistory) > 0 {
+		// If in command mode, navigate command history
+		if m.commandFocused && len(m.commandHistory) > 0 {
 			m.commandInput = m.getNextCommand()
 			return m, nil
 		}
@@ -786,31 +799,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showDialog = true
 		return m, tea.ClearScreen
 
-	default:
-		// MC-style: any printable character(s) go to command prompt
-		// This handles typing (starting a new command)
-
-		// Use msg.Runes to get raw text (Bubble Tea handles escape sequences for us)
-		// This avoids the brackets that msg.String() adds around paste events
-		text := string(msg.Runes)
-
-		// Only process if not a special key
-		if len(text) > 0 && !isSpecialKey(msg.String()) {
-			// Check if it's printable text
-			isPrintable := true
-			for _, r := range msg.Runes {
-				if r < 32 || r == 127 { // Control characters
-					isPrintable = false
-					break
-				}
-			}
-			if isPrintable {
-				// Strip ANSI codes to prevent pasted styled text from corrupting command line
-				m.commandInput += stripANSI(text)
-				m.historyPos = len(m.commandHistory)
-				return m, nil
-			}
-		}
+	// Default case removed - command input is now focus-based (press : to enter command mode)
+	// This prevents stray characters (including terminal response sequences) from leaking into command prompt
 	}
 
 	return m, nil

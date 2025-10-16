@@ -34,7 +34,8 @@ func stripANSI(s string) string {
 	// Also strip terminal response sequences that may appear without ESC prefix
 	// These can leak in when terminal responds to queries (e.g., color capability checks)
 	// Patterns: "1;rgb:xxxx/xxxx/xxxx", "0;rgb:...", numeric response codes
-	responseRegex := regexp.MustCompile(`^\d+;rgb:[0-9a-fA-F/]+$|^\d+;\d+$`)
+	// Match anywhere in the string, not just exact matches
+	responseRegex := regexp.MustCompile(`\d+;rgb:[0-9a-fA-F/]+|\d+;\d+(?:;\d+)*`)
 	cleaned = responseRegex.ReplaceAllString(cleaned, "")
 
 	return cleaned

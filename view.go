@@ -42,18 +42,50 @@ func (m model) View() string {
 func (m model) renderSinglePane() string {
 	var s strings.Builder
 
-	// Title
-	title := titleStyle.Render("TFE - Terminal File Explorer")
+	// Title with mode indicator
+	titleText := "TFE - Terminal File Explorer"
+	if m.commandFocused {
+		titleText += " [Command Mode]"
+	}
+	title := titleStyle.Render(titleText)
 	s.WriteString(title)
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
-	// Home button (path moved to command prompt line)
+	// Toolbar buttons
 	homeButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
-		Bold(true).
-		Render("[🏠]")
-	s.WriteString(homeButtonStyle)
+		Bold(true)
+
+	// Home button
+	s.WriteString(homeButtonStyle.Render("[🏠]"))
+	s.WriteString(" ")
+
+	// Favorites filter toggle button
+	starIcon := "⭐"
+	if m.showFavoritesOnly {
+		starIcon = "✨" // Different icon when filter is active
+	}
+	s.WriteString(homeButtonStyle.Render("[" + starIcon + "]"))
+	s.WriteString(" ")
+
+	// Command mode toggle button with green >_ and blue brackets
+	if m.commandFocused {
+		// Active: gray background
+		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Background(lipgloss.Color("237"))
+		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true).Background(lipgloss.Color("237"))
+		s.WriteString(bracketStyle.Render("["))
+		s.WriteString(termStyle.Render(">_"))
+		s.WriteString(bracketStyle.Render("]"))
+	} else {
+		// Inactive: normal styling
+		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true)
+		s.WriteString(bracketStyle.Render("["))
+		s.WriteString(termStyle.Render(">_"))
+		s.WriteString(bracketStyle.Render("]"))
+	}
+
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
@@ -61,14 +93,17 @@ func (m model) renderSinglePane() string {
 	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
 	pathPromptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 
 	s.WriteString(promptPrefix)
 	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
 	s.WriteString(inputStyle.Render(m.commandInput))
-	// Always show cursor (MC-style: command prompt is always active)
-	s.WriteString(cursorStyle.Render("█"))
+
+	// Show cursor only when command mode is active
+	if m.commandFocused {
+		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+		s.WriteString(cursorStyle.Render("█"))
+	}
 	// Explicitly reset styling after cursor to prevent ANSI code leakage
 	s.WriteString("\033[0m")
 	s.WriteString("\n")

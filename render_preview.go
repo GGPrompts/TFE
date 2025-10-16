@@ -141,42 +141,37 @@ func (m model) renderPreview(maxVisible int) string {
 	}
 
 	// If markdown, render with Glamour
-	if m.preview.isMarkdown {
-		// MUST use cached content - rendering markdown in the render loop is too expensive!
-		if m.preview.cacheValid && m.preview.cachedRenderedContent != "" {
-			renderedLines := strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
+	if m.preview.isMarkdown && m.preview.cachedRenderedContent != "" {
+		// Use cached Glamour-rendered content (no line numbers)
+		renderedLines := strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 
-			// Calculate visible range based on scroll position
-			totalLines := len(renderedLines)
-			start := m.preview.scrollPos
+		// Calculate visible range based on scroll position
+		totalLines := len(renderedLines)
+		start := m.preview.scrollPos
 
-			if start < 0 {
-				start = 0
-			}
-			if start >= totalLines {
-				start = max(0, totalLines-maxVisible)
-			}
-
-			end := start + maxVisible
-			if end > totalLines {
-				end = totalLines
-			}
-
-			// Render visible lines without line numbers for markdown
-			for i := start; i < end; i++ {
-				s.WriteString(renderedLines[i])
-				s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
-				s.WriteString("\n")
-			}
-
-			return s.String()
+		if start < 0 {
+			start = 0
+		}
+		if start >= totalLines {
+			start = max(0, totalLines-maxVisible)
 		}
 
-		// Cache not valid - show error (shouldn't happen if populatePreviewCache was called)
-		s.WriteString("Markdown rendering cache not populated\n")
-		s.WriteString("Please report this bug\n")
+		end := start + maxVisible
+		if end > totalLines {
+			end = totalLines
+		}
+
+		// Render visible lines without line numbers for markdown
+		for i := start; i < end; i++ {
+			s.WriteString(renderedLines[i])
+			s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
+			s.WriteString("\n")
+		}
+
 		return s.String()
 	}
+	// If markdown flag is set but no rendered content, fall through to plain text rendering
+	// This happens when Glamour fails or file is too large
 
 	// Wrap all lines first (use cache if available and width matches)
 	var wrappedLines []string
@@ -316,31 +311,67 @@ func (m model) renderFullPreview() string {
 func (m model) renderDualPane() string {
 	var s strings.Builder
 
-	// Title
-	s.WriteString(titleStyle.Render("TFE - Terminal File Explorer [Dual-Pane]"))
+	// Title with mode indicator
+	titleText := "TFE - Terminal File Explorer [Dual-Pane]"
+	if m.commandFocused {
+		titleText += " [Command Mode]"
+	}
+	s.WriteString(titleStyle.Render(titleText))
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
-	// Home button (path moved to command prompt line)
+	// Toolbar buttons
 	homeButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
-		Bold(true).
-		Render("[🏠]")
-	s.WriteString(homeButtonStyle)
+		Bold(true)
+
+	// Home button
+	s.WriteString(homeButtonStyle.Render("[🏠]"))
+	s.WriteString(" ")
+
+	// Favorites filter toggle button
+	starIcon := "⭐"
+	if m.showFavoritesOnly {
+		starIcon = "✨" // Different icon when filter is active
+	}
+	s.WriteString(homeButtonStyle.Render("[" + starIcon + "]"))
+	s.WriteString(" ")
+
+	// Command mode toggle button with green >_ and blue brackets
+	if m.commandFocused {
+		// Active: gray background
+		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Background(lipgloss.Color("237"))
+		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true).Background(lipgloss.Color("237"))
+		s.WriteString(bracketStyle.Render("["))
+		s.WriteString(termStyle.Render(">_"))
+		s.WriteString(bracketStyle.Render("]"))
+	} else {
+		// Inactive: normal styling
+		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true)
+		s.WriteString(bracketStyle.Render("["))
+		s.WriteString(termStyle.Render(">_"))
+		s.WriteString(bracketStyle.Render("]"))
+	}
+
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Command prompt with path (terminal-style)
 	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
 	pathPromptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 
 	s.WriteString(promptPrefix)
 	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
 	s.WriteString(inputStyle.Render(m.commandInput))
-	// Always show cursor (MC-style: command prompt is always active)
-	s.WriteString(cursorStyle.Render("█"))
+
+	// Show cursor only when command mode is active
+	if m.commandFocused {
+		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+		s.WriteString(cursorStyle.Render("█"))
+	}
 	// Explicitly reset styling after cursor to prevent ANSI code leakage
 	s.WriteString("\033[0m")
 	s.WriteString("\n")

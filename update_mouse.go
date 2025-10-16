@@ -59,17 +59,40 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
-			// Check for home button click (Y=1, X=0-4)
-			// Home button is [🏠] at the start of the path line
-			if msg.Y == 1 && msg.X <= 4 {
-				// Navigate to home directory
-				homeDir, err := os.UserHomeDir()
-				if err == nil {
-					m.currentPath = homeDir
-					m.cursor = 0
-					m.loadFiles()
+			// Check for toolbar button clicks (Y=1)
+			// Toolbar: [🏠] [⭐/✨] [>_]
+			if msg.Y == 1 {
+				// Home button [🏠] (X=0-4)
+				if msg.X >= 0 && msg.X <= 4 {
+					// Navigate to home directory
+					homeDir, err := os.UserHomeDir()
+					if err == nil {
+						m.currentPath = homeDir
+						m.cursor = 0
+						m.loadFiles()
+					}
+					return m, nil
 				}
-				return m, nil
+				// Star button [⭐/✨] (X=5-10)
+				if msg.X >= 5 && msg.X <= 10 {
+					// Toggle favorites filter (like F6)
+					m.showFavoritesOnly = !m.showFavoritesOnly
+					m.cursor = 0
+					if m.showFavoritesOnly {
+						m.loadFiles()
+					}
+					return m, nil
+				}
+				// Terminal button [>_] (X=11-16)
+				if msg.X >= 11 && msg.X <= 16 {
+					// Toggle command mode focus
+					m.commandFocused = !m.commandFocused
+					if !m.commandFocused {
+						// Clear command input when exiting command mode via click
+						m.commandInput = ""
+					}
+					return m, nil
+				}
 			}
 
 			// Handle context menu clicks if menu is open
