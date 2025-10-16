@@ -5,6 +5,18 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added
+- **Clickable Column Headers for Sorting (Detail View)**
+  - Click column headers (Name, Size, Modified, Type) to sort files
+  - Visual indicators: ↑ (ascending) or ↓ (descending) arrows show active sort
+  - Click same column again to reverse sort order
+  - Smart sorting behavior:
+    - **Name sort:** Folders grouped first, then files (traditional behavior)
+    - **Other sorts:** Files and folders mixed by sort criteria
+  - ".." parent directory always stays at top
+  - Cursor maintains position on same file after sorting
+  - Sort persists across directory navigation
+  - Works in both single-pane and dual-pane modes
+  - Files modified: `update_mouse.go`, `file_operations.go`, `render_file_list.go`
 - **Browser Support for Images and HTML Files**
   - F3 automatically opens images in default browser (PNG, JPG, GIF, SVG, WebP, BMP, ICO, TIFF)
   - F3 automatically opens HTML files in default browser

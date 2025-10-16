@@ -643,6 +643,135 @@ func (m *model) loadFiles() {
 	if m.cursor >= len(m.files) {
 		m.cursor = 0
 	}
+
+	// Apply sorting based on sortBy and sortAsc settings
+	m.sortFiles()
+}
+
+// sortFiles sorts the file list based on sortBy and sortAsc settings
+// Always keeps ".." parent directory at the top
+// When sorting by name: keeps folders grouped before files (traditional behavior)
+// When sorting by other criteria: mixes folders and files
+func (m *model) sortFiles() {
+	if len(m.files) <= 1 {
+		return
+	}
+
+	// Separate parent directory (..) from other files
+	var parentDir *fileItem
+	var otherFiles []fileItem
+
+	for i := range m.files {
+		if m.files[i].name == ".." {
+			parentDir = &m.files[i]
+		} else {
+			otherFiles = append(otherFiles, m.files[i])
+		}
+	}
+
+	// When sorting by name, keep folders grouped before files (traditional behavior)
+	if m.sortBy == "name" {
+		var dirs, files []fileItem
+
+		// Separate directories from files
+		for _, item := range otherFiles {
+			if item.isDir {
+				dirs = append(dirs, item)
+			} else {
+				files = append(files, item)
+			}
+		}
+
+		// Sort directories alphabetically
+		sort.Slice(dirs, func(i, j int) bool {
+			less := strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name)
+			if !m.sortAsc {
+				less = !less
+			}
+			return less
+		})
+
+		// Sort files alphabetically
+		sort.Slice(files, func(i, j int) bool {
+			less := strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
+			if !m.sortAsc {
+				less = !less
+			}
+			return less
+		})
+
+		// Reconstruct: parent dir, then folders, then files
+		m.files = make([]fileItem, 0, len(m.files))
+		if parentDir != nil {
+			m.files = append(m.files, *parentDir)
+		}
+		m.files = append(m.files, dirs...)
+		m.files = append(m.files, files...)
+		return
+	}
+
+	// For other sort criteria (size, modified, type): mix folders and files
+	sort.Slice(otherFiles, func(i, j int) bool {
+		a, b := otherFiles[i], otherFiles[j]
+
+		// Determine sort result based on sortBy
+		var less bool
+		switch m.sortBy {
+		case "size":
+			// For directories, compare by item count
+			// For files, compare by size
+			aSize := a.size
+			bSize := b.size
+			if a.isDir {
+				aSize = int64(getDirItemCount(a.path))
+			}
+			if b.isDir {
+				bSize = int64(getDirItemCount(b.path))
+			}
+			if aSize == bSize {
+				// If same size, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = aSize < bSize
+			}
+
+		case "modified":
+			if a.modTime.Equal(b.modTime) {
+				// If same time, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = a.modTime.Before(b.modTime)
+			}
+
+		case "type":
+			aType := getFileType(a)
+			bType := getFileType(b)
+			if aType == bType {
+				// If same type, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = aType < bType
+			}
+
+		default:
+			// Fallback to name sorting
+			less = strings.ToLower(a.name) < strings.ToLower(b.name)
+		}
+
+		// Apply sort direction (ascending vs descending)
+		if !m.sortAsc {
+			less = !less
+		}
+
+		return less
+	})
+
+	// Reconstruct files slice with parent directory at top (if present)
+	m.files = make([]fileItem, 0, len(m.files))
+	if parentDir != nil {
+		m.files = append(m.files, *parentDir)
+	}
+	m.files = append(m.files, otherFiles...)
 }
 
 // loadPreview loads the content of a file for preview
@@ -782,16 +911,26 @@ func (m *model) populatePreviewCache() {
 			if err == nil {
 				rendered, err := renderer.Render(markdownContent)
 				if err == nil {
-					m.preview.cachedRenderedContent = rendered
-					renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-					m.preview.cachedLineCount = len(renderedLines)
-					m.preview.cachedWidth = availableWidth
-					m.preview.cacheValid = true
-					return
+					// DEBUG: Check if rendered content is empty
+					if rendered == "" {
+						// Empty rendering - treat as plain text
+						m.preview.isMarkdown = false
+					} else {
+						m.preview.cachedRenderedContent = rendered
+						renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+						m.preview.cachedLineCount = len(renderedLines)
+						m.preview.cachedWidth = availableWidth
+						m.preview.cacheValid = true
+						return
+					}
+				} else {
+					// Glamour render failed - treat as plain text
+					m.preview.isMarkdown = false
 				}
+			} else {
+				// Glamour renderer creation failed - treat as plain text
+				m.preview.isMarkdown = false
 			}
-			// Glamour failed - treat as plain text
-			m.preview.isMarkdown = false
 			// Fall through to regular text wrapping
 		}
 	}

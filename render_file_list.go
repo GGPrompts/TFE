@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -199,13 +201,63 @@ func (m model) renderDetailView(maxVisible int) string {
 	// Get filtered files (respects favorites filter)
 	files := m.getFilteredFiles()
 
-	// Header
+	// Header with sort indicators
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("39")).
+		Foreground(lipgloss.Color("87")). // Bright blue for header
 		PaddingLeft(2)
 
-	header := fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", "Name", "Size", "Modified", "Type")
+	// Determine sort indicator (arrow)
+	sortIndicator := ""
+	if m.sortAsc {
+		sortIndicator = " ↑" // Ascending
+	} else {
+		sortIndicator = " ↓" // Descending
+	}
+
+	// Build header with sort indicators
+	var header string
+	if m.showFavoritesOnly {
+		// Favorites mode: Name, Size, Modified, Location
+		nameHeader := "Name"
+		sizeHeader := "Size"
+		modifiedHeader := "Modified"
+		locationHeader := "Location"
+
+		// Add indicator to active column
+		switch m.sortBy {
+		case "name":
+			nameHeader += sortIndicator
+		case "size":
+			sizeHeader += sortIndicator
+		case "modified":
+			modifiedHeader += sortIndicator
+		}
+
+		header = fmt.Sprintf("%-25s  %-10s  %-12s  %-25s", nameHeader, sizeHeader, modifiedHeader, locationHeader)
+	} else {
+		// Regular mode: Name, Size, Modified, Type
+		nameHeader := "Name"
+		sizeHeader := "Size"
+		modifiedHeader := "Modified"
+		typeHeader := "Type"
+
+		// Add indicator to active column
+		switch m.sortBy {
+		case "name":
+			nameHeader += sortIndicator
+		case "size":
+			sizeHeader += sortIndicator
+		case "modified":
+			modifiedHeader += sortIndicator
+		case "type":
+			typeHeader += sortIndicator
+		}
+
+		header = fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", nameHeader, sizeHeader, modifiedHeader, typeHeader)
+	}
+
+	// Render header with sort indicators
 	s.WriteString(headerStyle.Render(header))
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
@@ -277,9 +329,26 @@ func (m model) renderDetailView(maxVisible int) string {
 			size = formatFileSize(file.size)
 		}
 		modified := formatModTime(file.modTime)
-		fileType := getFileType(file)
 
-		line := fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", name, size, modified, fileType)
+		// Show location instead of type when viewing favorites
+		var line string
+		if m.showFavoritesOnly {
+			// Get parent directory path for location
+			location := filepath.Dir(file.path)
+			// Shorten home directory to ~
+			homeDir, _ := os.UserHomeDir()
+			if homeDir != "" && strings.HasPrefix(location, homeDir) {
+				location = "~" + strings.TrimPrefix(location, homeDir)
+			}
+			// Truncate long paths
+			if len(location) > 23 {
+				location = "..." + location[len(location)-20:]
+			}
+			line = fmt.Sprintf("%-25s  %-10s  %-12s  %-25s", name, size, modified, location)
+		} else {
+			fileType := getFileType(file)
+			line = fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", name, size, modified, fileType)
+		}
 
 		style := fileStyle
 		if file.isDir {

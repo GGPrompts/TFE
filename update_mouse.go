@@ -133,6 +133,69 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				break
 			}
 
+			// Handle column header clicks in detail view (for sorting)
+			if m.displayMode == modeDetail && msg.Y == 4 {
+				// Calculate which column was clicked based on X position
+				// Header format (regular): "%-30s  %-10s  %-12s  %-15s" with 2-space left padding
+				// Columns: Name (2-32), Size (34-44), Modified (46-58), Type (60-75)
+				// Header format (favorites): "%-25s  %-10s  %-12s  %-25s" with 2-space left padding
+				// Columns: Name (2-27), Size (29-39), Modified (41-53), Location (55-80)
+
+				var newSortBy string
+				if m.showFavoritesOnly {
+					// Favorites mode column ranges
+					if msg.X >= 2 && msg.X <= 27 {
+						newSortBy = "name"
+					} else if msg.X >= 29 && msg.X <= 39 {
+						newSortBy = "size"
+					} else if msg.X >= 41 && msg.X <= 53 {
+						newSortBy = "modified"
+					} else if msg.X >= 55 && msg.X <= 80 {
+						// Location column - not sortable yet, ignore
+						break
+					}
+				} else {
+					// Regular mode column ranges
+					if msg.X >= 2 && msg.X <= 32 {
+						newSortBy = "name"
+					} else if msg.X >= 34 && msg.X <= 44 {
+						newSortBy = "size"
+					} else if msg.X >= 46 && msg.X <= 58 {
+						newSortBy = "modified"
+					} else if msg.X >= 60 && msg.X <= 75 {
+						newSortBy = "type"
+					}
+				}
+
+				// Apply sorting if a valid column was clicked
+				if newSortBy != "" {
+					if m.sortBy == newSortBy {
+						// Same column - toggle sort direction
+						m.sortAsc = !m.sortAsc
+					} else {
+						// Different column - set new sort, default to ascending
+						m.sortBy = newSortBy
+						m.sortAsc = true
+					}
+
+					// Re-sort files and maintain cursor position if possible
+					currentFile := m.getCurrentFile()
+					m.sortFiles()
+
+					// Try to keep cursor on the same file after sorting
+					if currentFile != nil {
+						for i, file := range m.files {
+							if file.path == currentFile.path {
+								m.cursor = i
+								break
+							}
+						}
+					}
+
+					return m, nil
+				}
+			}
+
 			// Calculate which item was clicked (accounting for header lines and scrolling)
 			// Both modes: title(0) + path(1) + command(2) + separator(3) = 4 lines
 			// Lipgloss borders are only on sides (BorderRight/BorderLeft), not top/bottom
@@ -269,6 +332,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						// Enter full-screen preview (same as Enter key)
 						m.loadPreview(clickedFile.path)
 						m.viewMode = viewFullPreview
+						m.calculateLayout() // Update widths for full-screen
+						m.populatePreviewCache() // Repopulate cache with correct width
 						// Reset click tracking after double-click
 						m.lastClickIndex = -1
 						m.lastClickTime = time.Time{}
@@ -287,6 +352,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					// Update preview in dual-pane mode
 					if m.viewMode == viewDualPane && !clickedFile.isDir {
 						m.loadPreview(clickedFile.path)
+						m.populatePreviewCache() // Populate cache with dual-pane width
 					}
 				}
 			}
@@ -451,6 +517,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if m.viewMode == viewDualPane {
 					if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 						m.loadPreview(currentFile.path)
+						m.populatePreviewCache() // Populate cache with dual-pane width
 					}
 				}
 			}
@@ -487,6 +554,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if m.viewMode == viewDualPane {
 					if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 						m.loadPreview(currentFile.path)
+						m.populatePreviewCache() // Populate cache with dual-pane width
 					}
 				}
 			}
