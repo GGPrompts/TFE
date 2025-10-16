@@ -442,8 +442,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// In dual-pane mode, detect which pane was clicked to switch focus
 		if m.viewMode == viewDualPane && msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
 			// Check if click is in left or right pane (not in header or status bar)
-			// Header is 4 lines + 1 border line = 5 lines total before content starts
-			if msg.Y >= 5 && msg.Y < m.height-1 { // Skip header (5 lines) and status bar (1 line)
+			// Header is 4 lines total (title, path, command, separator)
+			if msg.Y >= 4 && msg.Y < m.height-1 { // Skip header (4 lines) and status bar (1 line)
 				if msg.X < m.leftWidth {
 					m.focusedPane = leftPane
 				} else if msg.X > m.leftWidth { // Account for separator
@@ -462,13 +462,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				// Calculate which item was clicked (accounting for header lines and scrolling)
-				// In dual-pane mode: title(0) + path(1) + command(2) + separator(3) = 4 lines
-				// Then Lipgloss adds a top border (1 line), so file list starts at line 5
-				// In single-pane mode: title(0) + path(1) + command(2) + separator(3) + file_list_starts(4) = 4 lines
+				// Both modes: title(0) + path(1) + command(2) + separator(3) = 4 lines
+				// Lipgloss borders are only on sides (BorderRight/BorderLeft), not top/bottom
+				// So file list starts at line 4 in both modes
 				headerOffset := 4
-				if m.viewMode == viewDualPane {
-					headerOffset = 5 // Account for Lipgloss border
-				}
 				if m.displayMode == modeDetail {
 					headerOffset += 2 // Add 2 for detail view's header and separator
 				}
