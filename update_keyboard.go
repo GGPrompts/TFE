@@ -367,6 +367,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// Update preview if file selected
 					if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 						m.loadPreview(currentFile.path)
+						m.populatePreviewCache() // Populate cache with dual-pane width
 					}
 				}
 			} else {
@@ -401,6 +402,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// Update preview if file selected
 					if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 						m.loadPreview(currentFile.path)
+						m.populatePreviewCache() // Populate cache with dual-pane width
 					}
 				}
 			} else {
@@ -496,6 +498,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Load preview of current file
 			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 				m.loadPreview(currentFile.path)
+				m.populatePreviewCache() // Populate cache with dual-pane width
 			}
 		}
 
@@ -508,6 +511,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Load preview of current file
 			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 				m.loadPreview(currentFile.path)
+				m.populatePreviewCache() // Populate cache with dual-pane width
 			}
 		} else if m.viewMode == viewDualPane {
 			m.viewMode = viewSinglePane

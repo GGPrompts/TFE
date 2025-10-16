@@ -138,18 +138,20 @@ func openInBrowser(path string) tea.Cmd {
 		return nil
 	}
 
-	var c *exec.Cmd
-	if browser == "cmd.exe" {
-		// Windows via WSL - use cmd.exe /c start
-		c = exec.Command("cmd.exe", "/c", "start", path)
-	} else {
-		// Linux/macOS/wslview
-		c = exec.Command(browser, path)
-	}
+	return func() tea.Msg {
+		var c *exec.Cmd
+		if browser == "cmd.exe" {
+			// Windows via WSL - use cmd.exe /c start
+			c = exec.Command("cmd.exe", "/c", "start", path)
+		} else {
+			// Linux/macOS/wslview
+			c = exec.Command(browser, path)
+		}
 
-	return tea.Sequence(
-		tea.ExecProcess(c, func(err error) tea.Msg {
-			return editorFinishedMsg{err}
-		}),
-	)
+		// Start the browser without blocking (browsers run in background)
+		_ = c.Start()
+
+		// Return a clear screen message to refresh the UI
+		return tea.ClearScreen()
+	}
 }

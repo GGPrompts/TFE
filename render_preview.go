@@ -142,8 +142,7 @@ func (m model) renderPreview(maxVisible int) string {
 
 	// If markdown, render with Glamour
 	if m.preview.isMarkdown {
-		// ALWAYS use cached rendered content - no fallback rendering in render loop!
-		// Cache MUST be populated by populatePreviewCache() after loading file
+		// MUST use cached content - rendering markdown in the render loop is too expensive!
 		if m.preview.cacheValid && m.preview.cachedRenderedContent != "" {
 			renderedLines := strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 
@@ -166,12 +165,17 @@ func (m model) renderPreview(maxVisible int) string {
 			// Render visible lines without line numbers for markdown
 			for i := start; i < end; i++ {
 				s.WriteString(renderedLines[i])
+				s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
 				s.WriteString("\n")
 			}
 
 			return s.String()
 		}
-		// If cache not valid, fall through to regular text rendering
+
+		// Cache not valid - show error (shouldn't happen if populatePreviewCache was called)
+		s.WriteString("Markdown rendering cache not populated\n")
+		s.WriteString("Please report this bug\n")
+		return s.String()
 	}
 
 	// Wrap all lines first (use cache if available and width matches)
@@ -220,6 +224,7 @@ func (m model) renderPreview(maxVisible int) string {
 
 		// Content line
 		s.WriteString(wrappedLines[i])
+		s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
 		s.WriteString("\n")
 	}
 
@@ -276,6 +281,7 @@ func (m model) renderFullPreview() string {
 		titleText += " [Markdown]"
 	}
 	s.WriteString(previewTitleStyle.Render(titleText))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// File info line - update based on whether we're showing markdown or wrapped text
@@ -290,6 +296,7 @@ func (m model) renderFullPreview() string {
 			m.preview.scrollPos+1)
 	}
 	s.WriteString(pathStyle.Render(infoText))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Content
@@ -300,6 +307,7 @@ func (m model) renderFullPreview() string {
 	s.WriteString("\n")
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
 	s.WriteString(helpStyle.Render("↑/↓: scroll • PgUp/PgDown: page • F4: edit • F5: copy path • Esc: close • F10: quit"))
+	s.WriteString("\033[0m") // Reset ANSI codes
 
 	return s.String()
 }
@@ -310,24 +318,26 @@ func (m model) renderDualPane() string {
 
 	// Title
 	s.WriteString(titleStyle.Render("TFE - Terminal File Explorer [Dual-Pane]"))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
-	// Home button + Current path (with ~ for home directory)
+	// Home button (path moved to command prompt line)
 	homeButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true).
 		Render("[🏠]")
 	s.WriteString(homeButtonStyle)
-	s.WriteString(" ")
-	s.WriteString(pathStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString("\n")
 
-	// Command prompt (left-aligned on its own line)
+	// Command prompt with path (terminal-style)
 	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
+	pathPromptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 
 	s.WriteString(promptPrefix)
+	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
+	s.WriteString(" ")
 	s.WriteString(inputStyle.Render(m.commandInput))
 	// Always show cursor (MC-style: command prompt is always active)
 	s.WriteString(cursorStyle.Render("█"))
@@ -367,13 +377,13 @@ func (m model) renderDualPane() string {
 			Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#5fd7ff"}).
 			Render(previewTitleText)
 		separatorLine := strings.Repeat("─", len(previewTitleText))
-		rightContent = previewTitle + "\n" + separatorLine + "\n"
+		rightContent = previewTitle + "\033[0m\n" + separatorLine + "\033[0m\n"
 		rightContent += m.renderPreview(maxVisible - 2)
 	} else {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			Italic(true)
-		rightContent = emptyStyle.Render("No preview available\n\nSelect a file to preview")
+		rightContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
 	}
 
 	// Create styled boxes for left and right panes using Lipgloss
@@ -468,11 +478,13 @@ func (m model) renderDualPane() string {
 	// Line 1: Counts, indicators, view mode, focus, help
 	statusLine1 := fmt.Sprintf("%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, m.displayMode.String(), focusInfo, helpHint)
 	s.WriteString(statusStyle.Render(statusLine1))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Line 2: Selected file info
 	statusLine2 := selectedInfo
 	s.WriteString(statusStyle.Render(statusLine2))
+	s.WriteString("\033[0m") // Reset ANSI codes
 
 	return s.String()
 }

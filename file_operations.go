@@ -715,8 +715,9 @@ func (m *model) loadPreview(path string) {
 		m.preview.content = lines
 		m.preview.loaded = true
 
-		// Populate cache for smooth scrolling performance
-		m.populatePreviewCache()
+		// DON'T populate cache here - let caller do it after setting view mode
+		// This prevents rendering with wrong width (e.g., m.rightWidth=0 in single-pane)
+		// Caller should call populatePreviewCache() after setting viewMode correctly
 		return
 	}
 
@@ -743,9 +744,21 @@ func (m *model) populatePreviewCache() {
 	}
 
 	// Calculate available width
-	availableWidth := m.rightWidth - 17
-	if m.viewMode == viewFullPreview {
-		availableWidth = m.width - 10
+	var availableWidth int
+	if m.preview.isMarkdown {
+		// Markdown never shows line numbers/scrollbar, so use wider width
+		if m.viewMode == viewFullPreview {
+			availableWidth = m.width - 4 // Just padding
+		} else {
+			availableWidth = m.rightWidth - 4 // Just padding in dual-pane
+		}
+	} else {
+		// Regular text files show line numbers and scrollbar
+		if m.viewMode == viewFullPreview {
+			availableWidth = m.width - 10 // line nums (6) + scrollbar (2) + padding (2)
+		} else {
+			availableWidth = m.rightWidth - 17 // line nums (8) + scrollbar (2) + borders (4) + padding (3)
+		}
 	}
 	if availableWidth < 20 {
 		availableWidth = 20
@@ -753,22 +766,34 @@ func (m *model) populatePreviewCache() {
 
 	// Cache markdown rendering
 	if m.preview.isMarkdown {
-		markdownContent := strings.Join(m.preview.content, "\n")
-		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("auto"),
-			glamour.WithWordWrap(availableWidth),
-		)
-		if err == nil {
-			rendered, err := renderer.Render(markdownContent)
+		// Safety: skip Glamour for very large markdown files (can cause hangs with complex content)
+		// For files > 2000 lines, treat as plain text to avoid performance issues
+		const maxMarkdownLines = 2000
+		if len(m.preview.content) > maxMarkdownLines {
+			// Too large for Glamour - treat as plain text
+			m.preview.isMarkdown = false
+			// Fall through to regular text wrapping below
+		} else {
+			markdownContent := strings.Join(m.preview.content, "\n")
+			renderer, err := glamour.NewTermRenderer(
+				glamour.WithStandardStyle("auto"),
+				glamour.WithWordWrap(availableWidth),
+			)
 			if err == nil {
-				m.preview.cachedRenderedContent = rendered
-				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-				m.preview.cachedLineCount = len(renderedLines)
-				m.preview.cachedWidth = availableWidth
-				m.preview.cacheValid = true
+				rendered, err := renderer.Render(markdownContent)
+				if err == nil {
+					m.preview.cachedRenderedContent = rendered
+					renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+					m.preview.cachedLineCount = len(renderedLines)
+					m.preview.cachedWidth = availableWidth
+					m.preview.cacheValid = true
+					return
+				}
 			}
+			// Glamour failed - treat as plain text
+			m.preview.isMarkdown = false
+			// Fall through to regular text wrapping
 		}
-		return
 	}
 
 	// Cache wrapped text lines

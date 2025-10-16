@@ -45,24 +45,27 @@ func (m model) renderSinglePane() string {
 	// Title
 	title := titleStyle.Render("TFE - Terminal File Explorer")
 	s.WriteString(title)
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
-	// Home button + Current path (with ~ for home directory)
+	// Home button (path moved to command prompt line)
 	homeButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true).
 		Render("[🏠]")
 	s.WriteString(homeButtonStyle)
-	s.WriteString(" ")
-	s.WriteString(pathStyle.Render(getDisplayPath(m.currentPath)))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
-	// Command prompt (left-aligned on its own line)
+	// Command prompt with path (terminal-style)
 	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
+	pathPromptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 
 	s.WriteString(promptPrefix)
+	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
+	s.WriteString(" ")
 	s.WriteString(inputStyle.Render(m.commandInput))
 	// Always show cursor (MC-style: command prompt is always active)
 	s.WriteString(cursorStyle.Render("█"))
@@ -108,6 +111,7 @@ func (m model) renderSinglePane() string {
 		}
 
 		s.WriteString(msgStyle.Render(m.statusMessage))
+		s.WriteString("\033[0m") // Reset ANSI codes
 	} else {
 		// Regular status bar
 		// Count directories and files
@@ -163,11 +167,13 @@ func (m model) renderSinglePane() string {
 		// Line 1: Counts, indicators, view mode, help
 		statusLine1 := fmt.Sprintf("%s%s%s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint)
 		s.WriteString(statusStyle.Render(statusLine1))
+		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
 
 		// Line 2: Selected file info
 		statusLine2 := selectedInfo
 		s.WriteString(statusStyle.Render(statusLine2))
+		s.WriteString("\033[0m") // Reset ANSI codes
 	}
 
 	return s.String()

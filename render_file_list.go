@@ -102,6 +102,7 @@ func (m model) renderListView(maxVisible int) string {
 		}
 
 		s.WriteString(line)
+		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
 	}
 
@@ -182,6 +183,7 @@ func (m model) renderGridView(maxVisible int) string {
 			}
 
 			s.WriteString(cell)
+			s.WriteString("\033[0m") // Reset ANSI codes
 			s.WriteString("  ")
 		}
 		s.WriteString("\n")
@@ -205,6 +207,7 @@ func (m model) renderDetailView(maxVisible int) string {
 
 	header := fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", "Name", "Size", "Modified", "Type")
 	s.WriteString(headerStyle.Render(header))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Separator - use left pane width in dual-pane mode to prevent wrapping
@@ -214,6 +217,7 @@ func (m model) renderDetailView(maxVisible int) string {
 	}
 	separator := strings.Repeat("─", separatorWidth)
 	s.WriteString(pathStyle.Render(separator))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Calculate visible range
@@ -293,6 +297,7 @@ func (m model) renderDetailView(maxVisible int) string {
 
 		s.WriteString("  ")
 		s.WriteString(line)
+		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
 	}
 
@@ -438,6 +443,7 @@ func (m model) renderTreeView(maxVisible int) string {
 		}
 
 		s.WriteString(line)
+		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
 	}
 

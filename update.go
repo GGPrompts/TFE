@@ -24,9 +24,20 @@ func (m model) Init() tea.Cmd {
 // stripANSI removes ANSI escape codes from a string
 // This prevents pasted styled text from corrupting the command line
 func stripANSI(s string) string {
-	// Match ANSI escape sequences: ESC [ ... m (and other variants)
-	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-	return ansiRegex.ReplaceAllString(s, "")
+	// Match all common ANSI escape sequences:
+	// - CSI sequences: ESC [ ... (letter or @)
+	// - OSC sequences: ESC ] ... (BEL or ST)
+	// - Other escape sequences: ESC followed by various characters
+	ansiRegex := regexp.MustCompile(`\x1b(\[[0-9;?]*[a-zA-Z@]|\][^\x07\x1b]*(\x07|\x1b\\)|[>=<>()#])`)
+	cleaned := ansiRegex.ReplaceAllString(s, "")
+
+	// Also strip terminal response sequences that may appear without ESC prefix
+	// These can leak in when terminal responds to queries (e.g., color capability checks)
+	// Patterns: "1;rgb:xxxx/xxxx/xxxx", "0;rgb:...", numeric response codes
+	responseRegex := regexp.MustCompile(`^\d+;rgb:[0-9a-fA-F/]+$|^\d+;\d+$`)
+	cleaned = responseRegex.ReplaceAllString(cleaned, "")
+
+	return cleaned
 }
 
 // isSpecialKey checks if a key string represents a special (non-printable) key
