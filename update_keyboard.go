@@ -135,9 +135,20 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 			default:
 				// Add printable characters to input
-				key := msg.String()
-				if len(key) == 1 && key[0] >= 32 && key[0] <= 126 {
-					m.dialog.input += key
+				// Use msg.Runes to avoid brackets from msg.String() on paste events
+				text := string(msg.Runes)
+				if len(text) > 0 {
+					// Check if all characters are printable
+					isPrintable := true
+					for _, r := range msg.Runes {
+						if r < 32 || r > 126 {
+							isPrintable = false
+							break
+						}
+					}
+					if isPrintable {
+						m.dialog.input += text
+					}
 				}
 				return m, nil
 			}
@@ -292,30 +303,26 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Check if user is typing/pasting in command prompt
 	// If commandInput has text, prioritize adding to it over hotkeys
 	// This allows typing 'e', 'v', 'f', etc. in commands
-	key := msg.String()
 
-	// Handle typing while command is active
+	// Handle typing/pasting while command is active
 	if len(m.commandInput) > 0 {
-		// Skip bracketed paste markers entirely
-		if isBracketedPasteMarker(key) {
-			return m, nil
-		}
-		// Check if it's printable text (not a special key)
-		if len(key) > 0 && !isSpecialKey(key) {
+		// Use msg.Runes to get raw text (Bubble Tea handles escape sequences for us)
+		// This avoids the brackets that msg.String() adds around paste events
+		text := string(msg.Runes)
+
+		// Only process if not a special key
+		if len(text) > 0 && !isSpecialKey(msg.String()) {
+			// Check if it's printable text
 			isPrintable := true
-			for _, r := range key {
+			for _, r := range msg.Runes {
 				if r < 32 || r == 127 { // Control characters
 					isPrintable = false
 					break
 				}
 			}
 			if isPrintable {
-				// Clean bracketed paste sequences before adding to input
-				cleanedKey := cleanBracketedPaste(key)
-				if cleanedKey != "" {
-					m.commandInput += cleanedKey
-					m.historyPos = len(m.commandHistory)
-				}
+				m.commandInput += text
+				m.historyPos = len(m.commandHistory)
 				return m, nil
 			}
 		}
@@ -696,28 +703,25 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		// MC-style: any printable character(s) go to command prompt
 		// This handles typing (starting a new command)
-		key := msg.String()
-		// Skip bracketed paste markers entirely
-		if isBracketedPasteMarker(key) {
-			return m, nil
-		}
-		if len(key) > 0 && !isSpecialKey(key) {
-			// Check if it's printable text (not a special key or control character)
+
+		// Use msg.Runes to get raw text (Bubble Tea handles escape sequences for us)
+		// This avoids the brackets that msg.String() adds around paste events
+		text := string(msg.Runes)
+
+		// Only process if not a special key
+		if len(text) > 0 && !isSpecialKey(msg.String()) {
+			// Check if it's printable text
 			isPrintable := true
-			for _, r := range key {
+			for _, r := range msg.Runes {
 				if r < 32 || r == 127 { // Control characters
 					isPrintable = false
 					break
 				}
 			}
 			if isPrintable {
-				// Clean bracketed paste sequences before adding to input
-				cleanedKey := cleanBracketedPaste(key)
-				if cleanedKey != "" {
-					m.commandInput += cleanedKey
-					m.historyPos = len(m.commandHistory)
-				}
-				return m, nil // Return to update the view
+				m.commandInput += text
+				m.historyPos = len(m.commandHistory)
+				return m, nil
 			}
 		}
 	}

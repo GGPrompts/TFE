@@ -14,6 +14,12 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Cross-platform support (WSL, Linux, macOS)
 
 ### Fixed
+- **Command Line Paste Bug:** Fixed brackets appearing around pasted text
+  - Root cause: Using `msg.String()` which wraps paste events in brackets by design
+  - Solution: Use `msg.Runes` to get raw text (Bubble Tea handles escape sequences)
+  - Removed unnecessary helper functions (`cleanBracketedPaste`, `isBracketedPasteMarker`)
+  - Fixed in: command prompt input, dialog input, and command continuation
+  - Credit: Analysis by OpenAI Codex
 - **Command Line Input:** Removed 's' key hotkey to allow typing 's' in command prompt
   - 's' key was intercepting command input before reaching the prompt
   - To toggle favorites, use F2 (context menu) or right-click → "☆ Add Favorite"

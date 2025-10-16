@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,7 +13,7 @@ import (
 // - Window resize handling
 // - Editor/command finished message handling
 // - Spinner tick handling
-// - Helper functions for input processing
+// - Helper function: isSpecialKey() for detecting non-printable keys
 
 func (m model) Init() tea.Cmd {
 	return m.spinner.Tick
@@ -48,45 +46,6 @@ func isSpecialKey(key string) bool {
 		}
 	}
 
-	return false
-}
-
-// cleanBracketedPaste removes bracketed paste escape sequences from input
-// Bracketed paste sequences are: ESC[200~ (start) and ESC[201~ (end)
-func cleanBracketedPaste(s string) string {
-	// Remove common bracketed paste escape sequences (with and without ESC)
-	s = strings.ReplaceAll(s, "\x1b[200~", "")
-	s = strings.ReplaceAll(s, "\x1b[201~", "")
-	s = strings.ReplaceAll(s, "\x1b[200", "")
-	s = strings.ReplaceAll(s, "\x1b[201", "")
-	s = strings.ReplaceAll(s, "[200~", "")
-	s = strings.ReplaceAll(s, "[201~", "")
-	s = strings.ReplaceAll(s, "[200", "")
-	s = strings.ReplaceAll(s, "[201", "")
-	// Remove any standalone bracketed paste markers that might slip through
-	if s == "[" || s == "]" || s == "~" {
-		return ""
-	}
-	return s
-}
-
-// isBracketedPasteMarker checks if the input is a bracketed paste sequence marker
-func isBracketedPasteMarker(s string) bool {
-	markers := []string{
-		"\x1b[200~", "\x1b[201~",
-		"[200~", "[201~",
-		"\x1b[200", "\x1b[201",
-		"[200", "[201",
-	}
-	for _, marker := range markers {
-		if strings.Contains(s, marker) {
-			return true
-		}
-	}
-	// Check for partial markers that might come through
-	if len(s) <= 5 && (strings.HasPrefix(s, "[20") || strings.HasPrefix(s, "\x1b[20")) {
-		return true
-	}
 	return false
 }
 
