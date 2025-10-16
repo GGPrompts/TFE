@@ -4,6 +4,21 @@ All notable changes to the Terminal File Explorer (TFE) project.
 
 ## [Unreleased]
 
+### Added
+- **Browser Support for Images and HTML Files**
+  - F3 automatically opens images in default browser (PNG, JPG, GIF, SVG, WebP, BMP, ICO, TIFF)
+  - F3 automatically opens HTML files in default browser
+  - Context menu "🌐 Open in Browser" option for images and HTML files
+  - Platform-aware detection (wslview, cmd.exe, xdg-open, open)
+  - Falls back to text preview for non-browser files
+  - Cross-platform support (WSL, Linux, macOS)
+
+### Fixed
+- **Command Line Input:** Removed 's' key hotkey to allow typing 's' in command prompt
+  - 's' key was intercepting command input before reaching the prompt
+  - To toggle favorites, use F2 (context menu) or right-click → "☆ Add Favorite"
+  - Prioritizes command typing over single-letter shortcuts
+
 ### To Be Implemented
 - Search/filter functionality within directories
 - Multi-select and bulk operations

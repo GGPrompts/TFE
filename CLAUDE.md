@@ -15,17 +15,22 @@ TFE follows a **modular architecture** where each file has a single, clear respo
 ```
 tfe/
 ├── main.go (21 lines)           - Entry point ONLY
-├── types.go (135 lines)         - Type definitions & enums
-├── styles.go (36 lines)         - Lipgloss style definitions
-├── model.go (75 lines)          - Model initialization & layout calculations
-├── update.go (650 lines)        - Event handling (Init & Update functions)
-├── view.go (120 lines)          - View dispatcher & single-pane rendering
-├── render_preview.go (219)      - Preview rendering (full & dual-pane)
-├── render_file_list.go (440)    - File list views (List/Grid/Detail/Tree)
-├── file_operations.go (465)     - File operations & formatting
-├── editor.go (72 lines)         - External editor integration
-├── favorites.go (115 lines)     - Favorites/bookmarks system
-└── helpers.go (45 lines)        - Helper functions for model
+├── types.go (173 lines)         - Type definitions & enums
+├── styles.go (35 lines)         - Lipgloss style definitions
+├── model.go (78 lines)          - Model initialization & layout calculations
+├── update.go (111 lines)        - Main update dispatcher & initialization
+├── update_keyboard.go (714)     - Keyboard event handling
+├── update_mouse.go (383)        - Mouse event handling
+├── view.go (189 lines)          - View dispatcher & single-pane rendering
+├── render_preview.go (468)      - Preview rendering (full & dual-pane)
+├── render_file_list.go (447)    - File list views (List/Grid/Detail/Tree)
+├── file_operations.go (657)     - File operations & formatting
+├── editor.go (90 lines)         - External editor integration
+├── command.go (127 lines)       - Command execution system
+├── dialog.go (141 lines)        - Dialog system (input/confirm)
+├── context_menu.go (313 lines)  - Right-click context menu
+├── favorites.go (150 lines)     - Favorites/bookmarks system
+└── helpers.go (69 lines)        - Helper functions for model
 ```
 
 ## Module Responsibilities
@@ -73,19 +78,42 @@ tfe/
 
 **When to extend**: Add new initialization logic or layout calculation functions here.
 
-### 5. `update.go` - Event Handling
-**Purpose**: All keyboard, mouse, and window event handling
+### 5. `update.go` - Main Update Dispatcher
+**Purpose**: Message dispatching and non-input event handling
 **Contents**:
 - `Init()` - Bubbletea initialization
-- `Update()` - main event loop
-- Key bindings for all modes (single-pane, dual-pane, preview)
-- Mouse event handlers (clicks, scrolling, double-clicks)
+- `Update()` - Main message dispatcher (calls keyboard/mouse handlers)
 - Window resize handling
+- Editor/command finished message handling
+- Spinner tick handling
+- Helper functions: `isSpecialKey()`, `cleanBracketedPaste()`
 
-**When to extend**:
-- Add new keyboard shortcuts as new cases in the switch statements
-- Add new event types as new case branches
-- Keep event handling logic here, delegate complex operations to other modules
+**When to extend**: Add new message types or top-level event handlers here
+
+### 5a. `update_keyboard.go` - Keyboard Event Handling
+**Purpose**: All keyboard input processing
+**Contents**:
+- `handleKeyEvent()` - Main keyboard event handler
+- Preview mode keys (F10, F4, F5, arrow keys, pageup/pagedown)
+- Dialog input handling (input/confirm dialogs)
+- Context menu keyboard navigation
+- Command prompt input (enter, backspace, history)
+- All file browser keyboard shortcuts (F1-F10, navigation, display modes)
+
+**When to extend**: Add new keyboard shortcuts or key bindings here
+
+### 5b. `update_mouse.go` - Mouse Event Handling
+**Purpose**: All mouse input processing
+**Contents**:
+- `handleMouseEvent()` - Main mouse event handler
+- Left/right click handling
+- Double-click detection (navigate folders, preview files)
+- Context menu mouse interaction
+- Mouse wheel scrolling (file list, preview, context menu)
+- Dual-pane click focus switching
+- Clickable UI elements (home button)
+
+**When to extend**: Add new mouse interactions or clickable elements here
 
 ### 6. `view.go` - View Rendering
 **Purpose**: Top-level view dispatching and single-pane rendering
@@ -130,15 +158,25 @@ tfe/
 - Add new file type detection logic
 - Add new formatting utilities
 
-### 10. `editor.go` - External Editor Integration
-**Purpose**: External editor launching and integration
+### 10. `editor.go` - External Tool Integration
+**Purpose**: External tool launching and integration (editors, browsers, clipboard)
 **Contents**:
-- `getAvailableEditor()` - finds available editors
-- `editorAvailable()` - checks if specific editor exists
-- `openEditor()` - launches editor
-- `copyToClipboard()` - clipboard integration
+- **Editor functions:**
+  - `getAvailableEditor()` - finds available editors (micro, nano, vim, vi)
+  - `editorAvailable()` - checks if specific editor exists
+  - `openEditor()` - launches editor
+- **Browser functions:**
+  - `isImageFile()` - detects image files (.png, .jpg, .gif, .svg, etc.)
+  - `isHTMLFile()` - detects HTML files (.html, .htm)
+  - `isBrowserFile()` - combined check for browser-openable files
+  - `getAvailableBrowser()` - platform detection (wslview, cmd.exe, xdg-open, open)
+  - `openInBrowser()` - launches file in default browser
+- **Clipboard:**
+  - `copyToClipboard()` - clipboard integration (termux-api, xclip, xsel, pbcopy, clip.exe)
+- **TUI tools:**
+  - `openTUITool()` - launches TUI applications (lazygit, htop, etc.)
 
-**When to extend**: Add new editor support or clipboard features.
+**When to extend**: Add new editor/browser support, clipboard features, or TUI tool integrations.
 
 ### 11. `favorites.go` - Favorites System
 **Purpose**: Bookmarking files and directories
@@ -165,7 +203,7 @@ When adding new features, follow this decision tree:
 
 1. **Is it a new type or data structure?** → Add to `types.go`
 2. **Is it a visual style?** → Add to `styles.go`
-3. **Is it event handling (keyboard/mouse)?** → Add to `update.go`
+3. **Is it event handling (keyboard/mouse)?** → Add to `update_keyboard.go` or `update_mouse.go`
 4. **Is it a rendering function?** → Add to `view.go`, `render_preview.go`, or `render_file_list.go`
 5. **Is it a file operation?** → Add to `file_operations.go`
 6. **Is it external tool integration?** → Add to `editor.go` or create new module
@@ -219,7 +257,7 @@ When adding tests (future):
 
 ### Adding a New Keyboard Shortcut
 
-1. Go to `update.go`
+1. Go to `update_keyboard.go`
 2. Find the appropriate switch statement (preview mode vs regular mode)
 3. Add a new case for your key
 4. Implement the logic or call a function from another module
@@ -253,7 +291,7 @@ func (m model) renderYourNewMode(maxVisible int) string {
 
 3. Update the switch in `render_file_list.go` or `view.go` to call your renderer
 
-4. Add keyboard shortcut in `update.go` if needed
+4. Add keyboard shortcut in `update_keyboard.go` if needed
 
 ### Adding a New File Operation
 
@@ -265,7 +303,7 @@ func (m *model) yourNewOperation(path string) error {
 }
 ```
 
-2. Add keyboard shortcut in `update.go` to call it:
+2. Add keyboard shortcut in `update_keyboard.go` to call it:
 ```go
 case "x":
     if err := m.yourNewOperation(m.files[m.cursor].path); err != nil {
@@ -283,7 +321,11 @@ This modular architecture was achieved through a systematic refactoring process:
 - **Phase 6**: Extracted preview rendering and view functions (Commit: 49d6ece)
 - **Phase 7**: Extracted Update and Init functions (Commit: 03efd5c)
 - **Phase 8**: Extracted model initialization and layout (Commit: 68d5a87)
-- **Final**: `main.go` reduced to 21 lines containing only `main()`
+- **Phase 9**: Split `update.go` (1145 lines) into 3 focused files:
+  - `update.go` (111 lines) - dispatcher only
+  - `update_keyboard.go` (714 lines) - keyboard handling
+  - `update_mouse.go` (383 lines) - mouse handling
+- **Final**: `main.go` reduced to 21 lines, all modules under 800 lines
 
 ## Benefits of This Architecture
 

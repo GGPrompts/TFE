@@ -1,87 +1,190 @@
-# Next Session: Continue TFE Development
+# Next Session Plan
 
-## What We Just Completed ✅
+## Recently Completed
 
-**Session Date:** 2025-10-16
-**Version:** v0.4.0
+### Session: 2025-10-16 (Browser Support)
 
-### Implemented Features
-- ✅ **F7/F8 File Operations** - Full dialog system with create directory and delete operations
-- ✅ **Dialog System** - Input, confirmation, and status message dialogs (new module: `dialog.go`)
-- ✅ **Status Messages** - Auto-dismissing green (success) / red (error) messages in status bar
-- ✅ **Context Menu Integration** - Added "New Folder" and "Delete" to context menus
-- ✅ **Documentation Management System** - Created BACKLOG.md, added line limits to CLAUDE.md
-- ✅ **Documentation Cleanup** - PLAN.md reduced from 445 → 339 lines, CHANGELOG.md updated
+**Feature:** Browser support for images and HTML files
 
-### Build Status
-- ✅ Project builds successfully
-- ✅ All F7/F8 functionality implemented and working
-- ⚠️ Dialog positioning was fixed (initial bug with only showing 2-3 lines)
+**Changes:**
+1. **editor.go** (+66 lines, now 156 lines)
+   - Added `isImageFile()` - detects 10+ image extensions
+   - Added `isHTMLFile()` - detects .html and .htm
+   - Added `isBrowserFile()` - combined check
+   - Added `getAvailableBrowser()` - platform detection (wslview, cmd.exe, xdg-open, open)
+   - Added `openInBrowser()` - launches browser with platform-specific handling
+
+2. **update_keyboard.go** (modified F3 handler at line 498-512)
+   - F3 now checks if file is image/HTML
+   - Opens in browser if yes, otherwise opens text preview
+   - Seamless fallback behavior
+
+3. **HOTKEYS.md** (updated)
+   - F3 description updated in F-Keys table
+   - F3 description updated in Preview & Full-Screen Mode section
+   - Added tip #3 about browser support with examples
+
+4. **context_menu.go** (modified)
+   - Added "🌐 Open in Browser" option to file context menu
+   - Only shows for images and HTML files (uses `isBrowserFile()`)
+   - Added "browser" action handler in `executeContextMenuAction()`
+   - Positioned between "Preview" and "Edit" options
+
+5. **update_keyboard.go** (bug fix)
+   - Removed 's'/'S' hotkey that was preventing typing 's' in command prompt
+   - Added comment explaining why 's' was removed
+   - Users can now type 's' in commands (e.g., "ls", "sudo", etc.)
+   - Favorites still accessible via F2 (context menu) or right-click
+
+6. **HOTKEYS.md** (updated)
+   - Removed 's'/'S' from Favorites section
+   - Documented context menu method for toggling favorites
+   - Clarified F6 is for filtering, context menu is for adding/removing
+
+**Supported File Types:**
+- Images: .png, .jpg, .jpeg, .gif, .bmp, .svg, .webp, .ico, .tiff, .tif
+- HTML: .html, .htm
+
+**Platform Support:**
+- WSL: Uses wslview or cmd.exe /c start
+- Linux: Uses xdg-open
+- macOS: Uses open
+
+**Build Status:** ✅ Compiles successfully with `go build`
 
 ---
 
-## Prompt to Start Next Session
+## Previously Completed
+
+### Session: 2025-10-16 (update.go Refactoring - Phase 9)
+
+**Refactoring:** Split update.go (1145 lines) into 3 focused modules
+
+**Changes:**
+1. **update.go** (1145 → 111 lines) - Main dispatcher only
+   - Init(), Update() dispatcher, WindowSizeMsg, spinner, editor/command finished handlers
+   - Helper functions: isSpecialKey(), cleanBracketedPaste(), isBracketedPasteMarker()
+   - Added tree items cache update at start of Update()
+
+2. **update_keyboard.go** (714 lines) - All keyboard event handling
+   - handleKeyEvent() main handler
+   - Preview mode keys, dialog input, context menu navigation
+   - Command prompt handling, file browser keys (F1-F10, navigation, display modes)
+   - Fixed special key detection and bracketed paste filtering
+
+3. **update_mouse.go** (470 lines) - All mouse event handling
+   - handleMouseEvent() main handler
+   - Fixed tree view mouse calculations (now uses m.treeItems in tree mode)
+   - Left/right click, double-click detection, context menu, scrolling
+   - Updated maxVisible calculations for 2-line status bar
+
+**Bug Fixes:**
+- Command line input: Special keys no longer type literally
+- Bracketed paste: No more `[` and `]` markers
+- Tree view mouse: Clicks now work correctly when folders are expanded
+- Type column: Now shows descriptive types (100+ file extension mappings)
+- Footer: Now two lines to prevent filename truncation
+
+**CLAUDE.md:** Updated with Phase 9 refactoring details
+
+---
+
+## Current File Status
 
 ```
-Hi! I'm back to continue working on TFE.
-
-Last session we completed Phase 1 (F7/F8 file operations with dialog system) and set up documentation management rules. Everything is in CHANGELOG.md v0.4.0.
-
-What should we work on next? Here are some options:
-
-1. **Phase 2: Code Quality** - Refactor update.go (991 lines), improve error handling
-2. **Search/Filter** - Quick file search within current directory (user-requested)
-3. **Menu Bar** - DEFERRED to BACKLOG.md (too complex for now, needs mouse positioning audit)
-4. **Something else** - Check PLAN.md or BACKLOG.md for ideas
-
-Please review the current status and suggest what makes sense to prioritize next.
+main.go: 21 lines ✅
+styles.go: 35 lines ✅
+helpers.go: 69 lines ✅
+model.go: 78 lines ✅
+update.go: 111 lines ✅ (refactored!)
+command.go: 127 lines ✅
+dialog.go: 141 lines ✅
+favorites.go: 150 lines ✅
+editor.go: 156 lines ✅ (browser support added!)
+types.go: 173 lines ✅
+view.go: 198 lines ✅
+context_menu.go: 313 lines ✅
+render_file_list.go: 447 lines ✅
+render_preview.go: 498 lines ✅
+update_keyboard.go: 714 lines ✅ (new!)
+update_mouse.go: 470 lines ✅ (new!)
+file_operations.go: 846 lines ⚠️ (acceptable - has 100+ file type mappings)
 ```
 
----
-
-## Quick Reference
-
-**Documentation Structure:**
-- `PLAN.md` - Current roadmap (Phase 2-5)
-- `BACKLOG.md` - Ideas not ready for PLAN.md yet
-- `CHANGELOG.md` - v0.4.0 released today
-- `CLAUDE.md` - Architecture guide + doc management rules
-
-**Key Files:**
-- `dialog.go` - NEW! Dialog rendering system
-- `file_operations.go` - createDirectory(), deleteFileOrDir(), setStatusMessage()
-- `update.go` - F7/F8 handlers + dialog event handling
-- `view.go` - Dialog overlay rendering + status messages
-- `context_menu.go` - "New Folder" and "Delete" menu items
-
-**Current Line Counts:**
-- All docs are within limits ✅
-- PLAN.md: 339/400 lines
-- CHANGELOG.md: 254/300 lines
-- CLAUDE.md: 408/500 lines
+**Architecture Status:** ✅ All modules under control, modular architecture maintained
 
 ---
 
-## Known Issues
+## Next Priorities
 
-1. ⚠️ **Menu bar idea deferred** - Would break mouse positioning in ~8+ locations (see BACKLOG.md)
-2. 📝 **update.go is large** - 991 lines, Phase 2 includes refactoring
-3. 🔍 **No search yet** - Can't filter files in current directory
+### Option 1: Search Functionality
+Add file/directory search capabilities:
+- Search by name (fuzzy matching)
+- Filter current directory
+- Recursive search option
+- Search results view mode
+
+### Option 2: Copy/Move Operations
+Extend file operations beyond create/delete:
+- F5: Copy file (currently just copies path)
+- F6: Move/rename file (currently favorites toggle - may need new key)
+- Multi-select support (Space to mark, operations on marked files)
+- Progress indicators for large operations
+
+### Option 3: Performance Optimizations
+Optimize for large directories:
+- Lazy loading for directories with thousands of files
+- Virtual scrolling in grid/list views
+- Background preview loading
+- Preview caching improvements
+
+### Option 4: UX Polish
+Small but impactful improvements:
+- Breadcrumb navigation in header
+- File/folder size summaries in detail view
+- Recent files/folders history
+- Quick jump to letter (type 'a' to jump to first file starting with 'a')
 
 ---
 
-## Testing Notes
+## Documentation Status
 
-If you want to test F7/F8 before continuing:
-```bash
-cd /home/matt/TFE
-./tfe
-# Press F7 to create a directory
-# Press F8 to delete a file/folder
-# Right-click for context menu with "New Folder" and "Delete"
+Last checked: 2025-10-16
+
+```
+CLAUDE.md: 440 lines ✅ (under 500 limit)
+README.md: 375 lines ✅ (under 400 limit)
+PLAN.md: 339 lines ✅ (under 400 limit)
+CHANGELOG.md: 263 lines ✅ (under 300 limit)
+BACKLOG.md: 97 lines ✅ (under 300 limit)
+HOTKEYS.md: 170 lines ✅ (under 200 limit)
+docs/NEXT_SESSION.md: This file
 ```
 
+All documentation within limits! ✅
+
 ---
 
-**Last Updated:** 2025-10-16
-**Next Priority:** TBD - discuss with user at start of next session
+## Quick Start for Next Session
+
+Pick a priority and dive in, or explore new ideas in BACKLOG.md first.
+
+For search functionality:
+```
+Hi! Let's add search functionality to TFE. I'd like to:
+1. Add file/directory name search with fuzzy matching
+2. Show search results in a filtered view
+3. Use a keyboard shortcut to trigger search (maybe Ctrl+F or /)
+4. Allow clearing search to return to normal view
+
+What do you think would be the best approach?
+```
+
+For copy/move operations:
+```
+Hi! Let's extend TFE's file operations with copy and move functionality.
+Currently F5 copies the path, but we need actual file copying.
+What key bindings would work best? Should we repurpose existing keys or add new ones?
+```
+
+Good luck with the next feature! 🚀

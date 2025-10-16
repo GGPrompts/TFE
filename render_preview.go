@@ -334,8 +334,14 @@ func (m model) renderDualPane() string {
 	s.WriteString(titleStyle.Render("TFE - Terminal File Explorer [Dual-Pane]"))
 	s.WriteString("\n")
 
-	// Current path
-	s.WriteString(pathStyle.Render(m.currentPath))
+	// Home button + Current path (with ~ for home directory)
+	homeButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true).
+		Render("[🏠]")
+	s.WriteString(homeButtonStyle)
+	s.WriteString(" ")
+	s.WriteString(pathStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString("\n")
 
 	// Command prompt (left-aligned on its own line)
@@ -353,9 +359,9 @@ func (m model) renderDualPane() string {
 	s.WriteString("\n")
 
 	// Calculate max visible for both panes
-	// title=1 + path=1 + command=1 + separator=1 + panes=maxVisible + status=1 = m.height
-	// Therefore: maxVisible = m.height - 5
-	maxVisible := m.height - 5
+	// title=1 + path=1 + command=1 + separator=1 + panes=maxVisible + status=2 = m.height
+	// Therefore: maxVisible = m.height - 6
+	maxVisible := m.height - 6
 
 	// Get left pane content
 	var leftContent string
@@ -446,6 +452,12 @@ func (m model) renderDualPane() string {
 	if m.showHidden {
 		hiddenIndicator = " • hidden"
 	}
+
+	favoritesIndicator := ""
+	if m.showFavoritesOnly {
+		favoritesIndicator = " • ⭐ favorites only"
+	}
+
 	// Show focused pane info in status bar
 	focusInfo := ""
 	if m.focusedPane == leftPane {
@@ -453,10 +465,34 @@ func (m model) renderDualPane() string {
 	} else {
 		focusInfo = " • [RIGHT focused]"
 	}
+
 	// Help hint
 	helpHint := " • F1: help"
-	statusText := fmt.Sprintf("%s%s • %s%s%s", itemsInfo, hiddenIndicator, m.displayMode.String(), focusInfo, helpHint)
-	s.WriteString(statusStyle.Render(statusText))
+
+	// Selected file info
+	var selectedInfo string
+	if currentFile := m.getCurrentFile(); currentFile != nil {
+		if currentFile.isDir {
+			selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
+		} else {
+			fileType := getFileType(*currentFile)
+			selectedInfo = fmt.Sprintf("Selected: %s (%s, %s, %s)",
+				currentFile.name,
+				fileType,
+				formatFileSize(currentFile.size),
+				formatModTime(currentFile.modTime))
+		}
+	}
+
+	// Split status into two lines to prevent truncation
+	// Line 1: Counts, indicators, view mode, focus, help
+	statusLine1 := fmt.Sprintf("%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, m.displayMode.String(), focusInfo, helpHint)
+	s.WriteString(statusStyle.Render(statusLine1))
+	s.WriteString("\n")
+
+	// Line 2: Selected file info
+	statusLine2 := selectedInfo
+	s.WriteString(statusStyle.Render(statusLine2))
 
 	return s.String()
 }

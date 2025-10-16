@@ -273,10 +273,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			size = formatFileSize(file.size)
 		}
 		modified := formatModTime(file.modTime)
-		fileType := "File"
-		if file.isDir {
-			fileType = "Folder"
-		}
+		fileType := getFileType(file)
 
 		line := fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", name, size, modified, fileType)
 
@@ -334,17 +331,18 @@ func (m model) buildTreeItems(files []fileItem, depth int, parentLasts []bool) [
 	return items
 }
 
+// updateTreeItems rebuilds the tree items cache (called before rendering tree view)
+func (m *model) updateTreeItems() {
+	files := m.getFilteredFiles()
+	m.treeItems = m.buildTreeItems(files, 0, []bool{})
+}
+
 // renderTreeView renders files in a hierarchical tree structure with expandable folders
 func (m model) renderTreeView(maxVisible int) string {
 	var s strings.Builder
 
-	// Get filtered files (respects favorites filter)
-	files := m.getFilteredFiles()
-
-	// Build tree structure with expanded directories and cache it in model
-	// Note: We're modifying the model here which is unusual in a render function,
-	// but necessary for cursor-to-file mapping to work correctly
-	treeItems := m.buildTreeItems(files, 0, []bool{})
+	// Use cached tree items (should be updated before rendering)
+	treeItems := m.treeItems
 
 	// Calculate visible range
 	start := 0

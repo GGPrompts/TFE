@@ -91,6 +91,12 @@ func (m model) getContextMenuItems() []contextMenuItem {
 	} else {
 		// File menu items
 		items = append(items, contextMenuItem{"👁  Preview", "preview"})
+
+		// Add "Open in Browser" for images and HTML files
+		if isBrowserFile(m.contextMenuFile.path) {
+			items = append(items, contextMenuItem{"🌐 Open in Browser", "browser"})
+		}
+
 		items = append(items, contextMenuItem{"✏  Edit", "edit"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
@@ -148,6 +154,13 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			m.viewMode = viewFullPreview
 			// Disable mouse to allow text selection
 			return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+		}
+		return m, tea.ClearScreen
+
+	case "browser":
+		// Open in browser (images/HTML)
+		if !m.contextMenuFile.isDir {
+			return m, openInBrowser(m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 

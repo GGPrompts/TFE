@@ -88,3 +88,68 @@ func copyToClipboard(text string) error {
 
 	return cmd.Wait()
 }
+
+// isImageFile checks if a file is an image based on extension
+func isImageFile(path string) bool {
+	imageExts := []string{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp", ".ico", ".tiff", ".tif"}
+	for _, ext := range imageExts {
+		if len(path) >= len(ext) && path[len(path)-len(ext):] == ext {
+			return true
+		}
+	}
+	return false
+}
+
+// isHTMLFile checks if a file is an HTML file based on extension
+func isHTMLFile(path string) bool {
+	return len(path) >= 5 && (path[len(path)-5:] == ".html" || path[len(path)-4:] == ".htm")
+}
+
+// isBrowserFile checks if a file should be opened in a browser
+func isBrowserFile(path string) bool {
+	return isImageFile(path) || isHTMLFile(path)
+}
+
+// getAvailableBrowser returns the command to open files in the default browser
+func getAvailableBrowser() string {
+	// WSL - try wslview first (from wslu package), then use Windows commands
+	if editorAvailable("wslview") {
+		return "wslview"
+	}
+	// Windows via WSL
+	if editorAvailable("cmd.exe") {
+		return "cmd.exe"
+	}
+	// Linux - xdg-open is the standard
+	if editorAvailable("xdg-open") {
+		return "xdg-open"
+	}
+	// macOS
+	if editorAvailable("open") {
+		return "open"
+	}
+	return ""
+}
+
+// openInBrowser opens a file in the default browser
+func openInBrowser(path string) tea.Cmd {
+	browser := getAvailableBrowser()
+	if browser == "" {
+		return nil
+	}
+
+	var c *exec.Cmd
+	if browser == "cmd.exe" {
+		// Windows via WSL - use cmd.exe /c start
+		c = exec.Command("cmd.exe", "/c", "start", path)
+	} else {
+		// Linux/macOS/wslview
+		c = exec.Command(browser, path)
+	}
+
+	return tea.Sequence(
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}

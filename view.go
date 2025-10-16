@@ -73,8 +73,14 @@ func (m model) renderSinglePane() string {
 	s.WriteString(title)
 	s.WriteString("\n")
 
-	// Current path
-	s.WriteString(pathStyle.Render(m.currentPath))
+	// Home button + Current path (with ~ for home directory)
+	homeButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true).
+		Render("[🏠]")
+	s.WriteString(homeButtonStyle)
+	s.WriteString(" ")
+	s.WriteString(pathStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString("\n")
 
 	// Command prompt (left-aligned on its own line)
@@ -93,9 +99,9 @@ func (m model) renderSinglePane() string {
 
 	// File list - render based on current display mode
 	// Calculate maxVisible to fit within terminal height:
-	// title=1 + path=1 + command=1 + separator=1 + filelist=maxVisible + spacer=1 + status=1 = m.height
-	// Therefore: maxVisible = m.height - 6
-	maxVisible := m.height - 6 // Reserve space for all UI elements
+	// title=1 + path=1 + command=1 + separator=1 + filelist=maxVisible + spacer=1 + status=2 = m.height
+	// Therefore: maxVisible = m.height - 7
+	maxVisible := m.height - 7 // Reserve space for all UI elements (including 2-line status)
 
 	switch m.displayMode {
 	case modeList:
@@ -147,8 +153,10 @@ func (m model) renderSinglePane() string {
 			if currentFile.isDir {
 				selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
 			} else {
-				selectedInfo = fmt.Sprintf("Selected: %s (%s, %s)",
+				fileType := getFileType(*currentFile)
+				selectedInfo = fmt.Sprintf("Selected: %s (%s, %s, %s)",
 					currentFile.name,
+					fileType,
 					formatFileSize(currentFile.size),
 					formatModTime(currentFile.modTime))
 			}
@@ -175,8 +183,15 @@ func (m model) renderSinglePane() string {
 		// Help hint
 		helpHint := " • F1: help"
 
-		statusText := fmt.Sprintf("%s%s%s%s%s | %s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint, selectedInfo)
-		s.WriteString(statusStyle.Render(statusText))
+		// Split status into two lines to prevent truncation
+		// Line 1: Counts, indicators, view mode, help
+		statusLine1 := fmt.Sprintf("%s%s%s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint)
+		s.WriteString(statusStyle.Render(statusLine1))
+		s.WriteString("\n")
+
+		// Line 2: Selected file info
+		statusLine2 := selectedInfo
+		s.WriteString(statusStyle.Render(statusLine2))
 	}
 
 	return s.String()

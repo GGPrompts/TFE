@@ -6,7 +6,7 @@
 |-----|--------|
 | **F1** | Show this help reference |
 | **F2** | Open context menu (keyboard alternative to right-click) |
-| **F3** | View/Preview file in full-screen |
+| **F3** | Open images/HTML in browser OR view/preview file in full-screen |
 | **F4** | Edit file in external editor |
 | **F5** | Copy file path to clipboard |
 | **F6** | Toggle favorites filter (show only favorites) |
@@ -42,7 +42,7 @@
 
 | Key | Action |
 |-----|--------|
-| **F3** | Force full-screen preview of current file |
+| **F3** | Open images/HTML in default browser OR full-screen preview of current file |
 | **Enter** | Open full-screen preview (when on a file) |
 | **Esc** | Exit full-screen preview / Exit dual-pane mode |
 | **↑** / **k** | Scroll preview up (in full-screen or dual-pane right) |
@@ -71,17 +71,21 @@
 
 Context menu actions include:
 - 👁️ Preview file
+- 🌐 Open in browser (images/HTML files only)
 - ✏️ Edit file
 - 📋 Copy path to clipboard
 - ⭐ Toggle favorite
 - 📂 Quick CD (for directories)
+- 🗑️ Delete file/folder
 
 ## Favorites
 
 | Key | Action |
 |-----|--------|
-| **s** / **S** | Toggle favorite for current file/folder |
 | **F6** | Toggle favorites filter (show only favorites) |
+| **F2** or **Right-Click** | Open context menu to add/remove favorites |
+
+To add or remove favorites, use the context menu (F2 or right-click) and select "☆ Add Favorite" or "⭐ Unfavorite".
 
 When in favorites mode, press Enter on a favorite to navigate to its location.
 
@@ -155,12 +159,13 @@ TFE uses emoji icons to indicate file types:
 
 1. **Quick Preview:** Press **Tab** to enter dual-pane mode and see file previews as you navigate
 2. **Full-Screen Reading:** Press **Enter** or **F3** on a file for distraction-free viewing
-3. **Command Execution:** Type any shell command and press Enter - TFE pauses, runs it, and returns
-4. **Fast Editing:** Press **F4** on any file to jump straight into Micro/nano editor
-5. **Copy Paths:** Press **F5** to copy file paths for pasting elsewhere
-6. **Command History:** Use ↑/↓ arrows when typing to recall previous commands
-7. **Context Menu:** Press **F2** or right-click for quick access to common actions
-8. **Favorites:** Press **s** to bookmark files/folders, then **F6** to filter by favorites
+3. **Browser Support:** Press **F3** on images (.png, .jpg, .gif, .svg, etc.) or HTML files to open them in your default browser
+4. **Command Execution:** Type any shell command and press Enter - TFE pauses, runs it, and returns
+5. **Fast Editing:** Press **F4** on any file to jump straight into Micro/nano editor
+6. **Copy Paths:** Press **F5** to copy file paths for pasting elsewhere
+7. **Command History:** Use ↑/↓ arrows when typing to recall previous commands
+8. **Context Menu:** Press **F2** or right-click for quick access to common actions
+9. **Favorites:** Press **s** to bookmark files/folders, then **F6** to filter by favorites
 
 ---
 

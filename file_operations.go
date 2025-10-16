@@ -341,6 +341,195 @@ func truncateToWidth(s string, targetWidth int) string {
 	return result
 }
 
+// getFileType returns a descriptive file type string based on file extension
+func getFileType(item fileItem) string {
+	if item.isDir {
+		return "Folder"
+	}
+
+	// Get file extension
+	ext := strings.ToLower(filepath.Ext(item.name))
+
+	// Map extensions to descriptive types
+	typeMap := map[string]string{
+		// Programming languages
+		".go":     "Go Source",
+		".py":     "Python",
+		".js":     "JavaScript",
+		".ts":     "TypeScript",
+		".jsx":    "React (JSX)",
+		".tsx":    "React (TSX)",
+		".rs":     "Rust",
+		".c":      "C Source",
+		".cpp":    "C++",
+		".cc":     "C++",
+		".cxx":    "C++",
+		".h":      "C Header",
+		".hpp":    "C++ Header",
+		".java":   "Java",
+		".rb":     "Ruby",
+		".php":    "PHP",
+		".sh":     "Shell Script",
+		".bash":   "Bash Script",
+		".zsh":    "ZSH Script",
+		".fish":   "Fish Script",
+		".lua":    "Lua",
+		".r":      "R Script",
+		".swift":  "Swift",
+		".kt":     "Kotlin",
+		".scala":  "Scala",
+		".cs":     "C#",
+		".vb":     "Visual Basic",
+		".pl":     "Perl",
+
+		// Web
+		".html":   "HTML",
+		".htm":    "HTML",
+		".css":    "CSS",
+		".scss":   "SCSS",
+		".sass":   "Sass",
+		".less":   "Less",
+		".vue":    "Vue Component",
+		".svelte": "Svelte",
+
+		// Data/Config
+		".json":  "JSON",
+		".yaml":  "YAML",
+		".yml":   "YAML",
+		".toml":  "TOML",
+		".xml":   "XML",
+		".csv":   "CSV",
+		".sql":   "SQL",
+		".env":   "Environment",
+		".ini":   "INI Config",
+		".conf":  "Config",
+		".cfg":   "Config",
+		".properties": "Properties",
+
+		// Documents
+		".md":       "Markdown",
+		".markdown": "Markdown",
+		".txt":      "Text",
+		".pdf":      "PDF Document",
+		".doc":      "Word Doc",
+		".docx":     "Word Doc",
+		".rtf":      "Rich Text",
+		".odt":      "OpenDocument",
+
+		// Archives
+		".zip":  "ZIP Archive",
+		".tar":  "TAR Archive",
+		".gz":   "GZip Archive",
+		".bz2":  "BZip2 Archive",
+		".xz":   "XZ Archive",
+		".7z":   "7-Zip Archive",
+		".rar":  "RAR Archive",
+		".tgz":  "TAR.GZ Archive",
+
+		// Images
+		".png":  "PNG Image",
+		".jpg":  "JPEG Image",
+		".jpeg": "JPEG Image",
+		".gif":  "GIF Image",
+		".svg":  "SVG Image",
+		".ico":  "Icon",
+		".webp": "WebP Image",
+		".bmp":  "Bitmap Image",
+		".tiff": "TIFF Image",
+		".tif":  "TIFF Image",
+
+		// Audio/Video
+		".mp3":  "MP3 Audio",
+		".mp4":  "MP4 Video",
+		".wav":  "WAV Audio",
+		".flac": "FLAC Audio",
+		".ogg":  "OGG Audio",
+		".avi":  "AVI Video",
+		".mkv":  "MKV Video",
+		".mov":  "MOV Video",
+		".wmv":  "WMV Video",
+
+		// System/Build
+		".exe":    "Executable",
+		".dll":    "DLL Library",
+		".so":     "Shared Library",
+		".dylib":  "Dynamic Library",
+		".a":      "Static Library",
+		".o":      "Object File",
+		".lock":   "Lock File",
+		".log":    "Log File",
+		".tmp":    "Temporary",
+		".bak":    "Backup",
+		".swp":    "Swap File",
+
+		// Build/Package files
+		".gradle": "Gradle",
+		".maven":  "Maven",
+		".npm":    "NPM",
+		".mod":    "Go Module",
+		".sum":    "Go Checksum",
+		".gem":    "Ruby Gem",
+		".whl":    "Python Wheel",
+		".deb":    "Debian Package",
+		".rpm":    "RPM Package",
+	}
+
+	// Check for extension mapping
+	if fileType, ok := typeMap[ext]; ok {
+		return fileType
+	}
+
+	// Check for special files without extension or specific names
+	switch item.name {
+	case "Makefile", "makefile", "GNUmakefile":
+		return "Makefile"
+	case "Dockerfile":
+		return "Dockerfile"
+	case "docker-compose.yml", "docker-compose.yaml":
+		return "Docker Compose"
+	case "LICENSE", "LICENSE.txt", "LICENSE.md":
+		return "License"
+	case "README", "README.md", "README.txt":
+		return "ReadMe"
+	case ".gitignore":
+		return "Git Ignore"
+	case ".gitattributes":
+		return "Git Attributes"
+	case ".gitmodules":
+		return "Git Modules"
+	case "package.json":
+		return "NPM Package"
+	case "package-lock.json":
+		return "NPM Lock"
+	case "tsconfig.json":
+		return "TS Config"
+	case "go.mod":
+		return "Go Module"
+	case "go.sum":
+		return "Go Checksum"
+	case "Cargo.toml":
+		return "Cargo Config"
+	case "Cargo.lock":
+		return "Cargo Lock"
+	case "requirements.txt":
+		return "Python Deps"
+	case "Gemfile":
+		return "Ruby Gemfile"
+	case "Gemfile.lock":
+		return "Ruby Lock"
+	case "CLAUDE.md", "CLAUDE.local.md":
+		return "Claude Context"
+	}
+
+	// If extension exists but not mapped, return it
+	if ext != "" {
+		return strings.TrimPrefix(ext, ".") + " File"
+	}
+
+	// No extension - return generic "File"
+	return "File"
+}
+
 // loadSubdirFiles loads files from a specific directory (for tree view expansion)
 func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 	entries, err := os.ReadDir(dirPath)
