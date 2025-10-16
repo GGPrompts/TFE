@@ -4,7 +4,7 @@ This document describes the architecture of the TFE (Terminal File Explorer) pro
 
 ## Architecture Overview
 
-TFE follows a **modular architecture** where each file has a single, clear responsibility. This organization was established through a comprehensive refactoring that reduced `main.go` from 1668 lines to just 21 lines, distributing functionality across 9 focused modules.
+TFE follows a **modular architecture** where each file has a single, clear responsibility. This organization was established through a comprehensive refactoring that reduced `main.go` from 1668 lines to just 21 lines, distributing functionality across 11 focused modules.
 
 ### Core Principle
 
@@ -15,15 +15,17 @@ TFE follows a **modular architecture** where each file has a single, clear respo
 ```
 tfe/
 ├── main.go (21 lines)           - Entry point ONLY
-├── types.go (110 lines)         - Type definitions & enums
+├── types.go (135 lines)         - Type definitions & enums
 ├── styles.go (36 lines)         - Lipgloss style definitions
-├── model.go (64 lines)          - Model initialization & layout calculations
-├── update.go (453 lines)        - Event handling (Init & Update functions)
-├── view.go (107 lines)          - View dispatcher & single-pane rendering
+├── model.go (75 lines)          - Model initialization & layout calculations
+├── update.go (650 lines)        - Event handling (Init & Update functions)
+├── view.go (120 lines)          - View dispatcher & single-pane rendering
 ├── render_preview.go (219)      - Preview rendering (full & dual-pane)
-├── render_file_list.go (284)    - File list views (List/Grid/Detail/Tree)
-├── file_operations.go (329)     - File operations & formatting
-└── editor.go (72 lines)         - External editor integration
+├── render_file_list.go (440)    - File list views (List/Grid/Detail/Tree)
+├── file_operations.go (465)     - File operations & formatting
+├── editor.go (72 lines)         - External editor integration
+├── favorites.go (115 lines)     - Favorites/bookmarks system
+└── helpers.go (45 lines)        - Helper functions for model
 ```
 
 ## Module Responsibilities
@@ -48,6 +50,8 @@ tfe/
 - Custom message types: `editorFinishedMsg`
 
 **When to extend**: Add new types here when introducing new data structures or state fields.
+
+**Recent additions**: `treeItem` struct for tree view, favorites fields in model.
 
 ### 3. `styles.go` - Visual Styling
 **Purpose**: All Lipgloss style definitions
@@ -105,8 +109,9 @@ tfe/
 **Contents**:
 - `renderListView()` - simple list view
 - `renderGridView()` - grid layout view
-- `renderDetailView()` - detailed view with metadata
-- `renderTreeView()` - tree/hierarchical view
+- `renderDetailView()` - detailed view with metadata (default)
+- `renderTreeView()` - expandable hierarchical tree view
+- `buildTreeItems()` - recursively builds tree with expanded folders
 
 **When to extend**: Add new display modes or modify existing view layouts.
 
@@ -114,10 +119,11 @@ tfe/
 **Purpose**: All file system operations and formatting
 **Contents**:
 - `loadFiles()` - reads directory contents
+- `loadSubdirFiles()` - loads subdirectory for tree view expansion
 - `loadPreview()` - loads file for preview
 - Icon mapping functions (`getFileIcon()`, `getIconForExtension()`)
-- Formatting functions (`formatFileSize()`, `formatModTime()`, `formatPermissions()`)
-- File type detection (`isBinaryFile()`, `getLanguage()`)
+- Formatting functions (`formatFileSize()`, `formatModTime()`)
+- File type detection (`isBinaryFile()`, `isClaudeContextFile()`)
 
 **When to extend**:
 - Add new file operations (copy, move, delete) here
@@ -133,6 +139,23 @@ tfe/
 - `copyToClipboard()` - clipboard integration
 
 **When to extend**: Add new editor support or clipboard features.
+
+### 11. `favorites.go` - Favorites System
+**Purpose**: Bookmarking files and directories
+**Contents**:
+- `loadFavorites()` / `saveFavorites()` - persistence to ~/.config/tfe/favorites.json
+- `toggleFavorite()` - add/remove favorites
+- `getFilteredFiles()` - filter by favorites
+
+**When to extend**: Add favorite management features (import/export, categories, etc.).
+
+### 12. `helpers.go` - Helper Functions
+**Purpose**: Utility functions for model operations
+**Contents**:
+- `getCurrentFile()` - gets selected file (handles tree view expansion)
+- `getMaxCursor()` - calculates cursor bounds for current display mode
+
+**When to extend**: Add reusable helper functions that don't fit other modules.
 
 ## Development Guidelines
 

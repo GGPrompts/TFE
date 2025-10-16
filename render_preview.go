@@ -141,9 +141,9 @@ func (m model) renderPreview(maxVisible int) string {
 		markdownContent := strings.Join(m.preview.content, "\n")
 
 		// Create Glamour renderer with appropriate width
-		// Use "dark" theme for better contrast
+		// Use "ascii" theme which has minimal backgrounds
 		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStylePath("dark"),
+			glamour.WithStylePath("ascii"),
 			glamour.WithWordWrap(availableWidth),
 		)
 

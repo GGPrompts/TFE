@@ -18,23 +18,26 @@ func initialModel() model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#5fd7ff"})
 
 	m := model{
-		currentPath:    cwd,
-		cursor:         0,
-		height:         24,
-		width:          80,
-		showHidden:     false,
-		displayMode:    modeList,
-		gridColumns:    4,
-		sortBy:         "name",
-		sortAsc:        true,
-		viewMode:       viewSinglePane,
-		focusedPane:    leftPane,
-		lastClickIndex: -1,
+		currentPath:       cwd,
+		cursor:            0,
+		height:            24,
+		width:             80,
+		showHidden:        false,
+		displayMode:       modeDetail,
+		gridColumns:       4,
+		sortBy:            "name",
+		sortAsc:           true,
+		viewMode:          viewSinglePane,
+		focusedPane:       leftPane,
+		lastClickIndex:    -1,
 		preview: previewModel{
 			maxPreview: 10000, // Max 10k lines
 		},
-		spinner: s,
-		loading: false,
+		spinner:           s,
+		loading:           false,
+		favorites:         loadFavorites(),
+		showFavoritesOnly: false,
+		expandedDirs:      make(map[string]bool),
 	}
 
 	m.loadFiles()

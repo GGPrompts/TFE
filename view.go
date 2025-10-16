@@ -84,15 +84,14 @@ func (m model) renderSinglePane() string {
 
 	// Selected file info
 	var selectedInfo string
-	if len(m.files) > 0 && m.cursor < len(m.files) {
-		selected := m.files[m.cursor]
-		if selected.isDir {
-			selectedInfo = fmt.Sprintf("Selected: %s (folder)", selected.name)
+	if currentFile := m.getCurrentFile(); currentFile != nil {
+		if currentFile.isDir {
+			selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
 		} else {
 			selectedInfo = fmt.Sprintf("Selected: %s (%s, %s)",
-				selected.name,
-				formatFileSize(selected.size),
-				formatModTime(selected.modTime))
+				currentFile.name,
+				formatFileSize(currentFile.size),
+				formatModTime(currentFile.modTime))
 		}
 	}
 
@@ -106,13 +105,18 @@ func (m model) renderSinglePane() string {
 		hiddenIndicator = " • showing hidden"
 	}
 
+	favoritesIndicator := ""
+	if m.showFavoritesOnly {
+		favoritesIndicator = " • ⭐ favorites only"
+	}
+
 	// View mode indicator
 	viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
 
 	// Help hint
 	helpHint := " • ?: help"
 
-	statusText := fmt.Sprintf("%s%s%s%s | %s", itemsInfo, hiddenIndicator, viewModeText, helpHint, selectedInfo)
+	statusText := fmt.Sprintf("%s%s%s%s%s | %s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint, selectedInfo)
 	s.WriteString(statusStyle.Render(statusText))
 
 	return s.String()

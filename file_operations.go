@@ -31,7 +31,7 @@ func isClaudeContextFile(name string) bool {
 func getFileIcon(item fileItem) string {
 	if item.isDir {
 		if item.name == ".." {
-			return "⬆️ " // Up arrow for parent dir
+			return "⬆️" // Up arrow for parent dir
 		}
 		// Special folder icons
 		switch item.name {
@@ -314,6 +314,54 @@ func truncateToWidth(s string, targetWidth int) string {
 		result += string(ch)
 	}
 
+	return result
+}
+
+// loadSubdirFiles loads files from a specific directory (for tree view expansion)
+func (m *model) loadSubdirFiles(dirPath string) []fileItem {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return []fileItem{}
+	}
+
+	var dirs, files []fileItem
+
+	for _, entry := range entries {
+		// Skip hidden files unless showHidden is true
+		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		item := fileItem{
+			name:    entry.Name(),
+			path:    filepath.Join(dirPath, entry.Name()),
+			isDir:   entry.IsDir(),
+			size:    info.Size(),
+			modTime: info.ModTime(),
+			mode:    info.Mode(),
+		}
+
+		if entry.IsDir() {
+			dirs = append(dirs, item)
+		} else {
+			files = append(files, item)
+		}
+	}
+
+	// Sort alphabetically
+	sort.Slice(dirs, func(i, j int) bool {
+		return strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name)
+	})
+	sort.Slice(files, func(i, j int) bool {
+		return strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
+	})
+
+	result := append(dirs, files...)
 	return result
 }
 

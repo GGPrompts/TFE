@@ -161,8 +161,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.cursor > 0 {
 						m.cursor--
 						// Update preview if file selected
-						if len(m.files) > 0 && !m.files[m.cursor].isDir {
-							m.loadPreview(m.files[m.cursor].path)
+						if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+							m.loadPreview(currentFile.path)
 						}
 					}
 				} else {
@@ -191,11 +191,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// In dual-pane mode, check which pane is focused
 				if m.focusedPane == leftPane {
 					// Scroll file list
-					if m.cursor < len(m.files)-1 {
+					maxCursor := m.getMaxCursor()
+					if m.cursor < maxCursor {
 						m.cursor++
 						// Update preview if file selected
-						if len(m.files) > 0 && !m.files[m.cursor].isDir {
-							m.loadPreview(m.files[m.cursor].path)
+						if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+							m.loadPreview(currentFile.path)
 						}
 					}
 				} else {
@@ -213,21 +214,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				// Single-pane mode: just move cursor
-				if m.cursor < len(m.files)-1 {
+				maxCursor := m.getMaxCursor()
+				if m.cursor < maxCursor {
 					m.cursor++
 				}
 			}
 
 		case "enter":
-			if len(m.files) > 0 {
-				if m.files[m.cursor].isDir {
-					// Navigate into directory
-					m.currentPath = m.files[m.cursor].path
-					m.cursor = 0
-					m.loadFiles()
+			if currentFile := m.getCurrentFile(); currentFile != nil {
+				if currentFile.isDir {
+					// In tree view: toggle expansion instead of navigating
+					if m.displayMode == modeTree && currentFile.name != ".." {
+						m.expandedDirs[currentFile.path] = !m.expandedDirs[currentFile.path]
+					} else {
+						// Other modes: navigate into directory
+						m.currentPath = currentFile.path
+						m.cursor = 0
+						m.loadFiles()
+					}
 				} else {
 					// Enter full-screen preview (regardless of current mode)
-					m.loadPreview(m.files[m.cursor].path)
+					m.loadPreview(currentFile.path)
 					m.viewMode = viewFullPreview
 					return m, tea.ClearScreen
 				}
@@ -249,8 +256,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focusedPane = leftPane
 				m.calculateLayout()
 				// Load preview of current file
-				if len(m.files) > 0 && !m.files[m.cursor].isDir {
-					m.loadPreview(m.files[m.cursor].path)
+				if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+					m.loadPreview(currentFile.path)
 				}
 			}
 
@@ -261,8 +268,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focusedPane = leftPane
 				m.calculateLayout()
 				// Load preview of current file
-				if len(m.files) > 0 && !m.files[m.cursor].isDir {
-					m.loadPreview(m.files[m.cursor].path)
+				if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+					m.loadPreview(currentFile.path)
 				}
 			} else if m.viewMode == viewDualPane {
 				m.viewMode = viewSinglePane
@@ -271,8 +278,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "f":
 			// Force full-screen preview
-			if len(m.files) > 0 && !m.files[m.cursor].isDir {
-				m.loadPreview(m.files[m.cursor].path)
+			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
 				return m, tea.ClearScreen
 			}
@@ -338,7 +345,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "e", "E":
 			// Edit file in external editor
-			if len(m.files) > 0 && !m.files[m.cursor].isDir {
+			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 				editor := getAvailableEditor()
 				if editor == "" {
 					// Could show error message - for now, do nothing
@@ -348,22 +355,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if editorAvailable("micro") {
 					editor = "micro"
 				}
-				return m, openEditor(editor, m.files[m.cursor].path)
+				return m, openEditor(editor, currentFile.path)
 			}
 
 		case "n", "N":
 			// Edit file in nano specifically
-			if len(m.files) > 0 && !m.files[m.cursor].isDir {
+			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 				if editorAvailable("nano") {
-					return m, openEditor("nano", m.files[m.cursor].path)
+					return m, openEditor("nano", currentFile.path)
 				}
 			}
 
 		case "y":
 			// Copy file path to clipboard (vim-style "yank")
-			if len(m.files) > 0 {
-				path := m.files[m.cursor].path
-				err := copyToClipboard(path)
+			if currentFile := m.getCurrentFile(); currentFile != nil {
+				err := copyToClipboard(currentFile.path)
 				if err != nil {
 					// Could show error - for now, silently continue
 					// In the future, we could add a status message system
@@ -373,10 +379,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "c":
 			// Copy file path (alternative to y)
-			if len(m.files) > 0 {
-				path := m.files[m.cursor].path
-				_ = copyToClipboard(path)
+			if currentFile := m.getCurrentFile(); currentFile != nil {
+				_ = copyToClipboard(currentFile.path)
 			}
+
+		case "s", "S":
+			// Toggle favorite for current file/folder
+			if currentFile := m.getCurrentFile(); currentFile != nil {
+				m.toggleFavorite(currentFile.path)
+			}
+
+		case "b", "B":
+			// Toggle favorites filter (show only favorites)
+			m.showFavoritesOnly = !m.showFavoritesOnly
 
 		case "?":
 			// Show hotkeys reference
@@ -485,13 +500,66 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.displayMode == modeDetail {
 					maxVisible -= 2 // Account for detail header
 				}
-				start, end := m.getVisibleRange(maxVisible)
 
-				// Convert clicked line to actual file index
-				clickedLine := msg.Y - headerOffset
-				clickedIndex := start + clickedLine
+				var clickedIndex int
+				var clickedLine int
 
-				if clickedLine >= 0 && clickedIndex >= start && clickedIndex < end && clickedIndex < len(m.files) {
+				// Grid view requires calculating both row and column from X,Y coordinates
+				if m.displayMode == modeGrid {
+					// Calculate which row was clicked
+					clickedRow := msg.Y - headerOffset
+
+					// Calculate which column was clicked
+					// Each grid cell is approximately: icon(2) + space(1) + name(12) + padding(2) = 17 chars
+					cellWidth := 17
+					clickedCol := msg.X / cellWidth
+					if clickedCol >= m.gridColumns {
+						clickedCol = m.gridColumns - 1
+					}
+
+					// Calculate visible row range (grid mode uses rows, not items)
+					totalItems := len(m.files)
+					rows := (totalItems + m.gridColumns - 1) / m.gridColumns
+
+					startRow := 0
+					endRow := rows
+					if rows > maxVisible {
+						cursorRow := m.cursor / m.gridColumns
+						startRow = cursorRow - maxVisible/2
+						if startRow < 0 {
+							startRow = 0
+						}
+						endRow = startRow + maxVisible
+						if endRow > rows {
+							endRow = rows
+							startRow = endRow - maxVisible
+							if startRow < 0 {
+								startRow = 0
+							}
+						}
+					}
+
+					// Convert click to item index
+					actualRow := startRow + clickedRow
+					clickedIndex = actualRow*m.gridColumns + clickedCol
+
+					// Validate the clicked index is within bounds
+					if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(m.files) {
+						clickedIndex = -1
+					}
+				} else {
+					// List, Detail, and Tree modes: one item per line
+					start, end := m.getVisibleRange(maxVisible)
+					clickedLine = msg.Y - headerOffset
+					clickedIndex = start + clickedLine
+
+					// Validate bounds
+					if clickedLine < 0 || clickedIndex >= end || clickedIndex >= len(m.files) {
+						clickedIndex = -1
+					}
+				}
+
+				if clickedIndex >= 0 && clickedIndex < len(m.files) {
 					now := time.Now()
 
 					// Check for double-click: same item clicked within 500ms
@@ -543,8 +611,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor > 0 {
 					m.cursor--
 					// Update preview in dual-pane mode
-					if m.viewMode == viewDualPane && len(m.files) > 0 && !m.files[m.cursor].isDir {
-						m.loadPreview(m.files[m.cursor].path)
+					if m.viewMode == viewDualPane {
+						if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+							m.loadPreview(currentFile.path)
+						}
 					}
 				}
 			}
@@ -564,11 +634,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				// Scroll file list
-				if m.cursor < len(m.files)-1 {
+				maxCursor := m.getMaxCursor()
+				if m.cursor < maxCursor {
 					m.cursor++
 					// Update preview in dual-pane mode
-					if m.viewMode == viewDualPane && len(m.files) > 0 && !m.files[m.cursor].isDir {
-						m.loadPreview(m.files[m.cursor].path)
+					if m.viewMode == viewDualPane {
+						if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+							m.loadPreview(currentFile.path)
+						}
 					}
 				}
 			}

@@ -115,6 +115,20 @@ type model struct {
 	// Loading spinner
 	spinner spinner.Model
 	loading bool
+	// Favorites system
+	favorites         map[string]bool // Path -> favorited
+	showFavoritesOnly bool            // Filter to show only favorites
+	// Tree view expansion
+	expandedDirs map[string]bool // Path -> expanded state
+	treeItems    []treeItem       // Cached tree items for tree view
+}
+
+// treeItem represents an item in the tree view with depth information
+type treeItem struct {
+	file        fileItem
+	depth       int
+	isLast      bool
+	parentLasts []bool // Track which parent levels are last items
 }
 
 // editorFinishedMsg is sent when external editor exits

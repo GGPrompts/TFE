@@ -33,11 +33,29 @@ func (m model) getVisibleRange(maxVisible int) (start, end int) {
 func (m model) renderListView(maxVisible int) string {
 	var s strings.Builder
 
+	// Get filtered files (respects favorites filter)
+	files := m.getFilteredFiles()
+
 	// Calculate visible range (simple scrolling)
-	start, end := m.getVisibleRange(maxVisible)
+	start := 0
+	end := len(files)
+	if len(files) > maxVisible {
+		start = m.cursor - maxVisible/2
+		if start < 0 {
+			start = 0
+		}
+		end = start + maxVisible
+		if end > len(files) {
+			end = len(files)
+			start = end - maxVisible
+			if start < 0 {
+				start = 0
+			}
+		}
+	}
 
 	for i := start; i < end; i++ {
-		file := m.files[i]
+		file := files[i]
 
 		// Get icon based on file type
 		icon := getFileIcon(file)
@@ -50,6 +68,12 @@ func (m model) renderListView(maxVisible int) string {
 		// Override with orange color if it's a Claude context file
 		if isClaudeContextFile(file.name) {
 			style = claudeContextStyle
+		}
+
+		// Add star indicator for favorites
+		favIndicator := ""
+		if m.isFavorite(file.path) {
+			favIndicator = "⭐"
 		}
 
 		// Truncate long filenames to prevent wrapping
@@ -68,7 +92,7 @@ func (m model) renderListView(maxVisible int) string {
 		}
 
 		// Build the line
-		line := fmt.Sprintf("  %s %s", icon, displayName)
+		line := fmt.Sprintf("  %s%s %s", icon, favIndicator, displayName)
 
 		// Apply selection style
 		if i == m.cursor {
@@ -88,8 +112,11 @@ func (m model) renderListView(maxVisible int) string {
 func (m model) renderGridView(maxVisible int) string {
 	var s strings.Builder
 
+	// Get filtered files (respects favorites filter)
+	files := m.getFilteredFiles()
+
 	// Calculate how many rows we need
-	totalItems := len(m.files)
+	totalItems := len(files)
 	rows := (totalItems + m.gridColumns - 1) / m.gridColumns
 
 	// Calculate visible range
@@ -120,8 +147,14 @@ func (m model) renderGridView(maxVisible int) string {
 				break
 			}
 
-			file := m.files[idx]
+			file := files[idx]
 			icon := getFileIcon(file)
+
+			// Add star indicator for favorites
+			favIndicator := ""
+			if m.isFavorite(file.path) {
+				favIndicator = "⭐"
+			}
 
 			// Truncate long names
 			displayName := file.name
@@ -139,7 +172,7 @@ func (m model) renderGridView(maxVisible int) string {
 			}
 
 			// Build cell content
-			cell := fmt.Sprintf("%s %-12s", icon, displayName)
+			cell := fmt.Sprintf("%s%s %-12s", icon, favIndicator, displayName)
 
 			// Apply selection style
 			if idx == m.cursor {
@@ -161,6 +194,9 @@ func (m model) renderGridView(maxVisible int) string {
 func (m model) renderDetailView(maxVisible int) string {
 	var s strings.Builder
 
+	// Get filtered files (respects favorites filter)
+	files := m.getFilteredFiles()
+
 	// Header
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -171,23 +207,27 @@ func (m model) renderDetailView(maxVisible int) string {
 	s.WriteString(headerStyle.Render(header))
 	s.WriteString("\n")
 
-	// Separator
-	separator := strings.Repeat("─", m.width-4)
+	// Separator - use left pane width in dual-pane mode to prevent wrapping
+	separatorWidth := m.width - 4
+	if m.viewMode == viewDualPane {
+		separatorWidth = m.leftWidth - 4
+	}
+	separator := strings.Repeat("─", separatorWidth)
 	s.WriteString(pathStyle.Render(separator))
 	s.WriteString("\n")
 
 	// Calculate visible range
 	start := 0
-	end := len(m.files)
+	end := len(files)
 
-	if len(m.files) > maxVisible-2 { // -2 for header and separator
+	if len(files) > maxVisible-2 { // -2 for header and separator
 		start = m.cursor - (maxVisible-2)/2
 		if start < 0 {
 			start = 0
 		}
 		end = start + maxVisible - 2
-		if end > len(m.files) {
-			end = len(m.files)
+		if end > len(files) {
+			end = len(files)
 			start = end - (maxVisible - 2)
 			if start < 0 {
 				start = 0
@@ -197,8 +237,14 @@ func (m model) renderDetailView(maxVisible int) string {
 
 	// Render rows
 	for i := start; i < end; i++ {
-		file := m.files[i]
+		file := files[i]
 		icon := getFileIcon(file)
+
+		// Add star indicator for favorites
+		favIndicator := ""
+		if m.isFavorite(file.path) {
+			favIndicator = "⭐"
+		}
 
 		// Truncate long names
 		displayName := file.name
@@ -207,7 +253,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			displayName = displayName[:maxNameLen-2] + ".."
 		}
 
-		name := fmt.Sprintf("%s %s", icon, displayName)
+		name := fmt.Sprintf("%s%s %s", icon, favIndicator, displayName)
 		size := "-"
 		if !file.isDir {
 			size = formatFileSize(file.size)
@@ -242,24 +288,103 @@ func (m model) renderDetailView(maxVisible int) string {
 	return s.String()
 }
 
-// renderTreeView renders files in a hierarchical tree structure
+// buildTreeItems builds a flattened list of tree items including expanded directories
+func (m model) buildTreeItems(files []fileItem, depth int, parentLasts []bool) []treeItem {
+	items := make([]treeItem, 0)
+
+	for i, file := range files {
+		isLast := i == len(files)-1
+
+		// Add current item
+		item := treeItem{
+			file:        file,
+			depth:       depth,
+			isLast:      isLast,
+			parentLasts: append([]bool{}, parentLasts...), // Copy parent lasts
+		}
+		items = append(items, item)
+
+		// If this is an expanded directory, recursively add its contents
+		if file.isDir && file.name != ".." && m.expandedDirs[file.path] {
+			// Load subdirectory contents
+			subFiles := m.loadSubdirFiles(file.path)
+			if len(subFiles) > 0 {
+				// Update parentLasts for children
+				newParentLasts := append(parentLasts, isLast)
+				subItems := m.buildTreeItems(subFiles, depth+1, newParentLasts)
+				items = append(items, subItems...)
+			}
+		}
+	}
+
+	return items
+}
+
+// renderTreeView renders files in a hierarchical tree structure with expandable folders
 func (m model) renderTreeView(maxVisible int) string {
 	var s strings.Builder
 
-	// For now, render a simplified tree view similar to list view
-	// In the future, this could show expanded subdirectories
-	start, end := m.getVisibleRange(maxVisible)
+	// Get filtered files (respects favorites filter)
+	files := m.getFilteredFiles()
+
+	// Build tree structure with expanded directories and cache it in model
+	// Note: We're modifying the model here which is unusual in a render function,
+	// but necessary for cursor-to-file mapping to work correctly
+	treeItems := m.buildTreeItems(files, 0, []bool{})
+
+	// Calculate visible range
+	start := 0
+	end := len(treeItems)
+	if len(treeItems) > maxVisible {
+		start = m.cursor - maxVisible/2
+		if start < 0 {
+			start = 0
+		}
+		end = start + maxVisible
+		if end > len(treeItems) {
+			end = len(treeItems)
+			start = end - maxVisible
+			if start < 0 {
+				start = 0
+			}
+		}
+	}
 
 	for i := start; i < end; i++ {
-		file := m.files[i]
+		item := treeItems[i]
+		file := item.file
 
-		// Use tree-style prefix
-		prefix := "├─ "
-		if i == len(m.files)-1 {
-			prefix = "└─ "
+		// Build indentation with tree characters
+		var indent strings.Builder
+		indent.WriteString("  ") // Base padding
+
+		// Draw vertical lines for parent levels
+		for j := 0; j < item.depth; j++ {
+			if j < len(item.parentLasts) && !item.parentLasts[j] {
+				indent.WriteString("│  ")
+			} else {
+				indent.WriteString("   ")
+			}
 		}
+
+		// Draw tree connector
+		var prefix string
 		if file.name == ".." {
 			prefix = "↑  "
+		} else if item.isLast {
+			prefix = "└─ "
+		} else {
+			prefix = "├─ "
+		}
+
+		// Add expansion indicator for directories
+		expansionIndicator := ""
+		if file.isDir && file.name != ".." {
+			if m.expandedDirs[file.path] {
+				expansionIndicator = "▼ " // Expanded
+			} else {
+				expansionIndicator = "▶ " // Collapsed
+			}
 		}
 
 		icon := getFileIcon(file)
@@ -273,22 +398,26 @@ func (m model) renderTreeView(maxVisible int) string {
 			style = claudeContextStyle
 		}
 
+		// Add star indicator for favorites
+		favIndicator := ""
+		if m.isFavorite(file.path) {
+			favIndicator = "⭐"
+		}
+
 		// Truncate long filenames to prevent wrapping
-		// Account for prefix (4 chars) + icon (2) + spaces
 		displayName := file.name
-		maxNameLen := 35 // Default for single-pane
+		maxNameLen := 25 - (item.depth * 3) // Reduce for deeper nesting
 		if m.viewMode == viewDualPane {
-			// Account for left pane width minus prefix, icon, and padding
-			maxNameLen = m.leftWidth - 15
-			if maxNameLen < 20 {
-				maxNameLen = 20 // Minimum reasonable length
+			maxNameLen = m.leftWidth - 20 - (item.depth * 3)
+			if maxNameLen < 15 {
+				maxNameLen = 15
 			}
 		}
 		if len(displayName) > maxNameLen {
 			displayName = displayName[:maxNameLen-2] + ".."
 		}
 
-		line := fmt.Sprintf("  %s%s %s", prefix, icon, displayName)
+		line := fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, displayName)
 
 		if i == m.cursor {
 			line = selectedStyle.Render(line)
