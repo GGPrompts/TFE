@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/glamour"
 )
 
 // isClaudeContextFile checks if a file/folder is automatically loaded by Claude Code
@@ -463,6 +465,11 @@ func (m *model) loadPreview(path string) {
 	m.preview.isBinary = false
 	m.preview.tooLarge = false
 	m.preview.isMarkdown = false
+	// Invalidate cache when loading new file
+	m.preview.cacheValid = false
+	m.preview.cachedWrappedLines = nil
+	m.preview.cachedRenderedContent = ""
+	m.preview.cachedLineCount = 0
 
 	// Get file info
 	info, err := os.Stat(path)
@@ -532,4 +539,52 @@ func (m *model) loadPreview(path string) {
 
 	m.preview.content = lines
 	m.preview.loaded = true
+
+	// Populate cache for better scroll performance
+	m.populatePreviewCache()
+}
+
+// populatePreviewCache pre-computes and caches wrapped/rendered content for better scroll performance
+func (m *model) populatePreviewCache() {
+	if !m.preview.loaded {
+		return
+	}
+
+	// Calculate available width
+	availableWidth := m.rightWidth - 17
+	if m.viewMode == viewFullPreview {
+		availableWidth = m.width - 10
+	}
+	if availableWidth < 20 {
+		availableWidth = 20
+	}
+
+	// Cache markdown rendering
+	if m.preview.isMarkdown {
+		markdownContent := strings.Join(m.preview.content, "\n")
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithStandardStyle("dark"),
+			glamour.WithWordWrap(availableWidth),
+		)
+		if err == nil {
+			rendered, err := renderer.Render(markdownContent)
+			if err == nil {
+				m.preview.cachedRenderedContent = rendered
+				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+				m.preview.cachedLineCount = len(renderedLines)
+				m.preview.cacheValid = true
+			}
+		}
+		return
+	}
+
+	// Cache wrapped text lines
+	var wrappedLines []string
+	for _, line := range m.preview.content {
+		wrapped := wrapLine(line, availableWidth)
+		wrappedLines = append(wrappedLines, wrapped...)
+	}
+	m.preview.cachedWrappedLines = wrappedLines
+	m.preview.cachedLineCount = len(wrappedLines)
+	m.preview.cacheValid = true
 }

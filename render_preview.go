@@ -14,10 +14,15 @@ func (m model) getWrappedLineCount() int {
 		return 0
 	}
 
+	// Use cached line count if available
+	if m.preview.cacheValid && m.preview.cachedLineCount > 0 {
+		return m.preview.cachedLineCount
+	}
+
 	// Calculate available width
 	availableWidth := m.rightWidth - 17
 	if m.viewMode == viewFullPreview {
-		availableWidth = m.width - 17
+		availableWidth = m.width - 10 // line nums (6) + scrollbar (2) + padding (2)
 	}
 	if availableWidth < 20 {
 		availableWidth = 20
@@ -129,7 +134,7 @@ func (m model) renderPreview(maxVisible int) string {
 	// Calculate available width for content
 	availableWidth := m.rightWidth - 17 // line nums (8) + scrollbar (2) + borders (4) + padding (3)
 	if m.viewMode == viewFullPreview {
-		availableWidth = m.width - 17
+		availableWidth = m.width - 10 // line nums (6) + scrollbar (2) + padding (2)
 	}
 	if availableWidth < 20 {
 		availableWidth = 20 // Minimum width
@@ -137,55 +142,71 @@ func (m model) renderPreview(maxVisible int) string {
 
 	// If markdown, render with Glamour
 	if m.preview.isMarkdown {
-		// Join content back to original markdown
-		markdownContent := strings.Join(m.preview.content, "\n")
+		var renderedLines []string
 
-		// Create Glamour renderer with appropriate width
-		// Use dark theme with standard styling
-		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("dark"),
-			glamour.WithWordWrap(availableWidth),
-		)
+		// Check if we have cached rendered content
+		if m.preview.cacheValid && m.preview.cachedRenderedContent != "" {
+			// Use cached rendered content
+			renderedLines = strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
+		} else {
+			// Join content back to original markdown
+			markdownContent := strings.Join(m.preview.content, "\n")
 
-		if err == nil {
-			rendered, err := renderer.Render(markdownContent)
+			// Create Glamour renderer with appropriate width
+			// Use dark theme with standard styling
+			renderer, err := glamour.NewTermRenderer(
+				glamour.WithStandardStyle("dark"),
+				glamour.WithWordWrap(availableWidth),
+			)
+
 			if err == nil {
-				// Split rendered markdown into lines for scrolling
-				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-
-				// Calculate visible range based on scroll position
-				totalLines := len(renderedLines)
-				start := m.preview.scrollPos
-
-				if start < 0 {
-					start = 0
+				rendered, err := renderer.Render(markdownContent)
+				if err == nil {
+					renderedLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
 				}
-				if start >= totalLines {
-					start = max(0, totalLines-maxVisible)
-				}
-
-				end := start + maxVisible
-				if end > totalLines {
-					end = totalLines
-				}
-
-				// Render visible lines without line numbers for markdown
-				for i := start; i < end; i++ {
-					s.WriteString(renderedLines[i])
-					s.WriteString("\n")
-				}
-
-				return s.String()
 			}
+		}
+
+		// If we successfully got rendered lines, display them
+		if len(renderedLines) > 0 {
+			// Calculate visible range based on scroll position
+			totalLines := len(renderedLines)
+			start := m.preview.scrollPos
+
+			if start < 0 {
+				start = 0
+			}
+			if start >= totalLines {
+				start = max(0, totalLines-maxVisible)
+			}
+
+			end := start + maxVisible
+			if end > totalLines {
+				end = totalLines
+			}
+
+			// Render visible lines without line numbers for markdown
+			for i := start; i < end; i++ {
+				s.WriteString(renderedLines[i])
+				s.WriteString("\n")
+			}
+
+			return s.String()
 		}
 		// If Glamour rendering fails, fall through to regular rendering
 	}
 
-	// Wrap all lines first
+	// Wrap all lines first (use cache if available)
 	var wrappedLines []string
-	for _, line := range m.preview.content {
-		wrapped := wrapLine(line, availableWidth)
-		wrappedLines = append(wrappedLines, wrapped...)
+	if m.preview.cacheValid && len(m.preview.cachedWrappedLines) > 0 {
+		// Use cached wrapped lines
+		wrappedLines = m.preview.cachedWrappedLines
+	} else {
+		// Wrap lines (will be slow for large files without cache)
+		for _, line := range m.preview.content {
+			wrapped := wrapLine(line, availableWidth)
+			wrappedLines = append(wrappedLines, wrapped...)
+		}
 	}
 
 	// Calculate visible range based on scroll position

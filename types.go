@@ -84,6 +84,11 @@ type previewModel struct {
 	tooLarge   bool
 	fileSize   int64
 	isMarkdown bool // Whether the file is markdown
+	// Caching for performance
+	cachedWrappedLines    []string // Cached wrapped text lines
+	cachedRenderedContent string   // Cached Glamour-rendered markdown
+	cachedLineCount       int      // Cached total line count after wrapping
+	cacheValid            bool     // Whether cache is valid
 }
 
 // model represents the main application state

@@ -24,8 +24,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Exit preview mode (F10 replaces q)
 				m.viewMode = viewSinglePane
 				m.calculateLayout()
-				// Re-enable mouse for navigation
-				return m, tea.Batch(tea.ClearScreen, tea.EnableMouseCellMotion)
+				return m, tea.ClearScreen
 
 			case "f4":
 				// Edit file in external editor from preview (F4 replaces e/E)
@@ -69,13 +68,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.preview.scrollPos++
 				}
 
-			case "pageup":
+			case "pageup", "pgup":
 				m.preview.scrollPos -= m.height - 6
 				if m.preview.scrollPos < 0 {
 					m.preview.scrollPos = 0
 				}
 
-			case "pagedown":
+			case "pagedown", "pgdn":
 				totalLines := m.getWrappedLineCount()
 				maxScroll := totalLines - (m.height - 6)
 				if maxScroll < 0 {
@@ -156,14 +155,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If no command input, handle Esc for dual-pane exit (below)
 		}
 
-		// Check if user is typing in command prompt
+		// Check if user is typing/pasting in command prompt
 		// If commandInput has text, prioritize adding to it over hotkeys
 		// This allows typing 'e', 'v', 'f', etc. in commands
 		key := msg.String()
-		if len(m.commandInput) > 0 && len(key) == 1 {
-			// User is actively typing a command - add this character
-			m.commandInput += key
-			return m, nil
+
+		// Handle paste (multi-character input) or typing while command is active
+		if len(m.commandInput) > 0 {
+			// Check if it's printable text (not a special key like arrow keys)
+			if len(key) > 0 {
+				isPrintable := true
+				for _, r := range key {
+					if r < 32 || r == 127 { // Control characters
+						isPrintable = false
+						break
+					}
+				}
+				if isPrintable {
+					m.commandInput += key
+					m.historyPos = len(m.commandHistory)
+					return m, nil
+				}
+			}
 		}
 
 		// Regular file browser keys
@@ -282,8 +295,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// File is in current directory, just preview it
 						m.loadPreview(currentFile.path)
 						m.viewMode = viewFullPreview
-						// Disable mouse to allow text selection
-						return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+						// Clear screen for clean rendering
+						return m, tea.ClearScreen
 					}
 				} else if currentFile.isDir {
 					// In tree view: toggle expansion instead of navigating
@@ -299,8 +312,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Enter full-screen preview (regardless of current mode)
 					m.loadPreview(currentFile.path)
 					m.viewMode = viewFullPreview
-					// Disable mouse to allow text selection
-					return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+					// Clear screen for clean rendering
+					return m, tea.ClearScreen
 				}
 			}
 
@@ -345,11 +358,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
-				// Disable mouse to allow text selection
-				return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+				// Clear screen for clean rendering
+				return m, tea.ClearScreen
 			}
 
-		case "pageup":
+		case "pageup", "pgup":
 			// Page up in dual-pane mode (only works when right pane focused)
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 				visibleLines := m.height - 7
@@ -359,7 +372,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "pagedown":
+		case "pagedown", "pgdn":
 			// Page down in dual-pane mode (only works when right pane focused)
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 				// Calculate visible lines: m.height - 5 (header) - 2 (preview title) = m.height - 7
@@ -467,8 +480,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if _, err := os.Stat(hotkeysPath); err == nil {
 				m.loadPreview(hotkeysPath)
 				m.viewMode = viewFullPreview
-				// Disable mouse to allow text selection
-				return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+				// Clear screen for clean rendering
+				return m, tea.ClearScreen
 			}
 
 		case "f2":
@@ -508,10 +521,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// TODO: Implement file deletion with confirmation
 
 		default:
-			// MC-style: any single character goes to command prompt
-			if len(msg.String()) == 1 {
-				m.commandInput += msg.String()
-				m.historyPos = len(m.commandHistory)
+			// MC-style: any printable character(s) go to command prompt
+			// This handles both typing and pasting (starting a new command)
+			key := msg.String()
+			if len(key) > 0 {
+				// Check if it's printable text (not a special key)
+				// Pasted text comes through as multi-character strings
+				isPrintable := true
+				for _, r := range key {
+					if r < 32 || r == 127 { // Control characters
+						isPrintable = false
+						break
+					}
+				}
+				if isPrintable {
+					m.commandInput += key
+					m.historyPos = len(m.commandHistory)
+					return m, nil // Return to update the view
+				}
 			}
 		}
 
@@ -708,8 +735,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							// Reset click tracking after double-click
 							m.lastClickIndex = -1
 							m.lastClickTime = time.Time{}
-							// Disable mouse to allow text selection
-							return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+							// Clear screen for clean rendering
+							return m, tea.ClearScreen
 						}
 						// Reset click tracking after double-click (for directory navigation)
 						m.lastClickIndex = -1
@@ -886,8 +913,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		m.width = msg.Width
-		m.calculateGridLayout() // Recalculate grid columns on resize
-		m.calculateLayout()     // Recalculate pane layout on resize
+		m.calculateGridLayout()  // Recalculate grid columns on resize
+		m.calculateLayout()      // Recalculate pane layout on resize
+		m.populatePreviewCache() // Repopulate cache with new width
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
