@@ -123,6 +123,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If no command input, handle Esc for dual-pane exit (below)
 		}
 
+		// Check if user is typing in command prompt
+		// If commandInput has text, prioritize adding to it over hotkeys
+		// This allows typing 'e', 'v', 'f', etc. in commands
+		key := msg.String()
+		if len(m.commandInput) > 0 && len(key) == 1 {
+			// User is actively typing a command - add this character
+			m.commandInput += key
+			return m, nil
+		}
+
 		// Regular file browser keys
 		switch msg.String() {
 		case "q", "ctrl+c":
