@@ -215,6 +215,16 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				maxVisible -= 2 // Account for detail header
 			}
 
+			// Get filtered files for click detection (respects favorites filter)
+			// This must match what's actually rendered on screen
+			var displayedFiles []fileItem
+			if m.displayMode == modeTree {
+				// Tree mode uses treeItems, not filtered files
+				displayedFiles = nil // Will use m.treeItems instead
+			} else {
+				displayedFiles = m.getFilteredFiles()
+			}
+
 			var clickedIndex int
 			var clickedLine int
 
@@ -232,7 +242,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 
 				// Calculate visible row range (grid mode uses rows, not items)
-				totalItems := len(m.files)
+				totalItems := len(displayedFiles)
 				rows := (totalItems + m.gridColumns - 1) / m.gridColumns
 
 				startRow := 0
@@ -258,7 +268,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				clickedIndex = actualRow*m.gridColumns + clickedCol
 
 				// Validate the clicked index is within bounds
-				if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(m.files) {
+				if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(displayedFiles) {
 					clickedIndex = -1
 				}
 			} else {
@@ -268,7 +278,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if m.displayMode == modeTree {
 					totalItems = len(m.treeItems)
 				} else {
-					totalItems = len(m.files)
+					totalItems = len(displayedFiles)
 				}
 
 				// Calculate visible range based on cursor and totalItems
@@ -303,7 +313,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			if m.displayMode == modeTree {
 				validIndex = clickedIndex >= 0 && clickedIndex < len(m.treeItems)
 			} else {
-				validIndex = clickedIndex >= 0 && clickedIndex < len(m.files)
+				validIndex = clickedIndex >= 0 && clickedIndex < len(displayedFiles)
 			}
 
 			if validIndex {
@@ -319,7 +329,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if m.displayMode == modeTree {
 					clickedFile = m.treeItems[clickedIndex].file
 				} else {
-					clickedFile = m.files[clickedIndex]
+					clickedFile = displayedFiles[clickedIndex]
 				}
 
 				if isDoubleClick {
@@ -388,6 +398,14 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				maxVisible -= 2
 			}
 
+			// Get filtered files for right-click detection (respects favorites filter)
+			var displayedFiles []fileItem
+			if m.displayMode == modeTree {
+				displayedFiles = nil // Tree mode uses treeItems
+			} else {
+				displayedFiles = m.getFilteredFiles()
+			}
+
 			var clickedIndex int
 
 			// Grid view: calculate row and column
@@ -399,7 +417,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					clickedCol = m.gridColumns - 1
 				}
 
-				totalItems := len(m.files)
+				totalItems := len(displayedFiles)
 				rows := (totalItems + m.gridColumns - 1) / m.gridColumns
 
 				startRow := 0
@@ -423,7 +441,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				actualRow := startRow + clickedRow
 				clickedIndex = actualRow*m.gridColumns + clickedCol
 
-				if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(m.files) {
+				if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(displayedFiles) {
 					clickedIndex = -1
 				}
 			} else {
@@ -433,7 +451,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if m.displayMode == modeTree {
 					totalItems = len(m.treeItems)
 				} else {
-					totalItems = len(m.files)
+					totalItems = len(displayedFiles)
 				}
 
 				// Calculate visible range based on cursor and totalItems
@@ -467,7 +485,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			if m.displayMode == modeTree {
 				validIndex = clickedIndex >= 0 && clickedIndex < len(m.treeItems)
 			} else {
-				validIndex = clickedIndex >= 0 && clickedIndex < len(m.files)
+				validIndex = clickedIndex >= 0 && clickedIndex < len(displayedFiles)
 			}
 
 			if validIndex {
@@ -488,7 +506,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					file := m.treeItems[clickedIndex].file
 					m.contextMenuFile = &file
 				} else {
-					m.contextMenuFile = &m.files[clickedIndex]
+					m.contextMenuFile = &displayedFiles[clickedIndex]
 				}
 				m.contextMenuCursor = 0
 			}
