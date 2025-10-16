@@ -133,6 +133,12 @@ type model struct {
 	contextMenuY      int
 	contextMenuFile   *fileItem
 	contextMenuCursor int
+	// Dialog system
+	dialog        dialogModel
+	showDialog    bool
+	statusMessage string    // Temporary status message
+	statusIsError bool      // Whether status message is an error
+	statusTime    time.Time // When status was shown
 }
 
 // treeItem represents an item in the tree view with depth information
@@ -145,3 +151,23 @@ type treeItem struct {
 
 // editorFinishedMsg is sent when external editor exits
 type editorFinishedMsg struct{ err error }
+
+// dialogType represents different types of dialogs
+type dialogType int
+
+const (
+	dialogNone dialogType = iota
+	dialogInput   // Text input dialog (F7 directory name)
+	dialogConfirm // Yes/No confirmation (F8 delete)
+	dialogMessage // Status messages (success/error)
+)
+
+// dialogModel holds dialog state
+type dialogModel struct {
+	dialogType dialogType
+	title      string
+	message    string
+	input      string // For text input dialogs
+	confirmed  bool   // User confirmed action
+	isError    bool   // For message dialogs (red vs green)
+}

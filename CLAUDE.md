@@ -305,3 +305,104 @@ Do NOT add complex logic to `main.go`. Instead:
 - Update this document when creating new modules
 
 This architecture took significant effort to establish - let's maintain it! 🏗️
+
+---
+
+## Documentation Management
+
+**Problem:** Documentation files can grow too large, making them hard to read, navigate, and load into AI context. This leads to "documentation bloat" that makes projects unmaintainable.
+
+**Solution:** Strict line limits and archiving rules for all documentation files.
+
+### Core Documentation Files
+
+These files live in the project root and should be kept concise:
+
+| File | Max Lines | Purpose | When to Clean |
+|------|-----------|---------|---------------|
+| **CLAUDE.md** | 500 | Architecture guide for AI assistants | Archive old sections to `docs/archive/` |
+| **README.md** | 400 | Project overview, installation, usage | Split detailed docs to `docs/` |
+| **PLAN.md** | 400 | Current roadmap & planned features | Move completed items to CHANGELOG.md |
+| **CHANGELOG.md** | 300 | Recent changes & release notes | Archive old versions to `docs/archive/CHANGELOG_YYYY.md` |
+| **BACKLOG.md** | 300 | Ideas & future features (brainstorming) | Move refined ideas to PLAN.md or archive |
+| **HOTKEYS.md** | 200 | User-facing keyboard shortcuts | Should rarely grow |
+
+### Documentation Workflow
+
+**1. Idea Stage → BACKLOG.md**
+- Raw ideas, brainstorming, "nice to have" features
+- Things that need more research or aren't prioritized yet
+- Parking lot for concepts that don't warrant PLAN.md yet
+
+**2. Planning Stage → PLAN.md**
+- Refined ideas with clear requirements
+- Prioritized features ready for implementation
+- When item is completed → Move to CHANGELOG.md
+
+**3. Implementation Stage → docs/NEXT_SESSION.md**
+- Detailed implementation plans for current work
+- Session-specific notes and checklists
+- After completion → Delete or archive
+
+**4. Completion Stage → CHANGELOG.md**
+- Brief description of what was implemented
+- Version number, date, key changes
+- When file exceeds 300 lines → Archive old versions
+
+**5. Research Notes → docs/**
+- Research documents can be large but should be split by topic
+- One topic per file (e.g., `RESEARCH_UI_FRAMEWORKS.md`)
+- Archive when no longer relevant
+
+### Archiving Rules
+
+**When to archive:**
+- CHANGELOG.md exceeds 300 lines → Move entries older than 6 months to `docs/archive/CHANGELOG_2024.md`
+- PLAN.md exceeds 400 lines → Move completed items to CHANGELOG.md, defer low-priority items to BACKLOG.md
+- BACKLOG.md exceeds 300 lines → Archive old/rejected ideas to `docs/archive/BACKLOG_OLD.md`
+- Research docs exceed 1000 lines → Split into multiple focused docs or archive outdated sections
+
+**Archive structure:**
+```
+docs/
+├── archive/
+│   ├── CHANGELOG_2024.md
+│   ├── BACKLOG_2024.md
+│   ├── RESEARCH_OLD.md
+│   └── ...
+├── NEXT_SESSION.md (current work)
+├── RESEARCH_XYZ.md (active research)
+└── ...
+```
+
+### AI Assistant Reminders
+
+**For Claude Code:**
+- If any core doc exceeds its line limit during a session, proactively suggest cleanup
+- When adding to PLAN.md, check if it's grown too large
+- Suggest moving completed PLAN.md items to CHANGELOG.md
+- Keep NEXT_SESSION.md focused on current work only
+
+**Checking file sizes:**
+```bash
+wc -l *.md docs/*.md
+```
+
+### Benefits of This System
+
+✅ **AI Context Efficiency** - Smaller files load faster and fit in context windows
+✅ **Human Readability** - Easier to scan and find information
+✅ **Project Maintainability** - Clear separation between active and archived info
+✅ **Prevents Bloat** - Proactive limits prevent files from becoming unmanageable
+✅ **Clear Workflow** - Know exactly where each piece of information belongs
+
+### Current Status (as of 2025-10-16)
+
+Recent line counts:
+- CLAUDE.md: 408 lines ✅ (under 500 limit)
+- PLAN.md: 339 lines ✅ (under 400 limit - cleaned up Phase 1)
+- CHANGELOG.md: 254 lines ✅ (under 300 limit)
+- BACKLOG.md: 97 lines ✅ (newly created)
+- README.md: 375 lines ✅ (under 400 limit)
+
+**Status:** ✅ All documentation is within limits! Phase 1 completion moved to CHANGELOG.md.

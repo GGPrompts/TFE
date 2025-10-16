@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,6 +127,119 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, nil
+		}
+
+		// Handle dialog input if dialog is open
+		if m.showDialog {
+			switch m.dialog.dialogType {
+			case dialogInput:
+				// Handle text input dialog
+				switch msg.String() {
+				case "esc":
+					// Cancel dialog
+					m.showDialog = false
+					m.dialog = dialogModel{}
+					return m, tea.ClearScreen
+
+				case "enter":
+					// Confirm input
+					if m.dialog.title == "Create Directory" {
+						// Handle F7 directory creation
+						if err := m.createDirectory(m.dialog.input); err != nil {
+							m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+						} else {
+							m.setStatusMessage(fmt.Sprintf("Created directory: %s", m.dialog.input), false)
+							m.loadFiles()
+							// Move cursor to newly created directory
+							for i, f := range m.files {
+								if f.name == m.dialog.input {
+									m.cursor = i
+									break
+								}
+							}
+						}
+					}
+					m.showDialog = false
+					m.dialog = dialogModel{}
+					return m, tea.ClearScreen
+
+				case "backspace":
+					// Delete last character
+					if len(m.dialog.input) > 0 {
+						m.dialog.input = m.dialog.input[:len(m.dialog.input)-1]
+					}
+					return m, nil
+
+				default:
+					// Add printable characters to input
+					key := msg.String()
+					if len(key) == 1 && key[0] >= 32 && key[0] <= 126 {
+						m.dialog.input += key
+					}
+					return m, nil
+				}
+
+			case dialogConfirm:
+				// Handle confirmation dialog
+				switch msg.String() {
+				case "esc", "n", "N":
+					// Cancel dialog
+					m.showDialog = false
+					m.dialog = dialogModel{}
+					return m, tea.ClearScreen
+
+				case "y", "Y":
+					// Confirm action
+					if m.dialog.title == "Delete file" || m.dialog.title == "Delete directory" {
+						// Handle F8 deletion
+						if m.contextMenuFile != nil {
+							// Delete from context menu
+							if err := m.deleteFileOrDir(m.contextMenuFile.path, m.contextMenuFile.isDir); err != nil {
+								m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+							} else {
+								itemType := "file"
+								if m.contextMenuFile.isDir {
+									itemType = "directory"
+								}
+								m.setStatusMessage(fmt.Sprintf("Deleted %s: %s", itemType, m.contextMenuFile.name), false)
+								m.loadFiles()
+								// Adjust cursor if needed
+								if m.cursor >= len(m.files) {
+									m.cursor = len(m.files) - 1
+									if m.cursor < 0 {
+										m.cursor = 0
+									}
+								}
+							}
+							m.contextMenuFile = nil
+							m.contextMenuOpen = false
+						} else if currentFile := m.getCurrentFile(); currentFile != nil {
+							// Delete from F8 key
+							if err := m.deleteFileOrDir(currentFile.path, currentFile.isDir); err != nil {
+								m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+							} else {
+								itemType := "file"
+								if currentFile.isDir {
+									itemType = "directory"
+								}
+								m.setStatusMessage(fmt.Sprintf("Deleted %s: %s", itemType, currentFile.name), false)
+								m.loadFiles()
+								// Adjust cursor if needed
+								if m.cursor >= len(m.files) {
+									m.cursor = len(m.files) - 1
+									if m.cursor < 0 {
+										m.cursor = 0
+									}
+								}
+							}
+						}
+					}
+					m.showDialog = false
+					m.dialog = dialogModel{}
+					return m, tea.ClearScreen
+				}
+				return m, nil
+			}
 		}
 
 		// Handle context menu input if menu is open
@@ -574,12 +688,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "f7":
-			// F7: Create directory (placeholder for future feature)
-			// TODO: Implement directory creation
+			// F7: Create directory
+			m.dialog = dialogModel{
+				dialogType: dialogInput,
+				title:      "Create Directory",
+				message:    "Enter directory name:",
+				input:      "",
+			}
+			m.showDialog = true
+			return m, tea.ClearScreen
 
 		case "f8":
-			// F8: Delete file/folder (placeholder for future feature)
-			// TODO: Implement file deletion with confirmation
+			// F8: Delete file/folder
+			if len(m.files) == 0 || m.cursor >= len(m.files) {
+				return m, nil
+			}
+
+			currentFile := m.getCurrentFile()
+			if currentFile == nil || currentFile.name == ".." {
+				return m, nil // Can't delete parent
+			}
+
+			// Show confirmation dialog
+			fileType := "file"
+			if currentFile.isDir {
+				fileType = "directory"
+			}
+			m.dialog = dialogModel{
+				dialogType: dialogConfirm,
+				title:      "Delete " + fileType,
+				message:    fmt.Sprintf("Delete '%s'?\nThis cannot be undone.", currentFile.name),
+			}
+			m.showDialog = true
+			return m, tea.ClearScreen
 
 		default:
 			// MC-style: any printable character(s) go to command prompt

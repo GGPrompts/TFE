@@ -590,3 +590,68 @@ func (m *model) populatePreviewCache() {
 	m.preview.cachedWidth = availableWidth
 	m.preview.cacheValid = true
 }
+
+// setStatusMessage sets a temporary status message with auto-dismiss
+func (m *model) setStatusMessage(message string, isError bool) {
+	m.statusMessage = message
+	m.statusIsError = isError
+	m.statusTime = time.Now()
+}
+
+// createDirectory creates a new directory in the current path
+func (m *model) createDirectory(name string) error {
+	// Validate name (no /, \, special chars)
+	if strings.ContainsAny(name, "/\\:*?\"<>|") {
+		return fmt.Errorf("invalid characters in directory name")
+	}
+	if name == "" || name == "." || name == ".." {
+		return fmt.Errorf("invalid directory name")
+	}
+
+	// Create directory in current path
+	path := filepath.Join(m.currentPath, name)
+	if err := os.Mkdir(path, 0755); err != nil {
+		if os.IsExist(err) {
+			return fmt.Errorf("directory already exists")
+		}
+		return err
+	}
+
+	return nil
+}
+
+// deleteFileOrDir deletes a file or directory
+func (m *model) deleteFileOrDir(path string, isDir bool) error {
+	// Check if exists
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file not found")
+		}
+		return err
+	}
+
+	if isDir {
+		// Check if directory is empty
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return err
+		}
+
+		if len(entries) > 0 {
+			// For non-empty directories, we need to ask for recursive deletion
+			return fmt.Errorf("directory not empty (%d items)", len(entries))
+		}
+
+		// Delete empty directory
+		return os.Remove(path)
+	}
+
+	// Delete file
+	// Check if file is writable
+	if info.Mode()&0200 == 0 {
+		return fmt.Errorf("file is read-only")
+	}
+
+	return os.Remove(path)
+}

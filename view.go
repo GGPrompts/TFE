@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -51,6 +52,13 @@ func (m model) View() string {
 		// ANSI escape codes use 1-based indexing, so add 1 to coordinates
 		menuOverlay := fmt.Sprintf("\033[%d;%dH%s", y+1, x+1, menuPositioned)
 		baseView += menuOverlay
+	}
+
+	// Overlay dialog if open
+	if m.showDialog {
+		dialog := m.renderDialog()
+		dialogOverlay := m.positionDialog(dialog)
+		baseView += dialogOverlay
 	}
 
 	return baseView
@@ -105,55 +113,71 @@ func (m model) renderSinglePane() string {
 	// Status bar
 	s.WriteString("\n")
 
-	// Count directories and files
-	dirCount, fileCount := 0, 0
-	for _, f := range m.files {
-		if f.name == ".." {
-			continue
+	// Check if we should show status message (auto-dismiss after 3s)
+	if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
+		msgStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("28")). // Green
+			Foreground(lipgloss.Color("0")).
+			Bold(true).
+			Padding(0, 1)
+
+		if m.statusIsError {
+			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
 		}
-		if f.isDir {
-			dirCount++
-		} else {
-			fileCount++
+
+		s.WriteString(msgStyle.Render(m.statusMessage))
+	} else {
+		// Regular status bar
+		// Count directories and files
+		dirCount, fileCount := 0, 0
+		for _, f := range m.files {
+			if f.name == ".." {
+				continue
+			}
+			if f.isDir {
+				dirCount++
+			} else {
+				fileCount++
+			}
 		}
-	}
 
-	// Selected file info
-	var selectedInfo string
-	if currentFile := m.getCurrentFile(); currentFile != nil {
-		if currentFile.isDir {
-			selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
-		} else {
-			selectedInfo = fmt.Sprintf("Selected: %s (%s, %s)",
-				currentFile.name,
-				formatFileSize(currentFile.size),
-				formatModTime(currentFile.modTime))
+		// Selected file info
+		var selectedInfo string
+		if currentFile := m.getCurrentFile(); currentFile != nil {
+			if currentFile.isDir {
+				selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
+			} else {
+				selectedInfo = fmt.Sprintf("Selected: %s (%s, %s)",
+					currentFile.name,
+					formatFileSize(currentFile.size),
+					formatModTime(currentFile.modTime))
+			}
 		}
+
+		itemsInfo := fmt.Sprintf("%d items", len(m.files))
+		if dirCount > 0 || fileCount > 0 {
+			itemsInfo = fmt.Sprintf("%d folders, %d files", dirCount, fileCount)
+		}
+
+		hiddenIndicator := ""
+		if m.showHidden {
+			hiddenIndicator = " • showing hidden"
+		}
+
+		favoritesIndicator := ""
+		if m.showFavoritesOnly {
+			favoritesIndicator = " • ⭐ favorites only"
+		}
+
+		// View mode indicator
+		viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
+
+		// Help hint
+		helpHint := " • F1: help"
+
+		statusText := fmt.Sprintf("%s%s%s%s%s | %s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint, selectedInfo)
+		s.WriteString(statusStyle.Render(statusText))
 	}
-
-	itemsInfo := fmt.Sprintf("%d items", len(m.files))
-	if dirCount > 0 || fileCount > 0 {
-		itemsInfo = fmt.Sprintf("%d folders, %d files", dirCount, fileCount)
-	}
-
-	hiddenIndicator := ""
-	if m.showHidden {
-		hiddenIndicator = " • showing hidden"
-	}
-
-	favoritesIndicator := ""
-	if m.showFavoritesOnly {
-		favoritesIndicator = " • ⭐ favorites only"
-	}
-
-	// View mode indicator
-	viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
-
-	// Help hint
-	helpHint := " • F1: help"
-
-	statusText := fmt.Sprintf("%s%s%s%s%s | %s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint, selectedInfo)
-	s.WriteString(statusStyle.Render(statusText))
 
 	return s.String()
 }

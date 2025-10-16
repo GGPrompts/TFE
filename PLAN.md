@@ -1,7 +1,7 @@
 # TFE Development Plan
 
 **Project:** TFE - Terminal File Explorer
-**Status:** v0.3.0 - Feature-complete file viewer/browser
+**Status:** v0.4.0 - True file manager with F7/F8 operations
 **Updated:** 2025-10-16
 
 ---
@@ -21,138 +21,32 @@
 - **Clipboard Integration** - Multi-platform path copying
 - **Mouse Support** - Click, double-click, scroll
 - **TUI Tool Launcher** - lazygit, lazydocker, lnav, htop
+- **F7: Create Directory** - ✨ NEW! Dialog system with validation
+- **F8: Delete Files** - ✨ NEW! Safe deletion with confirmations
+- **Dialog System** - Input, confirmation, and status messages
 
 ### 🚧 Known Limitations
-- **F7/F8 are placeholders** - No create directory or delete file operations yet
-- **Silent error handling** - Some operations fail without user feedback
 - **No search** - Can't filter/find files within current directory
 - **No multi-select** - Operations limited to single files
 - **Large update.go** - 991 lines, needs refactoring
+- **No copy/move** - Can't move files between directories yet
 
 ---
 
 ## Roadmap
 
-### Phase 1: Complete File Operations 🎯 **HIGH PRIORITY**
+### ✅ Phase 1: Complete File Operations - **COMPLETED v0.4.0**
 
-**Goal:** Make TFE a true file *manager*, not just a viewer
+**Status:** ✅ Fully implemented (2025-10-16)
 
-**Why:** F7/F8 are the most visible incomplete features. Users can press them and nothing happens.
+**What was delivered:**
+- F7: Create Directory with validation
+- F8: Delete File/Folder with confirmations
+- Dialog system (input, confirm, status messages)
+- Context menu integration
+- Auto-dismissing status messages (3s)
 
-#### 1.1 Dialog System (NEW)
-**Create:** `dialog.go`
-
-```go
-type dialogType int
-const (
-    dialogNone dialogType = iota
-    dialogInput       // For F7 (directory name)
-    dialogConfirm     // For F8 (yes/no delete)
-    dialogError       // For error messages
-    dialogSuccess     // For success messages
-)
-
-type dialogModel struct {
-    dialogType dialogType
-    title      string
-    message    string
-    input      string      // For text input
-    callback   func()      // Action on confirm
-}
-```
-
-**Features:**
-- Text input dialog for directory names (F7)
-- Yes/No confirmation dialog for destructive operations (F8)
-- Error/Success toast notifications (auto-dismiss after 3s)
-- Overlay rendering (similar to context menu)
-- ESC to cancel, Enter to confirm
-- Input validation
-
-#### 1.2 F7: Create Directory
-**Location:** `update.go` + `file_operations.go`
-
-**Implementation:**
-1. Detect F7 keypress → Show input dialog
-2. Get directory name from user
-3. Validate name (no /, \\, special chars)
-4. Call `os.Mkdir()` with 0755 permissions
-5. Handle errors gracefully (show error dialog)
-6. Refresh file list
-7. Move cursor to newly created directory
-
-**Context Menu Integration:**
-- Add "New Folder..." option to context menu when in directory
-
-#### 1.3 F8: Delete File/Folder
-**Location:** `update.go` + `file_operations.go`
-
-**Implementation:**
-1. Detect F8 keypress → Show confirmation dialog
-2. Display: "Delete [filename]? This cannot be undone."
-3. If confirmed:
-   - For files: `os.Remove()`
-   - For empty directories: `os.Remove()`
-   - For non-empty directories: Show warning, require second confirmation, then `os.RemoveAll()`
-4. Handle errors (permissions, file in use, etc.)
-5. Show success message
-6. Refresh file list
-7. Move cursor to previous item (or next if was last)
-
-**Context Menu Integration:**
-- Add "Delete" option to context menu
-- Same behavior as F8
-
-**Safety Features:**
-- Always confirm before delete
-- Warn on non-empty directories
-- Clear error messages for permission issues
-- Don't delete if file doesn't exist anymore
-
-#### 1.4 Error Feedback System
-**Location:** `types.go`, `view.go`
-
-Add status message system:
-```go
-type statusMessage struct {
-    text      string
-    isError   bool
-    timestamp time.Time
-}
-
-// In model:
-statusMsg *statusMessage  // Auto-dismiss after 3 seconds
-```
-
-Show in status bar:
-- Success: Green background, "✓ Directory created: project/"
-- Error: Red background, "✗ Permission denied: /root/folder"
-- Auto-dismiss after 3 seconds or ESC
-
-**Files to Update:**
-- `types.go` - Add dialog state, status message to model
-- `dialog.go` - NEW file for dialog system
-- `update.go` - Add F7/F8 handlers, dialog event handling
-- `view.go` - Render dialog overlay, status messages
-- `context_menu.go` - Add "New Folder" and "Delete" menu items
-- `file_operations.go` - Add mkdir and delete helper functions
-
-**Testing Checklist:**
-- [ ] F7 creates directory successfully
-- [ ] F7 handles invalid names (/, *, etc.)
-- [ ] F7 handles existing directory name
-- [ ] F7 ESC cancels without creating
-- [ ] F8 shows confirmation dialog
-- [ ] F8 deletes file after confirmation
-- [ ] F8 deletes empty directory
-- [ ] F8 warns on non-empty directory
-- [ ] F8 ESC cancels without deleting
-- [ ] Context menu "Delete" works
-- [ ] Context menu "New Folder" works
-- [ ] Error messages display correctly
-- [ ] Success messages display correctly
-
-**Estimated Time:** 4-6 hours
+See **CHANGELOG.md** for full details.
 
 ---
 

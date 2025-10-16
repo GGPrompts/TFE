@@ -46,6 +46,7 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		// Directory menu items
 		items = append(items, contextMenuItem{"📂 Open", "open"})
 		items = append(items, contextMenuItem{"📂 Quick CD", "quickcd"})
+		items = append(items, contextMenuItem{"📁 New Folder...", "newfolder"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 
 		// Add separator and TUI tools if available
@@ -81,6 +82,7 @@ func (m model) getContextMenuItems() []contextMenuItem {
 
 		// Add separator and favorites
 		items = append(items, contextMenuItem{"─────────", "separator"})
+		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
 		if m.isFavorite(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
 		} else {
@@ -91,6 +93,7 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		items = append(items, contextMenuItem{"👁  Preview", "preview"})
 		items = append(items, contextMenuItem{"✏  Edit", "edit"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
+		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
 		if m.isFavorite(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
 		} else {
@@ -202,6 +205,39 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		if m.contextMenuFile.isDir {
 			return m, openTUITool("htop", m.contextMenuFile.path)
 		}
+		return m, tea.ClearScreen
+
+	case "newfolder":
+		// Create new folder in the selected directory
+		if m.contextMenuFile.isDir {
+			// Navigate to the directory first
+			m.currentPath = m.contextMenuFile.path
+			m.cursor = 0
+			m.loadFiles()
+
+			// Show input dialog for folder name
+			m.dialog = dialogModel{
+				dialogType: dialogInput,
+				title:      "Create Directory",
+				message:    "Enter directory name:",
+				input:      "",
+			}
+			m.showDialog = true
+		}
+		return m, tea.ClearScreen
+
+	case "delete":
+		// Delete the selected file or folder
+		fileType := "file"
+		if m.contextMenuFile.isDir {
+			fileType = "directory"
+		}
+		m.dialog = dialogModel{
+			dialogType: dialogConfirm,
+			title:      "Delete " + fileType,
+			message:    fmt.Sprintf("Delete '%s'?\nThis cannot be undone.", m.contextMenuFile.name),
+		}
+		m.showDialog = true
 		return m, tea.ClearScreen
 	}
 

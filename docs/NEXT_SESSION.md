@@ -1,126 +1,87 @@
-# Next Session
+# Next Session: Continue TFE Development
 
-## Context
-TFE is a terminal file explorer built with Go + Bubbletea. We've just completed a major UX overhaul with F-keys and context menus.
+## What We Just Completed ✅
 
-**Current Status:**
-- ✅ All core features complete (file browsing, view modes, dual-pane, preview)
-- ✅ MC-style command prompt with history
-- ✅ External editor integration (Micro/nano)
-- ✅ F-key hotkeys (F1-F10, Midnight Commander style) - **Just completed!**
-- ✅ Context menu system (right-click + F2) - **Just completed!**
-- ✅ Favorites/bookmarks system
-- ✅ Markdown rendering with Glamour
-- ✅ Line wrapping for all files
-- ✅ Text selection in preview mode - **Just completed!**
-- ✅ Mouse wheel context menu scrolling - **Just completed!**
+**Session Date:** 2025-10-16
+**Version:** v0.4.0
 
-**Decision:** TFE is feature-complete as a lightweight file viewer + launcher. Future work focuses on file operations (F7/F8) and polish.
+### Implemented Features
+- ✅ **F7/F8 File Operations** - Full dialog system with create directory and delete operations
+- ✅ **Dialog System** - Input, confirmation, and status message dialogs (new module: `dialog.go`)
+- ✅ **Status Messages** - Auto-dismissing green (success) / red (error) messages in status bar
+- ✅ **Context Menu Integration** - Added "New Folder" and "Delete" to context menus
+- ✅ **Documentation Management System** - Created BACKLOG.md, added line limits to CLAUDE.md
+- ✅ **Documentation Cleanup** - PLAN.md reduced from 445 → 339 lines, CHANGELOG.md updated
 
-## Goal for Next Session
+### Build Status
+- ✅ Project builds successfully
+- ✅ All F7/F8 functionality implemented and working
+- ⚠️ Dialog positioning was fixed (initial bug with only showing 2-3 lines)
 
-**Implement File Operations (F7/F8):**
+---
 
-1. **F7: Create Directory**
-   - Show input prompt for directory name
-   - Create directory in current path
-   - Refresh file list after creation
-   - Select newly created directory
+## Prompt to Start Next Session
 
-2. **F8: Delete File/Folder**
-   - Show confirmation dialog
-   - Support deleting files and empty/non-empty directories
-   - Refresh file list after deletion
-   - Move cursor to next valid item
+```
+Hi! I'm back to continue working on TFE.
 
-3. **Optional Enhancements:**
-   - F5: Copy file (vs current clipboard copy path)
-   - F6: Move/rename file (vs current favorites filter - could move to different key)
-   - Progress indicators for long operations
-   - Error handling and user feedback
+Last session we completed Phase 1 (F7/F8 file operations with dialog system) and set up documentation management rules. Everything is in CHANGELOG.md v0.4.0.
 
-## Implementation Steps
+What should we work on next? Here are some options:
 
-### Step 1: Add Input Dialog System
-Create `dialog.go` for user input dialogs:
-- Text input for F7 (directory name)
-- Confirmation dialog for F8 (yes/no)
-- Render as overlay similar to context menu
+1. **Phase 2: Code Quality** - Refactor update.go (991 lines), improve error handling
+2. **Search/Filter** - Quick file search within current directory (user-requested)
+3. **Menu Bar** - DEFERRED to BACKLOG.md (too complex for now, needs mouse positioning audit)
+4. **Something else** - Check PLAN.md or BACKLOG.md for ideas
 
-### Step 2: Implement F7 (Create Directory)
-In `update.go`:
-- Detect F7 key press
-- Show input dialog for directory name
-- Call `os.Mkdir()` with user input
-- Refresh file list
-- Select new directory
+Please review the current status and suggest what makes sense to prioritize next.
+```
 
-### Step 3: Implement F8 (Delete)
-In `update.go`:
-- Detect F8 key press
-- Show confirmation dialog
-- Call `os.Remove()` or `os.RemoveAll()` based on type
-- Handle errors gracefully
-- Refresh file list
+---
 
-### Step 4: Add to Context Menu
-Update `context_menu.go`:
-- Add "Delete" option to menu
-- Add "New Folder" option for directories
+## Quick Reference
 
-## Files to Create/Modify
+**Documentation Structure:**
+- `PLAN.md` - Current roadmap (Phase 2-5)
+- `BACKLOG.md` - Ideas not ready for PLAN.md yet
+- `CHANGELOG.md` - v0.4.0 released today
+- `CLAUDE.md` - Architecture guide + doc management rules
 
-1. **dialog.go** (NEW) - Dialog system for user input/confirmation
-2. **types.go** - Add dialog state to model
-3. **update.go** - F7/F8 handlers, dialog event handling
-4. **view.go** - Render dialog overlay
-5. **context_menu.go** - Add delete/new folder menu items
-6. **file_operations.go** - Helper functions for file ops
+**Key Files:**
+- `dialog.go` - NEW! Dialog rendering system
+- `file_operations.go` - createDirectory(), deleteFileOrDir(), setStatusMessage()
+- `update.go` - F7/F8 handlers + dialog event handling
+- `view.go` - Dialog overlay rendering + status messages
+- `context_menu.go` - "New Folder" and "Delete" menu items
 
-## Key Design Decisions
+**Current Line Counts:**
+- All docs are within limits ✅
+- PLAN.md: 339/400 lines
+- CHANGELOG.md: 254/300 lines
+- CLAUDE.md: 408/500 lines
 
-- **Safety first:** Always confirm before deleting
-- **Non-recursive by default:** Warn on non-empty directories
-- **Clear feedback:** Show success/error messages
-- **Keyboard-friendly:** ESC cancels dialogs
-- **Keep it simple:** No undo, no trash - direct filesystem ops
+---
 
-## Testing Checklist
+## Known Issues
 
-After implementation:
-- [ ] F7 creates directory successfully
-- [ ] F7 handles invalid names gracefully
-- [ ] F7 ESC cancels without creating
-- [ ] F8 shows confirmation dialog
-- [ ] F8 deletes file after confirmation
-- [ ] F8 deletes empty directory
-- [ ] F8 handles non-empty directory (warn or recursive?)
-- [ ] F8 ESC cancels without deleting
-- [ ] Context menu "Delete" works
-- [ ] Context menu "New Folder" works
-- [ ] File list refreshes after operations
-- [ ] Cursor moves to sensible location after delete
+1. ⚠️ **Menu bar idea deferred** - Would break mouse positioning in ~8+ locations (see BACKLOG.md)
+2. 📝 **update.go is large** - 991 lines, Phase 2 includes refactoring
+3. 🔍 **No search yet** - Can't filter files in current directory
 
-## Reference Files
+---
 
-Key files for dialogs/overlays:
-- **context_menu.go** - Menu overlay system (similar pattern for dialogs)
-- **view.go:24-54** - Context menu positioning logic
-- **update.go:474-500** - F2 handler (reference for F7/F8)
+## Testing Notes
 
-## Expected Outcome
+If you want to test F7/F8 before continuing:
+```bash
+cd /home/matt/TFE
+./tfe
+# Press F7 to create a directory
+# Press F8 to delete a file/folder
+# Right-click for context menu with "New Folder" and "Delete"
+```
 
-After this session:
-1. Users can create directories with F7
-2. Users can delete files/folders with F8
-3. All operations have proper confirmation/feedback
-4. TFE becomes fully functional for basic file management
-5. F7/F8 placeholders are now fully implemented
+---
 
-## Why This Matters
-
-With F7/F8 implemented, TFE becomes:
-- Complete Midnight Commander alternative for basic tasks
-- No need to drop to shell for mkdir/rm
-- Faster workflow for file organization
-- True file "management" not just browsing
+**Last Updated:** 2025-10-16
+**Next Priority:** TBD - discuss with user at start of next session
