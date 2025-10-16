@@ -27,7 +27,7 @@ func (m model) getWrappedLineCount() int {
 	if m.preview.isMarkdown {
 		markdownContent := strings.Join(m.preview.content, "\n")
 		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStylePath("dark"),
+			glamour.WithStandardStyle("dark"),
 			glamour.WithWordWrap(availableWidth),
 		)
 		if err == nil {
@@ -141,9 +141,9 @@ func (m model) renderPreview(maxVisible int) string {
 		markdownContent := strings.Join(m.preview.content, "\n")
 
 		// Create Glamour renderer with appropriate width
-		// Use "ascii" theme which has minimal backgrounds
+		// Use dark theme with standard styling
 		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStylePath("ascii"),
+			glamour.WithStandardStyle("dark"),
 			glamour.WithWordWrap(availableWidth),
 		)
 
@@ -300,7 +300,7 @@ func (m model) renderFullPreview() string {
 	// Help text
 	s.WriteString("\n")
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
-	s.WriteString(helpStyle.Render("↑/↓: scroll • PgUp/PgDown: page • E: edit • y/c: copy path • Esc: close • q: quit"))
+	s.WriteString(helpStyle.Render("↑/↓: scroll • PgUp/PgDown: page • F4: edit • F5: copy path • Esc: close • F10: quit"))
 
 	return s.String()
 }
@@ -433,7 +433,7 @@ func (m model) renderDualPane() string {
 		focusInfo = " • [RIGHT focused]"
 	}
 	// Help hint
-	helpHint := " • ?: help"
+	helpHint := " • F1: help"
 	statusText := fmt.Sprintf("%s%s • %s%s%s", itemsInfo, hiddenIndicator, m.displayMode.String(), focusInfo, helpHint)
 	s.WriteString(statusStyle.Render(statusText))
 

@@ -8,16 +8,52 @@ import (
 )
 
 func (m model) View() string {
+	var baseView string
+
 	// Dispatch to appropriate view based on viewMode
 	switch m.viewMode {
 	case viewFullPreview:
-		return m.renderFullPreview()
+		baseView = m.renderFullPreview()
 	case viewDualPane:
-		return m.renderDualPane()
+		baseView = m.renderDualPane()
 	default:
 		// Single-pane mode (original view)
-		return m.renderSinglePane()
+		baseView = m.renderSinglePane()
 	}
+
+	// Overlay context menu if open
+	if m.contextMenuOpen {
+		menu := m.renderContextMenu()
+		// Position menu using ANSI escape codes
+		// Move cursor to menu position and render
+		x, y := m.contextMenuX, m.contextMenuY
+
+		// Ensure menu stays on screen with proper margins
+		if x < 1 {
+			x = 1 // Minimum left margin to show border
+		}
+		if x > m.width-25 {
+			x = m.width - 25
+		}
+		if y < 1 {
+			y = 1 // Minimum top margin
+		}
+		if y > m.height-10 {
+			y = m.height - 10
+		}
+
+		// Replace newlines with newline + cursor positioning to maintain X coordinate
+		// This keeps the menu together while fixing the alignment issue
+		cursorToX := fmt.Sprintf("\n\033[%dG", x+1) // Move to column x+1 after each newline
+		menuPositioned := strings.ReplaceAll(menu, "\n", cursorToX)
+
+		// Position the start of the menu
+		// ANSI escape codes use 1-based indexing, so add 1 to coordinates
+		menuOverlay := fmt.Sprintf("\033[%d;%dH%s", y+1, x+1, menuPositioned)
+		baseView += menuOverlay
+	}
+
+	return baseView
 }
 
 // renderSinglePane renders the original single-pane file browser
@@ -114,7 +150,7 @@ func (m model) renderSinglePane() string {
 	viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
 
 	// Help hint
-	helpHint := " • ?: help"
+	helpHint := " • F1: help"
 
 	statusText := fmt.Sprintf("%s%s%s%s%s | %s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint, selectedInfo)
 	s.WriteString(statusStyle.Render(statusText))

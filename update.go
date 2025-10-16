@@ -20,14 +20,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle preview mode keys first
 		if m.viewMode == viewFullPreview {
 			switch msg.String() {
-			case "q", "ctrl+c", "esc":
-				// Exit preview mode
+			case "f10", "ctrl+c", "esc":
+				// Exit preview mode (F10 replaces q)
 				m.viewMode = viewSinglePane
 				m.calculateLayout()
-				return m, tea.ClearScreen
+				// Re-enable mouse for navigation
+				return m, tea.Batch(tea.ClearScreen, tea.EnableMouseCellMotion)
 
-			case "e", "E":
-				// Edit file in external editor from preview
+			case "f4":
+				// Edit file in external editor from preview (F4 replaces e/E)
 				if m.preview.loaded && m.preview.filePath != "" {
 					editor := getAvailableEditor()
 					if editor == "" {
@@ -45,8 +46,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, openEditor("nano", m.preview.filePath)
 				}
 
-			case "y", "c":
-				// Copy file path from preview
+			case "f5":
+				// Copy file path from preview (F5 replaces y)
 				if m.preview.loaded && m.preview.filePath != "" {
 					_ = copyToClipboard(m.preview.filePath)
 				}
@@ -84,6 +85,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.preview.scrollPos > maxScroll {
 					m.preview.scrollPos = maxScroll
 				}
+			}
+			return m, nil
+		}
+
+		// Handle context menu input if menu is open
+		if m.contextMenuOpen {
+			switch msg.String() {
+			case "esc", "q":
+				// Close context menu and clear screen to remove visual artifacts
+				m.contextMenuOpen = false
+				return m, tea.ClearScreen
+
+			case "up", "k":
+				// Navigate up in menu
+				if m.contextMenuCursor > 0 {
+					m.contextMenuCursor--
+				}
+				// Clear screen to prevent ANSI overlay artifacts
+				return m, tea.ClearScreen
+
+			case "down", "j":
+				// Navigate down in menu
+				menuItems := m.getContextMenuItems()
+				if m.contextMenuCursor < len(menuItems)-1 {
+					m.contextMenuCursor++
+				}
+				// Clear screen to prevent ANSI overlay artifacts
+				return m, tea.ClearScreen
+
+			case "enter":
+				// Execute selected menu action
+				return m.executeContextMenuAction()
 			}
 			return m, nil
 		}
@@ -135,7 +168,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Regular file browser keys
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "f10", "ctrl+c":
+			// F10: Quit (replaces q)
 			return m, tea.Quit
 
 		case "esc":
@@ -222,7 +256,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			if currentFile := m.getCurrentFile(); currentFile != nil {
-				if currentFile.isDir {
+				// If in favorites mode, check if we need to navigate to a different directory
+				if m.showFavoritesOnly && currentFile.name != ".." {
+					// Check if favorite is in a different location than current path
+					fileDir := filepath.Dir(currentFile.path)
+					if currentFile.isDir {
+						// Navigate to the favorited directory
+						m.currentPath = currentFile.path
+						m.cursor = 0
+						m.showFavoritesOnly = false // Exit favorites mode
+						m.loadFiles()
+					} else if fileDir != m.currentPath {
+						// Navigate to the file's parent directory and select it
+						m.currentPath = fileDir
+						m.showFavoritesOnly = false // Exit favorites mode
+						m.loadFiles()
+						// Find and select the file
+						for i, f := range m.files {
+							if f.path == currentFile.path {
+								m.cursor = i
+								break
+							}
+						}
+					} else {
+						// File is in current directory, just preview it
+						m.loadPreview(currentFile.path)
+						m.viewMode = viewFullPreview
+						// Disable mouse to allow text selection
+						return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+					}
+				} else if currentFile.isDir {
 					// In tree view: toggle expansion instead of navigating
 					if m.displayMode == modeTree && currentFile.name != ".." {
 						m.expandedDirs[currentFile.path] = !m.expandedDirs[currentFile.path]
@@ -236,7 +299,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Enter full-screen preview (regardless of current mode)
 					m.loadPreview(currentFile.path)
 					m.viewMode = viewFullPreview
-					return m, tea.ClearScreen
+					// Disable mouse to allow text selection
+					return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
 				}
 			}
 
@@ -276,12 +340,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.calculateLayout()
 			}
 
-		case "f":
-			// Force full-screen preview
+		case "f3":
+			// F3: Force full-screen preview (replaces f)
 			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
-				return m, tea.ClearScreen
+				// Disable mouse to allow text selection
+				return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
 			}
 
 		case "pageup":
@@ -323,8 +388,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showHidden = !m.showHidden
 			m.loadFiles()
 
-		case "v":
-			// Cycle through display modes
+		case "f9":
+			// F9: Cycle through display modes (replaces v)
 			m.displayMode = (m.displayMode + 1) % 4
 
 		case "1":
@@ -343,8 +408,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Switch to tree view
 			m.displayMode = modeTree
 
-		case "e", "E":
-			// Edit file in external editor
+		case "f4":
+			// F4: Edit file in external editor (replaces e/E)
 			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 				editor := getAvailableEditor()
 				if editor == "" {
@@ -366,8 +431,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "y":
-			// Copy file path to clipboard (vim-style "yank")
+		case "f5":
+			// F5: Copy file path to clipboard (replaces y)
 			if currentFile := m.getCurrentFile(); currentFile != nil {
 				err := copyToClipboard(currentFile.path)
 				if err != nil {
@@ -377,24 +442,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Success - path is copied to clipboard
 			}
 
-		case "c":
-			// Copy file path (alternative to y)
-			if currentFile := m.getCurrentFile(); currentFile != nil {
-				_ = copyToClipboard(currentFile.path)
-			}
-
 		case "s", "S":
 			// Toggle favorite for current file/folder
 			if currentFile := m.getCurrentFile(); currentFile != nil {
 				m.toggleFavorite(currentFile.path)
 			}
 
-		case "b", "B":
-			// Toggle favorites filter (show only favorites)
+		case "f6":
+			// F6: Toggle favorites filter (replaces b/B)
 			m.showFavoritesOnly = !m.showFavoritesOnly
 
-		case "?":
-			// Show hotkeys reference
+		case "f1":
+			// F1: Show hotkeys reference (replaces ?)
 			hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")
 			// Try to find HOTKEYS.md in the TFE directory
 			// First check if it exists in current directory
@@ -408,8 +467,45 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if _, err := os.Stat(hotkeysPath); err == nil {
 				m.loadPreview(hotkeysPath)
 				m.viewMode = viewFullPreview
-				return m, tea.ClearScreen
+				// Disable mouse to allow text selection
+				return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
 			}
+
+		case "f2":
+			// F2: Open context menu at cursor position (keyboard alternative to right-click)
+			if currentFile := m.getCurrentFile(); currentFile != nil {
+				// Calculate menu position based on cursor
+				headerOffset := 4
+				if m.displayMode == modeDetail {
+					headerOffset = 6 // Account for detail view header
+				}
+
+				// Calculate visible range to account for scrolling
+				maxVisible := m.height - 6
+				if m.displayMode == modeDetail {
+					maxVisible -= 2
+				}
+				start, _ := m.getVisibleRange(maxVisible)
+
+				// Calculate Y position relative to visible cursor position
+				menuY := headerOffset + (m.cursor - start)
+				menuX := 10 // Left margin for menu (increased for border visibility)
+
+				// Open menu
+				m.contextMenuOpen = true
+				m.contextMenuX = menuX
+				m.contextMenuY = menuY
+				m.contextMenuFile = currentFile
+				m.contextMenuCursor = 0
+			}
+
+		case "f7":
+			// F7: Create directory (placeholder for future feature)
+			// TODO: Implement directory creation
+
+		case "f8":
+			// F8: Delete file/folder (placeholder for future feature)
+			// TODO: Implement file deletion with confirmation
 
 		default:
 			// MC-style: any single character goes to command prompt
@@ -480,6 +576,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Button {
 		case tea.MouseButtonLeft:
 			if msg.Action == tea.MouseActionRelease {
+				// Close context menu if open (clicking anywhere closes it)
+				if m.contextMenuOpen {
+					m.contextMenuOpen = false
+					return m, tea.ClearScreen
+				}
+
 				// In dual-pane mode, only process file clicks if within left pane
 				if m.viewMode == viewDualPane && msg.X >= m.leftWidth {
 					// Click is in right pane or beyond - don't select files
@@ -580,7 +682,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							// Reset click tracking after double-click
 							m.lastClickIndex = -1
 							m.lastClickTime = time.Time{}
-							return m, tea.ClearScreen
+							// Disable mouse to allow text selection
+							return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
 						}
 						// Reset click tracking after double-click (for directory navigation)
 						m.lastClickIndex = -1
@@ -599,7 +702,100 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+		case tea.MouseButtonRight:
+			// Right-click: open context menu
+			if msg.Action == tea.MouseActionRelease {
+				// Don't open menu in preview mode or if in right pane
+				if m.viewMode == viewFullPreview {
+					break
+				}
+				if m.viewMode == viewDualPane && msg.X >= m.leftWidth {
+					break
+				}
+
+				// Calculate which item was right-clicked
+				headerOffset := 4
+				if m.displayMode == modeDetail {
+					headerOffset += 2
+				}
+
+				maxVisible := m.height - 6
+				if m.displayMode == modeDetail {
+					maxVisible -= 2
+				}
+
+				var clickedIndex int
+
+				// Grid view: calculate row and column
+				if m.displayMode == modeGrid {
+					clickedRow := msg.Y - headerOffset
+					cellWidth := 17
+					clickedCol := msg.X / cellWidth
+					if clickedCol >= m.gridColumns {
+						clickedCol = m.gridColumns - 1
+					}
+
+					totalItems := len(m.files)
+					rows := (totalItems + m.gridColumns - 1) / m.gridColumns
+
+					startRow := 0
+					endRow := rows
+					if rows > maxVisible {
+						cursorRow := m.cursor / m.gridColumns
+						startRow = cursorRow - maxVisible/2
+						if startRow < 0 {
+							startRow = 0
+						}
+						endRow = startRow + maxVisible
+						if endRow > rows {
+							endRow = rows
+							startRow = endRow - maxVisible
+							if startRow < 0 {
+								startRow = 0
+							}
+						}
+					}
+
+					actualRow := startRow + clickedRow
+					clickedIndex = actualRow*m.gridColumns + clickedCol
+
+					if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(m.files) {
+						clickedIndex = -1
+					}
+				} else {
+					// List, Detail, Tree modes: one item per line
+					start, end := m.getVisibleRange(maxVisible)
+					clickedLine := msg.Y - headerOffset
+					clickedIndex = start + clickedLine
+
+					if clickedLine < 0 || clickedIndex >= end || clickedIndex >= len(m.files) {
+						clickedIndex = -1
+					}
+				}
+
+				// Open context menu if a valid file was clicked
+				if clickedIndex >= 0 && clickedIndex < len(m.files) {
+					m.contextMenuOpen = true
+					// Ensure menu has enough left margin for border to show
+					m.contextMenuX = msg.X
+					if m.contextMenuX < 2 {
+						m.contextMenuX = 2
+					}
+					m.contextMenuY = msg.Y
+					m.contextMenuFile = &m.files[clickedIndex]
+					m.contextMenuCursor = 0
+				}
+			}
+
 		case tea.MouseButtonWheelUp:
+			// If context menu is open, scroll the menu
+			if m.contextMenuOpen {
+				if m.contextMenuCursor > 0 {
+					m.contextMenuCursor--
+				}
+				return m, tea.ClearScreen
+			}
+
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 				// Scroll preview up when right pane focused (3 lines per tick)
 				m.preview.scrollPos -= 3
@@ -620,6 +816,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.MouseButtonWheelDown:
+			// If context menu is open, scroll the menu
+			if m.contextMenuOpen {
+				menuItems := m.getContextMenuItems()
+				if m.contextMenuCursor < len(menuItems)-1 {
+					m.contextMenuCursor++
+				}
+				return m, tea.ClearScreen
+			}
+
 			if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 				// Scroll preview down when right pane focused (3 lines per tick)
 				visibleLines := m.height - 7

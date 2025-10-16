@@ -255,7 +255,21 @@ func (m model) renderDetailView(maxVisible int) string {
 
 		name := fmt.Sprintf("%s%s %s", icon, favIndicator, displayName)
 		size := "-"
-		if !file.isDir {
+		if file.isDir {
+			// Show item count for directories
+			if file.name == ".." {
+				size = "-"
+			} else {
+				count := getDirItemCount(file.path)
+				if count == 0 {
+					size = "empty"
+				} else if count == 1 {
+					size = "1 item"
+				} else {
+					size = fmt.Sprintf("%d items", count)
+				}
+			}
+		} else {
 			size = formatFileSize(file.size)
 		}
 		modified := formatModTime(file.modTime)

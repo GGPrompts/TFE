@@ -121,6 +121,12 @@ type model struct {
 	// Tree view expansion
 	expandedDirs map[string]bool // Path -> expanded state
 	treeItems    []treeItem       // Cached tree items for tree view
+	// Context menu (right-click menu)
+	contextMenuOpen   bool
+	contextMenuX      int
+	contextMenuY      int
+	contextMenuFile   *fileItem
+	contextMenuCursor int
 }
 
 // treeItem represents an item in the tree view with depth information

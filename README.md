@@ -6,10 +6,15 @@ A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE
 
 - **Clean Interface**: Minimalist design focused on usability
 - **Dual Navigation**: Both keyboard shortcuts and mouse support
+- **F-Key Controls**: Midnight Commander-style F1-F10 hotkeys for common operations
+- **Context Menu**: Right-click or F2 for quick access to file operations
 - **Dual-Pane Mode**: Split-screen layout with file browser and live preview
 - **File Preview**: View file contents with syntax highlighting and line numbers
+- **Text Selection**: Mouse text selection enabled in preview mode
+- **Markdown Rendering**: Beautiful markdown preview with Glamour
 - **External Editor Integration**: Open files in Micro, nano, vim, or vi
-- **Command Prompt**: Execute shell commands directly from TFE
+- **Command Prompt**: Midnight Commander-style always-active command line
+- **Favorites System**: Bookmark files and folders with quick filter (F6)
 - **Clipboard Integration**: Copy file paths to system clipboard
 - **Multiple Display Modes**: List, Grid, Detail, and Tree views
 - **Nerd Font Icons**: Visual file/folder indicators using file type detection
@@ -45,6 +50,20 @@ The file explorer will start in your current working directory.
 
 ### Keyboard Controls
 
+#### F-Keys (Midnight Commander Style)
+| Key | Action |
+|-----|--------|
+| `F1` | Show help (HOTKEYS.md reference) |
+| `F2` | Open context menu for current file |
+| `F3` | View/Preview file in full-screen |
+| `F4` | Edit file in external editor |
+| `F5` | Copy file path to clipboard |
+| `F6` | Toggle favorites filter |
+| `F7` | Create directory *(coming soon)* |
+| `F8` | Delete file/folder *(coming soon)* |
+| `F9` | Cycle through display modes |
+| `F10` | Quit application |
+
 #### Navigation
 | Key | Action |
 |-----|--------|
@@ -53,39 +72,40 @@ The file explorer will start in your current working directory.
 | `h` / `←` | Navigate to parent directory |
 | `PageUp` | Scroll preview up one page (when right pane focused) |
 | `PageDown` | Scroll preview down one page (when right pane focused) |
-
-#### File Operations
-| Key | Action |
-|-----|--------|
 | `Enter` | Open folder or preview file |
 | `Space` | Toggle dual-pane mode on/off |
 | `Tab` | Toggle dual-pane mode / switch between panes |
-| `f` | Full-screen preview of selected file |
-| `E` | Edit file in external editor (Micro preferred) |
-| `N` | Edit file in nano |
-| `y` / `c` | Copy file path to clipboard |
 
 #### View Modes
 | Key | Action |
 |-----|--------|
-| `v` | Cycle through display modes |
+| `F9` | Cycle through display modes |
 | `1` | Switch to List view |
 | `2` | Switch to Grid view |
 | `3` | Switch to Detail view |
 | `4` | Switch to Tree view |
 | `.` / `Ctrl+h` | Toggle hidden files |
 
-#### Exit
+#### Favorites
 | Key | Action |
 |-----|--------|
-| `q` / `Ctrl+C` | Quit application |
-| `Esc` | Exit dual-pane/preview mode (or quit from single-pane) |
+| `s` / `S` | Toggle favorite for current file/folder |
+| `F6` | Toggle favorites filter (show only favorites) |
+
+#### Other Keys
+| Key | Action |
+|-----|--------|
+| `n` / `N` | Edit file in nano specifically |
+| `Esc` | Exit dual-pane/preview mode / close context menu |
+| `Ctrl+C` | Force quit application |
 
 ### Mouse Controls
 
-- **Left Click**: Select and open item (or switch pane focus in dual-pane mode)
+- **Left Click**: Select item (or switch pane focus in dual-pane mode)
 - **Double Click**: Navigate into folder or preview file
-- **Scroll Wheel Up/Down**: Navigate through file list
+- **Right Click**: Open context menu for file operations
+- **Scroll Wheel Up/Down**: Navigate through file list (or scroll context menu when open)
+- **Text Selection**: Enabled in preview mode - select and copy text with mouse
 
 ## Interface
 
@@ -203,24 +223,24 @@ The command prompt is always visible at the bottom of the screen. Simply start t
 ```
 tfe/
 ├── main.go                 # Entry point (21 lines)
-├── types.go                # Type definitions (116 lines)
+├── types.go                # Type definitions (135 lines)
 ├── styles.go               # Lipgloss styles (36 lines)
-├── model.go                # Model initialization & layout (64 lines)
-├── update.go               # Event handling (520 lines)
+├── model.go                # Model initialization & layout (75 lines)
+├── update.go               # Event handling (850+ lines)
 ├── view.go                 # View dispatcher (120 lines)
-├── render_file_list.go     # File list rendering (284 lines)
-├── render_preview.go       # Preview rendering (266 lines)
-├── file_operations.go      # File operations & formatting (329 lines)
+├── render_file_list.go     # File list rendering (440 lines)
+├── render_preview.go       # Preview rendering (442 lines)
+├── file_operations.go      # File operations & formatting (465 lines)
 ├── editor.go               # External editor integration (72 lines)
-├── command.go              # Command prompt & execution (96 lines)
+├── context_menu.go         # Context menu system (196 lines)
+├── favorites.go            # Favorites/bookmarks (115 lines)
+├── helpers.go              # Helper functions (45 lines)
 ├── go.mod                  # Go module definition
 ├── go.sum                  # Dependency checksums
 ├── README.md               # User documentation
+├── HOTKEYS.md              # Keyboard shortcuts reference
 ├── PLAN.md                 # Development roadmap
 ├── CLAUDE.md               # Architecture & development guide
-├── docs/                   # Additional documentation
-│   ├── REFACTOR_PLAN.md    # Refactoring history
-│   └── RESEARCH.md         # Background research
 └── tfe                     # Compiled binary (after build)
 ```
 
@@ -260,9 +280,9 @@ go get github.com/charmbracelet/bubbles
 
 ### Architecture
 
-TFE follows a modular architecture with 11 focused files:
+TFE follows a modular architecture with 13 focused files:
 - See **CLAUDE.md** for complete architecture documentation
-- See **docs/REFACTOR_PLAN.md** for refactoring history
+- See **HOTKEYS.md** for complete keyboard shortcuts reference
 - See **PLAN.md** for development roadmap and future features
 
 ## Roadmap
@@ -273,14 +293,19 @@ TFE follows a modular architecture with 11 focused files:
 - ✅ File size and permissions display (Detail view)
 - ✅ Multiple display modes (List, Grid, Detail, Tree)
 - ✅ Clipboard integration
+- ✅ F-key hotkeys (Midnight Commander style)
+- ✅ Context menu (right-click and F2)
+- ✅ Favorites/bookmarks system
+- ✅ Text selection in preview mode
+- ✅ Markdown rendering with Glamour
+- ✅ Command history (last 100 commands)
 
 ### Planned Features
-- File operations (copy, move, delete, rename)
+- File operations (copy, move, delete, rename) - F7/F8 placeholders ready
 - File search functionality
 - Configurable color schemes and themes
-- Bookmarks/favorites system
 - Custom hidden file patterns
-- Syntax highlighting in preview
+- Syntax highlighting in code preview
 - Archive file browsing (.zip, .tar.gz)
 - Git status indicators
 

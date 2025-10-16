@@ -27,6 +27,24 @@ func isClaudeContextFile(name string) bool {
 	return false
 }
 
+// isDirEmpty checks if a directory is empty (no files or subdirectories)
+func isDirEmpty(path string) bool {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false // Can't read, assume not empty
+	}
+	return len(entries) == 0
+}
+
+// getDirItemCount returns the number of items in a directory
+func getDirItemCount(path string) int {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return 0
+	}
+	return len(entries)
+}
+
 // getFileIcon returns the appropriate emoji icon based on file type
 func getFileIcon(item fileItem) string {
 	if item.isDir {
@@ -56,7 +74,11 @@ func getFileIcon(item fileItem) string {
 		case "scripts":
 			return "📜" // Scroll
 		default:
-			return "📁" // Regular folder
+			// Check if folder is empty
+			if isDirEmpty(item.path) {
+				return "📂" // Open/empty folder
+			}
+			return "📁" // Regular closed folder (has content)
 		}
 	}
 

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // getFavoritesPath returns the path to the favorites file
@@ -104,19 +105,45 @@ func (m *model) getFilteredFiles() []fileItem {
 		return m.files
 	}
 
-	// Filter to only show favorites
+	// Show ALL favorites from anywhere in filesystem
 	filtered := make([]fileItem, 0)
+
+	// Always include ".." parent directory from current location
 	for _, file := range m.files {
-		// Always include ".." parent directory
 		if file.name == ".." {
 			filtered = append(filtered, file)
+			break
+		}
+	}
+
+	// Collect all favorite paths into a slice for sorting
+	favPaths := make([]string, 0, len(m.favorites))
+	for favPath := range m.favorites {
+		favPaths = append(favPaths, favPath)
+	}
+
+	// Sort paths alphabetically for consistent ordering
+	sort.Strings(favPaths)
+
+	// Add all favorited paths as fileItems in sorted order
+	for _, favPath := range favPaths {
+		// Get file info for this favorite
+		info, err := os.Stat(favPath)
+		if err != nil {
+			// File no longer exists, skip it
 			continue
 		}
 
-		// Include if favorited
-		if m.isFavorite(file.path) {
-			filtered = append(filtered, file)
+		// Create fileItem from the favorite path
+		item := fileItem{
+			name:    filepath.Base(favPath),
+			path:    favPath,
+			isDir:   info.IsDir(),
+			size:    info.Size(),
+			modTime: info.ModTime(),
+			mode:    info.Mode(),
 		}
+		filtered = append(filtered, item)
 	}
 
 	return filtered
