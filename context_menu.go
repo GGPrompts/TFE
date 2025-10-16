@@ -152,6 +152,8 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		if !m.contextMenuFile.isDir {
 			m.loadPreview(m.contextMenuFile.path)
 			m.viewMode = viewFullPreview
+			m.calculateLayout() // Update widths for full-screen
+			m.populatePreviewCache() // Repopulate cache with correct width
 			// Disable mouse to allow text selection
 			return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
 		}

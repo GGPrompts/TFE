@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -321,12 +322,22 @@ func (m model) renderDualPane() string {
 	s.WriteString("\n")
 
 	// Toolbar buttons
-	homeButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-
-	// Home button
-	s.WriteString(homeButtonStyle.Render("[🏠]"))
+	// Home button - highlight with gray background when in home directory
+	homeDir, _ := os.UserHomeDir()
+	if homeDir != "" && m.currentPath == homeDir {
+		// Active: gray background (in home directory)
+		homeButtonStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(homeButtonStyle.Render("[🏠]"))
+	} else {
+		// Inactive: normal styling
+		homeButtonStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true)
+		s.WriteString(homeButtonStyle.Render("[🏠]"))
+	}
 	s.WriteString(" ")
 
 	// Favorites filter toggle button
@@ -334,7 +345,10 @@ func (m model) renderDualPane() string {
 	if m.showFavoritesOnly {
 		starIcon = "✨" // Different icon when filter is active
 	}
-	s.WriteString(homeButtonStyle.Render("[" + starIcon + "]"))
+	favButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(favButtonStyle.Render("[" + starIcon + "]"))
 	s.WriteString(" ")
 
 	// Command mode toggle button with green >_ and blue brackets

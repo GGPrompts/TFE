@@ -4,32 +4,63 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Styles
+// Adaptive color definitions - work in both light and dark terminals
 var (
+	// Title bar styling
 	titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("39")).
-			PaddingLeft(2)
+		Bold(true).
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#0087d7", // Dark blue for light backgrounds
+			Dark:  "#5fd7ff", // Bright cyan for dark backgrounds
+		}).
+		PaddingLeft(2)
 
+	// Path display styling
 	pathStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			PaddingLeft(2)
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#666666", // Medium gray for light
+			Dark:  "#999999", // Light gray for dark
+		}).
+		PaddingLeft(2)
 
-	selectedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
-			Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
-			Bold(true)
-
-	folderStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#005faf", Dark: "#5fd7ff"})
-
-	fileStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#444444", Dark: "#d0d0d0"})
-
+	// Status bar styling
 	statusStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			PaddingLeft(2)
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#444444",
+			Dark:  "#AAAAAA",
+		}).
+		PaddingLeft(2)
 
+	// Selected item styling
+	selectedStyle = lipgloss.NewStyle().
+		Bold(true).
+		Background(lipgloss.AdaptiveColor{
+			Light: "#0087d7", // Dark blue background for light
+			Dark:  "#00d7ff", // Bright cyan background for dark
+		}).
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#FFFFFF", // White text on dark blue
+			Dark:  "#000000", // Black text on bright cyan
+		})
+
+	// Folder styling
+	folderStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#005faf", // Dark blue for light
+			Dark:  "#5fd7ff", // Bright cyan for dark
+		})
+
+	// File styling
+	fileStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#000000", // Black for light
+			Dark:  "#FFFFFF", // White for dark
+		})
+
+	// Claude context file styling (orange)
 	claudeContextStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("214")) // Orange
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#D75F00", // Darker orange for light
+			Dark:  "#FF8700", // Bright orange for dark
+		})
 )

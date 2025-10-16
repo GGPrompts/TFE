@@ -81,9 +81,10 @@ type previewModel struct {
 	maxPreview int      // Max lines to load (prevent huge files)
 	loaded     bool
 	isBinary   bool
-	tooLarge   bool
-	fileSize   int64
-	isMarkdown bool // Whether the file is markdown
+	tooLarge            bool
+	fileSize            int64
+	isMarkdown          bool // Whether the file is markdown
+	isSyntaxHighlighted bool // Whether syntax highlighting was applied
 	// Caching for performance
 	cachedWrappedLines    []string // Cached wrapped text lines
 	cachedRenderedContent string   // Cached Glamour-rendered markdown

@@ -24,6 +24,30 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Platform-aware detection (wslview, cmd.exe, xdg-open, open)
   - Falls back to text preview for non-browser files
   - Cross-platform support (WSL, Linux, macOS)
+- **Syntax Highlighting for Code Files**
+  - Powered by Chroma v2.14.0 (100+ languages supported)
+  - Automatic language detection from file extension
+  - Color-coded keywords, strings, comments, functions
+  - Works in all preview modes (single-pane, dual-pane, full-screen)
+  - Monokai color scheme optimized for dark terminals
+  - Fallback to plain text for unknown file types
+  - Zero configuration needed
+- **Adaptive Colors for Light/Dark Terminals**
+  - Automatic adaptation to terminal background color
+  - Professional appearance without manual configuration
+  - Better readability across different terminal themes
+  - Adaptive colors for:
+    - Title bar (dark blue/bright cyan)
+    - Selected items (high contrast in both modes)
+    - Folders (blue tones)
+    - Files (black/white)
+    - Status bar (gray tones)
+    - Claude context files (orange)
+- **Rounded Borders for Modern UI**
+  - Modern rounded corners for preview pane borders
+  - Adaptive border colors for light/dark terminals
+  - Enhanced visual polish in dual-pane mode
+  - Better visual hierarchy and focus indicators
 
 ### Fixed
 - **Command Line Paste Bug:** Fixed brackets appearing around pasted text

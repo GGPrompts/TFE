@@ -108,13 +108,8 @@ func (m *model) getFilteredFiles() []fileItem {
 	// Show ALL favorites from anywhere in filesystem
 	filtered := make([]fileItem, 0)
 
-	// Always include ".." parent directory from current location
-	for _, file := range m.files {
-		if file.name == ".." {
-			filtered = append(filtered, file)
-			break
-		}
-	}
+	// Don't include ".." when viewing favorites from multiple locations
+	// (it doesn't make sense since favorites can be from anywhere)
 
 	// Collect all favorite paths into a slice for sorting
 	favPaths := make([]string, 0, len(m.favorites))

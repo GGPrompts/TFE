@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -297,6 +302,52 @@ func isBinaryFile(path string) bool {
 	}
 
 	return false
+}
+
+// highlightCode applies syntax highlighting to code files using Chroma
+// Returns highlighted content and success status
+func highlightCode(content, filepath string) (string, bool) {
+	var buf bytes.Buffer
+
+	// Try to determine lexer from filename
+	lexer := lexers.Match(filepath)
+	if lexer == nil {
+		// Fallback: analyze content
+		lexer = lexers.Analyse(content)
+	}
+	if lexer == nil {
+		// Still nothing, use fallback plain text
+		return "", false
+	}
+
+	// Configure lexer
+	lexer = chroma.Coalesce(lexer)
+
+	// Use terminal256 formatter for better color support
+	formatter := formatters.Get("terminal256")
+	if formatter == nil {
+		formatter = formatters.Fallback
+	}
+
+	// Use monokai style (works well in dark terminals)
+	// Alternative styles: dracula, vim, github, solarized-dark
+	style := styles.Get("monokai")
+	if style == nil {
+		style = styles.Fallback
+	}
+
+	// Tokenize and format
+	iterator, err := lexer.Tokenise(nil, content)
+	if err != nil {
+		return "", false
+	}
+
+	err = formatter.Format(&buf, style, iterator)
+	if err != nil {
+		return "", false
+	}
+
+	return buf.String(), true
 }
 
 // visualWidth calculates the visual width of a string, accounting for tabs
@@ -783,6 +834,7 @@ func (m *model) loadPreview(path string) {
 	m.preview.isBinary = false
 	m.preview.tooLarge = false
 	m.preview.isMarkdown = false
+	m.preview.isSyntaxHighlighted = false
 	// Invalidate cache when loading new file
 	m.preview.cacheValid = false
 	m.preview.cachedWrappedLines = nil
@@ -850,8 +902,19 @@ func (m *model) loadPreview(path string) {
 		return
 	}
 
-	// Split into lines for regular text files
-	lines := strings.Split(string(content), "\n")
+	// Try syntax highlighting for code files
+	highlighted, ok := highlightCode(string(content), path)
+	var lines []string
+
+	if ok {
+		// Syntax highlighting succeeded
+		lines = strings.Split(highlighted, "\n")
+		m.preview.isSyntaxHighlighted = true
+	} else {
+		// Fallback to plain text
+		lines = strings.Split(string(content), "\n")
+		m.preview.isSyntaxHighlighted = false
+	}
 
 	// Limit number of lines
 	if len(lines) > m.preview.maxPreview {

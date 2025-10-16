@@ -29,6 +29,9 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewMode = viewSinglePane
 			m.calculateLayout()
 			m.populatePreviewCache() // Refresh cache with new width
+			// Clear any stray command input that might have captured terminal responses
+			m.commandInput = ""
+			m.commandFocused = false
 			return m, tea.ClearScreen
 
 		case "f4":
