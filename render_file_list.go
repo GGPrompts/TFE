@@ -52,8 +52,23 @@ func (m model) renderListView(maxVisible int) string {
 			style = claudeContextStyle
 		}
 
+		// Truncate long filenames to prevent wrapping
+		// In dual-pane mode, use narrower width to fit in left pane
+		displayName := file.name
+		maxNameLen := 40 // Default for single-pane
+		if m.viewMode == viewDualPane {
+			// Account for left pane width, icon (2), spaces (2), and padding
+			maxNameLen = m.leftWidth - 10
+			if maxNameLen < 20 {
+				maxNameLen = 20 // Minimum reasonable length
+			}
+		}
+		if len(displayName) > maxNameLen {
+			displayName = displayName[:maxNameLen-2] + ".."
+		}
+
 		// Build the line
-		line := fmt.Sprintf("  %s %s", icon, file.name)
+		line := fmt.Sprintf("  %s %s", icon, displayName)
 
 		// Apply selection style
 		if i == m.cursor {
@@ -258,7 +273,22 @@ func (m model) renderTreeView(maxVisible int) string {
 			style = claudeContextStyle
 		}
 
-		line := fmt.Sprintf("  %s%s %s", prefix, icon, file.name)
+		// Truncate long filenames to prevent wrapping
+		// Account for prefix (4 chars) + icon (2) + spaces
+		displayName := file.name
+		maxNameLen := 35 // Default for single-pane
+		if m.viewMode == viewDualPane {
+			// Account for left pane width minus prefix, icon, and padding
+			maxNameLen = m.leftWidth - 15
+			if maxNameLen < 20 {
+				maxNameLen = 20 // Minimum reasonable length
+			}
+		}
+		if len(displayName) > maxNameLen {
+			displayName = displayName[:maxNameLen-2] + ".."
+		}
+
+		line := fmt.Sprintf("  %s%s %s", prefix, icon, displayName)
 
 		if i == m.cursor {
 			line = selectedStyle.Render(line)
