@@ -127,24 +127,48 @@ func (m model) renderSinglePane() string {
 
 	// File list - render based on current display mode
 	// Calculate maxVisible to fit within terminal height:
-	// title=1 + path=1 + command=1 + separator=1 + filelist=maxVisible + spacer=1 + status=2 = m.height
-	// Therefore: maxVisible = m.height - 7
-	maxVisible := m.height - 7 // Reserve space for all UI elements (including 2-line status)
+	// title=1 + toolbar=1 + command=1 + separator=1 + filelist=maxVisible + spacer=1 + status=2 = m.height
+	// Account for border (2 lines for top/bottom)
+	// Therefore: maxVisible = m.height - 9
+	maxVisible := m.height - 9 // Reserve space for all UI elements, borders, and 2-line status
 
+	// Get file list content
+	var fileListContent string
 	switch m.displayMode {
 	case modeList:
-		s.WriteString(m.renderListView(maxVisible))
+		fileListContent = m.renderListView(maxVisible)
 	case modeGrid:
-		s.WriteString(m.renderGridView(maxVisible))
+		fileListContent = m.renderGridView(maxVisible)
 	case modeDetail:
-		s.WriteString(m.renderDetailView(maxVisible))
+		fileListContent = m.renderDetailView(maxVisible)
 	case modeTree:
-		s.WriteString(m.renderTreeView(maxVisible))
+		fileListContent = m.renderTreeView(maxVisible)
 	default:
-		s.WriteString(m.renderListView(maxVisible))
+		fileListContent = m.renderListView(maxVisible)
 	}
 
-	// Status bar
+	// Wrap content in a bordered box
+	fileListStyle := lipgloss.NewStyle().
+		Width(m.width - 4). // Leave margin for padding
+		Height(maxVisible).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.AdaptiveColor{
+			Light: "#0087d7", // Dark blue border for light
+			Dark:  "#5fd7ff",  // Bright cyan border for dark
+		})
+
+	s.WriteString(fileListStyle.Render(fileListContent))
+
+	// Separator line above status bar
+	s.WriteString("\n")
+	separatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#0087d7",
+			Dark:  "#5fd7ff",
+		})
+	separator := strings.Repeat("─", m.width)
+	s.WriteString(separatorStyle.Render(separator))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Check if we should show status message (auto-dismiss after 3s)

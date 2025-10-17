@@ -295,9 +295,21 @@ func (m model) renderFullPreview() string {
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
-	// Content
-	maxVisible := m.height - 4 // Reserve space for title, info, and help
-	s.WriteString(m.renderPreview(maxVisible))
+	// Content with border
+	maxVisible := m.height - 6 // Reserve space for title, info, help, and borders
+	previewContent := m.renderPreview(maxVisible)
+
+	// Wrap preview in bordered box
+	previewBoxStyle := lipgloss.NewStyle().
+		Width(m.width - 4). // Leave margin
+		Height(maxVisible).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.AdaptiveColor{
+			Light: "#00af87", // Teal for light
+			Dark:  "#5faf87",  // Light teal for dark
+		})
+
+	s.WriteString(previewBoxStyle.Render(previewContent))
 
 	// Help text
 	s.WriteString("\n")
@@ -453,8 +465,7 @@ func (m model) renderDualPane() string {
 		MaxWidth(m.leftWidth).
 		Height(maxVisible).
 		MaxHeight(maxVisible).
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderRight(true).
+		Border(lipgloss.RoundedBorder()).
 		BorderForeground(leftBorderColor)
 
 	rightPaneStyle := lipgloss.NewStyle().
@@ -462,8 +473,7 @@ func (m model) renderDualPane() string {
 		MaxWidth(m.rightWidth).
 		Height(maxVisible).
 		MaxHeight(maxVisible).
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderLeft(true).
+		Border(lipgloss.RoundedBorder()).
 		BorderForeground(rightBorderColor)
 
 	// Apply styles to content
@@ -473,6 +483,17 @@ func (m model) renderDualPane() string {
 	// Join panes horizontally
 	panes := lipgloss.JoinHorizontal(lipgloss.Top, leftPaneRendered, rightPaneRendered)
 	s.WriteString(panes)
+	s.WriteString("\n")
+
+	// Separator line above status bar (connects with pane borders)
+	separatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#0087d7",
+			Dark:  "#5fd7ff",
+		})
+	separator := strings.Repeat("─", m.width)
+	s.WriteString(separatorStyle.Render(separator))
+	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Status bar (full width)

@@ -153,7 +153,13 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Handle column header clicks in detail view (for sorting)
-			if m.displayMode == modeDetail && msg.Y == 4 {
+			// Both modes: header at Y=5 (both have top borders now)
+			detailHeaderY := 5
+
+			if m.displayMode == modeDetail && msg.Y == detailHeaderY {
+				// Adjust X for left border (both modes have borders now)
+				adjustedX := msg.X - 2 // Account for left border
+
 				// Calculate which column was clicked based on X position
 				// Header format (regular): "%-30s  %-10s  %-12s  %-15s" with 2-space left padding
 				// Columns: Name (2-32), Size (34-44), Modified (46-58), Type (60-75)
@@ -163,25 +169,25 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				var newSortBy string
 				if m.showFavoritesOnly {
 					// Favorites mode column ranges
-					if msg.X >= 2 && msg.X <= 27 {
+					if adjustedX >= 2 && adjustedX <= 27 {
 						newSortBy = "name"
-					} else if msg.X >= 29 && msg.X <= 39 {
+					} else if adjustedX >= 29 && adjustedX <= 39 {
 						newSortBy = "size"
-					} else if msg.X >= 41 && msg.X <= 53 {
+					} else if adjustedX >= 41 && adjustedX <= 53 {
 						newSortBy = "modified"
-					} else if msg.X >= 55 && msg.X <= 80 {
+					} else if adjustedX >= 55 && adjustedX <= 80 {
 						// Location column - not sortable yet, ignore
 						break
 					}
 				} else {
 					// Regular mode column ranges
-					if msg.X >= 2 && msg.X <= 32 {
+					if adjustedX >= 2 && adjustedX <= 32 {
 						newSortBy = "name"
-					} else if msg.X >= 34 && msg.X <= 44 {
+					} else if adjustedX >= 34 && adjustedX <= 44 {
 						newSortBy = "size"
-					} else if msg.X >= 46 && msg.X <= 58 {
+					} else if adjustedX >= 46 && adjustedX <= 58 {
 						newSortBy = "modified"
-					} else if msg.X >= 60 && msg.X <= 75 {
+					} else if adjustedX >= 60 && adjustedX <= 75 {
 						newSortBy = "type"
 					}
 				}
@@ -216,10 +222,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Calculate which item was clicked (accounting for header lines and scrolling)
-			// Both modes: title(0) + path(1) + command(2) + separator(3) = 4 lines
-			// Lipgloss borders are only on sides (BorderRight/BorderLeft), not top/bottom
-			// So file list starts at line 4 in both modes
-			headerOffset := 4
+			// Both modes: title(0) + toolbar(1) + command(2) + separator(3) = 4 lines
+			// Both modes now have bordered boxes, so top border adds 1 more line
+			// File content starts at line 5 in both single-pane and dual-pane
+			headerOffset := 5 // +1 for top border of the box (both modes have borders now)
 			if m.displayMode == modeDetail {
 				headerOffset += 2 // Add 2 for detail view's header and separator
 			}
@@ -252,10 +258,16 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				// Calculate which row was clicked
 				clickedRow := msg.Y - headerOffset
 
+				// Adjust X coordinate for left border (both modes have borders now)
+				adjustedX := msg.X - 2 // Account for left border
+				if adjustedX < 0 {
+					adjustedX = 0
+				}
+
 				// Calculate which column was clicked
 				// Each grid cell is approximately: icon(2) + space(1) + name(12) + padding(2) = 17 chars
 				cellWidth := 17
-				clickedCol := msg.X / cellWidth
+				clickedCol := adjustedX / cellWidth
 				if clickedCol >= m.gridColumns {
 					clickedCol = m.gridColumns - 1
 				}
@@ -404,7 +416,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Calculate which item was right-clicked
-			headerOffset := 4
+			// Both modes have top borders now, so content starts at line 5
+			headerOffset := 5 // +1 for top border (both modes have borders now)
 			if m.displayMode == modeDetail {
 				headerOffset += 2
 			}
@@ -430,8 +443,15 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			// Grid view: calculate row and column
 			if m.displayMode == modeGrid {
 				clickedRow := msg.Y - headerOffset
+
+				// Adjust X coordinate for left border (both modes have borders now)
+				adjustedX := msg.X - 2 // Account for left border
+				if adjustedX < 0 {
+					adjustedX = 0
+				}
+
 				cellWidth := 17
-				clickedCol := msg.X / cellWidth
+				clickedCol := adjustedX / cellWidth
 				if clickedCol >= m.gridColumns {
 					clickedCol = m.gridColumns - 1
 				}
