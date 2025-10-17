@@ -26,9 +26,8 @@
 - **Dialog System** - Input, confirmation, and status messages
 
 ### 🚧 Known Limitations
-- **No search** - Can't filter/find files within current directory
+- **No directory search** - Can't filter files by name pattern (have fuzzy search via Ctrl+P)
 - **No multi-select** - Operations limited to single files
-- **Large update.go** - 991 lines, needs refactoring
 - **No copy/move** - Can't move files between directories yet
 
 ---
@@ -104,27 +103,18 @@ filteredFiles []fileItem  // Subset of m.files matching search
 
 **Estimated Time:** 30 minutes
 
-#### 2.4 Refactor update.go (OPTIONAL)
-**Issue:** 991 lines with 55+ case statements
+#### 2.4 Refactor update.go - ✅ **COMPLETED**
+**Status:** ✅ Completed during Phase 1
 
-**Goal:** Split into focused handler files
+**Result:** Successfully split into 3 focused files:
+- `update.go` (138 lines) - Main dispatcher
+- `update_keyboard.go` (821 lines) - Keyboard event handling
+- `update_mouse.go` (663 lines) - Mouse event handling
 
-**New Structure:**
-```
-keyboard_handler.go  - All keyboard event cases
-mouse_handler.go     - All mouse event cases
-window_handler.go    - Window resize events
-spinner_handler.go   - Spinner/background task events
-```
-
-**Benefits:**
-- Easier to maintain
-- Better testability
+**Benefits Achieved:**
+- Much easier to maintain and navigate
 - Clear separation of concerns
-
-**Note:** This is optional - only do if codebase feels unmanageable
-
-**Estimated Time:** 3-4 hours
+- Each file has single responsibility
 
 ---
 

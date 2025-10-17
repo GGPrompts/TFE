@@ -15,11 +15,24 @@ func (m model) getWrappedLineCount() int {
 		return 0
 	}
 
-	// Calculate available width
-	availableWidth := m.rightWidth - 17
+	// Calculate available width based on file type and view mode
+	var availableWidth int
+	var boxContentWidth int
+
 	if m.viewMode == viewFullPreview {
-		availableWidth = m.width - 10 // line nums (6) + scrollbar (2) + padding (2)
+		boxContentWidth = m.width - 6 // Box content width in full preview
+	} else {
+		boxContentWidth = m.rightWidth - 2 // Box content width in dual-pane
 	}
+
+	if m.preview.isMarkdown {
+		// Markdown: no line numbers or scrollbar, content uses full box width
+		availableWidth = boxContentWidth
+	} else {
+		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
+		availableWidth = boxContentWidth - 8
+	}
+
 	if availableWidth < 20 {
 		availableWidth = 20
 	}
@@ -132,11 +145,24 @@ func (m model) renderPreview(maxVisible int) string {
 		return s.String()
 	}
 
-	// Calculate available width for content
-	availableWidth := m.rightWidth - 17 // line nums (8) + scrollbar (2) + borders (4) + padding (3)
+	// Calculate available width for content based on file type and view mode
+	var availableWidth int
+	var boxContentWidth int // Width of the box content area
+
 	if m.viewMode == viewFullPreview {
-		availableWidth = m.width - 10 // line nums (6) + scrollbar (2) + padding (2)
+		boxContentWidth = m.width - 6 // Box content width in full preview
+	} else {
+		boxContentWidth = m.rightWidth - 2 // Box content width in dual-pane (accounting for borders)
 	}
+
+	if m.preview.isMarkdown {
+		// Markdown: no line numbers or scrollbar, content uses full box width
+		availableWidth = boxContentWidth
+	} else {
+		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
+		availableWidth = boxContentWidth - 8
+	}
+
 	if availableWidth < 20 {
 		availableWidth = 20 // Minimum width
 	}
@@ -296,13 +322,15 @@ func (m model) renderFullPreview() string {
 	s.WriteString("\n")
 
 	// Content with border
-	maxVisible := m.height - 6 // Reserve space for title, info, help, and borders
-	previewContent := m.renderPreview(maxVisible)
+	maxVisible := m.height - 6 // Reserve space for title, info, help (total box height INCLUDING borders)
+	contentHeight := maxVisible - 2 // Content area accounting for borders
+	previewContent := m.renderPreview(contentHeight)
 
-	// Wrap preview in bordered box
+	// Wrap preview in bordered box with fixed dimensions
+	// Content is constrained to contentHeight lines to fit within the box
 	previewBoxStyle := lipgloss.NewStyle().
-		Width(m.width - 4). // Leave margin
-		Height(maxVisible).
+		Width(m.width - 6).       // Leave margin for borders
+		Height(contentHeight).    // Content area height (borders added by Lipgloss)
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.AdaptiveColor{
 			Light: "#00af87", // Teal for light
@@ -409,40 +437,36 @@ func (m model) renderDualPane() string {
 	s.WriteString("\033[0m")
 	s.WriteString("\n")
 
-	// Separator line between command prompt and panes
+	// Blank line separator between command prompt and panes
 	s.WriteString("\n")
 
 	// Calculate max visible for both panes
-	// title=1 + path=1 + command=1 + separator=1 + panes=maxVisible + status=2 = m.height
-	// Therefore: maxVisible = m.height - 6
-	maxVisible := m.height - 6
+	// title=1 + toolbar=1 + command=1 + separator=1 + panes=maxVisible + separator=1 + status=2 = m.height
+	// Therefore: maxVisible = m.height - 7 (total pane height INCLUDING borders)
+	maxVisible := m.height - 7
 
-	// Get left pane content
+	// Content area is maxVisible - 2 (accounting for top/bottom borders)
+	contentHeight := maxVisible - 2
+
+	// Get left pane content - use contentHeight so content fits within the box
 	var leftContent string
 	switch m.displayMode {
 	case modeList:
-		leftContent = m.renderListView(maxVisible)
+		leftContent = m.renderListView(contentHeight)
 	case modeGrid:
-		leftContent = m.renderGridView(maxVisible)
+		leftContent = m.renderGridView(contentHeight)
 	case modeDetail:
-		leftContent = m.renderDetailView(maxVisible)
+		leftContent = m.renderDetailView(contentHeight)
 	case modeTree:
-		leftContent = m.renderTreeView(maxVisible)
+		leftContent = m.renderTreeView(contentHeight)
 	default:
-		leftContent = m.renderListView(maxVisible)
+		leftContent = m.renderListView(contentHeight)
 	}
 
-	// Get right pane content
+	// Get right pane content (just the preview, no title)
 	rightContent := ""
 	if m.preview.loaded {
-		previewTitleText := fmt.Sprintf("Preview: %s", m.preview.fileName)
-		previewTitle := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#5fd7ff"}).
-			Render(previewTitleText)
-		separatorLine := strings.Repeat("─", len(previewTitleText))
-		rightContent = previewTitle + "\033[0m\n" + separatorLine + "\033[0m\n"
-		rightContent += m.renderPreview(maxVisible - 2)
+		rightContent = m.renderPreview(contentHeight)
 	} else {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
@@ -460,19 +484,17 @@ func (m model) renderDualPane() string {
 		rightBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"} // bright blue for focused pane
 	}
 
+	// Use fixed Width/Height for consistent borders
+	// Content is constrained to contentHeight lines to fit within the box
 	leftPaneStyle := lipgloss.NewStyle().
-		Width(m.leftWidth).
-		MaxWidth(m.leftWidth).
-		Height(maxVisible).
-		MaxHeight(maxVisible).
+		Width(m.leftWidth - 2).   // -2 for left/right borders
+		Height(contentHeight).    // Content area height (borders added by Lipgloss)
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(leftBorderColor)
 
 	rightPaneStyle := lipgloss.NewStyle().
-		Width(m.rightWidth).
-		MaxWidth(m.rightWidth).
-		Height(maxVisible).
-		MaxHeight(maxVisible).
+		Width(m.rightWidth - 2).  // -2 for left/right borders
+		Height(contentHeight).    // Content area height (borders added by Lipgloss)
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(rightBorderColor)
 
@@ -483,17 +505,6 @@ func (m model) renderDualPane() string {
 	// Join panes horizontally
 	panes := lipgloss.JoinHorizontal(lipgloss.Top, leftPaneRendered, rightPaneRendered)
 	s.WriteString(panes)
-	s.WriteString("\n")
-
-	// Separator line above status bar (connects with pane borders)
-	separatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{
-			Light: "#0087d7",
-			Dark:  "#5fd7ff",
-		})
-	separator := strings.Repeat("─", m.width)
-	s.WriteString(separatorStyle.Render(separator))
-	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Status bar (full width)

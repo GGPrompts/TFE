@@ -142,7 +142,10 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 	case "quickcd":
 		// Quick CD: write directory to file and exit TFE so shell can cd
 		if m.contextMenuFile.isDir {
-			_ = writeCDTarget(m.contextMenuFile.path)
+			if err := writeCDTarget(m.contextMenuFile.path); err != nil {
+				m.setStatusMessage(fmt.Sprintf("Failed to save directory for quick CD: %s", err), true)
+				return m, tea.ClearScreen
+			}
 			return m, tea.Quit
 		}
 		return m, tea.ClearScreen
@@ -171,6 +174,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		if !m.contextMenuFile.isDir {
 			editor := getAvailableEditor()
 			if editor == "" {
+				m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
 				return m, tea.ClearScreen
 			}
 			if editorAvailable("micro") {
@@ -182,7 +186,11 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 
 	case "copypath":
 		// Copy path to clipboard
-		_ = copyToClipboard(m.contextMenuFile.path)
+		if err := copyToClipboard(m.contextMenuFile.path); err != nil {
+			m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
+		} else {
+			m.setStatusMessage("Path copied to clipboard", false)
+		}
 		return m, tea.ClearScreen
 
 	case "togglefav":

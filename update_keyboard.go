@@ -45,6 +45,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.preview.loaded && m.preview.filePath != "" {
 				editor := getAvailableEditor()
 				if editor == "" {
+					m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
 					return m, nil
 				}
 				if editorAvailable("micro") {
@@ -62,7 +63,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "f5":
 			// Copy file path from preview (F5 replaces y)
 			if m.preview.loaded && m.preview.filePath != "" {
-				_ = copyToClipboard(m.preview.filePath)
+				if err := copyToClipboard(m.preview.filePath); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
+				} else {
+					m.setStatusMessage("Path copied to clipboard", false)
+				}
 			}
 
 		case "up", "k":
@@ -273,6 +278,61 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Handle search mode input (/ key for directory search)
+	if m.searchMode {
+		switch msg.String() {
+		case "esc":
+			// Exit search mode
+			m.searchMode = false
+			m.searchQuery = ""
+			m.filteredIndices = nil
+			m.cursor = 0 // Reset cursor
+			return m, nil
+
+		case "backspace":
+			// Delete last character from search query
+			if len(m.searchQuery) > 0 {
+				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+				// Update filtered results
+				m.filteredIndices = m.filterFilesBySearch(m.searchQuery)
+				// Reset cursor if out of bounds
+				if m.cursor >= len(m.filteredIndices) {
+					m.cursor = 0
+				}
+			}
+			return m, nil
+
+		case "enter":
+			// Accept search and exit search mode (keep filter active)
+			m.searchMode = false
+			return m, nil
+
+		default:
+			// Add printable characters to search query
+			text := string(msg.Runes)
+			if len(text) > 0 && !isSpecialKey(msg.String()) {
+				// Check if it's printable text
+				isPrintable := true
+				for _, r := range msg.Runes {
+					if r < 32 || r == 127 { // Control characters
+						isPrintable = false
+						break
+					}
+				}
+				if isPrintable {
+					m.searchQuery += text
+					// Update filtered results
+					m.filteredIndices = m.filterFilesBySearch(m.searchQuery)
+					// Reset cursor if out of bounds
+					if m.cursor >= len(m.filteredIndices) {
+						m.cursor = 0
+					}
+				}
+			}
+			return m, nil
+		}
+	}
+
 	// Handle command prompt input (focus-based: only active when commandFocused)
 	// Special keys that interact with command prompt
 	switch msg.String() {
@@ -356,6 +416,13 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Ctrl+P: Fuzzy file search
 		m.fuzzySearchActive = true
 		return m, m.launchFuzzySearch()
+
+	case "/":
+		// /: Enter directory search mode (filter files by name)
+		m.searchMode = true
+		m.searchQuery = ""
+		m.filteredIndices = m.filterFilesBySearch("")
+		return m, nil
 
 	case "f10", "ctrl+c":
 		// F10: Quit (replaces q)
@@ -693,7 +760,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 			editor := getAvailableEditor()
 			if editor == "" {
-				// Could show error message - for now, do nothing
+				m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
 				return m, nil
 			}
 			// Prefer micro if available, otherwise use whatever was found
@@ -714,12 +781,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f5":
 		// F5: Copy file path to clipboard (replaces y)
 		if currentFile := m.getCurrentFile(); currentFile != nil {
-			err := copyToClipboard(currentFile.path)
-			if err != nil {
-				// Could show error - for now, silently continue
-				// In the future, we could add a status message system
+			if err := copyToClipboard(currentFile.path); err != nil {
+				m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
+			} else {
+				m.setStatusMessage("Path copied to clipboard", false)
 			}
-			// Success - path is copied to clipboard
 		}
 
 	// Note: 's' key removed to allow typing 's' in command prompt
@@ -754,15 +820,15 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// F2: Open context menu at cursor position (keyboard alternative to right-click)
 		if currentFile := m.getCurrentFile(); currentFile != nil {
 			// Calculate menu position based on cursor
-			headerOffset := 4
+			headerOffset := 5 // Account for borders (title + toolbar + command + separator + border)
 			if m.displayMode == modeDetail {
-				headerOffset = 6 // Account for detail view header
+				headerOffset = 6 // Detail view has header at line 5, content starts at 6 (separator removed)
 			}
 
 			// Calculate visible range to account for scrolling
-			maxVisible := m.height - 6
+			maxVisible := m.height - 7 // Match rendering calculation
 			if m.displayMode == modeDetail {
-				maxVisible -= 2
+				maxVisible -= 1 // Account for detail header only (separator removed)
 			}
 			start, _ := m.getVisibleRange(maxVisible)
 

@@ -227,17 +227,15 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			// File content starts at line 5 in both single-pane and dual-pane
 			headerOffset := 5 // +1 for top border of the box (both modes have borders now)
 			if m.displayMode == modeDetail {
-				headerOffset += 2 // Add 2 for detail view's header and separator
+				headerOffset += 1 // Add 1 for detail view's header only (separator removed)
 			}
 
 			// Calculate visible range to account for scrolling
-			// Account for 2-line status bar: m.height - 7 in single pane
+			// Both single-pane and dual-pane use same calculation: m.height - 7
+			// (title=1 + toolbar=1 + command=1 + separator=1 + panes=maxVisible + separator=1 + status=2)
 			maxVisible := m.height - 7
-			if m.viewMode == viewDualPane {
-				maxVisible = m.height - 6 // Dual-pane has slightly different layout
-			}
 			if m.displayMode == modeDetail {
-				maxVisible -= 2 // Account for detail header
+				maxVisible -= 1 // Account for detail header only (separator removed)
 			}
 
 			// Get filtered files for click detection (respects favorites filter)
@@ -265,8 +263,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 
 				// Calculate which column was clicked
-				// Each grid cell is approximately: icon(2) + space(1) + name(12) + padding(2) = 17 chars
-				cellWidth := 17
+				// Each grid cell: icon(2) + fav_indicator(2) + name(12) + padding(2) = 18 chars
+				cellWidth := 18
 				clickedCol := adjustedX / cellWidth
 				if clickedCol >= m.gridColumns {
 					clickedCol = m.gridColumns - 1
@@ -419,15 +417,13 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			// Both modes have top borders now, so content starts at line 5
 			headerOffset := 5 // +1 for top border (both modes have borders now)
 			if m.displayMode == modeDetail {
-				headerOffset += 2
+				headerOffset += 1 // Add 1 for detail view's header only (separator removed)
 			}
 
+			// Both single-pane and dual-pane use same calculation: m.height - 7
 			maxVisible := m.height - 7
-			if m.viewMode == viewDualPane {
-				maxVisible = m.height - 6 // Dual-pane has slightly different layout
-			}
 			if m.displayMode == modeDetail {
-				maxVisible -= 2
+				maxVisible -= 1 // Account for detail header only (separator removed)
 			}
 
 			// Get filtered files for right-click detection (respects favorites filter)
@@ -450,7 +446,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					adjustedX = 0
 				}
 
-				cellWidth := 17
+				// Each grid cell: icon(2) + fav_indicator(2) + name(12) + padding(2) = 18 chars
+				cellWidth := 18
 				clickedCol := adjustedX / cellWidth
 				if clickedCol >= m.gridColumns {
 					clickedCol = m.gridColumns - 1

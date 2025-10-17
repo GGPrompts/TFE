@@ -129,28 +129,32 @@ func (m model) renderSinglePane() string {
 	// Calculate maxVisible to fit within terminal height:
 	// title=1 + toolbar=1 + command=1 + separator=1 + filelist=maxVisible + spacer=1 + status=2 = m.height
 	// Account for border (2 lines for top/bottom)
-	// Therefore: maxVisible = m.height - 9
-	maxVisible := m.height - 9 // Reserve space for all UI elements, borders, and 2-line status
+	// Therefore: maxVisible = m.height - 9 (total box height INCLUDING borders)
+	maxVisible := m.height - 9
 
-	// Get file list content
+	// Content area is maxVisible - 2 (accounting for top/bottom borders)
+	contentHeight := maxVisible - 2
+
+	// Get file list content - use contentHeight so content fits within the box
 	var fileListContent string
 	switch m.displayMode {
 	case modeList:
-		fileListContent = m.renderListView(maxVisible)
+		fileListContent = m.renderListView(contentHeight)
 	case modeGrid:
-		fileListContent = m.renderGridView(maxVisible)
+		fileListContent = m.renderGridView(contentHeight)
 	case modeDetail:
-		fileListContent = m.renderDetailView(maxVisible)
+		fileListContent = m.renderDetailView(contentHeight)
 	case modeTree:
-		fileListContent = m.renderTreeView(maxVisible)
+		fileListContent = m.renderTreeView(contentHeight)
 	default:
-		fileListContent = m.renderListView(maxVisible)
+		fileListContent = m.renderListView(contentHeight)
 	}
 
-	// Wrap content in a bordered box
+	// Wrap content in a bordered box with fixed dimensions
+	// Content is constrained to contentHeight lines to fit within the box
 	fileListStyle := lipgloss.NewStyle().
-		Width(m.width - 4). // Leave margin for padding
-		Height(maxVisible).
+		Width(m.width - 6).       // Leave margin for padding
+		Height(contentHeight).    // Content area height (borders added by Lipgloss)
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.AdaptiveColor{
 			Light: "#0087d7", // Dark blue border for light
@@ -158,17 +162,6 @@ func (m model) renderSinglePane() string {
 		})
 
 	s.WriteString(fileListStyle.Render(fileListContent))
-
-	// Separator line above status bar
-	s.WriteString("\n")
-	separatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{
-			Light: "#0087d7",
-			Dark:  "#5fd7ff",
-		})
-	separator := strings.Repeat("─", m.width)
-	s.WriteString(separatorStyle.Render(separator))
-	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Check if we should show status message (auto-dismiss after 3s)
@@ -185,6 +178,35 @@ func (m model) renderSinglePane() string {
 
 		s.WriteString(msgStyle.Render(m.statusMessage))
 		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n") // Add blank line to maintain 2-line height
+		s.WriteString(" ") // Empty second line for consistent layout
+	} else if m.searchMode || m.searchQuery != "" {
+		// Show search status
+		searchStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("33")). // Blue background
+			Foreground(lipgloss.Color("0")).
+			Bold(true).
+			Padding(0, 1)
+
+		// Calculate match count (exclude parent directory "..")
+		matchCount := len(m.filteredIndices)
+		if matchCount > 0 {
+			matchCount-- // Exclude ".." which is always included
+		}
+
+		var searchStatus string
+		if m.searchMode {
+			// Active search mode with cursor
+			searchStatus = fmt.Sprintf("Search: %s█ (%d matches)", m.searchQuery, matchCount)
+		} else {
+			// Search accepted (filter active but not in input mode)
+			searchStatus = fmt.Sprintf("Filtered: %s (%d matches)", m.searchQuery, matchCount)
+		}
+
+		s.WriteString(searchStyle.Render(searchStatus))
+		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n") // Add blank line to maintain 2-line height
+		s.WriteString(" ") // Empty second line for consistent layout
 	} else {
 		// Regular status bar
 		// Count directories and files

@@ -100,7 +100,20 @@ func (m *model) isFavorite(path string) bool {
 }
 
 // getFilteredFiles returns files filtered by current filter mode
+// Search filtering takes precedence over favorites filtering
 func (m *model) getFilteredFiles() []fileItem {
+	// If search is active, use filtered indices
+	if len(m.filteredIndices) > 0 {
+		filtered := make([]fileItem, 0, len(m.filteredIndices))
+		for _, idx := range m.filteredIndices {
+			if idx < len(m.files) {
+				filtered = append(filtered, m.files[idx])
+			}
+		}
+		return filtered
+	}
+
+	// Otherwise, apply favorites filtering
 	if !m.showFavoritesOnly {
 		return m.files
 	}

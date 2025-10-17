@@ -154,9 +154,12 @@ func (m model) renderGridView(maxVisible int) string {
 			icon := getFileIcon(file)
 
 			// Add star indicator for favorites
+			// Always reserve 2 characters for alignment to maintain consistent grid cell width
 			favIndicator := ""
 			if m.isFavorite(file.path) {
 				favIndicator = "⭐"
+			} else {
+				favIndicator = "  " // Two spaces to match emoji width
 			}
 
 			// Truncate long names
@@ -174,8 +177,8 @@ func (m model) renderGridView(maxVisible int) string {
 				style = claudeContextStyle
 			}
 
-			// Build cell content
-			cell := fmt.Sprintf("%s%s %-12s", icon, favIndicator, displayName)
+			// Build cell content (no space after favIndicator - it's already 2 chars)
+			cell := fmt.Sprintf("%s%s%-12s", icon, favIndicator, displayName)
 
 			// Apply selection style
 			if idx == m.cursor {
@@ -262,29 +265,19 @@ func (m model) renderDetailView(maxVisible int) string {
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
-	// Separator - use left pane width in dual-pane mode to prevent wrapping
-	separatorWidth := m.width - 4
-	if m.viewMode == viewDualPane {
-		separatorWidth = m.leftWidth - 4
-	}
-	separator := strings.Repeat("─", separatorWidth)
-	s.WriteString(pathStyle.Render(separator))
-	s.WriteString("\033[0m") // Reset ANSI codes
-	s.WriteString("\n")
-
 	// Calculate visible range
 	start := 0
 	end := len(files)
 
-	if len(files) > maxVisible-2 { // -2 for header and separator
-		start = m.cursor - (maxVisible-2)/2
+	if len(files) > maxVisible-1 { // -1 for header only (separator removed)
+		start = m.cursor - (maxVisible-1)/2
 		if start < 0 {
 			start = 0
 		}
-		end = start + maxVisible - 2
+		end = start + maxVisible - 1
 		if end > len(files) {
 			end = len(files)
-			start = end - (maxVisible - 2)
+			start = end - (maxVisible - 1)
 			if start < 0 {
 				start = 0
 			}

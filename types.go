@@ -142,6 +142,10 @@ type model struct {
 	statusTime    time.Time // When status was shown
 	// Fuzzy search
 	fuzzySearchActive bool // Whether fuzzy search is active
+	// Directory search (/ key)
+	searchMode       bool   // Whether search mode is active
+	searchQuery      string // Current search query
+	filteredIndices  []int  // Indices of files matching search
 }
 
 // treeItem represents an item in the tree view with depth information

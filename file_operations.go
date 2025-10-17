@@ -1074,3 +1074,34 @@ func (m *model) deleteFileOrDir(path string, isDir bool) error {
 
 	return os.Remove(path)
 }
+
+// filterFilesBySearch returns indices of files matching the search query
+// Case-insensitive substring matching on file names
+func (m *model) filterFilesBySearch(query string) []int {
+	if query == "" {
+		// Empty query - return all indices
+		indices := make([]int, len(m.files))
+		for i := range indices {
+			indices[i] = i
+		}
+		return indices
+	}
+
+	queryLower := strings.ToLower(query)
+	var matchingIndices []int
+
+	for i, file := range m.files {
+		// Skip parent directory (..) - always show it
+		if file.name == ".." {
+			matchingIndices = append(matchingIndices, i)
+			continue
+		}
+
+		// Case-insensitive substring match
+		if strings.Contains(strings.ToLower(file.name), queryLower) {
+			matchingIndices = append(matchingIndices, i)
+		}
+	}
+
+	return matchingIndices
+}

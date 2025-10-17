@@ -4,7 +4,61 @@ All notable changes to the Terminal File Explorer (TFE) project.
 
 ## [Unreleased]
 
+### Fixed
+- **Silent Error Handling (Phase 2.1 Complete)**
+  - Editor availability: Now shows "No editor available (tried micro, nano, vim, vi)" when F4 pressed without editors
+    - Fixed in preview mode (update_keyboard.go:47)
+    - Fixed in file browser (update_keyboard.go:695)
+    - Fixed in context menu (context_menu.go:173)
+  - Clipboard operations: Now shows success/error messages for F5 and context menu copy
+    - "Path copied to clipboard" on success
+    - "Failed to copy to clipboard: [error]" on failure
+    - Fixed in preview mode (update_keyboard.go:65)
+    - Fixed in file browser (update_keyboard.go:717)
+    - Fixed in context menu (context_menu.go:185)
+  - Quick CD: Now shows "Failed to save directory for quick CD: [error]" on write failure
+    - Fixed in context menu (context_menu.go:145)
+  - All operations now use the existing status message system (auto-dismiss after 3 seconds)
+  - No more silent failures - users always get feedback
+
 ### Added
+- **Directory Search Feature (Phase 2.2 Complete)**
+  - Press `/` to enter search mode and filter files by name
+  - Incremental filtering as you type (case-insensitive substring match)
+  - ESC to clear search and show all files
+  - Enter to accept search and exit input mode (filter remains active)
+  - Backspace to delete characters from search query
+  - Status bar shows: "Search: [query]█ (X matches)" while typing
+  - Status bar shows: "Filtered: [query] (X matches)" when search is accepted
+  - Parent directory ".." always visible regardless of search
+  - Files modified: `types.go`, `file_operations.go`, `update_keyboard.go`, `favorites.go`, `view.go`
+- **Grid View Mouse Click Fix (Phase 2.3 Complete)**
+  - Fixed variable-width cell issue in grid view causing click misalignment
+  - Problem: Favorite stars (⭐) made some cells 2 chars wider, breaking click detection
+  - Solution: Always reserve 2 characters for favorite indicator (space or star)
+  - Consistent cell width: icon(2) + fav_indicator(2) + name(12) + padding(2) = 18 chars
+  - Updated both left-click and right-click handlers to match rendering
+  - Mouse clicks now accurately select grid items with mixed favorite/non-favorite files
+  - Files modified: `render_file_list.go`, `update_mouse.go`
+- **Fixed Border Rendering in All View Modes**
+  - Fixed Lipgloss border rendering issues (right/bottom borders now visible)
+  - Switched from MaxWidth/MaxHeight to fixed Width/Height for consistent borders
+  - Corrected width calculations to prevent content overflow
+  - Borders now stay fixed-size regardless of file content size
+  - Applied fixes to single-pane, dual-pane, and full-preview modes
+  - Files modified: `render_preview.go`, `view.go`
+- **Optimized Preview Content Width**
+  - Increased usable preview width by 7 characters in dual-pane mode
+  - Markdown files get 6 additional characters (no line numbers/scrollbar)
+  - Better text wrapping and reduced horizontal overflow
+  - Width now calculated based on actual box dimensions, not estimates
+  - Files modified: `render_preview.go`
+- **Fixed Dual-Pane Alignment**
+  - Both panes now perfectly aligned at top and bottom
+  - Removed redundant preview title header (filename already in status bar)
+  - Fixed mouse click coordinate offset issues
+  - Cleaner UI with less visual clutter
+  - Files modified: `render_preview.go`
 - **Fuzzy File Search with go-fzf**
   - Ctrl+P or click 🔍 button to launch fuzzy search
   - Search across current directory and subdirectories (depth=1)
