@@ -195,7 +195,7 @@ func (m model) renderPreview(maxVisible int) string {
 			s.WriteString("\n")
 		}
 
-		return s.String()
+		return strings.TrimRight(s.String(), "\n")
 	}
 	// If markdown flag is set but no rendered content, fall through to plain text rendering
 	// This happens when Glamour fails or file is too large
@@ -250,7 +250,7 @@ func (m model) renderPreview(maxVisible int) string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return strings.TrimRight(s.String(), "\n")
 }
 
 // renderScrollbar renders a scrollbar indicator for the current line
