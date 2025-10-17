@@ -9,6 +9,12 @@ import (
 )
 
 func (m model) View() string {
+	// If fuzzy search is active, return empty string
+	// (go-fzf handles its own rendering)
+	if m.fuzzySearchActive {
+		return ""
+	}
+
 	var baseView string
 
 	// Dispatch to appropriate view based on viewMode
@@ -89,6 +95,10 @@ func (m model) renderSinglePane() string {
 
 	// CellBlocks button
 	s.WriteString(homeButtonStyle.Render("[📦]"))
+	s.WriteString(" ")
+
+	// Fuzzy search button
+	s.WriteString(homeButtonStyle.Render("[🔍]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")

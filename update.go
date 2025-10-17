@@ -120,6 +120,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)
+
+	case fuzzySearchResultMsg:
+		// Fuzzy search completed
+		m.fuzzySearchActive = false
+		if msg.err == nil && msg.selected != "" {
+			m.navigateToFuzzyResult(msg.selected)
+		}
+		// Force a refresh and re-enable mouse support
+		return m, tea.Batch(
+			tea.ClearScreen,
+			tea.EnableMouseCellMotion,
+		)
 	}
 
 	return m, nil

@@ -140,6 +140,8 @@ type model struct {
 	statusMessage string    // Temporary status message
 	statusIsError bool      // Whether status message is an error
 	statusTime    time.Time // When status was shown
+	// Fuzzy search
+	fuzzySearchActive bool // Whether fuzzy search is active
 }
 
 // treeItem represents an item in the tree view with depth information
@@ -152,6 +154,12 @@ type treeItem struct {
 
 // editorFinishedMsg is sent when external editor exits
 type editorFinishedMsg struct{ err error }
+
+// fuzzySearchResultMsg is sent when fuzzy search completes
+type fuzzySearchResultMsg struct {
+	selected string // Selected file path
+	err      error
+}
 
 // dialogType represents different types of dialogs
 type dialogType int

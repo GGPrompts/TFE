@@ -492,13 +492,28 @@ func (m model) renderTreeView(maxVisible int) string {
 
 		// Truncate long filenames to prevent wrapping
 		displayName := file.name
-		maxNameLen := 25 - (item.depth * 3) // Reduce for deeper nesting
+
+		// Calculate available width dynamically based on view mode
+		var maxNameLen int
 		if m.viewMode == viewDualPane {
-			maxNameLen = m.leftWidth - 20 - (item.depth * 3)
-			if maxNameLen < 15 {
-				maxNameLen = 15
-			}
+			// In dual-pane: use left pane width minus UI elements
+			// Account for: indent, tree chars, icon, favorite, padding
+			indentWidth := 2 + (item.depth * 3) + 3 + 2 + 2 + 5
+			maxNameLen = m.leftWidth - indentWidth
+		} else {
+			// In single-pane: use full width minus UI elements
+			indentWidth := 2 + (item.depth * 3) + 3 + 2 + 2 + 5
+			maxNameLen = m.width - indentWidth
 		}
+
+		// Set reasonable bounds
+		if maxNameLen < 20 {
+			maxNameLen = 20
+		}
+		if maxNameLen > 100 {
+			maxNameLen = 100 // Reasonable maximum
+		}
+
 		if len(displayName) > maxNameLen {
 			displayName = displayName[:maxNameLen-2] + ".."
 		}

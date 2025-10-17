@@ -23,7 +23,7 @@ func initialModel() model {
 		height:            24,
 		width:             80,
 		showHidden:        false,
-		displayMode:       modeDetail,
+		displayMode:       modeTree, // Tree view works better on narrow terminals
 		gridColumns:       4,
 		sortBy:            "name",
 		sortAsc:           true,

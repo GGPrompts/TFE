@@ -20,6 +20,12 @@ import (
 
 // handleMouseEvent processes all mouse input
 func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// If fuzzy search is active, don't process any mouse events
+	// (go-fzf handles its own input)
+	if m.fuzzySearchActive {
+		return m, nil
+	}
+
 	// Handle mouse wheel scrolling in full-screen preview mode
 	if m.viewMode == viewFullPreview {
 		switch msg.Button {
@@ -61,9 +67,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [>_]
+			// Toolbar: [🏠] [⭐/✨] [>_] [📦] [🔍]
+			// Note: Emojis render as 2 characters wide in terminals
 			if msg.Y == 1 {
-				// Home button [🏠] (X=0-4)
+				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
 				if msg.X >= 0 && msg.X <= 4 {
 					// Navigate to home directory
 					homeDir, err := os.UserHomeDir()
@@ -74,8 +81,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Star button [⭐/✨] (X=5-10)
-				if msg.X >= 5 && msg.X <= 10 {
+				// Star button [⭐/✨] (X=5-9: [ + emoji(2) + ] + space)
+				if msg.X >= 5 && msg.X <= 9 {
 					// Toggle favorites filter (like F6)
 					m.showFavoritesOnly = !m.showFavoritesOnly
 					m.cursor = 0
@@ -84,8 +91,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Terminal button [>_] (X=11-16)
-				if msg.X >= 11 && msg.X <= 16 {
+				// Terminal button [>_] (X=10-14: [ + >_(2) + ] + space)
+				if msg.X >= 10 && msg.X <= 14 {
 					// Toggle command mode focus
 					m.commandFocused = !m.commandFocused
 					if !m.commandFocused {
@@ -94,10 +101,16 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// CellBlocks button [📦] (X=17-22)
-				if msg.X >= 17 && msg.X <= 22 {
+				// CellBlocks button [📦] (X=15-19: [ + emoji(2) + ] + space)
+				if msg.X >= 15 && msg.X <= 19 {
 					// Launch CellBlocksTUI
 					return m, launchCellBlocksTUI()
+				}
+				// Fuzzy search button [🔍] (X=20-24: [ + emoji(2) + ])
+				if msg.X >= 20 && msg.X <= 24 {
+					// Launch fuzzy search
+					m.fuzzySearchActive = true
+					return m, m.launchFuzzySearch()
 				}
 			}
 

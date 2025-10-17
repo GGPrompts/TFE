@@ -21,6 +21,12 @@ import (
 
 // handleKeyEvent processes all keyboard input
 func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If fuzzy search is active, don't process any keyboard events
+	// (go-fzf handles its own input)
+	if m.fuzzySearchActive {
+		return m, nil
+	}
+
 	// Handle preview mode keys first
 	if m.viewMode == viewFullPreview {
 		switch msg.String() {
@@ -346,6 +352,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Regular file browser keys
 	switch msg.String() {
+	case "ctrl+p":
+		// Ctrl+P: Fuzzy file search
+		m.fuzzySearchActive = true
+		return m, m.launchFuzzySearch()
+
 	case "f10", "ctrl+c":
 		// F10: Quit (replaces q)
 		return m, tea.Quit
