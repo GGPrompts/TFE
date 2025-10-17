@@ -7,6 +7,7 @@ A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE
 - **Clean Interface**: Minimalist design focused on usability
 - **Dual Navigation**: Both keyboard shortcuts and mouse support
 - **F-Key Controls**: Midnight Commander-style F1-F10 hotkeys for common operations
+- **Fuzzy Search**: Fast file search with go-fzf (Ctrl+P or click 🔍)
 - **Context Menu**: Right-click or F2 for quick access to file operations
 - **Quick CD**: Exit TFE and change shell directory to selected folder
 - **Dual-Pane Mode**: Split-screen layout with file browser and live preview
@@ -123,17 +124,20 @@ The file explorer will start in your current working directory.
 #### Other Keys
 | Key | Action |
 |-----|--------|
+| `Ctrl+P` | Launch fuzzy file search |
 | `n` / `N` | Edit file in nano specifically |
 | `Esc` | Exit dual-pane/preview mode / close context menu |
 | `Ctrl+C` | Force quit application |
 
 ### Mouse Controls
 
+- **Toolbar Buttons**: Click [🏠] home, [⭐] favorites, [>_] command mode, [📦] CellBlocksTUI, [🔍] fuzzy search
 - **Left Click**: Select item (or switch pane focus in dual-pane mode)
 - **Double Click**: Navigate into folder or preview file
 - **Right Click**: Open context menu for file operations (includes Quick CD for folders)
 - **Scroll Wheel Up/Down**: Navigate through file list (or scroll context menu when open)
 - **Text Selection**: Enabled in preview mode - select and copy text with mouse
+- **Column Headers** (Detail view): Click to sort by Name, Size, Modified, or Type
 
 ### Context Menu Actions
 
@@ -432,13 +436,17 @@ TFE follows a modular architecture with 13 focused files:
 - ✅ Command history (last 100 commands)
 - ✅ Bracketed paste support (proper paste handling)
 - ✅ Special key filtering (no more literal "end", "home", etc.)
+- ✅ Fuzzy file search with go-fzf (Ctrl+P or click 🔍)
+- ✅ CellBlocksTUI integration (click 📦 to launch)
+- ✅ Clickable toolbar buttons (home, favorites, search, etc.)
+- ✅ Column header sorting in Detail view (click to sort)
+- ✅ Rounded borders and polished UI
+- ✅ Syntax highlighting for code files (Chroma)
 
 ### Planned Features
 - File operations (copy, move, delete, rename) - F7/F8 placeholders ready
-- File search functionality
 - Configurable color schemes and themes
 - Custom hidden file patterns
-- Syntax highlighting in code preview
 - Archive file browsing (.zip, .tar.gz)
 - Git status indicators
 

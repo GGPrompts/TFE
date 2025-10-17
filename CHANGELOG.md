@@ -5,6 +5,27 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added
+- **Fuzzy File Search with go-fzf**
+  - Ctrl+P or click 🔍 button to launch fuzzy search
+  - Search across current directory and subdirectories (depth=1)
+  - Keyboard-driven interface (type to filter, arrow keys to navigate)
+  - Auto-navigates to selected file/folder on selection
+  - Performance optimized: 200 item limit, 8 visible results
+  - Returns to TFE with proper terminal state restoration
+  - Files modified: `fuzzy_search.go` (new), `types.go`, `update.go`, `update_keyboard.go`, `update_mouse.go`, `view.go`
+- **CellBlocksTUI Integration**
+  - Clickable 📦 button in toolbar to launch CellBlocksTUI
+  - Auto-detects installation path (PATH, ~/bin, ~/projects/CellBlocksTUI)
+  - Proper terminal state restoration on exit
+  - Mouse input works correctly after returning to TFE
+  - Files modified: `view.go`, `update_mouse.go`
+- **Enhanced UI Borders and Separators**
+  - Rounded borders on all panes (single-pane, dual-pane, full-preview)
+  - Horizontal separator lines above status bar (connects with pane borders)
+  - Adaptive border colors (blue/cyan) matching terminal theme
+  - Focus indicators in dual-pane mode (bright blue for active pane)
+  - Professional, polished appearance across all view modes
+  - Files modified: `view.go`, `render_preview.go`
 - **Clickable Column Headers for Sorting (Detail View)**
   - Click column headers (Name, Size, Modified, Type) to sort files
   - Visual indicators: ↑ (ascending) or ↓ (descending) arrows show active sort
@@ -49,7 +70,41 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Enhanced visual polish in dual-pane mode
   - Better visual hierarchy and focus indicators
 
+### Changed
+- **Tree View Now Default Display Mode**
+  - Changed from Detail view to Tree view as default
+  - Reason: Tree/List views work better on narrow terminals
+  - Grid/Detail views can have formatting issues with limited width
+  - Users can still switch modes with F9 or number keys (1-4)
+  - File modified: `model.go`
+- **Dynamic Filename Truncation in Tree View**
+  - Filenames now use available screen width instead of fixed 25-char limit
+  - Calculates width dynamically based on terminal size and view mode
+  - Accounts for indentation, tree characters, icons, and favorites
+  - Min: 20 chars, Max: 100 chars for optimal readability
+  - Works correctly in both single-pane and dual-pane modes
+  - File modified: `render_file_list.go`
+
 ### Fixed
+- **Mouse Click Accuracy with Borders**
+  - Fixed mouse clicks offset by border dimensions
+  - Y-axis: Account for top border (+1 line) in both single-pane and dual-pane
+  - X-axis: Account for left border (-2 chars) in both modes
+  - Applied to all click handlers: file selection, column headers, context menu
+  - Clicks now register accurately on the intended item/location
+  - Files modified: `update_mouse.go`
+- **Terminal State After External TUI Apps**
+  - Fixed mouse input not working after exiting CellBlocksTUI
+  - Issue: Terminal state (including mouse mode) not properly restored
+  - Solution: Use `tea.Sequence(tea.ClearScreen, tea.ExecProcess(...))` pattern
+  - Ensures proper cleanup and state restoration
+  - File modified: `update_mouse.go`
+- **Fuzzy Search UI Interference**
+  - Fixed background UI scrolling/updating during fuzzy search
+  - Fixed typing lag and missing keystrokes in fuzzy search
+  - Fixed filter results flickering through background UI
+  - Solution: Block all keyboard/mouse events when `fuzzySearchActive` is true
+  - Files modified: `update_keyboard.go`, `update_mouse.go`, `view.go`
 - **Command Line Paste Bug:** Fixed brackets appearing around pasted text
   - Root cause: Using `msg.String()` which wraps paste events in brackets by design
   - Solution: Use `msg.Runes` to get raw text (Bubble Tea handles escape sequences)
