@@ -621,11 +621,10 @@ func launchCellBlocksTUI() tea.Cmd {
 	}
 
 	c := exec.Command(cmdPath)
-	return tea.ExecProcess(c, func(err error) tea.Msg {
-		// Return error as message if launch fails
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
 }
