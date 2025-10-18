@@ -99,6 +99,14 @@ func (m model) renderSinglePane() string {
 
 	// Fuzzy search button
 	s.WriteString(homeButtonStyle.Render("[🔍]"))
+	s.WriteString(" ")
+
+	// Prompts filter toggle button
+	promptIcon := "📝"
+	if m.showPromptsOnly {
+		promptIcon = "✨📝" // Different icon when filter is active
+	}
+	s.WriteString(homeButtonStyle.Render("[" + promptIcon + "]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
@@ -252,6 +260,11 @@ func (m model) renderSinglePane() string {
 			favoritesIndicator = " • ⭐ favorites only"
 		}
 
+		promptsIndicator := ""
+		if m.showPromptsOnly {
+			promptsIndicator = " • 📝 prompts only"
+		}
+
 		// View mode indicator
 		viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
 
@@ -260,7 +273,7 @@ func (m model) renderSinglePane() string {
 
 		// Split status into two lines to prevent truncation
 		// Line 1: Counts, indicators, view mode, help
-		statusLine1 := fmt.Sprintf("%s%s%s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, viewModeText, helpHint)
+		statusLine1 := fmt.Sprintf("%s%s%s%s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, viewModeText, helpHint)
 		s.WriteString(statusStyle.Render(statusLine1))
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")

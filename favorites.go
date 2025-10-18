@@ -100,7 +100,7 @@ func (m *model) isFavorite(path string) bool {
 }
 
 // getFilteredFiles returns files filtered by current filter mode
-// Search filtering takes precedence over favorites filtering
+// Search filtering takes precedence over favorites and prompts filtering
 func (m *model) getFilteredFiles() []fileItem {
 	// If search is active, use filtered indices
 	if len(m.filteredIndices) > 0 {
@@ -108,6 +108,20 @@ func (m *model) getFilteredFiles() []fileItem {
 		for _, idx := range m.filteredIndices {
 			if idx < len(m.files) {
 				filtered = append(filtered, m.files[idx])
+			}
+		}
+		return filtered
+	}
+
+	// Apply prompts filtering (show only .yaml, .md, .txt files)
+	if m.showPromptsOnly {
+		filtered := make([]fileItem, 0)
+		for _, item := range m.files {
+			// Always include directories and ".." for navigation
+			if item.isDir {
+				filtered = append(filtered, item)
+			} else if isPromptFile(item) {
+				filtered = append(filtered, item)
 			}
 		}
 		return filtered

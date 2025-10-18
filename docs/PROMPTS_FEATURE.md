@@ -1,5 +1,9 @@
 # TFE Prompt Library Feature
 
+**Status:** Phase 1 Complete ✅ | Phase 2 In Progress 🚧
+
+**Last Updated:** 2025-10-18
+
 ## Vision
 
 Transform TFE into a command center that combines file browsing with a prompt library system. This turns TFE into a workflow hub where you can:
@@ -7,6 +11,7 @@ Transform TFE into a command center that combines file browsing with a prompt li
 - Preview prompts with template variables that auto-fill from context
 - Copy rendered prompts to clipboard for pasting anywhere
 - Organize prompts as files in `~/.prompts/` with version control
+- Integrate with `.claude/commands/` and `.claude/agents/` for project-specific prompts
 - Store CLI command references alongside prompts for quick access
 
 ## Architecture Philosophy
@@ -81,64 +86,91 @@ Transform TFE into a command center that combines file browsing with a prompt li
 
 **Strategy:** Build focused copy/paste workflow in 4 phases (~6-8 hours total).
 
-### Phase 1: Prompts Filter & UI
+### Phase 1: Prompts Filter & UI ✅ COMPLETE
 **Goal:** Add ability to filter/view only prompt files
 
-- [ ] **1.1** Add `showPromptsOnly bool` field to `types.go` model struct
-- [ ] **1.2** Add `isPromptFile()` helper function to `helpers.go`
-  - Check for `.yaml`, `.md`, `.txt` extensions
-- [ ] **1.3** Add `getFilteredPromptsFiles()` method (similar to `getFilteredFiles()`)
-- [ ] **1.4** Add toolbar button `[📝]` in `view.go` and `render_preview.go`
+- [x] **1.1** Add `showPromptsOnly bool` field to `types.go` model struct
+- [x] **1.2** Add `isPromptFile()` helper function to `helpers.go`
+  - Check for `.prompty`, `.yaml`, `.yml`, `.md`, `.txt` extensions
+  - Smart `.md` filtering: only in `.claude/` or `~/.prompts/` directories
+- [x] **1.3** Updated `getFilteredFiles()` in `favorites.go` to respect `showPromptsOnly`
+- [x] **1.4** Add toolbar button `[📝]` in `view.go` and `render_preview.go`
   - Position: After `[🔍]` fuzzy search button
   - Toggle `showPromptsOnly` on click
   - Highlight when active: `✨📝`
-- [ ] **1.5** Add keyboard shortcut `F11` to toggle prompt mode in `update_keyboard.go`
-- [ ] **1.6** Add mouse click handler for toolbar button in `update_mouse.go`
-  - Click region: X=25-29 (after search button)
-- [ ] **1.7** Update status bar to show "• prompts only" indicator when active
-- [ ] **1.8** Test: Toggle prompt mode, verify only `.yaml/.md/.txt` files shown
+- [x] **1.5** Add keyboard shortcut `F11` to toggle prompt mode in `update_keyboard.go`
+- [x] **1.6** Add mouse click handler for toolbar button in `update_mouse.go`
+  - Click region: X=25-34 (handles both normal and active state)
+- [x] **1.7** Update status bar to show "• 📝 prompts only" indicator when active
+- [x] **1.8** Test: Toggle prompt mode, verify only prompt files shown
 
-**Estimated Time:** 1-2 hours
-**Files Modified:** `types.go`, `helpers.go`, `view.go`, `render_preview.go`, `update_keyboard.go`, `update_mouse.go`
+**✨ Bonus Enhancements Added:**
+- [x] Always show important dev folders even when hidden files off:
+  - `.claude/` 🤖, `.git/` 📦, `.vscode/` 💻, `.github/` 🐙, `.config/` ⚙️, `.docker/` 🐳
+- [x] Added icons for new important folders
+- [x] Smart `.md` detection (only prompts if in `.claude/` or `~/.prompts/`)
+- [x] Added `.prompty` extension support (Microsoft Prompty format)
+
+**Time Taken:** ~1.5 hours
+**Files Modified:** `types.go`, `helpers.go`, `favorites.go`, `view.go`, `render_preview.go`, `update_keyboard.go`, `update_mouse.go`, `file_operations.go`
+**Stats:** +138 lines, -5 lines across 8 files
 
 ---
 
-### Phase 2: Template Variables & Rendering
-**Goal:** Parse and substitute variables in prompt files
+### Phase 2: Multi-Location Template Parsing & Rendering
+**Goal:** Parse prompts from multiple locations and render with variable substitution
 
-- [ ] **2.1** Create new file `prompt_parser.go` (new module)
-- [ ] **2.2** Add prompt type to `types.go`:
+**Multi-Location Support:**
+- [ ] **2.1** Add `findProjectRoot()` helper to locate `.git` or `.claude` folder
+- [ ] **2.2** Scan and collect prompts from:
+  - `~/.prompts/` (global prompts) - all extensions
+  - `.claude/commands/` (project commands) - `.md` files
+  - `.claude/agents/` (project agents) - `.md` files
+  - Current directory (ad-hoc prompts)
+- [ ] **2.3** Display in tree view with section headers:
+  ```
+  🌐 GLOBAL PROMPTS (~/.prompts/)
+  ⚙️ PROJECT COMMANDS (.claude/commands/)
+  🤖 PROJECT AGENTS (.claude/agents/)
+  📁 CURRENT FOLDER
+  ```
+
+**Template Parsing:**
+- [ ] **2.4** Create new file `prompt_parser.go` (new module)
+- [ ] **2.5** Add prompt type to `types.go`:
   ```go
   type promptTemplate struct {
       name        string
       description string
+      source      string // "global", "command", "agent", "local"
       variables   []string
       template    string
       raw         string
   }
   ```
-- [ ] **2.3** Implement `parsePromptFile(path string) (*promptTemplate, error)`
-  - Support YAML front matter (name, description, variables)
+- [ ] **2.6** Implement `parsePromptFile(path string) (*promptTemplate, error)`
+  - Support `.prompty` format (YAML frontmatter between `---` markers)
+  - Support YAML files (`.yaml`, `.yml`)
   - Support raw markdown/text files
   - Extract `{{VARIABLE}}` placeholders
-- [ ] **2.4** Implement `renderPromptTemplate(tmpl *promptTemplate, vars map[string]string) string`
+- [ ] **2.7** Implement `renderPromptTemplate(tmpl *promptTemplate, vars map[string]string) string`
   - Replace `{{VAR}}` with values from map
   - Highlight missing variables in preview
-- [ ] **2.5** Implement context variable providers:
-  - `{{FILE}}` → Currently selected file path
-  - `{{FILENAME}}` → File name only
-  - `{{PROJECT}}` → Current directory name
-  - `{{PATH}}` → Current full path
+- [ ] **2.8** Implement context variable providers:
+  - `{{file}}` → Currently selected file path
+  - `{{filename}}` → File name only
+  - `{{project}}` → Current directory name
+  - `{{path}}` → Current full path
   - `{{DATE}}` → Current date (YYYY-MM-DD)
   - `{{TIME}}` → Current time (HH:MM)
-- [ ] **2.6** Add `promptTemplate` to preview model
-- [ ] **2.7** Modify `loadPreview()` to detect and parse prompt files
-- [ ] **2.8** Update preview rendering to show rendered template
-- [ ] **2.9** Test: Create `test.yaml` with `{{FILE}}`, verify substitution
+- [ ] **2.9** Add `promptTemplate` to preview model
+- [ ] **2.10** Modify `loadPreview()` to detect and parse prompt files
+- [ ] **2.11** Update preview rendering to show rendered template with variable substitution
+- [ ] **2.12** Test: Create test prompts in all locations, verify collection and rendering
 
-**Estimated Time:** 2-3 hours
+**Estimated Time:** 3-4 hours
 **Files Created:** `prompt_parser.go`
-**Files Modified:** `types.go`, `file_operations.go`, `render_preview.go`
+**Files Modified:** `types.go`, `file_operations.go`, `render_preview.go`, `helpers.go`
 
 ---
 
@@ -483,8 +515,46 @@ See discussion above for why these aren't in core MVP.
 
 ---
 
-**Last Updated:** 2025-10-17 (Simplified to focused copy/paste MVP)
-**Status:** Planning Phase
+---
+
+## Implementation Decisions
+
+### Markdown File Filtering
+**Decision:** `.md` files are only considered prompts if located in:
+- `.claude/` or any subfolder (e.g., `.claude/commands/`, `.claude/agents/`)
+- `~/.prompts/` or any subfolder
+
+**Rationale:** Prevents `README.md`, `CHANGELOG.md`, and other documentation files from appearing in prompts mode while still supporting `.claude/commands/*.md` and `.claude/agents/*.md` for Claude Code integration.
+
+### Important Development Folders
+**Decision:** Always show these folders even when "show hidden files" is OFF:
+- `.claude/` 🤖 - Claude Code configuration, commands, agents
+- `.git/` 📦 - Git repository
+- `.vscode/` 💻 - VS Code settings
+- `.github/` 🐙 - GitHub Actions workflows
+- `.config/` ⚙️ - Application configuration
+- `.docker/` 🐳 - Docker configs
+
+**Rationale:** These are critical development folders that users need regular access to. Hiding them creates friction. This matches behavior of VS Code and other modern IDEs.
+
+### Multi-Location Prompt Display
+**Decision:** Tree view with section headers (Option C from design phase)
+
+**Rationale:** Best balance of discoverability and organization. User can see all available prompts at once, clearly organized by source, without needing to switch views.
+
+### Prompt File Formats
+**Decision:** Support `.prompty`, `.yaml`, `.yml`, `.md` (conditional), `.txt`
+
+**Rationale:**
+- `.prompty` - Microsoft Prompty format for VS Code compatibility
+- `.yaml`/`.yml` - Flexible structured format
+- `.md` - Natural for documentation-style prompts (when in appropriate folders)
+- `.txt` - Simple plain-text templates
+
+---
+
+**Last Updated:** 2025-10-18
+**Status:** Phase 1 Complete ✅ | Phase 2 In Progress 🚧
 **Branch:** `prompts`
-**Scope:** 4 phases, ~6-8 hours total
-**Next Step:** Ready to start Phase 1!
+**Scope:** 4 phases, ~8-10 hours total (adjusted for multi-location support)
+**Next Step:** Phase 2 - Multi-Location Template Parsing & Rendering

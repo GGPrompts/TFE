@@ -125,6 +125,8 @@ type model struct {
 	// Favorites system
 	favorites         map[string]bool // Path -> favorited
 	showFavoritesOnly bool            // Filter to show only favorites
+	// Prompts system
+	showPromptsOnly bool // Filter to show only prompt files (.yaml, .md, .txt)
 	// Tree view expansion
 	expandedDirs map[string]bool // Path -> expanded state
 	treeItems    []treeItem       // Cached tree items for tree view

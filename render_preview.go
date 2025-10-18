@@ -421,6 +421,17 @@ func (m model) renderDualPane() string {
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
 	s.WriteString(searchButtonStyle.Render("[🔍]"))
+	s.WriteString(" ")
+
+	// Prompts filter toggle button
+	promptIcon := "📝"
+	if m.showPromptsOnly {
+		promptIcon = "✨📝" // Different icon when filter is active
+	}
+	promptButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(promptButtonStyle.Render("[" + promptIcon + "]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
@@ -539,6 +550,11 @@ func (m model) renderDualPane() string {
 		favoritesIndicator = " • ⭐ favorites only"
 	}
 
+	promptsIndicator := ""
+	if m.showPromptsOnly {
+		promptsIndicator = " • 📝 prompts only"
+	}
+
 	// Show focused pane info in status bar
 	focusInfo := ""
 	if m.focusedPane == leftPane {
@@ -567,7 +583,7 @@ func (m model) renderDualPane() string {
 
 	// Split status into two lines to prevent truncation
 	// Line 1: Counts, indicators, view mode, focus, help
-	statusLine1 := fmt.Sprintf("%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, m.displayMode.String(), focusInfo, helpHint)
+	statusLine1 := fmt.Sprintf("%s%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, m.displayMode.String(), focusInfo, helpHint)
 	s.WriteString(statusStyle.Render(statusLine1))
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")

@@ -823,6 +823,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// F6: Toggle favorites filter (replaces b/B)
 		m.showFavoritesOnly = !m.showFavoritesOnly
 
+	case "f11":
+		// F11: Toggle prompts filter (show only .yaml, .md, .txt files)
+		m.showPromptsOnly = !m.showPromptsOnly
+
 	case "f1":
 		// F1: Show hotkeys reference (replaces ?)
 		hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")

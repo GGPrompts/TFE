@@ -112,6 +112,12 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.fuzzySearchActive = true
 					return m, m.launchFuzzySearch()
 				}
+				// Prompts filter button [📝] or [✨📝] (X=25-29 or beyond for active state)
+				if msg.X >= 25 && msg.X <= 34 {
+					// Toggle prompts filter
+					m.showPromptsOnly = !m.showPromptsOnly
+					return m, nil
+				}
 			}
 
 			// Handle context menu clicks if menu is open

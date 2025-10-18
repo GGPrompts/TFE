@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -72,4 +73,35 @@ func getDisplayPath(path string) string {
 // Grid and Detail views need full width for their column layouts
 func (m model) isDualPaneCompatible() bool {
 	return m.displayMode == modeList || m.displayMode == modeTree
+}
+
+// isPromptFile checks if a file is a prompt file (.prompty, .yaml, .md, .txt)
+// .md files are only considered prompts if they're in .claude/ or ~/.prompts/ directories
+func isPromptFile(item fileItem) bool {
+	if item.isDir {
+		return false
+	}
+
+	ext := strings.ToLower(filepath.Ext(item.name))
+
+	// .prompty, .yaml, .yml, .txt are always prompt files
+	if ext == ".prompty" || ext == ".yaml" || ext == ".yml" || ext == ".txt" {
+		return true
+	}
+
+	// .md files are only prompts if in special directories
+	if ext == ".md" {
+		// Check if in .claude/ or any subfolder
+		if strings.Contains(item.path, "/.claude/") || strings.Contains(item.path, "/.claude") {
+			return true
+		}
+		// Check if in ~/.prompts/ or any subfolder
+		homeDir, _ := os.UserHomeDir()
+		promptsDir := filepath.Join(homeDir, ".prompts")
+		if strings.HasPrefix(item.path, promptsDir) {
+			return true
+		}
+	}
+
+	return false
 }

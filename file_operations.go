@@ -64,6 +64,12 @@ func getFileIcon(item fileItem) string {
 			return "🤖" // Robot for Claude config
 		case ".git":
 			return "📦" // Package for git
+		case ".vscode":
+			return "💻" // Laptop for VS Code
+		case ".github":
+			return "🐙" // Octopus for GitHub
+		case ".docker":
+			return "🐳" // Whale for Docker
 		case "node_modules":
 			return "📚" // Books for dependencies
 		case "docs", "documentation":
@@ -593,7 +599,27 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 	for _, entry := range entries {
 		// Skip hidden files unless showHidden is true
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
-			continue
+			// Exception: Always show important development folders
+			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker"}
+			isImportantFolder := false
+			for _, folder := range importantFolders {
+				if entry.Name() == folder {
+					isImportantFolder = true
+					break
+				}
+			}
+
+			// Exception: If we're inside these folders, show all files
+			inImportantFolder := strings.Contains(dirPath, "/.claude") ||
+				strings.Contains(dirPath, "/.git") ||
+				strings.Contains(dirPath, "/.vscode") ||
+				strings.Contains(dirPath, "/.github") ||
+				strings.Contains(dirPath, "/.config") ||
+				strings.Contains(dirPath, "/.docker")
+
+			if !isImportantFolder && !inImportantFolder {
+				continue
+			}
 		}
 
 		info, err := entry.Info()
@@ -655,7 +681,27 @@ func (m *model) loadFiles() {
 	for _, entry := range entries {
 		// Skip hidden files starting with . (unless showHidden is true)
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
-			continue
+			// Exception: Always show important development folders
+			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker"}
+			isImportantFolder := false
+			for _, folder := range importantFolders {
+				if entry.Name() == folder {
+					isImportantFolder = true
+					break
+				}
+			}
+
+			// Exception: If we're inside these folders, show all files
+			inImportantFolder := strings.Contains(m.currentPath, "/.claude") ||
+				strings.Contains(m.currentPath, "/.git") ||
+				strings.Contains(m.currentPath, "/.vscode") ||
+				strings.Contains(m.currentPath, "/.github") ||
+				strings.Contains(m.currentPath, "/.config") ||
+				strings.Contains(m.currentPath, "/.docker")
+
+			if !isImportantFolder && !inImportantFolder {
+				continue
+			}
 		}
 
 		info, err := entry.Info()
