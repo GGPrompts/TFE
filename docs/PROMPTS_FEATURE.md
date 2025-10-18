@@ -2,11 +2,12 @@
 
 ## Vision
 
-Transform TFE into a command center that combines file browsing with a prompt library system and tmux session integration. This turns TFE into a multi-monitor workflow hub where you can:
+Transform TFE into a command center that combines file browsing with a prompt library system. This turns TFE into a workflow hub where you can:
 - Browse files and prompts in the same interface
-- Preview and send prompts to running tmux sessions (like Claude Code)
+- Preview prompts with template variables that auto-fill from context
+- Copy rendered prompts to clipboard for pasting anywhere
 - Organize prompts as files in `~/.prompts/` with version control
-- Use template variables that auto-fill from context
+- **(Optional)** Send prompts directly to tmux sessions (like Claude Code)
 
 ## Architecture Philosophy
 
@@ -17,31 +18,74 @@ Transform TFE into a command center that combines file browsing with a prompt li
 - Dual-pane preview already exists ✅
 - Tree view for organization already exists ✅
 
-**Minimal additions:**
+**Minimal additions (Core MVP):**
 - Prompts filter (like favorites filter)
-- Tmux integration module
-- Enhanced dual-pane mode for prompts
 - Template variable substitution
+- Copy to clipboard action
+- Enhanced dual-pane preview for prompts
 
-## User Workflow Example
+**Optional enhancement:**
+- Tmux integration module for direct sending
+
+## User Workflow Example (Core MVP)
 
 ```
 1. Working in TFE browsing project files
 2. Press F11 (or click 📝 button) → Activates "Prompt Mode"
 3. Left pane: Shows only prompt files from ~/.prompts/
-4. Right pane (top): Preview of selected prompt with variables filled
-5. Right pane (middle): List of active tmux sessions/panes
-6. Right pane (bottom): Send button and history
-7. Press Enter → Sends prompt to selected tmux pane (e.g., Claude Code)
-8. Press Esc → Exit prompt mode, return to normal file browsing
+4. Right pane: Preview of selected prompt with variables auto-filled
+   - {{FILE}} → currently selected file
+   - {{PROJECT}} → current directory name
+   - {{DATE}}, {{TIME}}, etc.
+5. Press Enter (or F5) → Copies rendered prompt to clipboard
+6. Status message: "✓ Prompt copied to clipboard"
+7. Paste anywhere (Claude Code, terminal, editor, etc.)
+8. Press Esc or F11 → Exit prompt mode, return to normal file browsing
 ```
 
-## UI Layout (Prompt Mode + Dual-Pane)
+## User Workflow Example (With Tmux Enhancement)
+
+```
+1-4. Same as above (browse prompts, preview with variables)
+5. Right pane shows tmux session selector (optional bottom panel)
+6. Select target tmux pane (e.g., "claude-code")
+7. Press Ctrl+Enter → Sends prompt directly to tmux pane
+8. OR press Enter → Copies to clipboard (default)
+```
+
+## UI Layout (Core MVP - Prompt Mode + Dual-Pane)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ TFE - Terminal File Explorer [🏠] [✨] [>_] [📦] [🔍] [📝]       │
-│ $ ~/.prompts/code-review                                        │
+│ $ ~/.prompts/code-review                         [Prompt Mode]  │
+├──────────────────────────┬──────────────────────────────────────┤
+│ PROMPTS (Left Pane)      │ PREVIEW (Right Pane)                 │
+│                          │                                      │
+│ 📁 code-review/          │  Code Review Request                 │
+│   ▶ 📄 general.yaml      │  ──────────────────────────          │
+│   📄 security.yaml       │  Please review the following code:   │
+│   📄 performance.yaml    │                                      │
+│ 📁 debugging/            │  File: main.go                       │
+│   📄 trace-error.yaml    │  Project: TFE                        │
+│   📄 add-logging.yaml    │                                      │
+│ 📁 explain/              │  Review for:                         │
+│   📄 architecture.yaml   │  - Code quality and readability      │
+│                          │  - Potential bugs                    │
+│ F11: Exit Prompt Mode    │  - Performance implications          │
+│ Enter/F5: Copy to Clip   │  - Security vulnerabilities          │
+│ Ctrl+F: Search Prompts   │                                      │
+│ Tab: Toggle Dual-Pane    │  [Enter] Copy to Clipboard           │
+│                          │  [Esc] Cancel                        │
+└──────────────────────────┴──────────────────────────────────────┘
+```
+
+## UI Layout (With Tmux Enhancement - Optional)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ TFE - Terminal File Explorer [🏠] [✨] [>_] [📦] [🔍] [📝]       │
+│ $ ~/.prompts/code-review                         [Prompt Mode]  │
 ├──────────────────────────┬──────────────────────────────────────┤
 │ PROMPTS (Left Pane)      │ PREVIEW (Top Right)                  │
 │                          │ ┌────────────────────────────────┐   │
@@ -51,24 +95,24 @@ Transform TFE into a command center that combines file browsing with a prompt li
 │   📄 performance.yaml    │ │ - Code quality                 │   │
 │ 📁 debugging/            │ │ - Performance                  │   │
 │   📄 trace-error.yaml    │ │ - Security concerns            │   │
-│   📄 add-logging.yaml    │ │                                │   │
-│ 📁 explain/              │ │ Focus: {{FOCUS_AREA}}          │   │
-│   📄 architecture.yaml   │ └────────────────────────────────┘   │
+│                          │ └────────────────────────────────┘   │
 │                          ├──────────────────────────────────────┤
 │ F11: Exit Prompt Mode    │ SEND TO (Bottom Right)               │
-│ Tab: Focus Pane          │ ┌────────────────────────────────┐   │
-│ Ctrl+F: Search Prompts   │ │ > dev-server (tmux:0.1) ●      │   │
-│                          │ │   claude-code (tmux:1.0)       │   │
+│ Enter: Copy to Clipboard │ ┌────────────────────────────────┐   │
+│ Ctrl+Enter: Send to Tmux │ │ > claude-code (tmux:1.0) ●     │   │
+│ Ctrl+F: Search Prompts   │ │   dev-server (tmux:0.1)        │   │
 │                          │ │   logs (tmux:1.1)              │   │
 │                          │ │                                │   │
-│                          │ │ [Enter] Send  [Esc] Cancel     │   │
+│                          │ │ [↑/↓] Select  [Ctrl+Enter] Send│   │
 │                          │ └────────────────────────────────┘   │
 └──────────────────────────┴──────────────────────────────────────┘
 ```
 
 ## Implementation Plan
 
-### Phase 1: Prompts Filter & UI
+**Strategy:** Build core copy/paste workflow first (Phases 1-5), add tmux integration as optional enhancement (Phase 6).
+
+### Phase 1: Prompts Filter & UI (Core MVP)
 **Goal:** Add ability to filter/view only prompt files
 
 - [ ] **1.1** Add `showPromptsOnly bool` field to `types.go` model struct
@@ -90,81 +134,11 @@ Transform TFE into a command center that combines file browsing with a prompt li
 
 ---
 
-### Phase 2: Tmux Integration Module
-**Goal:** Detect and interact with tmux sessions
-
-- [ ] **2.1** Create new file `tmux.go` (following TFE modular architecture)
-- [ ] **2.2** Add tmux types to `types.go`:
-  ```go
-  type tmuxPane struct {
-      sessionName string
-      windowIndex int
-      paneIndex   int
-      title       string
-      active      bool
-  }
-  ```
-- [ ] **2.3** Implement `isTmuxAvailable() bool` - check if tmux is installed
-- [ ] **2.4** Implement `listTmuxPanes() []tmuxPane`
-  - Run: `tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index}|#{pane_title}|#{pane_active}"`
-  - Parse output into structs
-- [ ] **2.5** Implement `sendToTmuxPane(pane tmuxPane, text string) error`
-  - Run: `tmux send-keys -t session:window.pane "text" Enter`
-- [ ] **2.6** Add model fields for tmux state:
-  ```go
-  tmuxPanes       []tmuxPane
-  selectedPaneIdx int
-  tmuxAvailable   bool
-  ```
-- [ ] **2.7** Add `refreshTmuxPanes()` method to update pane list
-- [ ] **2.8** Test: Run `listTmuxPanes()`, verify detection of active sessions
-
-**Estimated Time:** 2-3 hours
-**Files Created:** `tmux.go`
-**Files Modified:** `types.go`
-
----
-
-### Phase 3: Enhanced Dual-Pane for Prompts
-**Goal:** Split right pane into preview + tmux selector when in prompt mode
-
-- [ ] **3.1** Create new rendering function `renderPromptDualPane()` in `render_preview.go`
-- [ ] **3.2** Modify `View()` dispatcher in `view.go`:
-  ```go
-  if m.viewMode == viewDualPane {
-      if m.showPromptsOnly {
-          baseView = m.renderPromptDualPane()
-      } else {
-          baseView = m.renderDualPane()
-      }
-  }
-  ```
-- [ ] **3.3** Design three-section right pane layout:
-  - **Top 60%:** Prompt preview (existing `renderPreview()`)
-  - **Middle 25%:** Tmux session selector (new)
-  - **Bottom 15%:** Send button/status (new)
-- [ ] **3.4** Implement `renderTmuxSelector()` helper function
-  - List tmux panes with scroll support
-  - Highlight selected pane
-  - Show active pane with `●` indicator
-- [ ] **3.5** Add focus state: `tmuxSelectorFocused bool`
-- [ ] **3.6** Add keyboard navigation for tmux selector:
-  - Up/Down: Navigate panes
-  - Enter: Select target pane
-  - Tab: Cycle between preview and selector
-- [ ] **3.7** Update `calculateLayout()` to handle three-section split
-- [ ] **3.8** Test: Enter prompt mode + dual-pane, verify three sections render
-
-**Estimated Time:** 3-4 hours
-**Files Modified:** `render_preview.go`, `view.go`, `types.go`, `update_keyboard.go`, `model.go`
-
----
-
-### Phase 4: Template Variables & Rendering
+### Phase 2: Template Variables & Rendering (Core MVP)
 **Goal:** Parse and substitute variables in prompt files
 
-- [ ] **4.1** Create new file `prompt_parser.go` (new module)
-- [ ] **4.2** Add prompt type to `types.go`:
+- [ ] **2.1** Create new file `prompt_parser.go` (new module)
+- [ ] **2.2** Add prompt type to `types.go`:
   ```go
   type promptTemplate struct {
       name        string
@@ -174,24 +148,24 @@ Transform TFE into a command center that combines file browsing with a prompt li
       raw         string
   }
   ```
-- [ ] **4.3** Implement `parsePromptFile(path string) (*promptTemplate, error)`
+- [ ] **2.3** Implement `parsePromptFile(path string) (*promptTemplate, error)`
   - Support YAML front matter (name, description, variables)
   - Support raw markdown/text files
   - Extract `{{VARIABLE}}` placeholders
-- [ ] **4.4** Implement `renderPromptTemplate(tmpl *promptTemplate, vars map[string]string) string`
+- [ ] **2.4** Implement `renderPromptTemplate(tmpl *promptTemplate, vars map[string]string) string`
   - Replace `{{VAR}}` with values from map
   - Highlight missing variables in preview
-- [ ] **4.5** Implement context variable providers:
+- [ ] **2.5** Implement context variable providers:
   - `{{FILE}}` → Currently selected file path
   - `{{FILENAME}}` → File name only
   - `{{PROJECT}}` → Current directory name
   - `{{PATH}}` → Current full path
   - `{{DATE}}` → Current date (YYYY-MM-DD)
   - `{{TIME}}` → Current time (HH:MM)
-- [ ] **4.6** Add `promptTemplate` to preview model
-- [ ] **4.7** Modify `loadPreview()` to detect and parse prompt files
-- [ ] **4.8** Update preview rendering to show rendered template
-- [ ] **4.9** Test: Create `test.yaml` with `{{FILE}}`, verify substitution
+- [ ] **2.6** Add `promptTemplate` to preview model
+- [ ] **2.7** Modify `loadPreview()` to detect and parse prompt files
+- [ ] **2.8** Update preview rendering to show rendered template
+- [ ] **2.9** Test: Create `test.yaml` with `{{FILE}}`, verify substitution
 
 **Estimated Time:** 2-3 hours
 **Files Created:** `prompt_parser.go`
@@ -199,61 +173,128 @@ Transform TFE into a command center that combines file browsing with a prompt li
 
 ---
 
-### Phase 5: Send Action & Integration
-**Goal:** Wire up "Send to Tmux" functionality
+### Phase 3: Copy to Clipboard Action (Core MVP)
+**Goal:** Enable copying rendered prompts to clipboard
 
-- [ ] **5.1** Add `sendPromptToTmux()` method in `update_keyboard.go`
-- [ ] **5.2** Handle Enter key in prompt mode:
+- [ ] **3.1** Add `copyPromptToClipboard()` method in `update_keyboard.go`
+- [ ] **3.2** Handle Enter key in prompt mode:
   ```go
-  if m.showPromptsOnly && m.viewMode == viewDualPane {
-      // Send rendered prompt to selected tmux pane
-      m.sendPromptToTmux()
+  if m.showPromptsOnly {
+      // Copy rendered prompt to clipboard
+      m.copyPromptToClipboard()
   }
   ```
-- [ ] **5.3** Implement send workflow:
+- [ ] **3.3** Implement copy workflow:
   1. Get currently selected prompt file
   2. Parse and render template with variables
-  3. Send to selected tmux pane
-  4. Show success/error status message
-- [ ] **5.4** Add send confirmation dialog (optional)
-- [ ] **5.5** Add send history tracking:
-  - Store last 10 sent prompts
-  - Add `sendHistory []string` to model
+  3. Copy to clipboard using existing `copyToClipboard()` function
+  4. Show success status message: "✓ Prompt copied to clipboard"
+- [ ] **3.4** Add F5 as alternative copy shortcut (consistent with path copy)
+- [ ] **3.5** Add copy history tracking:
+  - Store last 10 copied prompts
+  - Add `promptHistory []string` to model
   - Save to `~/.config/tfe/prompt_history.json`
-- [ ] **5.6** Add clipboard fallback if tmux not available
-  - Copy to clipboard with status message
-- [ ] **5.7** Test: Send prompt to tmux pane, verify it appears
-- [ ] **5.8** Test: Send with no tmux, verify clipboard fallback
+- [ ] **3.6** Test: Press Enter on prompt, verify clipboard contains rendered text
+- [ ] **3.7** Test: Paste in external app, verify variables were substituted
 
-**Estimated Time:** 2-3 hours
+**Estimated Time:** 1-2 hours
 **Files Modified:** `update_keyboard.go`, `types.go`, `file_operations.go`
 
 ---
 
-### Phase 6: Polish & Documentation
-**Goal:** Refinement, error handling, and user documentation
+### Phase 4: Enhanced Dual-Pane for Prompts (Core MVP)
+**Goal:** Improve prompt preview display in dual-pane mode
 
-- [ ] **6.1** Add error handling for tmux failures
-- [ ] **6.2** Add loading spinner when refreshing tmux panes
-- [ ] **6.3** Add help text to prompt mode (F1 in prompt mode)
-- [ ] **6.4** Update `HOTKEYS.md` with prompt mode shortcuts
-- [ ] **6.5** Create example prompt library in `docs/examples/prompts/`
+- [ ] **4.1** Add special handling for prompt files in dual-pane preview
+- [ ] **4.2** Show prompt metadata in preview header:
+  - Prompt name (from YAML front matter)
+  - Description
+  - Required variables list
+- [ ] **4.3** Highlight variable substitutions in preview with styling
+  - Show `{{VAR}}` in one color if missing value
+  - Show substituted text in another color
+- [ ] **4.4** Add "Copy" button hint in preview footer
+- [ ] **4.5** Auto-enter dual-pane when entering prompt mode (optional UX enhancement)
+- [ ] **4.6** Test: Open prompt in dual-pane, verify enhanced preview
+- [ ] **4.7** Test: Variables highlighted correctly
+
+**Estimated Time:** 1-2 hours
+**Files Modified:** `render_preview.go`, `update_keyboard.go`
+
+---
+
+### Phase 5: Polish & Documentation (Core MVP Complete)
+**Goal:** Refinement, error handling, and user documentation for core feature
+
+- [ ] **5.1** Add error handling for clipboard failures
+- [ ] **5.2** Add help text to prompt mode (F1 in prompt mode)
+- [ ] **5.3** Update `HOTKEYS.md` with prompt mode shortcuts
+- [ ] **5.4** Create example prompt library in `docs/examples/prompts/`
   - `code-review/general.yaml`
   - `debugging/trace-error.yaml`
   - `explain/architecture.yaml`
-- [ ] **6.6** Add README for prompt library: `docs/PROMPT_LIBRARY.md`
+  - `refactor/extract-function.md`
+- [ ] **5.5** Add README for prompt library: `docs/PROMPT_LIBRARY.md`
   - How to create prompts
   - Available variables
   - YAML format specification
   - Examples
-- [ ] **6.7** Add demo GIF/screenshot to README
-- [ ] **6.8** Test all features end-to-end
-- [ ] **6.9** Update CHANGELOG.md
-- [ ] **6.10** Update main README.md with prompt feature
+- [ ] **5.6** Add demo GIF/screenshot to README
+- [ ] **5.7** Test all core features end-to-end
+  - Toggle prompt mode
+  - Browse prompts with tree view
+  - Preview with variable substitution
+  - Copy to clipboard
+  - Paste in external app
+- [ ] **5.8** Update CHANGELOG.md with core feature
+- [ ] **5.9** Update main README.md with prompt feature
 
 **Estimated Time:** 2-3 hours
 **Files Modified:** `HOTKEYS.md`, `README.md`, `CHANGELOG.md`
 **Files Created:** `docs/PROMPT_LIBRARY.md`, `docs/examples/prompts/*`
+
+**🎉 Core MVP Complete! Copy/paste workflow fully functional.**
+
+---
+
+### Phase 6: Tmux Integration (OPTIONAL Enhancement)
+**Goal:** Add direct sending to tmux sessions for advanced users
+
+- [ ] **6.1** Create new file `tmux.go` (following TFE modular architecture)
+- [ ] **6.2** Add tmux types to `types.go`:
+  ```go
+  type tmuxPane struct {
+      sessionName string
+      windowIndex int
+      paneIndex   int
+      title       string
+      active      bool
+  }
+  ```
+- [ ] **6.3** Implement `isTmuxAvailable() bool` - check if tmux is installed
+- [ ] **6.4** Implement `listTmuxPanes() []tmuxPane`
+  - Run: `tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index}|#{pane_title}|#{pane_active}"`
+  - Parse output into structs
+- [ ] **6.5** Implement `sendToTmuxPane(pane tmuxPane, text string) error`
+  - Run: `tmux send-keys -t session:window.pane "text" Enter`
+- [ ] **6.6** Add model fields for tmux state
+- [ ] **6.7** Create `renderPromptDualPaneWithTmux()` - three-section layout
+  - Top 60%: Prompt preview
+  - Middle 25%: Tmux session selector
+  - Bottom 15%: Send controls
+- [ ] **6.8** Add keyboard shortcuts:
+  - `Ctrl+Enter`: Send to selected tmux pane
+  - `Enter`: Copy to clipboard (default, unchanged)
+  - Up/Down in tmux selector: Navigate panes
+- [ ] **6.9** Add tmux pane selection UI with highlight
+- [ ] **6.10** Test: Send prompt to tmux, verify it appears
+- [ ] **6.11** Update documentation for tmux feature
+
+**Estimated Time:** 3-4 hours
+**Files Created:** `tmux.go`
+**Files Modified:** `types.go`, `render_preview.go`, `update_keyboard.go`, `view.go`
+
+**Note:** This phase is completely optional. Core feature works perfectly without tmux.
 
 ---
 
@@ -322,26 +363,34 @@ Focus area: {{FOCUS_AREA}}
     └── integration-test.yaml
 ```
 
-### Keyboard Shortcuts (Prompt Mode)
+### Keyboard Shortcuts (Core MVP)
 
 | Key | Action |
 |-----|--------|
 | `F11` | Toggle prompt mode on/off |
-| `Tab` | Cycle focus: file list → preview → tmux selector |
-| `Enter` | Send prompt to selected tmux pane |
-| `Esc` | Exit prompt mode / cancel send |
+| `Tab` | Toggle dual-pane view |
+| `Enter` or `F5` | Copy rendered prompt to clipboard |
+| `Esc` | Exit prompt mode |
 | `Ctrl+F` | Fuzzy search prompts |
-| `↑/↓` | Navigate tmux pane list (when focused) |
+| `↑/↓` | Navigate prompt list |
 | `1-4` | Switch display modes (works in prompt mode) |
 | `F1` | Help (prompt mode specific help) |
 
-### Mouse Actions (Prompt Mode)
+### Keyboard Shortcuts (With Tmux Enhancement)
+
+| Key | Action |
+|-----|--------|
+| `Enter` or `F5` | Copy to clipboard (default) |
+| `Ctrl+Enter` | Send to selected tmux pane |
+| `↑/↓` | Navigate tmux pane list (when tmux selector focused) |
+| `Tab` | Cycle focus: file list → preview → tmux selector |
+
+### Mouse Actions (Core MVP)
 
 | Click | Action |
 |-------|--------|
 | Toolbar `[📝]` | Toggle prompt mode |
 | Prompt file | Select and preview |
-| Tmux pane | Select target pane |
 | Preview area | Focus preview pane |
 
 ---
@@ -434,18 +483,32 @@ Focus area: {{FOCUS_AREA}}
 
 ## Success Metrics
 
-✅ **Feature is successful if:**
-1. Can toggle prompt mode in < 2 keystrokes
-2. Can send prompt to Claude Code in < 5 keystrokes
+✅ **Core MVP is successful if:**
+1. Can toggle prompt mode in < 2 keystrokes (F11 or toolbar click)
+2. Can copy rendered prompt to clipboard in < 3 keystrokes (browse, Enter)
 3. Template variables auto-fill correctly 90%+ of the time
-4. Works smoothly across 2-3 monitor setups
-5. Adds < 500 lines of code total (staying modular)
-6. Users organize 20+ prompts easily
+4. Clipboard paste works in any application
+5. Core feature adds < 300 lines of code (staying modular)
+6. Users organize 20+ prompts easily with tree view
 7. Integrates seamlessly with existing TFE workflow
+
+✅ **Tmux enhancement is successful if:**
+1. Detects all running tmux sessions accurately
+2. Sends prompts to correct pane 100% of the time
+3. Adds < 200 additional lines of code
+4. Works smoothly across 2-3 monitor setups
+5. Gracefully falls back to clipboard if tmux unavailable
 
 ---
 
 ## Notes & Decisions
+
+### Why prioritize copy/paste over tmux?
+- **Universal**: Works everywhere (any terminal, any app, any OS)
+- **Simple**: No dependencies, no tmux requirement
+- **Fast to implement**: Core feature complete in ~8-10 hours
+- **User control**: Paste where and when needed
+- **Tmux optional**: Power users can enable later if desired
 
 ### Why YAML over JSON?
 - More human-readable
@@ -453,11 +516,11 @@ Focus area: {{FOCUS_AREA}}
 - Common in config files
 - Easy to edit manually
 
-### Why Tmux over other terminals?
-- Universal on Linux/Mac
-- Well-documented API (send-keys)
-- Already common in dev workflows
-- Session persistence across connections
+### Why Tmux as enhancement (not core)?
+- Not all users run tmux
+- Adds complexity (session detection, pane selection)
+- Copy/paste covers 90% of use cases
+- Can be added later without breaking core feature
 
 ### Why filter approach vs new mode?
 - Reuses existing UI completely
@@ -474,16 +537,24 @@ Focus area: {{FOCUS_AREA}}
 
 ---
 
-## Questions for Review
+## Questions for Review (Core MVP)
 
 - [ ] Should prompt mode auto-enter dual-pane? (Or keep as separate toggle?)
 - [ ] Should we support custom variable prompts? (e.g., popup to fill `{{CUSTOM_INPUT}}`)
-- [ ] Should send history be per-prompt or global?
+- [ ] Should copy history be per-prompt or global?
 - [ ] Should we support JSON prompts in addition to YAML/MD?
-- [ ] Should there be a default prompts directory, or require config?
+- [ ] Should there be a default prompts directory (`~/.prompts/`), or require config?
+- [ ] Should F5 or Enter be the primary copy shortcut? (Or both?)
+
+## Questions for Review (Tmux Enhancement)
+
+- [ ] Should tmux selector be always visible or toggle-able?
+- [ ] Should there be a config to set default tmux pane per prompt?
+- [ ] Should Ctrl+Enter be the send shortcut? (Or different combo?)
 
 ---
 
-**Last Updated:** 2025-10-17
+**Last Updated:** 2025-10-17 (Reorganized to prioritize copy/paste workflow)
 **Status:** Planning Phase
 **Branch:** `prompts`
+**Implementation Order:** Phases 1-5 (Core MVP), Phase 6 (Optional Tmux)
