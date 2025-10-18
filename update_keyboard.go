@@ -903,6 +903,18 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// F11: Toggle prompts filter (show only .yaml, .md, .txt files)
 		m.showPromptsOnly = !m.showPromptsOnly
 
+		// Auto-expand ~/.prompts when filter is turned on
+		if m.showPromptsOnly {
+			if homeDir, err := os.UserHomeDir(); err == nil {
+				globalPromptsDir := filepath.Join(homeDir, ".prompts")
+				// Check if ~/.prompts exists
+				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
+					// Expand the ~/.prompts directory
+					m.expandedDirs[globalPromptsDir] = true
+				}
+			}
+		}
+
 	case "f1":
 		// F1: Show hotkeys reference (replaces ?)
 		hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")

@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -110,6 +111,18 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if msg.X >= 20 && msg.X <= 29 {
 					// Toggle prompts filter
 					m.showPromptsOnly = !m.showPromptsOnly
+
+					// Auto-expand ~/.prompts when filter is turned on
+					if m.showPromptsOnly {
+						if homeDir, err := os.UserHomeDir(); err == nil {
+							globalPromptsDir := filepath.Join(homeDir, ".prompts")
+							// Check if ~/.prompts exists
+							if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
+								// Expand the ~/.prompts directory
+								m.expandedDirs[globalPromptsDir] = true
+							}
+						}
+					}
 					return m, nil
 				}
 			}

@@ -202,7 +202,7 @@ func (m model) renderSinglePane() string {
 		// Show search status
 		searchStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("33")). // Blue background
-			Foreground(lipgloss.Color("0")).
+			Foreground(lipgloss.Color("255")). // Bright white for high contrast
 			Bold(true).
 			Padding(0, 1)
 
