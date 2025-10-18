@@ -44,6 +44,11 @@ func isPromptsFolder(name string) bool {
 	return name == ".prompts"
 }
 
+// isGlobalPromptsVirtualFolder checks if this is the virtual "🌐 ~/.prompts/" folder
+func isGlobalPromptsVirtualFolder(name string) bool {
+	return strings.HasPrefix(name, "🌐 ~/.prompts/")
+}
+
 // isDirEmpty checks if a directory is empty (no files or subdirectories)
 func isDirEmpty(path string) bool {
 	entries, err := os.ReadDir(path)
@@ -67,6 +72,10 @@ func getFileIcon(item fileItem) string {
 	if item.isDir {
 		if item.name == ".." {
 			return "⬆️" // Up arrow for parent dir
+		}
+		// Virtual global prompts folder - no icon since name already has 🌐
+		if isGlobalPromptsVirtualFolder(item.name) {
+			return "" // Name already contains 🌐 emoji
 		}
 		// Special folder icons
 		switch item.name {

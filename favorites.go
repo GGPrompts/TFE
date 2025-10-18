@@ -172,6 +172,29 @@ func (m *model) getFilteredFiles() []fileItem {
 	// Apply prompts filtering (show only .yaml, .md, .txt files)
 	if m.showPromptsOnly {
 		filtered := make([]fileItem, 0)
+
+		// Add global prompts section at the top (if not already in ~/.prompts/)
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			globalPromptsDir := filepath.Join(homeDir, ".prompts")
+			// Only show if we're not already in ~/.prompts/ and it exists
+			if m.currentPath != globalPromptsDir && !strings.HasPrefix(m.currentPath, globalPromptsDir+string(filepath.Separator)) {
+				// Check if ~/.prompts/ exists
+				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
+					// Create a virtual folder item for ~/.prompts/
+					globalPromptsItem := fileItem{
+						name:    "🌐 ~/.prompts/ (Global Prompts)",
+						path:    globalPromptsDir,
+						isDir:   true,
+						size:    info.Size(),
+						modTime: info.ModTime(),
+						mode:    info.Mode(),
+					}
+					filtered = append(filtered, globalPromptsItem)
+				}
+			}
+		}
+
 		for _, item := range m.files {
 			if item.isDir {
 				// Always include ".." for navigation

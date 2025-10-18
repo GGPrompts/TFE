@@ -77,8 +77,8 @@ func (m model) renderListView(maxVisible int) string {
 			style = agentsStyle
 		}
 
-		// Override with bright pink if it's the .prompts folder
-		if isPromptsFolder(file.name) {
+		// Override with bright pink if it's the .prompts folder or global prompts virtual folder
+		if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
 			style = promptsFolderStyle
 		}
 
@@ -189,7 +189,7 @@ func (m model) renderGridView(maxVisible int) string {
 			if isAgentsFile(file.name) {
 				style = agentsStyle
 			}
-			if isPromptsFolder(file.name) {
+			if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
 				style = promptsFolderStyle
 			}
 
@@ -369,7 +369,7 @@ func (m model) renderDetailView(maxVisible int) string {
 		if isAgentsFile(file.name) {
 			style = agentsStyle
 		}
-		if isPromptsFolder(file.name) {
+		if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
 			style = promptsFolderStyle
 		}
 
@@ -535,7 +535,7 @@ func (m model) renderTreeView(maxVisible int) string {
 			style = agentsStyle
 		}
 
-		if isPromptsFolder(file.name) {
+		if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
 			style = promptsFolderStyle
 		}
 
