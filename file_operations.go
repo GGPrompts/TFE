@@ -39,6 +39,11 @@ func isAgentsFile(name string) bool {
 	return name == "AGENTS.md"
 }
 
+// isPromptsFolder checks if a folder is the .prompts directory
+func isPromptsFolder(name string) bool {
+	return name == ".prompts"
+}
+
 // isDirEmpty checks if a directory is empty (no files or subdirectories)
 func isDirEmpty(path string) bool {
 	entries, err := os.ReadDir(path)

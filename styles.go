@@ -69,4 +69,12 @@ var (
 			Light: "#8B00FF", // Darker purple for light
 			Dark:  "#BD93F9", // Bright purple for dark
 		})
+
+	// Prompts folder styling (bright magenta/pink)
+	promptsFolderStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#D7005F", // Dark magenta for light
+			Dark:  "#FF79C6", // Bright pink for dark
+		}).
+		Bold(true) // Make it bold to stand out even more
 )

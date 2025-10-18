@@ -77,6 +77,11 @@ func (m model) renderListView(maxVisible int) string {
 			style = agentsStyle
 		}
 
+		// Override with bright pink if it's the .prompts folder
+		if isPromptsFolder(file.name) {
+			style = promptsFolderStyle
+		}
+
 		// Add star indicator for favorites
 		favIndicator := ""
 		if m.isFavorite(file.path) {
@@ -183,6 +188,9 @@ func (m model) renderGridView(maxVisible int) string {
 			}
 			if isAgentsFile(file.name) {
 				style = agentsStyle
+			}
+			if isPromptsFolder(file.name) {
+				style = promptsFolderStyle
 			}
 
 			// Build cell content (no space after favIndicator - it's already 2 chars)
@@ -361,6 +369,9 @@ func (m model) renderDetailView(maxVisible int) string {
 		if isAgentsFile(file.name) {
 			style = agentsStyle
 		}
+		if isPromptsFolder(file.name) {
+			style = promptsFolderStyle
+		}
 
 		if i == m.cursor {
 			line = selectedStyle.Render(line)
@@ -522,6 +533,10 @@ func (m model) renderTreeView(maxVisible int) string {
 
 		if isAgentsFile(file.name) {
 			style = agentsStyle
+		}
+
+		if isPromptsFolder(file.name) {
+			style = promptsFolderStyle
 		}
 
 		// Add star indicator for favorites
