@@ -6,14 +6,13 @@ import (
 
 // Adaptive color definitions - work in both light and dark terminals
 var (
-	// Title bar styling
+	// Title bar styling (left-aligned, no padding)
 	titleStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.AdaptiveColor{
 			Light: "#0087d7", // Dark blue for light backgrounds
 			Dark:  "#5fd7ff", // Bright cyan for dark backgrounds
-		}).
-		PaddingLeft(2)
+		})
 
 	// Path display styling
 	pathStyle = lipgloss.NewStyle().

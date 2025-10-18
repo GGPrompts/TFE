@@ -48,12 +48,26 @@ func (m model) View() string {
 func (m model) renderSinglePane() string {
 	var s strings.Builder
 
-	// Title with mode indicator
-	titleText := "TFE - Terminal File Explorer"
+	// Title with mode indicator and GitHub link
+	titleText := "(T)erminal (F)ile (E)xplorer"
 	if m.commandFocused {
 		titleText += " [Command Mode]"
 	}
-	title := titleStyle.Render(titleText)
+
+	// Create GitHub link (OSC 8 hyperlink format)
+	githubURL := "https://github.com/GGPrompts/TFE"
+	githubLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+
+	// Calculate spacing to right-align GitHub link
+	githubText := githubURL // Display text
+	availableWidth := m.width - len(titleText) - len(githubText) - 2
+	if availableWidth < 1 {
+		availableWidth = 1
+	}
+	spacing := strings.Repeat(" ", availableWidth)
+
+	// Render title on left, GitHub link on right
+	title := titleStyle.Render(titleText) + spacing + titleStyle.Render(githubLink)
 	s.WriteString(title)
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
