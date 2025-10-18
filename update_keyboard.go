@@ -683,6 +683,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.preview.scrollPos < 0 {
 				m.preview.scrollPos = 0
 			}
+			return m, nil
 		}
 
 	case "pagedown", "pgdn":
@@ -699,6 +700,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.preview.scrollPos > maxScroll {
 				m.preview.scrollPos = maxScroll
 			}
+			return m, nil
 		}
 
 	case "left":
