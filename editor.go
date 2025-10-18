@@ -89,20 +89,38 @@ func copyToClipboard(text string) error {
 	return cmd.Wait()
 }
 
-// isImageFile checks if a file is an image based on extension
+// isImageFile checks if a file is an image based on extension (case-insensitive)
 func isImageFile(path string) bool {
 	imageExts := []string{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp", ".ico", ".tiff", ".tif"}
+	// Convert path to lowercase for case-insensitive comparison
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
 	for _, ext := range imageExts {
-		if len(path) >= len(ext) && path[len(path)-len(ext):] == ext {
+		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
 			return true
 		}
 	}
 	return false
 }
 
-// isHTMLFile checks if a file is an HTML file based on extension
+// isHTMLFile checks if a file is an HTML file based on extension (case-insensitive)
 func isHTMLFile(path string) bool {
-	return len(path) >= 5 && (path[len(path)-5:] == ".html" || path[len(path)-4:] == ".htm")
+	// Convert path to lowercase for case-insensitive comparison
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
+	return len(lowerPath) >= 5 && (lowerPath[len(lowerPath)-5:] == ".html" || lowerPath[len(lowerPath)-4:] == ".htm")
 }
 
 // isBrowserFile checks if a file should be opened in a browser
@@ -131,11 +149,22 @@ func getAvailableBrowser() string {
 	return ""
 }
 
+// browserOpenedMsg is returned when a file is opened in browser
+type browserOpenedMsg struct {
+	success bool
+	err     error
+}
+
 // openInBrowser opens a file in the default browser
 func openInBrowser(path string) tea.Cmd {
 	browser := getAvailableBrowser()
 	if browser == "" {
-		return nil
+		return func() tea.Msg {
+			return browserOpenedMsg{
+				success: false,
+				err:     fmt.Errorf("no browser command found (install xdg-open, wslview, or open)"),
+			}
+		}
 	}
 
 	return func() tea.Msg {
@@ -149,9 +178,18 @@ func openInBrowser(path string) tea.Cmd {
 		}
 
 		// Start the browser without blocking (browsers run in background)
-		_ = c.Start()
+		err := c.Start()
+		if err != nil {
+			return browserOpenedMsg{
+				success: false,
+				err:     err,
+			}
+		}
 
-		// Return a clear screen message to refresh the UI
-		return tea.ClearScreen()
+		// Success
+		return browserOpenedMsg{
+			success: true,
+			err:     nil,
+		}
 	}
 }

@@ -107,10 +107,6 @@ func (m model) renderSinglePane() string {
 	}
 	s.WriteString(" ")
 
-	// CellBlocks button
-	s.WriteString(homeButtonStyle.Render("[📦]"))
-	s.WriteString(" ")
-
 	// Fuzzy search button
 	s.WriteString(homeButtonStyle.Render("[🔍]"))
 	s.WriteString(" ")

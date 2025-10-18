@@ -16,3 +16,18 @@ tfe
 
 # Dependency directories
 vendor/
+
+# Test files
+test_*.md
+*_test.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

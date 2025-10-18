@@ -1,6 +1,10 @@
 # TFE - Terminal File Explorer
 
-A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE provides a modern terminal UI with mouse and keyboard navigation, making file browsing efficient and intuitive.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/GGPrompts/TFE)
+
+A powerful and clean terminal-based file explorer built with Go and Bubbletea. TFE combines traditional file management with modern features like dual-pane preview, syntax highlighting, and an integrated AI prompts library.
 
 ## Features
 
@@ -24,6 +28,7 @@ A simple and clean terminal-based file explorer built with Go and Bubbletea. TFE
 - **Scrolling Support**: Handles large directories with auto-scrolling
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
 - **Double-Click Support**: Double-click to navigate folders or preview files
+- **Prompts Library**: F11 mode for AI prompt templates with variable substitution and clipboard copy
 
 ## Installation
 
@@ -86,12 +91,13 @@ The file explorer will start in your current working directory.
 | `F2` | Open context menu for current file |
 | `F3` | View/Preview file in full-screen |
 | `F4` | Edit file in external editor |
-| `F5` | Copy file path to clipboard |
+| `F5` | Copy file path to clipboard (or prompt in F11 mode) |
 | `F6` | Toggle favorites filter |
-| `F7` | Create directory *(coming soon)* |
-| `F8` | Delete file/folder *(coming soon)* |
+| `F7` | Create directory |
+| `F8` | Delete file/folder |
 | `F9` | Cycle through display modes |
 | `F10` | Quit application |
+| `F11` | Toggle Prompts Library mode |
 
 #### Navigation
 | Key | Action |
@@ -131,7 +137,7 @@ The file explorer will start in your current working directory.
 
 ### Mouse Controls
 
-- **Toolbar Buttons**: Click [🏠] home, [⭐] favorites, [>_] command mode, [📦] CellBlocksTUI, [🔍] fuzzy search
+- **Toolbar Buttons**: Click [🏠] home, [⭐] favorites, [>_] command mode, [🔍] fuzzy search
 - **Left Click**: Select item (or switch pane focus in dual-pane mode)
 - **Double Click**: Navigate into folder or preview file
 - **Right Click**: Open context menu for file operations (includes Quick CD for folders)
@@ -154,6 +160,51 @@ Right-click (or press F2) on any file or folder to access:
 - ✏ **Edit** - Open in external editor (micro/nano/vim)
 - 📋 **Copy Path** - Copy full path to clipboard
 - ⭐/**☆ Favorite** - Add/remove from favorites
+
+### Prompts Library (F11)
+
+TFE includes a built-in **Prompts Library** system for managing AI prompt templates across multiple locations. Press **F11** to enter Prompts Mode and access your prompt collection.
+
+**Key Features:**
+- **Multi-location support**: Access prompts from `~/.prompts/` (global), `.claude/commands/`, `.claude/agents/`, and local project folders
+- **Global prompts section**: Quick access to `~/.prompts/` from any directory (shown at top of file list)
+- **Template parsing**: Supports `.prompty` (Microsoft Prompty format), `.yaml`, `.md`, and `.txt` files
+- **Variable substitution**: Auto-fills `{{file}}`, `{{filename}}`, `{{project}}`, `{{path}}`, `{{DATE}}`, `{{TIME}}` from current context
+- **Clipboard copy**: Press **Enter** or **F5** to copy rendered prompt to clipboard
+- **Smart filtering**: Only shows prompt files and folders containing prompts
+- **Preview rendering**: View prompts with metadata (name, description, source, variables)
+
+**Supported Formats:**
+
+1. **Microsoft Prompty** (`.prompty`) - YAML frontmatter between `---` markers:
+```prompty
+---
+name: Code Review
+description: Review code changes
+---
+Please review {{file}} for best practices and potential issues.
+```
+
+2. **YAML** (`.yaml`, `.yml`) - Simple YAML with `template` field (only in `.claude/` or `~/.prompts/`):
+```yaml
+name: Bug Fix
+description: Create a bug fix
+template: |
+  Fix the bug in {{file}}.
+  Project: {{project}}
+```
+
+3. **Markdown/Text** (`.md`, `.txt`) - Plain text with `{{variables}}` (only in `.claude/` or `~/.prompts/`):
+```markdown
+Analyze {{file}} and suggest improvements for the {{project}} project.
+```
+
+**Quick Start:**
+1. Press **F11** to enable Prompts Mode
+2. Navigate to `🌐 ~/.prompts/ (Global Prompts)` or `.claude/` folders
+3. Select a prompt file to preview it with auto-filled variables
+4. Press **Enter** or **F5** to copy the rendered prompt to clipboard
+5. Paste into your AI chat (Claude, ChatGPT, etc.)
 
 ## Interface
 
@@ -258,90 +309,6 @@ The command prompt is always visible at the bottom of the screen. Simply start t
 5. **Status Bar**: File counts, view mode, and selection info
 6. **Command Prompt**: Always-visible shell command input at the bottom
 
-## CellBlocksTUI Integration
-
-TFE includes a built-in launcher for **CellBlocksTUI** - a companion terminal app for managing your command library, prompts, and code snippets. Access your card collection without leaving your terminal workflow!
-
-### Quick Launch
-
-Click the **[📦]** button in the TFE toolbar (top-left, after home/favorites/terminal buttons) to launch CellBlocksTUI instantly.
-
-### Setting Up CellBlocksTUI
-
-1. **Clone the repository:**
-```bash
-cd ~/projects
-git clone https://github.com/GGPrompts/CellBlocksTUI.git
-cd CellBlocksTUI
-```
-
-2. **Build the binary:**
-```bash
-go build -o cellblocks-tui
-```
-
-3. **Install to PATH:**
-```bash
-# Desktop/Linux
-cp cellblocks-tui ~/bin/
-
-# Termux
-cp cellblocks-tui $PREFIX/bin/
-```
-
-4. **Verify installation:**
-```bash
-cellblocks-tui --help
-# Or test the launch button from TFE
-```
-
-### What is CellBlocksTUI?
-
-CellBlocksTUI is a lightweight terminal interface for browsing and copying cards from your CellBlocks library:
-
-- **271 cards** organized in 10 categories (Bash, Prompts, Agents, etc.)
-- **Grid and list views** with category-colored borders
-- **Full-text search** across titles and content
-- **Mouse/touch support** (click to select, double-click to copy)
-- **Clipboard integration** (Termux, Linux, macOS, Windows)
-- **5MB binary** with ~10MB RAM usage
-- **Offline-first** - reads from local JSON file
-
-Perfect for quick command lookups, copying prompts for AI chats, or browsing agent configurations.
-
-### Split-Pane Workflow (Recommended)
-
-For the ultimate terminal productivity setup, run TFE and CellBlocksTUI side-by-side in tmux:
-
-```bash
-# Create a split-pane workspace
-tmux new -s work \; \
-  split-window -v -p 30 \; \
-  send-keys -t 0 'tfe' C-m \; \
-  send-keys -t 1 'cellblocks-tui' C-m \; \
-  select-pane -t 0
-```
-
-**Result:**
-- **Top pane (70%)**: TFE - Browse and manage files
-- **Bottom pane (30%)**: CellBlocksTUI - Quick access to commands and prompts
-
-**Usage:**
-- Browse files in TFE, copy commands from CellBlocksTUI
-- Paste commands directly into TFE's command prompt
-- Switch panes with `Ctrl+b` then arrow keys
-
-### Data Compatibility
-
-Both TFE and CellBlocksTUI can run simultaneously. CellBlocksTUI reads from:
-```
-~/projects/CellBlocks/data/cellblocks-data.json
-```
-
-This is the same data file used by the React CellBlocks app, so all your cards sync automatically.
-
-For more info, see the [CellBlocksTUI README](https://github.com/GGPrompts/CellBlocksTUI).
-
 ## Technical Details
 
 ### Built With
@@ -437,18 +404,20 @@ TFE follows a modular architecture with 13 focused files:
 - ✅ Bracketed paste support (proper paste handling)
 - ✅ Special key filtering (no more literal "end", "home", etc.)
 - ✅ Fuzzy file search with go-fzf (Ctrl+P or click 🔍)
-- ✅ CellBlocksTUI integration (click 📦 to launch)
 - ✅ Clickable toolbar buttons (home, favorites, search, etc.)
 - ✅ Column header sorting in Detail view (click to sort)
 - ✅ Rounded borders and polished UI
 - ✅ Syntax highlighting for code files (Chroma)
+- ✅ Prompts Library with template parsing and variable substitution (F11)
+- ✅ File operations (F7: Create Directory, F8: Delete)
 
 ### Planned Features
-- File operations (copy, move, delete, rename) - F7/F8 placeholders ready
+- File operations (copy, move, rename) - extending F7/F8 functionality
 - Configurable color schemes and themes
 - Custom hidden file patterns
 - Archive file browsing (.zip, .tar.gz)
 - Git status indicators
+- Multi-select and bulk operations
 
 ## License
 

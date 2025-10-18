@@ -67,12 +67,6 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Performance optimized: 200 item limit, 8 visible results
   - Returns to TFE with proper terminal state restoration
   - Files modified: `fuzzy_search.go` (new), `types.go`, `update.go`, `update_keyboard.go`, `update_mouse.go`, `view.go`
-- **CellBlocksTUI Integration**
-  - Clickable 📦 button in toolbar to launch CellBlocksTUI
-  - Auto-detects installation path (PATH, ~/bin, ~/projects/CellBlocksTUI)
-  - Proper terminal state restoration on exit
-  - Mouse input works correctly after returning to TFE
-  - Files modified: `view.go`, `update_mouse.go`
 - **Enhanced UI Borders and Separators**
   - Rounded borders on all panes (single-pane, dual-pane, full-preview)
   - Horizontal separator lines above status bar (connects with pane borders)
@@ -148,7 +142,7 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Clicks now register accurately on the intended item/location
   - Files modified: `update_mouse.go`
 - **Terminal State After External TUI Apps**
-  - Fixed mouse input not working after exiting CellBlocksTUI
+  - Fixed mouse input not working after exiting external TUI applications
   - Issue: Terminal state (including mouse mode) not properly restored
   - Solution: Use `tea.Sequence(tea.ClearScreen, tea.ExecProcess(...))` pattern
   - Ensures proper cleanup and state restoration

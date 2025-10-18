@@ -132,6 +132,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)
+
+	case browserOpenedMsg:
+		// Browser opened (or failed to open)
+		if msg.success {
+			m.setStatusMessage("✓ Opened in browser", false)
+		} else {
+			m.setStatusMessage("Failed to open in browser: "+msg.err.Error(), true)
+		}
+		return m, nil
 	}
 
 	return m, nil
