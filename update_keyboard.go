@@ -21,6 +21,16 @@ import (
 
 // handleKeyEvent processes all keyboard input
 func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Filter out terminal response sequences (color queries, etc.)
+	// These are not real keypresses but terminal responses that leak through
+	// Examples: "1;rgb:0000/00", "11;rgb:0000/0000/0000", "b:0000/00"
+	key := msg.String()
+	if strings.Contains(key, "rgb:") ||
+	   (strings.Contains(key, ":") && strings.Contains(key, "/")) {
+		// Ignore terminal response sequences
+		return m, nil
+	}
+
 	// If fuzzy search is active, don't process any keyboard events
 	// (go-fzf handles its own input)
 	if m.fuzzySearchActive {
