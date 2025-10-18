@@ -67,3 +67,9 @@ func getDisplayPath(path string) string {
 
 	return path
 }
+
+// isDualPaneCompatible checks if the current display mode supports dual-pane view
+// Grid and Detail views need full width for their column layouts
+func (m model) isDualPaneCompatible() bool {
+	return m.displayMode == modeList || m.displayMode == modeTree
+}

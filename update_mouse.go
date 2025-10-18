@@ -231,11 +231,15 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Calculate visible range to account for scrolling
-			// Both single-pane and dual-pane use same calculation: m.height - 7
-			// (title=1 + toolbar=1 + command=1 + separator=1 + panes=maxVisible + separator=1 + status=2)
-			maxVisible := m.height - 7
+			// Must match view.go calculation:
+			// maxVisible = m.height - 9 (header lines)
+			// contentHeight = maxVisible - 2 (box borders)
+			// Therefore: effective content = m.height - 11
+			maxVisible := m.height - 9
+			contentHeight := maxVisible - 2
+			maxVisible = contentHeight // Use contentHeight for consistency with rendering
 			if m.displayMode == modeDetail {
-				maxVisible -= 1 // Account for detail header only (separator removed)
+				maxVisible -= 1 // Account for detail header only
 			}
 
 			// Get filtered files for click detection (respects favorites filter)
@@ -420,10 +424,12 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				headerOffset += 1 // Add 1 for detail view's header only (separator removed)
 			}
 
-			// Both single-pane and dual-pane use same calculation: m.height - 7
-			maxVisible := m.height - 7
+			// Must match view.go calculation (same as left-click handler)
+			maxVisible := m.height - 9
+			contentHeight := maxVisible - 2
+			maxVisible = contentHeight
 			if m.displayMode == modeDetail {
-				maxVisible -= 1 // Account for detail header only (separator removed)
+				maxVisible -= 1 // Account for detail header only
 			}
 
 			// Get filtered files for right-click detection (respects favorites filter)

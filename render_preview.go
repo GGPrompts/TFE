@@ -414,6 +414,13 @@ func (m model) renderDualPane() string {
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
 	s.WriteString(cellblocksButtonStyle.Render("[📦]"))
+	s.WriteString(" ")
+
+	// Fuzzy search button
+	searchButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(searchButtonStyle.Render("[🔍]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")

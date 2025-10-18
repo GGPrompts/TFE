@@ -585,6 +585,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.focusedPane = leftPane
 			}
 		} else if m.viewMode == viewSinglePane {
+			// Check if current display mode supports dual-pane
+			if !m.isDualPaneCompatible() {
+				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 4)", true)
+				return m, nil
+			}
 			// Enter dual-pane mode
 			m.viewMode = viewDualPane
 			m.focusedPane = leftPane
@@ -599,6 +604,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case " ":
 		// Space: toggle dual-pane mode on/off
 		if m.viewMode == viewSinglePane {
+			// Check if current display mode supports dual-pane
+			if !m.isDualPaneCompatible() {
+				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 4)", true)
+				return m, nil
+			}
 			m.viewMode = viewDualPane
 			m.focusedPane = leftPane
 			m.calculateLayout()
@@ -738,6 +748,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f9":
 		// F9: Cycle through display modes (replaces v)
 		m.displayMode = (m.displayMode + 1) % 4
+		// Auto-exit dual-pane if switching to incompatible mode
+		if m.viewMode == viewDualPane && !m.isDualPaneCompatible() {
+			m.viewMode = viewSinglePane
+			m.calculateLayout()
+			m.populatePreviewCache()
+		}
 
 	case "1":
 		// Switch to list view
@@ -746,10 +762,22 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "2":
 		// Switch to grid view
 		m.displayMode = modeGrid
+		// Auto-exit dual-pane (grid view needs full width)
+		if m.viewMode == viewDualPane {
+			m.viewMode = viewSinglePane
+			m.calculateLayout()
+			m.populatePreviewCache()
+		}
 
 	case "3":
 		// Switch to detail view
 		m.displayMode = modeDetail
+		// Auto-exit dual-pane (detail view needs full width)
+		if m.viewMode == viewDualPane {
+			m.viewMode = viewSinglePane
+			m.calculateLayout()
+			m.populatePreviewCache()
+		}
 
 	case "4":
 		// Switch to tree view
