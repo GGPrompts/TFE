@@ -82,6 +82,11 @@ func (m model) renderListView(maxVisible int) string {
 			style = promptsFolderStyle
 		}
 
+		// Override with bright pink if it's a .claude prompts subfolder (commands, agents, skills)
+		if file.isDir && isClaudePromptsSubfolder(file.name) {
+			style = promptsFolderStyle
+		}
+
 		// Add star indicator for favorites
 		favIndicator := ""
 		if m.isFavorite(file.path) {
@@ -190,6 +195,9 @@ func (m model) renderGridView(maxVisible int) string {
 				style = agentsStyle
 			}
 			if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
+				style = promptsFolderStyle
+			}
+			if file.isDir && isClaudePromptsSubfolder(file.name) {
 				style = promptsFolderStyle
 			}
 
@@ -372,6 +380,9 @@ func (m model) renderDetailView(maxVisible int) string {
 		if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
 			style = promptsFolderStyle
 		}
+		if file.isDir && isClaudePromptsSubfolder(file.name) {
+			style = promptsFolderStyle
+		}
 
 		if i == m.cursor {
 			line = selectedStyle.Render(line)
@@ -536,6 +547,10 @@ func (m model) renderTreeView(maxVisible int) string {
 		}
 
 		if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
+			style = promptsFolderStyle
+		}
+
+		if file.isDir && isClaudePromptsSubfolder(file.name) {
 			style = promptsFolderStyle
 		}
 

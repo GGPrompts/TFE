@@ -234,6 +234,11 @@ func determinePromptSource(path string) string {
 		return "agent"
 	}
 
+	// Check if in .claude/skills/
+	if strings.Contains(absPath, "/.claude/skills/") {
+		return "skill"
+	}
+
 	// Default to local
 	return "local"
 }

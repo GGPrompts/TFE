@@ -296,6 +296,9 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	case "agent":
 		sourceIcon = "🤖"
 		sourceLabel = "Project Agent (.claude/agents/)"
+	case "skill":
+		sourceIcon = "🎯"
+		sourceLabel = "Project Skill (.claude/skills/)"
 	case "local":
 		sourceIcon = "📁"
 		sourceLabel = "Local Prompt"

@@ -50,6 +50,11 @@ func isGlobalPromptsVirtualFolder(name string) bool {
 	return strings.HasPrefix(name, "🌐 ~/.prompts/")
 }
 
+// isClaudePromptsSubfolder checks if a folder is a .claude subfolder (commands, agents, skills)
+func isClaudePromptsSubfolder(name string) bool {
+	return name == "commands" || name == "agents" || name == "skills"
+}
+
 // isDirEmpty checks if a directory is empty (no files or subdirectories)
 func isDirEmpty(path string) bool {
 	entries, err := os.ReadDir(path)
@@ -378,11 +383,29 @@ func highlightCode(content, filepath string) (string, bool) {
 	return buf.String(), true
 }
 
-// visualWidth calculates the visual width of a string, accounting for tabs
-// This is important for consistent scrollbar alignment
+// visualWidth calculates the visual width of a string, accounting for tabs and ANSI codes
+// This is important for consistent scrollbar alignment and box borders
 func visualWidth(s string) int {
 	width := 0
+	inAnsi := false
+
 	for _, ch := range s {
+		// Detect start of ANSI escape sequence
+		if ch == '\033' {
+			inAnsi = true
+			continue
+		}
+
+		// Skip characters inside ANSI sequences
+		if inAnsi {
+			// ANSI sequences end with a letter (A-Z, a-z)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+
+		// Count visible characters
 		if ch == '\t' {
 			// Tabs typically expand to next multiple of 8
 			width += 8 - (width % 8)
