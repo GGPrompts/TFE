@@ -91,6 +91,19 @@ type previewModel struct {
 	cachedLineCount       int      // Cached total line count after wrapping
 	cachedWidth           int      // Width the cache was computed for
 	cacheValid            bool     // Whether cache is valid
+	// Prompt template (for prompt files)
+	isPrompt       bool            // Whether the file is a prompt template
+	promptTemplate *promptTemplate // Parsed prompt template
+}
+
+// promptTemplate represents a parsed prompt with metadata and template
+type promptTemplate struct {
+	name        string
+	description string
+	source      string   // "global", "command", "agent", "local"
+	variables   []string // List of {{VAR}} placeholders found
+	template    string   // The template text with {{placeholders}}
+	raw         string   // Original file content
 }
 
 // model represents the main application state

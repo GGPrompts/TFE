@@ -34,6 +34,11 @@ func isClaudeContextFile(name string) bool {
 	return false
 }
 
+// isAgentsFile checks if a file is AGENTS.md (agent configuration/documentation)
+func isAgentsFile(name string) bool {
+	return name == "AGENTS.md"
+}
+
 // isDirEmpty checks if a directory is empty (no files or subdirectories)
 func isDirEmpty(path string) bool {
 	entries, err := os.ReadDir(path)
@@ -70,6 +75,8 @@ func getFileIcon(item fileItem) string {
 			return "🐙" // Octopus for GitHub
 		case ".docker":
 			return "🐳" // Whale for Docker
+		case ".prompts":
+			return "📝" // Memo for prompts library
 		case "node_modules":
 			return "📚" // Books for dependencies
 		case "docs", "documentation":
@@ -600,7 +607,7 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 		// Skip hidden files unless showHidden is true
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 			// Exception: Always show important development folders
-			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker"}
+			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts"}
 			isImportantFolder := false
 			for _, folder := range importantFolders {
 				if entry.Name() == folder {
@@ -615,7 +622,8 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 				strings.Contains(dirPath, "/.vscode") ||
 				strings.Contains(dirPath, "/.github") ||
 				strings.Contains(dirPath, "/.config") ||
-				strings.Contains(dirPath, "/.docker")
+				strings.Contains(dirPath, "/.docker") ||
+				strings.Contains(dirPath, "/.prompts")
 
 			if !isImportantFolder && !inImportantFolder {
 				continue
@@ -682,7 +690,7 @@ func (m *model) loadFiles() {
 		// Skip hidden files starting with . (unless showHidden is true)
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 			// Exception: Always show important development folders
-			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker"}
+			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts"}
 			isImportantFolder := false
 			for _, folder := range importantFolders {
 				if entry.Name() == folder {
@@ -697,7 +705,8 @@ func (m *model) loadFiles() {
 				strings.Contains(m.currentPath, "/.vscode") ||
 				strings.Contains(m.currentPath, "/.github") ||
 				strings.Contains(m.currentPath, "/.config") ||
-				strings.Contains(m.currentPath, "/.docker")
+				strings.Contains(m.currentPath, "/.docker") ||
+				strings.Contains(m.currentPath, "/.prompts")
 
 			if !isImportantFolder && !inImportantFolder {
 				continue
@@ -881,6 +890,8 @@ func (m *model) loadPreview(path string) {
 	m.preview.tooLarge = false
 	m.preview.isMarkdown = false
 	m.preview.isSyntaxHighlighted = false
+	m.preview.isPrompt = false
+	m.preview.promptTemplate = nil
 	// Invalidate cache when loading new file
 	m.preview.cacheValid = false
 	m.preview.cachedWrappedLines = nil
@@ -930,6 +941,37 @@ func (m *model) loadPreview(path string) {
 		}
 		m.preview.loaded = true
 		return
+	}
+
+	// Check if this is a prompt file and parse it
+	fileItem := fileItem{
+		name:  filepath.Base(path),
+		path:  path,
+		isDir: false,
+	}
+	if isPromptFile(fileItem) {
+		tmpl, err := parsePromptFile(path)
+		if err == nil {
+			// Successfully parsed as prompt
+			m.preview.isPrompt = true
+			m.preview.promptTemplate = tmpl
+
+			// Get context variables
+			contextVars := getContextVariables(m)
+
+			// Render the template with variables substituted
+			rendered := renderPromptTemplate(tmpl, contextVars)
+
+			// Split into lines for display
+			lines := strings.Split(rendered, "\n")
+			m.preview.content = lines
+			m.preview.loaded = true
+
+			// Populate cache for better scroll performance
+			m.populatePreviewCache()
+			return
+		}
+		// If parsing failed, fall through to regular preview
 	}
 
 	// Check if markdown and render with Glamour

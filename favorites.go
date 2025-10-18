@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // getFavoritesPath returns the path to the favorites file
@@ -99,6 +100,61 @@ func (m *model) isFavorite(path string) bool {
 	return m.favorites[path]
 }
 
+// directoryContainsPrompts checks if a directory contains any prompt files (recursively, up to 2 levels deep)
+func directoryContainsPrompts(dirPath string) bool {
+	return checkForPromptsRecursive(dirPath, 0, 2)
+}
+
+// checkForPromptsRecursive recursively checks for prompt files up to maxDepth levels
+func checkForPromptsRecursive(dirPath string, currentDepth, maxDepth int) bool {
+	if currentDepth > maxDepth {
+		return false
+	}
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return false
+	}
+
+	for _, entry := range entries {
+		// Skip hidden files/folders (except important ones)
+		if strings.HasPrefix(entry.Name(), ".") {
+			importantFolders := []string{".claude", ".prompts"}
+			isImportant := false
+			for _, folder := range importantFolders {
+				if entry.Name() == folder {
+					isImportant = true
+					break
+				}
+			}
+			if !isImportant {
+				continue
+			}
+		}
+
+		fullPath := filepath.Join(dirPath, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively check subdirectories
+			if checkForPromptsRecursive(fullPath, currentDepth+1, maxDepth) {
+				return true
+			}
+		} else {
+			// Check if this file is a prompt file
+			item := fileItem{
+				name:  entry.Name(),
+				path:  fullPath,
+				isDir: false,
+			}
+			if isPromptFile(item) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // getFilteredFiles returns files filtered by current filter mode
 // Search filtering takes precedence over favorites and prompts filtering
 func (m *model) getFilteredFiles() []fileItem {
@@ -117,9 +173,31 @@ func (m *model) getFilteredFiles() []fileItem {
 	if m.showPromptsOnly {
 		filtered := make([]fileItem, 0)
 		for _, item := range m.files {
-			// Always include directories and ".." for navigation
 			if item.isDir {
-				filtered = append(filtered, item)
+				// Always include ".." for navigation
+				if item.name == ".." {
+					filtered = append(filtered, item)
+					continue
+				}
+
+				// Always include important dev folders
+				importantFolders := []string{".claude", ".prompts", ".config"}
+				isImportant := false
+				for _, folder := range importantFolders {
+					if item.name == folder {
+						isImportant = true
+						break
+					}
+				}
+				if isImportant {
+					filtered = append(filtered, item)
+					continue
+				}
+
+				// Include directory if it contains prompt files
+				if directoryContainsPrompts(item.path) {
+					filtered = append(filtered, item)
+				}
 			} else if isPromptFile(item) {
 				filtered = append(filtered, item)
 			}

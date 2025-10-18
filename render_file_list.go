@@ -72,6 +72,11 @@ func (m model) renderListView(maxVisible int) string {
 			style = claudeContextStyle
 		}
 
+		// Override with purple color if it's an AGENTS.md file
+		if isAgentsFile(file.name) {
+			style = agentsStyle
+		}
+
 		// Add star indicator for favorites
 		favIndicator := ""
 		if m.isFavorite(file.path) {
@@ -175,6 +180,9 @@ func (m model) renderGridView(maxVisible int) string {
 			}
 			if isClaudeContextFile(file.name) {
 				style = claudeContextStyle
+			}
+			if isAgentsFile(file.name) {
+				style = agentsStyle
 			}
 
 			// Build cell content (no space after favIndicator - it's already 2 chars)
@@ -350,6 +358,9 @@ func (m model) renderDetailView(maxVisible int) string {
 		if isClaudeContextFile(file.name) {
 			style = claudeContextStyle
 		}
+		if isAgentsFile(file.name) {
+			style = agentsStyle
+		}
 
 		if i == m.cursor {
 			line = selectedStyle.Render(line)
@@ -386,6 +397,38 @@ func (m model) buildTreeItems(files []fileItem, depth int, parentLasts []bool) [
 		if file.isDir && file.name != ".." && m.expandedDirs[file.path] {
 			// Load subdirectory contents
 			subFiles := m.loadSubdirFiles(file.path)
+
+			// Apply prompts filtering if active
+			if m.showPromptsOnly {
+				filteredSubFiles := make([]fileItem, 0)
+				for _, subFile := range subFiles {
+					if subFile.isDir {
+						// Always include important dev folders
+						importantFolders := []string{".claude", ".prompts", ".config"}
+						isImportant := false
+						for _, folder := range importantFolders {
+							if subFile.name == folder {
+								isImportant = true
+								break
+							}
+						}
+						if isImportant {
+							filteredSubFiles = append(filteredSubFiles, subFile)
+							continue
+						}
+
+						// Include directory if it contains prompt files
+						if directoryContainsPrompts(subFile.path) {
+							filteredSubFiles = append(filteredSubFiles, subFile)
+						}
+					} else if isPromptFile(subFile) {
+						// Only include prompt files
+						filteredSubFiles = append(filteredSubFiles, subFile)
+					}
+				}
+				subFiles = filteredSubFiles
+			}
+
 			if len(subFiles) > 0 {
 				// Update parentLasts for children
 				newParentLasts := append(parentLasts, isLast)
@@ -475,6 +518,10 @@ func (m model) renderTreeView(maxVisible int) string {
 
 		if isClaudeContextFile(file.name) {
 			style = claudeContextStyle
+		}
+
+		if isAgentsFile(file.name) {
+			style = agentsStyle
 		}
 
 		// Add star indicator for favorites

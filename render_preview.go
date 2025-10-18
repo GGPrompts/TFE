@@ -145,6 +145,11 @@ func (m model) renderPreview(maxVisible int) string {
 		return s.String()
 	}
 
+	// If this is a prompt file, show metadata header
+	if m.preview.isPrompt && m.preview.promptTemplate != nil {
+		return m.renderPromptPreview(maxVisible)
+	}
+
 	// Calculate available width for content based on file type and view mode
 	var availableWidth int
 	var boxContentWidth int // Width of the box content area
@@ -253,6 +258,126 @@ func (m model) renderPreview(maxVisible int) string {
 	return strings.TrimRight(s.String(), "\n")
 }
 
+// renderPromptPreview renders a prompt file with metadata header
+func (m model) renderPromptPreview(maxVisible int) string {
+	var s strings.Builder
+	tmpl := m.preview.promptTemplate
+
+	// Build header lines
+	var headerLines []string
+
+	// Prompt name (if available)
+	if tmpl.name != "" {
+		nameStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+		headerLines = append(headerLines, nameStyle.Render("📝 "+tmpl.name))
+		headerLines = append(headerLines, "") // Blank line
+	}
+
+	// Description (if available)
+	if tmpl.description != "" {
+		descStyle := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("245"))
+		headerLines = append(headerLines, descStyle.Render(tmpl.description))
+		headerLines = append(headerLines, "") // Blank line
+	}
+
+	// Source indicator
+	sourceStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	sourceIcon := ""
+	sourceLabel := ""
+	switch tmpl.source {
+	case "global":
+		sourceIcon = "🌐"
+		sourceLabel = "Global Prompt (~/.prompts/)"
+	case "command":
+		sourceIcon = "⚙️"
+		sourceLabel = "Project Command (.claude/commands/)"
+	case "agent":
+		sourceIcon = "🤖"
+		sourceLabel = "Project Agent (.claude/agents/)"
+	case "local":
+		sourceIcon = "📁"
+		sourceLabel = "Local Prompt"
+	}
+	headerLines = append(headerLines, sourceStyle.Render(sourceIcon+" "+sourceLabel))
+
+	// Variables detected (if any)
+	if len(tmpl.variables) > 0 {
+		varsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+		varsLine := fmt.Sprintf("Variables: %s", strings.Join(tmpl.variables, ", "))
+		headerLines = append(headerLines, varsStyle.Render(varsLine))
+	}
+
+	// Separator line
+	separatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	headerLines = append(headerLines, separatorStyle.Render("─────────────────────────────────────"))
+	headerLines = append(headerLines, "") // Blank line before content
+
+	// Calculate how many lines the header takes
+	headerHeight := len(headerLines)
+
+	// Calculate available height for content
+	contentHeight := maxVisible - headerHeight
+	if contentHeight < 5 {
+		contentHeight = 5 // Minimum content height
+	}
+
+	// Calculate available width
+	var availableWidth int
+	var boxContentWidth int
+
+	if m.viewMode == viewFullPreview {
+		boxContentWidth = m.width - 6
+	} else {
+		boxContentWidth = m.rightWidth - 2
+	}
+
+	// Prompts don't show line numbers, so use full width
+	availableWidth = boxContentWidth - 2 // Just padding
+
+	if availableWidth < 20 {
+		availableWidth = 20
+	}
+
+	// Wrap content lines
+	var wrappedLines []string
+	for _, line := range m.preview.content {
+		wrapped := wrapLine(line, availableWidth)
+		wrappedLines = append(wrappedLines, wrapped...)
+	}
+
+	// Calculate visible range for content
+	totalLines := len(wrappedLines)
+	start := m.preview.scrollPos
+
+	if start < 0 {
+		start = 0
+	}
+	if start >= totalLines {
+		start = max(0, totalLines-contentHeight)
+	}
+
+	end := start + contentHeight
+	if end > totalLines {
+		end = totalLines
+	}
+
+	// Render header
+	for _, line := range headerLines {
+		s.WriteString(line)
+		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n")
+	}
+
+	// Render content (no line numbers for prompts)
+	for i := start; i < end; i++ {
+		s.WriteString(wrappedLines[i])
+		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n")
+	}
+
+	return strings.TrimRight(s.String(), "\n")
+}
+
 // renderScrollbar renders a scrollbar indicator for the current line
 // Now renders in place of the separator between line numbers and content
 func (m model) renderScrollbar(lineIndex, visibleLines, totalLines int) string {
@@ -299,7 +424,9 @@ func (m model) renderFullPreview() string {
 	if m.preview.tooLarge || m.preview.isBinary {
 		titleText += " [Cannot Preview]"
 	}
-	if m.preview.isMarkdown {
+	if m.preview.isPrompt {
+		titleText += " [Prompt Template]"
+	} else if m.preview.isMarkdown {
 		titleText += " [Markdown]"
 	}
 	s.WriteString(previewTitleStyle.Render(titleText))

@@ -63,4 +63,11 @@ var (
 			Light: "#D75F00", // Darker orange for light
 			Dark:  "#FF8700", // Bright orange for dark
 		})
+
+	// Agents file styling (purple)
+	agentsStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#8B00FF", // Darker purple for light
+			Dark:  "#BD93F9", // Bright purple for dark
+		})
 )

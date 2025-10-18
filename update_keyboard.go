@@ -61,12 +61,28 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 		case "f5":
-			// Copy file path from preview (F5 replaces y)
+			// Copy rendered prompt (if prompt) or file path (regular file)
 			if m.preview.loaded && m.preview.filePath != "" {
-				if err := copyToClipboard(m.preview.filePath); err != nil {
-					m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
+				// If this is a prompt, copy the rendered template
+				if m.preview.isPrompt && m.preview.promptTemplate != nil {
+					// Get context variables
+					contextVars := getContextVariables(&m)
+					// Render the template with variables substituted
+					rendered := renderPromptTemplate(m.preview.promptTemplate, contextVars)
+
+					// Copy to clipboard
+					if err := copyToClipboard(rendered); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Failed to copy prompt: %s", err), true)
+					} else {
+						m.setStatusMessage("✓ Prompt copied to clipboard", false)
+					}
 				} else {
-					m.setStatusMessage("Path copied to clipboard", false)
+					// Regular file: copy path
+					if err := copyToClipboard(m.preview.filePath); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
+					} else {
+						m.setStatusMessage("Path copied to clipboard", false)
+					}
 				}
 			}
 
@@ -522,6 +538,24 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		if currentFile := m.getCurrentFile(); currentFile != nil {
+			// Special handling for prompts mode: copy rendered prompt to clipboard
+			if m.showPromptsOnly && !currentFile.isDir && isPromptFile(*currentFile) {
+				if m.preview.isPrompt && m.preview.promptTemplate != nil {
+					// Get context variables
+					contextVars := getContextVariables(&m)
+					// Render the template with variables substituted
+					rendered := renderPromptTemplate(m.preview.promptTemplate, contextVars)
+
+					// Copy to clipboard
+					if err := copyToClipboard(rendered); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Failed to copy prompt: %s", err), true)
+					} else {
+						m.setStatusMessage("✓ Prompt copied to clipboard", false)
+					}
+					return m, nil
+				}
+			}
+
 			// If in favorites mode, check if we need to navigate to a different directory
 			if m.showFavoritesOnly && currentFile.name != ".." {
 				// Check if favorite is in a different location than current path
@@ -807,8 +841,27 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "f5":
-		// F5: Copy file path to clipboard (replaces y)
+		// F5: Copy rendered prompt (in prompts mode) or file path (regular mode)
 		if currentFile := m.getCurrentFile(); currentFile != nil {
+			// Special handling for prompts mode: copy rendered prompt
+			if m.showPromptsOnly && !currentFile.isDir && isPromptFile(*currentFile) {
+				if m.preview.isPrompt && m.preview.promptTemplate != nil {
+					// Get context variables
+					contextVars := getContextVariables(&m)
+					// Render the template with variables substituted
+					rendered := renderPromptTemplate(m.preview.promptTemplate, contextVars)
+
+					// Copy to clipboard
+					if err := copyToClipboard(rendered); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Failed to copy prompt: %s", err), true)
+					} else {
+						m.setStatusMessage("✓ Prompt copied to clipboard", false)
+					}
+					return m, nil
+				}
+			}
+
+			// Regular mode: copy file path
 			if err := copyToClipboard(currentFile.path); err != nil {
 				m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
 			} else {
