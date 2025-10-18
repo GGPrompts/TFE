@@ -174,6 +174,9 @@ type treeItem struct {
 // editorFinishedMsg is sent when external editor exits
 type editorFinishedMsg struct{ err error }
 
+// markdownRenderedMsg is sent when markdown rendering completes
+type markdownRenderedMsg struct{}
+
 // fuzzySearchResultMsg is sent when fuzzy search completes
 type fuzzySearchResultMsg struct {
 	selected string // Selected file path

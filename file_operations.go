@@ -13,6 +13,7 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -1110,6 +1111,15 @@ func (m *model) populatePreviewCache() {
 	m.preview.cachedLineCount = len(wrappedLines)
 	m.preview.cachedWidth = availableWidth
 	m.preview.cacheValid = true
+}
+
+// renderMarkdownAsync renders markdown in a background goroutine
+func renderMarkdownAsync(m *model) tea.Cmd {
+	return func() tea.Msg {
+		// Populate cache (includes Glamour rendering)
+		m.populatePreviewCache()
+		return markdownRenderedMsg{}
+	}
 }
 
 // setStatusMessage sets a temporary status message with auto-dismiss

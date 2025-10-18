@@ -10,6 +10,9 @@ import (
 )
 
 func main() {
+	// Ensure terminal cleanup on exit (defer runs even if panic/interrupt)
+	defer cleanupTerminal()
+
 	// Set up signal catching to handle Ctrl+C gracefully
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
@@ -30,4 +33,14 @@ func main() {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)
 	}
+}
+
+// cleanupTerminal resets terminal state to prevent formatting bleed
+func cleanupTerminal() {
+	// Reset all ANSI formatting
+	fmt.Print("\033[0m")
+	// Show cursor (in case it was hidden)
+	fmt.Print("\033[?25h")
+	// Reset scrolling region
+	fmt.Print("\033[r")
 }

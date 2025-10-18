@@ -175,35 +175,37 @@ func (m model) renderPreview(maxVisible int) string {
 	// If markdown, render with Glamour
 	if m.preview.isMarkdown && m.preview.cachedRenderedContent != "" {
 		// Use cached Glamour-rendered content (no line numbers)
-		renderedLines := strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
+		if m.preview.cachedRenderedContent != "" {
+			renderedLines := strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 
-		// Calculate visible range based on scroll position
-		totalLines := len(renderedLines)
-		start := m.preview.scrollPos
+			// Calculate visible range based on scroll position
+			totalLines := len(renderedLines)
+			start := m.preview.scrollPos
 
-		if start < 0 {
-			start = 0
+			if start < 0 {
+				start = 0
+			}
+			if start >= totalLines {
+				start = max(0, totalLines-maxVisible)
+			}
+
+			end := start + maxVisible
+			if end > totalLines {
+				end = totalLines
+			}
+
+			// Render visible lines without line numbers for markdown
+			for i := start; i < end; i++ {
+				s.WriteString(renderedLines[i])
+				s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
+				s.WriteString("\n")
+			}
+
+			return strings.TrimRight(s.String(), "\n")
 		}
-		if start >= totalLines {
-			start = max(0, totalLines-maxVisible)
-		}
-
-		end := start + maxVisible
-		if end > totalLines {
-			end = totalLines
-		}
-
-		// Render visible lines without line numbers for markdown
-		for i := start; i < end; i++ {
-			s.WriteString(renderedLines[i])
-			s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
-			s.WriteString("\n")
-		}
-
-		return strings.TrimRight(s.String(), "\n")
+		// If markdown flag is set but no rendered content, fall through to plain text rendering
+		// This happens when Glamour fails or file is too large
 	}
-	// If markdown flag is set but no rendered content, fall through to plain text rendering
-	// This happens when Glamour fails or file is too large
 
 	// Wrap all lines first (use cache if available and width matches)
 	var wrappedLines []string

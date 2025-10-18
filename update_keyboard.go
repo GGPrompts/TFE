@@ -49,7 +49,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Clear any stray command input that might have captured terminal responses
 			m.commandInput = ""
 			m.commandFocused = false
-			return m, tea.ClearScreen
+			// Return nil to force immediate re-render
+			return m, nil
 
 		case "f4":
 			// Edit file in external editor from preview (F4 replaces e/E)
@@ -595,9 +596,13 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.viewMode = viewFullPreview
 					m.searchMode = false // Disable search mode in preview
 					m.calculateLayout() // Update widths for full-screen
-					m.populatePreviewCache() // Repopulate cache with correct width
-					// Clear screen for clean rendering
-					return m, tea.ClearScreen
+					// For markdown, render asynchronously to avoid blocking
+					if m.preview.isMarkdown {
+						return m, renderMarkdownAsync(&m)
+					}
+					// For other files, populate cache now
+					m.populatePreviewCache()
+					return m, nil
 				}
 			} else if currentFile.isDir {
 				// In tree view: toggle expansion instead of navigating
@@ -614,9 +619,13 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
 				m.calculateLayout() // Update widths for full-screen
-				m.populatePreviewCache() // Repopulate cache with correct width
-				// Clear screen for clean rendering
-				return m, tea.ClearScreen
+				// For markdown, render asynchronously to avoid blocking
+				if m.preview.isMarkdown {
+					return m, renderMarkdownAsync(&m)
+				}
+				// For other files, populate cache now
+				m.populatePreviewCache()
+				return m, nil
 			}
 		}
 

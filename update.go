@@ -133,6 +133,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tea.EnableMouseCellMotion,
 		)
 
+	case markdownRenderedMsg:
+		// Markdown rendering completed in background
+		// Just return to trigger a re-render with the cached content
+		return m, nil
+
 	case browserOpenedMsg:
 		// Browser opened (or failed to open)
 		if msg.success {
