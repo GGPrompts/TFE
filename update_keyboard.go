@@ -29,6 +29,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Handle preview mode keys first
 	if m.viewMode == viewFullPreview {
+
 		switch msg.String() {
 		case "f10", "ctrl+c", "esc":
 			// Exit preview mode (F10 replaces q)
@@ -109,7 +110,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.preview.scrollPos = 0
 			}
 
-		case "pagedown", "pgdn":
+		case "pagedown", "pgdn", "pgdown":
 			totalLines := m.getWrappedLineCount()
 			maxScroll := totalLines - (m.height - 6)
 			if maxScroll < 0 {
@@ -582,6 +583,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// File is in current directory, just preview it
 					m.loadPreview(currentFile.path)
 					m.viewMode = viewFullPreview
+					m.searchMode = false // Disable search mode in preview
 					m.calculateLayout() // Update widths for full-screen
 					m.populatePreviewCache() // Repopulate cache with correct width
 					// Clear screen for clean rendering
@@ -686,7 +688,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-	case "pagedown", "pgdn":
+	case "pagedown", "pgdn", "pgdown":
 		// Page down in dual-pane mode (only works when right pane focused)
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 			// Calculate visible lines: m.height - 5 (header) - 2 (preview title) = m.height - 7
@@ -897,6 +899,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if _, err := os.Stat(hotkeysPath); err == nil {
 			m.loadPreview(hotkeysPath)
 			m.viewMode = viewFullPreview
+			m.searchMode = false // Disable search mode in preview
 			m.calculateLayout() // Update widths for full-screen
 			m.populatePreviewCache() // Repopulate cache with correct width
 			// Clear screen for clean rendering
