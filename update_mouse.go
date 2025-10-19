@@ -393,6 +393,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					if clickedFile.isDir {
 						m.currentPath = clickedFile.path
 						m.cursor = 0
+						// Exit favorites mode when navigating into a folder (same as Enter key behavior)
+						if m.showFavoritesOnly {
+							m.showFavoritesOnly = false
+						}
 						m.loadFiles()
 					} else if !m.filePickerMode {
 						// Enter full-screen preview (only if NOT in file picker mode)
