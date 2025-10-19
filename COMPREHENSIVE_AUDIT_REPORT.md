@@ -26,31 +26,40 @@ TFE is a **well-architected, modular terminal file explorer** with excellent cod
 
 ## Critical Findings Summary
 
-### 🔴 CRITICAL Issues (Fix Immediately)
+### ✅ CRITICAL Issues (FIXED 2025-10-19)
 
-1. **Command Injection Vulnerability** (Security)
+1. **Command Injection Vulnerability** (Security) ✅ FIXED
    - **Location:** `context_menu.go:198`, `command.go:37-47`
    - **Risk:** Remote code execution, data loss
    - **Impact:** HIGH - Users can execute arbitrary commands
-   - **Fix Time:** 1-2 hours
+   - **Status:** Fixed via safe parameter passing in runScript()
+   - **See:** SECURITY_FIXES_SUMMARY.md
 
-2. **Goroutine & Channel Leaks** (Reliability)
+2. **Goroutine & Channel Leaks** (Reliability) ✅ FIXED
    - **Location:** `render_preview.go:186-247`
    - **Risk:** Memory leaks, application freezing
    - **Impact:** HIGH - Degraded performance over time
-   - **Fix Time:** 2-4 hours
+   - **Status:** Fixed with 5s timeout + buffered channels + panic recovery
+   - **See:** SECURITY_FIXES_SUMMARY.md
 
-3. **Unbounded Memory Consumption** (Performance)
-   - **Location:** `file_operations.go:186-232`
+3. **Unbounded Memory Consumption** (Performance) ✅ FIXED
+   - **Location:** `file_operations.go:186-232`, `prompt_parser.go`
    - **Risk:** OOM crashes, system freeze
    - **Impact:** HIGH - Large files crash the app
-   - **Fix Time:** 1-2 hours
+   - **Status:** 1MB limits enforced in loadPreview() and parsePromptFile()
+   - **See:** SECURITY_FIXES_SUMMARY.md
 
-4. **Zero Test Coverage** (Quality)
+4. **Zero Test Coverage** (Quality) ⏳ IN PROGRESS
    - **Current:** 0% → 13.8% (after creating initial tests during audit)
    - **Risk:** Regressions, data loss, bugs
    - **Impact:** CRITICAL - No safety net for changes
-   - **Fix Time:** 4 weeks to reach 70%
+   - **Target:** 40% coverage (next session priority)
+
+### 🎉 BONUS: Trash/Recycle Bin Feature (NEW 2025-10-19)
+- Safe, reversible deletion system implemented
+- Windows-style recycle bin for Linux users
+- Clickable trash button in header, F12 shortcut
+- See TRASH_FEATURE_SUMMARY.md for details
 
 ---
 
@@ -464,17 +473,17 @@ Total                   4,165   ✅ Well-organized
 
 ### Immediate (This Week) - CRITICAL
 
-**1. Security Hardening (1-2 days)**
-- [ ] Fix command injection in `context_menu.go:198`
-- [ ] Fix command injection in `command.go:37-47`
+**1. Security Hardening (1-2 days)** ✅ COMPLETED 2025-10-19
+- [x] Fix command injection in `context_menu.go:198` ✅
+- [x] Fix command injection in `command.go:37-47` ✅ (via runScript)
 - [ ] Add input validation helpers
 - [ ] Update vulnerable dependencies (`chroma/v2`)
 
-**2. Reliability Fixes (1-2 days)**
-- [ ] Fix goroutine leaks in `render_preview.go:186-247`
-- [ ] Add `defer` cleanup for all file handles
-- [ ] Add file size limits to prevent OOM
-- [ ] Implement proper error handling pattern
+**2. Reliability Fixes (1-2 days)** ✅ COMPLETED 2025-10-19
+- [x] Fix goroutine leaks in `render_preview.go:186-247` ✅
+- [x] Add `defer` cleanup for all file handles ✅
+- [x] Add file size limits to prevent OOM ✅
+- [ ] Implement proper error handling pattern (partial - status messages added)
 
 **3. Documentation Completion (1 day)**
 - [ ] Fill README.md installation section
@@ -493,7 +502,12 @@ Total                   4,165   ✅ Well-organized
 - [ ] Add symlink safety checks (`os.Lstat()`)
 - [ ] Implement path traversal validation
 - [ ] Add dangerous command detection
-- [ ] Implement trash instead of delete
+- [x] Implement trash instead of delete ✅ COMPLETED 2025-10-19
+  - Full trash/recycle bin system implemented
+  - Clickable trash button in header
+  - F12 keyboard shortcut
+  - Restore, permanent delete, empty trash
+  - See TRASH_FEATURE_SUMMARY.md
 
 **6. Testing Expansion**
 - [ ] Create `editor_test.go` (tool detection)
