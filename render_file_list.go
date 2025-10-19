@@ -427,6 +427,18 @@ func (m model) buildTreeItems(files []fileItem, depth int, parentLasts []bool) [
 			// Load subdirectory contents
 			subFiles := m.loadSubdirFiles(file.path)
 
+			// Apply favorites filtering if active
+			// Only show contents of favorited folders (let users explore inside their favorites)
+			if m.showFavoritesOnly && !m.isFavorite(file.path) {
+				filteredSubFiles := make([]fileItem, 0)
+				for _, subFile := range subFiles {
+					if m.isFavorite(subFile.path) {
+						filteredSubFiles = append(filteredSubFiles, subFile)
+					}
+				}
+				subFiles = filteredSubFiles
+			}
+
 			// Apply prompts filtering if active
 			if m.showPromptsOnly {
 				filteredSubFiles := make([]fileItem, 0)
