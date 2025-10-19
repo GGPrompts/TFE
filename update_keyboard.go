@@ -997,8 +997,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.loadFiles()
 
 	case "f9":
-		// F9: Cycle through display modes (replaces v)
-		m.displayMode = (m.displayMode + 1) % 4
+		// F9: Cycle through display modes (List → Detail → Tree)
+		m.displayMode = (m.displayMode + 1) % 3
 		// Auto-exit dual-pane if switching to incompatible mode
 		if m.viewMode == viewDualPane && !m.isDualPaneCompatible() {
 			m.viewMode = viewSinglePane
@@ -1011,13 +1011,17 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.displayMode = modeList
 
 	case "2":
-		// Switch to grid view
-		m.displayMode = modeGrid
-		// Auto-exit dual-pane (grid view needs full width)
-		if m.viewMode == viewDualPane {
-			m.viewMode = viewSinglePane
-			m.calculateLayout()
-			m.populatePreviewCache()
+		// Quick toggle between List and Detail (most common views)
+		if m.displayMode == modeList {
+			m.displayMode = modeDetail
+			// Auto-exit dual-pane (detail view needs full width)
+			if m.viewMode == viewDualPane {
+				m.viewMode = viewSinglePane
+				m.calculateLayout()
+				m.populatePreviewCache()
+			}
+		} else {
+			m.displayMode = modeList
 		}
 
 	case "3":

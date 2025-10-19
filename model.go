@@ -24,7 +24,6 @@ func initialModel() model {
 		width:             80,
 		showHidden:        false,
 		displayMode:       modeTree, // Tree view works better on narrow terminals
-		gridColumns:       4,
 		sortBy:            "name",
 		sortAsc:           true,
 		viewMode:          viewSinglePane,
@@ -42,22 +41,8 @@ func initialModel() model {
 	}
 
 	m.loadFiles()
-	m.calculateGridLayout()
 	m.calculateLayout()
 	return m
-}
-
-// calculateGridLayout calculates how many columns fit in grid view
-func (m *model) calculateGridLayout() {
-	itemWidth := 15 // Estimated width per item (icon + name + padding)
-	columns := m.width / itemWidth
-	if columns < 1 {
-		columns = 1
-	}
-	if columns > 8 {
-		columns = 8 // Max 8 columns for readability
-	}
-	m.gridColumns = columns
 }
 
 // calculateLayout calculates left and right pane widths for dual-pane mode

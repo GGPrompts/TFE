@@ -12,7 +12,6 @@ type displayMode int
 
 const (
 	modeList displayMode = iota
-	modeGrid
 	modeDetail
 	modeTree
 )
@@ -21,8 +20,6 @@ func (d displayMode) String() string {
 	switch d {
 	case modeList:
 		return "List"
-	case modeGrid:
-		return "Grid"
 	case modeDetail:
 		return "Detail"
 	case modeTree:
@@ -192,7 +189,6 @@ type model struct {
 	width       int
 	showHidden  bool
 	displayMode displayMode
-	gridColumns int
 	sortBy      string // "name", "size", "modified" for detail view
 	sortAsc     bool   // Sort ascending or descending
 	// Preview-related fields

@@ -187,14 +187,12 @@ func (m model) renderSinglePane() string {
 	switch m.displayMode {
 	case modeList:
 		fileListContent = m.renderListView(contentHeight)
-	case modeGrid:
-		fileListContent = m.renderGridView(contentHeight)
 	case modeDetail:
 		fileListContent = m.renderDetailView(contentHeight)
 	case modeTree:
 		fileListContent = m.renderTreeView(contentHeight)
 	default:
-		fileListContent = m.renderListView(contentHeight)
+		fileListContent = m.renderDetailView(contentHeight) // Default to detail view
 	}
 
 	// Wrap content in a bordered box with fixed dimensions

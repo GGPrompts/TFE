@@ -12,7 +12,7 @@
 | **F6** | Toggle favorites filter (show only favorites) |
 | **F7** | Create new directory (prompts for name) |
 | **F8** | Delete file/folder (prompts for confirmation) |
-| **F9** | Cycle through display modes (List → Grid → Detail → Tree) |
+| **F9** | Cycle through display modes (List → Detail → Tree) |
 | **F10** | Quit TFE |
 
 ## Navigation
@@ -35,9 +35,9 @@
 
 | Key | Action |
 |-----|--------|
-| **F9** | Cycle through display modes (List → Grid → Detail → Tree) |
+| **F9** | Cycle through display modes (List → Detail → Tree) |
 | **1** | Switch to List view |
-| **2** | Switch to Grid view |
+| **2** | Quick toggle List ↔ Detail |
 | **3** | Switch to Detail view |
 | **4** | Switch to Tree view |
 | **.** / **Ctrl+h** | Toggle hidden files visibility |

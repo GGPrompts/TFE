@@ -91,7 +91,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle window resize
 		m.height = msg.Height
 		m.width = msg.Width
-		m.calculateGridLayout()  // Recalculate grid columns on resize
 		m.calculateLayout()      // Recalculate pane layout on resize
 		m.populatePreviewCache() // Repopulate cache with new width
 

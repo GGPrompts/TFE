@@ -23,7 +23,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Command Prompt**: Midnight Commander-style always-active command line
 - **Favorites System**: Bookmark files and folders with quick filter (F6)
 - **Clipboard Integration**: Copy file paths to system clipboard
-- **Multiple Display Modes**: List, Grid, Detail, and Tree views
+- **Multiple Display Modes**: List, Detail, and Tree views
 - **Nerd Font Icons**: Visual file/folder indicators using file type detection
 - **Smart Sorting**: Directories first, then files (alphabetically sorted)
 - **Scrolling Support**: Handles large directories with auto-scrolling
@@ -165,7 +165,7 @@ tfe    # Launch from any directory with Quick CD support
 |-----|--------|
 | `F9` | Cycle through display modes |
 | `1` | Switch to List view |
-| `2` | Switch to Grid view |
+| `2` | Quick toggle List ↔ Detail |
 | `3` | Switch to Detail view |
 | `4` | Switch to Tree view |
 | `.` / `Ctrl+h` | Toggle hidden files |
@@ -206,7 +206,7 @@ TFE has been **extensively tested on Termux/Android** throughout development and
 - **Pinch/Spread**: Not needed - use keyboard for view switching
 
 **Optimized for Mobile:**
-- **Single-pane modes**: List, Grid, Detail, and Tree views all work excellently on small screens
+- **Single-pane modes**: List, Detail, and Tree views all work excellently on small screens
 - **Toolbar buttons**: Large touch targets for easy tapping
 - **Context menu**: Touch-friendly menu system
 - **Full preview mode**: Distraction-free reading on mobile
@@ -525,7 +525,7 @@ TFE follows a modular architecture with 13 focused files:
 - ✅ File preview pane (dual-pane and full-screen modes)
 - ✅ External editor integration
 - ✅ File size and permissions display (Detail view)
-- ✅ Multiple display modes (List, Grid, Detail, Tree)
+- ✅ Multiple display modes (List, Detail, Tree)
 - ✅ Clipboard integration (with Termux support)
 - ✅ F-key hotkeys (Midnight Commander style)
 - ✅ Context menu (right-click and F2)

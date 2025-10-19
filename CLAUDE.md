@@ -23,7 +23,7 @@ tfe/
 ├── update_mouse.go (383)        - Mouse event handling
 ├── view.go (189 lines)          - View dispatcher & single-pane rendering
 ├── render_preview.go (468)      - Preview rendering (full & dual-pane)
-├── render_file_list.go (447)    - File list views (List/Grid/Detail/Tree)
+├── render_file_list.go (447)    - File list views (List/Detail/Tree)
 ├── file_operations.go (657)     - File operations & formatting
 ├── editor.go (90 lines)         - External editor integration
 ├── command.go (127 lines)       - Command execution system
@@ -73,7 +73,6 @@ tfe/
 **Purpose**: Model initialization and layout calculations
 **Contents**:
 - `initialModel()` - creates the initial application state
-- `calculateGridLayout()` - computes grid column layout
 - `calculateLayout()` - computes dual-pane widths
 
 **When to extend**: Add new initialization logic or layout calculation functions here.
@@ -136,7 +135,6 @@ tfe/
 **Purpose**: File list rendering in all display modes
 **Contents**:
 - `renderListView()` - simple list view
-- `renderGridView()` - grid layout view
 - `renderDetailView()` - detailed view with metadata (default)
 - `renderTreeView()` - expandable hierarchical tree view
 - `buildTreeItems()` - recursively builds tree with expanded folders
@@ -275,7 +273,6 @@ case "s":
 ```go
 const (
     modeList displayMode = iota
-    modeGrid
     modeDetail
     modeTree
     modeYourNewMode  // Add here

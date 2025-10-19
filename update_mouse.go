@@ -69,7 +69,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if msg.Action == tea.MouseActionRelease {
 			// Check for toolbar button clicks (Y=1)
 			// Toolbar: [🏠] [⭐/✨] [>_] [🔍] [📝] [🗑️]
-			// Note: Emojis render as 2 characters wide in terminals
+			// Layout:  0-4   5-9    10-14 15-19 20-24 25-29
+			// Note: Each button is 5 chars: [ + emoji(2) + ] + space
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
 				if msg.X >= 0 && msg.X <= 4 {
@@ -108,8 +109,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.fuzzySearchActive = true
 					return m, m.launchFuzzySearch()
 				}
-				// Prompts filter button [📝] or [✨📝] (X=20-29 or beyond for active state)
-				if msg.X >= 20 && msg.X <= 29 {
+				// Prompts filter button [📝] (X=20-24: [ + emoji(2) + ] + space)
+				if msg.X >= 20 && msg.X <= 24 {
 					// Toggle prompts filter
 					m.showPromptsOnly = !m.showPromptsOnly
 
@@ -126,8 +127,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Trash button [🗑️] or [♻️] (X=30-34: [ + emoji(2) + ])
-				if msg.X >= 30 && msg.X <= 34 {
+				// Trash button [🗑️] or [♻️] (X=25-29: [ + emoji(2) + ])
+				if msg.X >= 25 && msg.X <= 29 {
 					// Toggle trash view
 					m.showTrashOnly = !m.showTrashOnly
 					m.showFavoritesOnly = false // Disable favorites filter
@@ -298,90 +299,39 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			var clickedIndex int
 			var clickedLine int
 
-			// Grid view requires calculating both row and column from X,Y coordinates
-			if m.displayMode == modeGrid {
-				// Calculate which row was clicked
-				clickedRow := msg.Y - headerOffset
-
-				// Adjust X coordinate for left border (both modes have borders now)
-				adjustedX := msg.X - 2 // Account for left border
-				if adjustedX < 0 {
-					adjustedX = 0
-				}
-
-				// Calculate which column was clicked
-				// Each grid cell: icon(2) + fav_indicator(2) + name(12) + padding(2) = 18 chars
-				cellWidth := 18
-				clickedCol := adjustedX / cellWidth
-				if clickedCol >= m.gridColumns {
-					clickedCol = m.gridColumns - 1
-				}
-
-				// Calculate visible row range (grid mode uses rows, not items)
-				totalItems := len(displayedFiles)
-				rows := (totalItems + m.gridColumns - 1) / m.gridColumns
-
-				startRow := 0
-				endRow := rows
-				if rows > maxVisible {
-					cursorRow := m.cursor / m.gridColumns
-					startRow = cursorRow - maxVisible/2
-					if startRow < 0 {
-						startRow = 0
-					}
-					endRow = startRow + maxVisible
-					if endRow > rows {
-						endRow = rows
-						startRow = endRow - maxVisible
-						if startRow < 0 {
-							startRow = 0
-						}
-					}
-				}
-
-				// Convert click to item index
-				actualRow := startRow + clickedRow
-				clickedIndex = actualRow*m.gridColumns + clickedCol
-
-				// Validate the clicked index is within bounds
-				if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(displayedFiles) {
-					clickedIndex = -1
-				}
+			// List, Detail, and Tree modes: one item per line
+			// In tree mode, use tree items instead of files
+			var totalItems int
+			if m.displayMode == modeTree {
+				totalItems = len(m.treeItems)
 			} else {
-				// List, Detail, and Tree modes: one item per line
-				// In tree mode, use tree items instead of files
-				var totalItems int
-				if m.displayMode == modeTree {
-					totalItems = len(m.treeItems)
-				} else {
-					totalItems = len(displayedFiles)
-				}
+				totalItems = len(displayedFiles)
+			}
 
-				// Calculate visible range based on cursor and totalItems
-				start := 0
-				end := totalItems
-				if totalItems > maxVisible {
-					start = m.cursor - maxVisible/2
+			// Calculate visible range based on cursor and totalItems
+			start := 0
+			end := totalItems
+			if totalItems > maxVisible {
+				start = m.cursor - maxVisible/2
+				if start < 0 {
+					start = 0
+				}
+				end = start + maxVisible
+				if end > totalItems {
+					end = totalItems
+					start = end - maxVisible
 					if start < 0 {
 						start = 0
 					}
-					end = start + maxVisible
-					if end > totalItems {
-						end = totalItems
-						start = end - maxVisible
-						if start < 0 {
-							start = 0
-						}
-					}
 				}
+			}
 
-				clickedLine = msg.Y - headerOffset
-				clickedIndex = start + clickedLine
+			clickedLine = msg.Y - headerOffset
+			clickedIndex = start + clickedLine
 
-				// Validate bounds
-				if clickedLine < 0 || clickedIndex >= end || clickedIndex >= totalItems {
-					clickedIndex = -1
-				}
+			// Validate bounds
+			if clickedLine < 0 || clickedIndex >= end || clickedIndex >= totalItems {
+				clickedIndex = -1
 			}
 
 			// Check bounds based on display mode
@@ -526,84 +476,38 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 			var clickedIndex int
 
-			// Grid view: calculate row and column
-			if m.displayMode == modeGrid {
-				clickedRow := msg.Y - headerOffset
-
-				// Adjust X coordinate for left border (both modes have borders now)
-				adjustedX := msg.X - 2 // Account for left border
-				if adjustedX < 0 {
-					adjustedX = 0
-				}
-
-				// Each grid cell: icon(2) + fav_indicator(2) + name(12) + padding(2) = 18 chars
-				cellWidth := 18
-				clickedCol := adjustedX / cellWidth
-				if clickedCol >= m.gridColumns {
-					clickedCol = m.gridColumns - 1
-				}
-
-				totalItems := len(displayedFiles)
-				rows := (totalItems + m.gridColumns - 1) / m.gridColumns
-
-				startRow := 0
-				endRow := rows
-				if rows > maxVisible {
-					cursorRow := m.cursor / m.gridColumns
-					startRow = cursorRow - maxVisible/2
-					if startRow < 0 {
-						startRow = 0
-					}
-					endRow = startRow + maxVisible
-					if endRow > rows {
-						endRow = rows
-						startRow = endRow - maxVisible
-						if startRow < 0 {
-							startRow = 0
-						}
-					}
-				}
-
-				actualRow := startRow + clickedRow
-				clickedIndex = actualRow*m.gridColumns + clickedCol
-
-				if clickedRow < 0 || actualRow >= endRow || clickedIndex >= len(displayedFiles) {
-					clickedIndex = -1
-				}
+			// List, Detail, Tree modes: one item per line
+			// In tree mode, use tree items instead of files
+			var totalItems int
+			if m.displayMode == modeTree {
+				totalItems = len(m.treeItems)
 			} else {
-				// List, Detail, Tree modes: one item per line
-				// In tree mode, use tree items instead of files
-				var totalItems int
-				if m.displayMode == modeTree {
-					totalItems = len(m.treeItems)
-				} else {
-					totalItems = len(displayedFiles)
-				}
+				totalItems = len(displayedFiles)
+			}
 
-				// Calculate visible range based on cursor and totalItems
-				start := 0
-				end := totalItems
-				if totalItems > maxVisible {
-					start = m.cursor - maxVisible/2
+			// Calculate visible range based on cursor and totalItems
+			start := 0
+			end := totalItems
+			if totalItems > maxVisible {
+				start = m.cursor - maxVisible/2
+				if start < 0 {
+					start = 0
+				}
+				end = start + maxVisible
+				if end > totalItems {
+					end = totalItems
+					start = end - maxVisible
 					if start < 0 {
 						start = 0
 					}
-					end = start + maxVisible
-					if end > totalItems {
-						end = totalItems
-						start = end - maxVisible
-						if start < 0 {
-							start = 0
-						}
-					}
 				}
+			}
 
-				clickedLine := msg.Y - headerOffset
-				clickedIndex = start + clickedLine
+			clickedLine := msg.Y - headerOffset
+			clickedIndex = start + clickedLine
 
-				if clickedLine < 0 || clickedIndex >= end || clickedIndex >= totalItems {
-					clickedIndex = -1
-				}
+			if clickedLine < 0 || clickedIndex >= end || clickedIndex >= totalItems {
+				clickedIndex = -1
 			}
 
 			// Open context menu if a valid file was clicked

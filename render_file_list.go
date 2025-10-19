@@ -126,101 +126,6 @@ func (m model) renderListView(maxVisible int) string {
 	return strings.TrimRight(s.String(), "\n")
 }
 
-// renderGridView renders files in a multi-column grid layout
-func (m model) renderGridView(maxVisible int) string {
-	var s strings.Builder
-
-	// Get filtered files (respects favorites filter)
-	files := m.getFilteredFiles()
-
-	// Calculate how many rows we need
-	totalItems := len(files)
-	rows := (totalItems + m.gridColumns - 1) / m.gridColumns
-
-	// Calculate visible range
-	start := 0
-	end := rows
-
-	if rows > maxVisible {
-		cursorRow := m.cursor / m.gridColumns
-		start = cursorRow - maxVisible/2
-		if start < 0 {
-			start = 0
-		}
-		end = start + maxVisible
-		if end > rows {
-			end = rows
-			start = end - maxVisible
-			if start < 0 {
-				start = 0
-			}
-		}
-	}
-
-	// Render rows
-	for row := start; row < end; row++ {
-		for col := 0; col < m.gridColumns; col++ {
-			idx := row*m.gridColumns + col
-			if idx >= totalItems {
-				break
-			}
-
-			file := files[idx]
-			icon := getFileIcon(file)
-
-			// Add star indicator for favorites
-			// Always reserve 2 characters for alignment to maintain consistent grid cell width
-			favIndicator := ""
-			if m.isFavorite(file.path) {
-				favIndicator = "⭐"
-			} else {
-				favIndicator = "  " // Two spaces to match emoji width
-			}
-
-			// Truncate long names
-			displayName := file.name
-			maxNameLen := 12
-			if len(displayName) > maxNameLen {
-				displayName = displayName[:maxNameLen-2] + ".."
-			}
-
-			style := fileStyle
-			if file.isDir {
-				style = folderStyle
-			}
-			if isClaudeContextFile(file.name) {
-				style = claudeContextStyle
-			}
-			if isAgentsFile(file.name) {
-				style = agentsStyle
-			}
-			if isPromptsFolder(file.name) || isGlobalPromptsVirtualFolder(file.name) {
-				style = promptsFolderStyle
-			}
-			if file.isDir && isClaudePromptsSubfolder(file.name) {
-				style = promptsFolderStyle
-			}
-
-			// Build cell content (no space after favIndicator - it's already 2 chars)
-			cell := fmt.Sprintf("%s%s%-12s", icon, favIndicator, displayName)
-
-			// Apply selection style
-			if idx == m.cursor {
-				cell = selectedStyle.Render(cell)
-			} else {
-				cell = style.Render(cell)
-			}
-
-			s.WriteString(cell)
-			s.WriteString("\033[0m") // Reset ANSI codes
-			s.WriteString("  ")
-		}
-		s.WriteString("\n")
-	}
-
-	return strings.TrimRight(s.String(), "\n")
-}
-
 // renderDetailView renders files in a detailed table with columns
 func (m model) renderDetailView(maxVisible int) string {
 	var s strings.Builder
@@ -244,7 +149,25 @@ func (m model) renderDetailView(maxVisible int) string {
 
 	// Build header with sort indicators
 	var header string
-	if m.showFavoritesOnly {
+	if m.showTrashOnly {
+		// Trash mode: Name, Size, Deleted, Original Location
+		nameHeader := "Name"
+		sizeHeader := "Size"
+		deletedHeader := "Deleted"
+		locationHeader := "Original Location"
+
+		// Add indicator to active column
+		switch m.sortBy {
+		case "name":
+			nameHeader += sortIndicator
+		case "size":
+			sizeHeader += sortIndicator
+		case "modified": // DeletedAt is stored in modTime
+			deletedHeader += sortIndicator
+		}
+
+		header = fmt.Sprintf("%-25s  %-10s  %-12s  %-30s", nameHeader, sizeHeader, deletedHeader, locationHeader)
+	} else if m.showFavoritesOnly {
 		// Favorites mode: Name, Size, Modified, Location
 		nameHeader := "Name"
 		sizeHeader := "Size"
@@ -347,9 +270,30 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 		modified := formatModTime(file.modTime)
 
-		// Show location instead of type when viewing favorites
+		// Show different columns based on view mode
 		var line string
-		if m.showFavoritesOnly {
+		if m.showTrashOnly {
+			// Trash mode: Name, Size, Deleted, Original Location
+			deleted := formatModTime(file.modTime) // DeletedAt is stored in modTime
+
+			// Look up original location from trash metadata
+			location := "-"
+			if trashItem, found := getTrashItemByPath(m.trashItems, file.path); found {
+				location = filepath.Dir(trashItem.OriginalPath)
+				// Shorten home directory to ~
+				homeDir, _ := os.UserHomeDir()
+				if homeDir != "" && strings.HasPrefix(location, homeDir) {
+					location = "~" + strings.TrimPrefix(location, homeDir)
+				}
+				// Truncate long paths
+				if len(location) > 28 {
+					location = "..." + location[len(location)-25:]
+				}
+			}
+
+			line = fmt.Sprintf("%-25s  %-10s  %-12s  %-30s", name, size, deleted, location)
+		} else if m.showFavoritesOnly {
+			// Favorites mode: Name, Size, Modified, Location
 			// Get parent directory path for location
 			location := filepath.Dir(file.path)
 			// Shorten home directory to ~
@@ -363,6 +307,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 			line = fmt.Sprintf("%-25s  %-10s  %-12s  %-25s", name, size, modified, location)
 		} else {
+			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)
 			line = fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", name, size, modified, fileType)
 		}
@@ -387,7 +332,14 @@ func (m model) renderDetailView(maxVisible int) string {
 		if i == m.cursor {
 			line = selectedStyle.Render(line)
 		} else {
-			line = style.Render(line)
+			// Add alternating row background for easier reading
+			// Even rows (0, 2, 4...) get a subtle dark background
+			if i%2 == 0 {
+				alternateStyle := style.Copy().Background(lipgloss.Color("235")) // Very dark gray
+				line = alternateStyle.Render(line)
+			} else {
+				line = style.Render(line)
+			}
 		}
 
 		s.WriteString("  ")

@@ -832,14 +832,12 @@ func (m model) renderDualPane() string {
 	switch m.displayMode {
 	case modeList:
 		leftContent = m.renderListView(contentHeight)
-	case modeGrid:
-		leftContent = m.renderGridView(contentHeight)
 	case modeDetail:
 		leftContent = m.renderDetailView(contentHeight)
 	case modeTree:
 		leftContent = m.renderTreeView(contentHeight)
 	default:
-		leftContent = m.renderListView(contentHeight)
+		leftContent = m.renderDetailView(contentHeight) // Default to detail view
 	}
 
 	// Get right pane content (just the preview, no title)
