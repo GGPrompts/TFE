@@ -107,7 +107,11 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if msg.X >= 15 && msg.X <= 19 {
 					// Launch fuzzy search
 					m.fuzzySearchActive = true
-					return m, m.launchFuzzySearch()
+					// Clear screen before launching fuzzy search to ensure clean terminal state
+					return m, tea.Sequence(
+						tea.ClearScreen,
+						m.launchFuzzySearch(),
+					)
 				}
 				// Prompts filter button [📝] (X=20-24: [ + emoji(2) + ] + space)
 				if msg.X >= 20 && msg.X <= 24 {

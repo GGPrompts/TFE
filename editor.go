@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -218,14 +219,32 @@ func openImageViewer(path string) tea.Cmd {
 	var c *exec.Cmd
 	if viewer == "viu" {
 		// viu with transparent background and size to terminal
-		c = exec.Command("viu", "-t", path)
+		// Wrap in shell to pause after displaying image (same as command prompt)
+		script := fmt.Sprintf(`viu -t '%s'
+echo ""
+echo "Press any key to continue..."
+read -n 1 -s -r`, path)
+		c = exec.Command("bash", "-c", script)
 	} else if viewer == "timg" {
 		// timg with grid view support
-		c = exec.Command("timg", path)
+		script := fmt.Sprintf(`timg '%s'
+echo ""
+echo "Press any key to continue..."
+read -n 1 -s -r`, path)
+		c = exec.Command("bash", "-c", script)
 	} else {
 		// chafa or other
-		c = exec.Command(viewer, path)
+		script := fmt.Sprintf(`%s '%s'
+echo ""
+echo "Press any key to continue..."
+read -n 1 -s -r`, viewer, path)
+		c = exec.Command("bash", "-c", script)
 	}
+
+	// Set up stdin/stdout/stderr for interaction (same as command execution)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
 
 	return tea.Sequence(
 		tea.ClearScreen,

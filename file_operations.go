@@ -996,12 +996,17 @@ func (m *model) loadPreview(path string) {
 	// Check if binary
 	if isBinaryFile(path) {
 		m.preview.isBinary = true
-		m.preview.content = []string{
+		content := []string{
 			"Binary file detected",
 			fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 			"",
 			"Cannot preview binary files",
 		}
+		// Add hint for image files
+		if isImageFile(path) {
+			content = append(content, "", "Press 'V' to view image in terminal viewer")
+		}
+		m.preview.content = content
 		m.preview.loaded = true
 		return
 	}

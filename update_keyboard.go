@@ -239,6 +239,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, tea.DisableMouse
 			}
 
+		case "v", "V":
+			// View image in terminal viewer (for binary image files)
+			if m.preview.loaded && m.preview.isBinary && isImageFile(m.preview.filePath) {
+				return m, openImageViewer(m.preview.filePath)
+			}
+
 		case "ctrl+f":
 			// Activate search mode in preview
 			if !m.preview.searchActive {
@@ -755,13 +761,20 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+p":
 		// Ctrl+P: Fuzzy file search
 		m.fuzzySearchActive = true
-		return m, m.launchFuzzySearch()
+		// Clear screen before launching fuzzy search to ensure clean terminal state
+		return m, tea.Sequence(
+			tea.ClearScreen,
+			m.launchFuzzySearch(),
+		)
 
 	case "/":
 		// /: Enter directory search mode (filter files by name)
-		m.searchMode = true
-		m.searchQuery = ""
-		m.filteredIndices = m.filterFilesBySearch("")
+		// Only activate in file list view, not in full preview mode
+		if m.viewMode != viewFullPreview {
+			m.searchMode = true
+			m.searchQuery = ""
+			m.filteredIndices = m.filterFilesBySearch("")
+		}
 		return m, nil
 
 	case "f10", "ctrl+c":
@@ -923,6 +936,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Enter full-screen preview (regardless of current mode)
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
+				// Clear any active search mode (file list search doesn't apply in preview)
+				m.searchMode = false
+				m.searchQuery = ""
+				m.filteredIndices = nil
 				m.calculateLayout() // Update widths for full-screen
 				// Populate cache synchronously for full preview (user expects instant display)
 				m.populatePreviewCache()
@@ -999,6 +1016,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Open in full-screen preview
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
+				// Clear any active search mode (file list search doesn't apply in preview)
+				m.searchMode = false
+				m.searchQuery = ""
+				m.filteredIndices = nil
 				m.calculateLayout() // Update widths for full-screen
 				m.populatePreviewCache() // Repopulate cache with correct width
 				// Clear screen for clean rendering

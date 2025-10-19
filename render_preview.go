@@ -708,10 +708,20 @@ func (m model) renderFullPreview() string {
 	var mouseStatus, helpText string
 	if m.previewMouseEnabled {
 		mouseStatus = "ON"
-		helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (🖱️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
+		// Show 'V: view image' for binary image files
+		if m.preview.isBinary && isImageFile(m.preview.filePath) {
+			helpText = fmt.Sprintf("V: view image • m: toggle border/mouse (🖱️  %s) • F4: edit • Esc: close", mouseStatus)
+		} else {
+			helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (🖱️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
+		}
 	} else {
 		mouseStatus = "OFF"
-		helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (⌨️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
+		// Show 'V: view image' for binary image files
+		if m.preview.isBinary && isImageFile(m.preview.filePath) {
+			helpText = fmt.Sprintf("V: view image • m: toggle border/mouse (⌨️  %s) • F4: edit • Esc: close", mouseStatus)
+		} else {
+			helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (⌨️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
+		}
 	}
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes
