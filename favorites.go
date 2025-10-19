@@ -214,7 +214,7 @@ func (m *model) getFilteredFiles() []fileItem {
 				if info, err := os.Stat(globalClaudeDir); err == nil && info.IsDir() {
 					// Create a virtual folder item for ~/.claude/
 					globalClaudeItem := fileItem{
-						name:    "🤖 ~/.claude/ (Global Commands, Agents & Skills)",
+						name:    "🤖 ~/.claude/ (🌐 Commands, Agents & Skills)",
 						path:    globalClaudeDir,
 						isDir:   true,
 						size:    info.Size(),
