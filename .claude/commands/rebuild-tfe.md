@@ -1,38 +1,41 @@
-# Rebuild and Restart TFE
+# Pull Changes and Rebuild TFE
 
-You are rebuilding the TFE application and restarting it.
+You are pulling the latest changes and rebuilding the TFE application binary.
 
 ## Your Task
 
-Use Desktop Commander and standard tools to:
+Use standard tools to:
 
-1. **Kill existing TFE process (if running)**
-   - Use `list_processes` to find TFE process
+1. **Pull remote changes**
+   - Run `git pull` to fetch and merge latest changes
+   - Report what was updated (files changed, commits pulled)
+
+2. **Kill existing TFE process (if running)**
+   - Use `list_processes` to find any running TFE process
    - Use `kill_process` to terminate it gracefully
+   - Skip if no TFE process found
 
-2. **Clean build artifacts**
+3. **Clean build artifacts**
    - Run `go clean`
    - Remove old binary if exists
 
-3. **Build TFE**
+4. **Build TFE**
    - Run `go build` in the project directory
-   - Capture build output
+   - Capture build output with timing
    - Check for compilation errors or warnings
 
-4. **Report build results**
-   - ✅ If successful: Report build time and binary size
+5. **Install binary to PATH**
+   - Ensure `~/.local/bin` directory exists
+   - Copy `./tfe` to `~/.local/bin/tfe`
+   - Make it executable
+   - This allows the `tfe` command/alias to work from any directory
+
+6. **Report build results**
+   - ✅ If successful: Report build time, binary size, and install location
    - ❌ If failed: Show detailed error messages with file:line references
    - ⚠️ If warnings: List all warnings
 
-5. **Start TFE (if build succeeded)**
-   - Use `start_process("./tfe")` to launch in background
-   - Monitor initial startup (first 2-3 seconds)
-   - Check for immediate crashes or panics
-   - Report PID and status
-
-6. **Verify it's running**
-   - Use `list_processes` to confirm process is alive
-   - Check initial output for errors
+**IMPORTANT:** Do NOT launch TFE as a background process. TFE is a full-screen TUI application that must be run by the user in their own terminal. Just build the binary and report success.
 
 ## Error Handling
 
@@ -42,23 +45,18 @@ If build fails:
 - Suggest fixes
 - Ask if I want you to apply them
 
-If runtime crash:
-- Capture the panic/error
-- Show stack trace
-- Identify the problematic code
-- Suggest debugging steps
-
 ## Report Format
 
 ```
-🔄 Rebuilding TFE...
-  • Killing old process (PID 12345)... ✅
+🔄 Pulling changes and rebuilding TFE...
+  • Pulling from remote... ✅ (3 files changed, 2 commits)
+  • Killing old process... ✅ (or: no TFE process found)
   • Cleaning... ✅
   • Building... ✅ (2.3s, 8.4 MB)
-  • Starting... ✅ (PID 12389)
-  • Monitoring... ✅ No errors detected
+  • Installing to ~/.local/bin... ✅
 
-🎯 TFE is running cleanly on PID 12389
+🎯 TFE installed successfully!
+   Run from anywhere: tfe
 ```
 
 Execute this rebuild sequence now.
