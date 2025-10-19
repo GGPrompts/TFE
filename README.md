@@ -37,9 +37,48 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 
 - Go 1.24 or higher
 - A terminal with Nerd Fonts installed (for proper icon display)
+  - **Windows Terminal**: Requires manual font selection in Settings → Appearance → Font face (e.g., "CaskaydiaCove Nerd Font")
+  - **Termux**: Works out of the box, no configuration needed
+  - **macOS/Linux**: Depends on your terminal emulator (iTerm2, Alacritty, etc.)
 - **For Termux users**: Install `termux-api` for clipboard support: `pkg install termux-api`
 
-### Building from Source
+> 💡 **Need help installing?** Ask Claude or your AI assistant: *"Help me install TFE from https://github.com/GGPrompts/TFE on [your OS]"*
+
+### Option 1: Quick Install (Recommended for Most Users)
+
+**Install globally using Go:**
+
+```bash
+go install github.com/GGPrompts/TFE@latest
+```
+
+This installs the `tfe` binary to `~/go/bin/` (or `$GOPATH/bin`). Make sure this directory is in your PATH:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc if not already present
+export PATH=$PATH:~/go/bin
+```
+
+**Usage:**
+```bash
+tfe    # Launch from any directory
+```
+
+✅ **What you get:**
+- Global `tfe` command - launch from anywhere
+- Clean installation via Go's package manager
+- Easy updates with `go install`
+
+❌ **What's missing:**
+- Quick CD feature (see Option 2 if you want this)
+
+---
+
+### Option 2: Full Installation with Quick CD Feature
+
+**For users who want the "Quick CD" feature** that lets you exit TFE and automatically change your shell to a selected directory:
+
+1. **Clone and build:**
 
 ```bash
 git clone https://github.com/GGPrompts/tfe.git
@@ -47,39 +86,48 @@ cd tfe
 go build -o tfe
 ```
 
-### Setup (Required for Quick CD Feature)
-
-To enable the "Quick CD" feature that lets you exit TFE and automatically change your shell to a selected directory:
-
-1. Add the wrapper to your shell configuration:
+2. **Set up the shell wrapper:**
 
 ```bash
+# Add wrapper to your shell config
 echo 'source ~/tfe/tfe-wrapper.sh' >> ~/.bashrc
+
+# For zsh users:
+echo 'source ~/tfe/tfe-wrapper.sh' >> ~/.zshrc
+
+# Reload your shell
+source ~/.bashrc  # or source ~/.zshrc
 ```
 
-2. Reload your shell:
+3. **Update the path if you moved TFE** (the wrapper auto-detects by default):
 
+The wrapper automatically finds the binary in the same directory. If you move it, edit `tfe-wrapper.sh` and adjust the path.
+
+**Usage:**
 ```bash
-source ~/.bashrc
+tfe    # Launch from any directory with Quick CD support
 ```
 
-3. Update the wrapper path if you installed TFE in a different location:
+✅ **What you get:**
+- Global `tfe` command - launch from anywhere
+- **Quick CD feature** - right-click folder → "📂 Quick CD" → exits TFE and changes your shell to that directory
+- Direct access to source code for customization
 
-```bash
-# Edit tfe-wrapper.sh and change the TFE_BIN path to match your installation
-```
+---
 
-**Note**: After setup, use `tfe` command instead of `./tfe` to launch the application.
+### Which Option Should I Choose?
 
-### Running
+**Choose Option 1** if you:
+- Just want a great terminal file manager
+- Prefer standard Go package installation
+- Don't need the Quick CD shell integration
 
-```bash
-tfe    # If wrapper is installed (enables Quick CD)
-# or
-./tfe # Direct execution (Quick CD won't work)
-```
+**Choose Option 2** if you:
+- Want the Quick CD feature (exit TFE and auto-cd to selected folder)
+- Like having the source code locally
+- Want to customize or contribute to TFE
 
-The file explorer will start in your current working directory.
+**Note:** You can always start with Option 1 and add the wrapper later if you decide you want Quick CD!
 
 ## Usage
 
@@ -244,6 +292,41 @@ template: |
 ```markdown
 Analyze {{file}} and suggest improvements for the {{project}} project.
 ```
+
+**Setting Up Your Prompts Library:**
+
+To use the global prompts feature, create a `~/.prompts/` directory in your home folder:
+
+```bash
+# Create the global prompts directory
+mkdir -p ~/.prompts
+
+# Create an example prompt (Microsoft Prompty format)
+cat > ~/.prompts/code-review.prompty << 'EOF'
+---
+name: Code Review
+description: Review code for best practices and potential issues
+---
+Please review the following code for:
+- Best practices and code quality
+- Potential bugs or edge cases
+- Performance considerations
+- Security vulnerabilities
+
+File: {{file}}
+Project: {{project}}
+
+Provide specific, actionable feedback.
+EOF
+```
+
+Now when you press **F11** in TFE, you'll see `🌐 ~/.prompts/ (Global Prompts)` at the top of the file list, accessible from any directory.
+
+**Tips:**
+- Organize prompts into subdirectories: `~/.prompts/coding/`, `~/.prompts/writing/`, etc.
+- Use `.prompty` format for the best metadata support
+- Prompts are accessible from **any directory** when F11 mode is active
+- The `~/.prompts/` folder auto-expands when you enable F11 mode
 
 **Quick Start:**
 1. Press **F11** to enable Prompts Mode

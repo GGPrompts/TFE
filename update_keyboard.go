@@ -130,8 +130,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Clear any stray command input that might have captured terminal responses
 			m.commandInput = ""
 			m.commandFocused = false
-			// Return nil to force immediate re-render
-			return m, nil
+			// Re-enable mouse when exiting preview
+			return m, tea.EnableMouseCellMotion
 
 		case "f4":
 			// Edit file in external editor from preview (F4 replaces e/E)
@@ -249,6 +249,27 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 								m.cursor = i
 								break
 							}
+						}
+					}
+				} else if m.dialog.title == "Create File" {
+					// Handle file creation
+					filepath := filepath.Join(m.currentPath, m.dialog.input)
+					file, err := os.Create(filepath)
+					if err != nil {
+						m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+					} else {
+						file.Close()
+						m.setStatusMessage(fmt.Sprintf("Created file: %s", m.dialog.input), false)
+						m.loadFiles()
+
+						// Open in editor
+						editor := getAvailableEditor()
+						if editor == "" {
+							m.setStatusMessage("File created, but no editor available", true)
+						} else {
+							m.showDialog = false
+							m.dialog = dialogModel{}
+							return m, openEditor(editor, filepath)
 						}
 					}
 				}
@@ -697,6 +718,19 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		if currentFile := m.getCurrentFile(); currentFile != nil {
+			// Check if this is the prompts setup helper
+			if m.showPromptsOnly && strings.HasPrefix(currentFile.name, "💡 Setup:") {
+				// Create ~/.prompts/ folder
+				if err := os.MkdirAll(currentFile.path, 0755); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to create folder: %s", err), true)
+				} else {
+					m.setStatusMessage("✓ Created ~/.prompts/ folder! Add .prompty, .yaml, .md, or .txt files here.", false)
+					// Reload files to show the new folder instead of the helper
+					m.loadFiles()
+				}
+				return m, nil
+			}
+
 			// If in favorites mode, check if we need to navigate to a different directory
 			if m.showFavoritesOnly && currentFile.name != ".." {
 				// Check if favorite is in a different location than current path
@@ -1037,6 +1071,9 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
 					// Expand the ~/.prompts directory
 					m.expandedDirs[globalPromptsDir] = true
+				} else {
+					// ~/.prompts doesn't exist - show helpful message
+					m.setStatusMessage("💡 Tip: Create ~/.prompts/ folder for global prompts (see helper below)", false)
 				}
 			}
 		}

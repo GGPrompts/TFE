@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -126,16 +125,108 @@ func (m model) getDialogPosition() (int, int) {
 	return x, y
 }
 
-// positionDialog wraps dialog content with ANSI positioning codes
-func (m model) positionDialog(dialogContent string) string {
+// overlayDialog embeds the dialog into the base view at the centered position
+// This approach works with Bubble Tea's diff-based rendering
+func (m model) overlayDialog(baseView, dialogContent string) string {
 	x, y := m.getDialogPosition()
 
-	// Replace newlines with newline + cursor positioning to maintain X coordinate
-	// This keeps the dialog together while preserving lipgloss styling
-	cursorToX := fmt.Sprintf("\n\033[%dG", x+1) // Move to column x+1 after each newline
-	dialogPositioned := strings.ReplaceAll(dialogContent, "\n", cursorToX)
+	// Ensure dialog stays on screen with proper margins
+	if x < 1 {
+		x = 1
+	}
+	if y < 1 {
+		y = 1
+	}
 
-	// Position the start of the dialog
-	// ANSI escape codes use 1-based indexing, so add 1 to coordinates
-	return fmt.Sprintf("\033[%d;%dH%s", y+1, x+1, dialogPositioned)
+	// Split both views into lines
+	baseLines := strings.Split(baseView, "\n")
+	dialogLines := strings.Split(strings.TrimSpace(dialogContent), "\n")
+
+	// Ensure we have enough base lines
+	for len(baseLines) < m.height {
+		baseLines = append(baseLines, "")
+	}
+
+	// Overlay each dialog line onto the base view
+	for i, dialogLine := range dialogLines {
+		targetLine := y + i
+		if targetLine < 0 || targetLine >= len(baseLines) {
+			continue
+		}
+
+		baseLine := baseLines[targetLine]
+
+		// We need to overlay dialogLine at visual column x
+		// Use a string builder to construct the new line
+		var newLine strings.Builder
+
+		// Get the part of baseLine before position x
+		// We need to handle ANSI codes properly
+		visualPos := 0
+		bytePos := 0
+		inAnsi := false
+		baseRunes := []rune(baseLine)
+
+		// Scan through base line until we reach visual position x
+		for bytePos < len(baseRunes) && visualPos < x {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			}
+
+			if inAnsi {
+				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
+					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
+					inAnsi = false
+				}
+			} else {
+				visualPos++
+			}
+			bytePos++
+		}
+
+		// Add the left part of the base line (up to position x)
+		if bytePos > 0 && bytePos <= len(baseRunes) {
+			newLine.WriteString(string(baseRunes[:bytePos]))
+		}
+
+		// Pad with spaces if needed to reach position x
+		for visualPos < x {
+			newLine.WriteRune(' ')
+			visualPos++
+		}
+
+		// Add the dialog line
+		newLine.WriteString(dialogLine)
+
+		// Calculate where the dialog ends visually
+		dialogWidth := visualWidth(dialogLine)
+		endPos := x + dialogWidth
+
+		// Preserve the rest of the base line after the dialog
+		// Continue scanning from where we left off to find the visual end position
+		for bytePos < len(baseRunes) && visualPos < endPos {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			}
+
+			if inAnsi {
+				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
+					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
+					inAnsi = false
+				}
+			} else {
+				visualPos++
+			}
+			bytePos++
+		}
+
+		// Append the rest of the base line (everything after the dialog)
+		if bytePos < len(baseRunes) {
+			newLine.WriteString(string(baseRunes[bytePos:]))
+		}
+
+		baseLines[targetLine] = newLine.String()
+	}
+
+	return strings.Join(baseLines, "\n")
 }

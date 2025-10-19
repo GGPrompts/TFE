@@ -38,8 +38,7 @@ func (m model) View() string {
 	// Overlay dialog if open
 	if m.showDialog {
 		dialog := m.renderDialog()
-		dialogOverlay := m.positionDialog(dialog)
-		baseView += dialogOverlay
+		baseView = m.overlayDialog(baseView, dialog)
 	}
 
 	return baseView

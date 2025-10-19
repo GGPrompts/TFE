@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // getFavoritesPath returns the path to the favorites file
@@ -177,7 +178,7 @@ func (m *model) getFilteredFiles() []fileItem {
 		homeDir, err := os.UserHomeDir()
 		if err == nil {
 			globalPromptsDir := filepath.Join(homeDir, ".prompts")
-			// Only show if we're not already in ~/.prompts/ and it exists
+			// Only show if we're not already in ~/.prompts/
 			if m.currentPath != globalPromptsDir && !strings.HasPrefix(m.currentPath, globalPromptsDir+string(filepath.Separator)) {
 				// Check if ~/.prompts/ exists
 				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
@@ -191,6 +192,17 @@ func (m *model) getFilteredFiles() []fileItem {
 						mode:    info.Mode(),
 					}
 					filtered = append(filtered, globalPromptsItem)
+				} else {
+					// ~/.prompts doesn't exist - show helper to create it
+					helperItem := fileItem{
+						name:    "💡 Setup: Create ~/.prompts/ for global prompts (press Enter)",
+						path:    globalPromptsDir, // Use the path we want to create
+						isDir:   true,
+						size:    0,
+						modTime: time.Now(),
+						mode:    0755,
+					}
+					filtered = append(filtered, helperItem)
 				}
 			}
 		}

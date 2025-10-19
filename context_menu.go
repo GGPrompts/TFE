@@ -47,6 +47,7 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		items = append(items, contextMenuItem{"📂 Open", "open"})
 		items = append(items, contextMenuItem{"📂 Quick CD", "quickcd"})
 		items = append(items, contextMenuItem{"📁 New Folder...", "newfolder"})
+		items = append(items, contextMenuItem{"📄 New File...", "newfile"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 
 		// Add separator and TUI tools if available
@@ -259,6 +260,25 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 				dialogType: dialogInput,
 				title:      "Create Directory",
 				message:    "Enter directory name:",
+				input:      "",
+			}
+			m.showDialog = true
+		}
+		return m, tea.ClearScreen
+
+	case "newfile":
+		// Create new file in the selected directory
+		if m.contextMenuFile.isDir {
+			// Navigate to the directory first
+			m.currentPath = m.contextMenuFile.path
+			m.cursor = 0
+			m.loadFiles()
+
+			// Show input dialog for file name
+			m.dialog = dialogModel{
+				dialogType: dialogInput,
+				title:      "Create File",
+				message:    "Enter filename:",
 				input:      "",
 			}
 			m.showDialog = true
