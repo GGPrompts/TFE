@@ -108,14 +108,38 @@ func (m model) renderListView(maxVisible int) string {
 			displayName = displayName[:maxNameLen-2] + ".."
 		}
 
-		// Build the line
-		line := fmt.Sprintf("  %s%s %s", icon, favIndicator, displayName)
+		// Build the line with special handling for global virtual folders to preserve emoji color
+		var line string
+		if isGlobalPromptsVirtualFolder(file.name) || isGlobalClaudeVirtualFolder(file.name) {
+			// Extract the leading emoji and render it separately to preserve its color
+			var leadingEmoji string
+			var restOfName string
+			if strings.HasPrefix(displayName, "🌐 ") {
+				leadingEmoji = "🌐 "
+				restOfName = strings.TrimPrefix(displayName, "🌐 ")
+			} else if strings.HasPrefix(displayName, "🤖 ") {
+				leadingEmoji = "🤖 "
+				restOfName = strings.TrimPrefix(displayName, "🤖 ")
+			} else {
+				restOfName = displayName
+			}
 
-		// Apply selection style
-		if i == m.cursor {
-			line = selectedStyle.Render(line)
+			// Render the emoji without styling, then the rest with styling
+			if i == m.cursor {
+				line = fmt.Sprintf("  %s%s %s%s", icon, favIndicator, leadingEmoji, selectedStyle.Render(restOfName))
+			} else {
+				line = fmt.Sprintf("  %s%s %s%s", icon, favIndicator, leadingEmoji, style.Render(restOfName))
+			}
 		} else {
-			line = style.Render(line)
+			// Normal rendering for all other files
+			line = fmt.Sprintf("  %s%s %s", icon, favIndicator, displayName)
+
+			// Apply selection style
+			if i == m.cursor {
+				line = selectedStyle.Render(line)
+			} else {
+				line = style.Render(line)
+			}
 		}
 
 		s.WriteString(line)
@@ -249,6 +273,19 @@ func (m model) renderDetailView(maxVisible int) string {
 			displayName = displayName[:maxNameLen-2] + ".."
 		}
 
+		// Extract leading emoji for global virtual folders to preserve color
+		var nameLeadingEmoji string
+		var nameWithoutEmoji string
+		if isGlobalPromptsVirtualFolder(file.name) || isGlobalClaudeVirtualFolder(file.name) {
+			if strings.HasPrefix(displayName, "🌐 ") {
+				nameLeadingEmoji = "🌐 "
+				nameWithoutEmoji = strings.TrimPrefix(displayName, "🌐 ")
+			} else if strings.HasPrefix(displayName, "🤖 ") {
+				nameLeadingEmoji = "🤖 "
+				nameWithoutEmoji = strings.TrimPrefix(displayName, "🤖 ")
+			}
+		}
+
 		name := fmt.Sprintf("%s%s %s", icon, favIndicator, displayName)
 		size := "-"
 		if file.isDir {
@@ -329,16 +366,34 @@ func (m model) renderDetailView(maxVisible int) string {
 			style = promptsFolderStyle
 		}
 
-		if i == m.cursor {
-			line = selectedStyle.Render(line)
-		} else {
-			// Add alternating row background for easier reading
-			// Even rows (0, 2, 4...) get a subtle dark background
-			if i%2 == 0 {
-				alternateStyle := style.Copy().Background(lipgloss.Color("235")) // Very dark gray
-				line = alternateStyle.Render(line)
+		// Apply styling with special handling for global virtual folders to preserve emoji color
+		if nameLeadingEmoji != "" {
+			// Replace the styled portion, preserving the emoji color
+			plainNameWithEmoji := fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, nameWithoutEmoji)
+
+			if i == m.cursor {
+				line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
 			} else {
-				line = style.Render(line)
+				if i%2 == 0 {
+					alternateStyle := style.Copy().Background(lipgloss.Color("235"))
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
+				} else {
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, style.Render(nameWithoutEmoji)), 1)
+				}
+			}
+		} else {
+			// Normal rendering
+			if i == m.cursor {
+				line = selectedStyle.Render(line)
+			} else {
+				// Add alternating row background for easier reading
+				// Even rows (0, 2, 4...) get a subtle dark background
+				if i%2 == 0 {
+					alternateStyle := style.Copy().Background(lipgloss.Color("235")) // Very dark gray
+					line = alternateStyle.Render(line)
+				} else {
+					line = style.Render(line)
+				}
 			}
 		}
 
@@ -540,12 +595,40 @@ func (m model) renderTreeView(maxVisible int) string {
 			displayName = displayName[:maxNameLen-2] + ".."
 		}
 
-		line := fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, displayName)
+		// Build the line with special handling for global virtual folders to preserve emoji color
+		var line string
+		if isGlobalPromptsVirtualFolder(file.name) || isGlobalClaudeVirtualFolder(file.name) {
+			// Extract the leading emoji and render it separately to preserve its color
+			var leadingEmoji string
+			var restOfName string
+			if strings.HasPrefix(displayName, "🌐 ") {
+				leadingEmoji = "🌐 "
+				restOfName = strings.TrimPrefix(displayName, "🌐 ")
+			} else if strings.HasPrefix(displayName, "🤖 ") {
+				leadingEmoji = "🤖 "
+				restOfName = strings.TrimPrefix(displayName, "🤖 ")
+			} else {
+				restOfName = displayName
+			}
 
-		if i == m.cursor {
-			line = selectedStyle.Render(line)
+			// Build base string with emoji uncolored
+			baseString := fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, leadingEmoji)
+
+			// Render the emoji without styling, then the rest with styling
+			if i == m.cursor {
+				line = baseString + selectedStyle.Render(restOfName)
+			} else {
+				line = baseString + style.Render(restOfName)
+			}
 		} else {
-			line = style.Render(line)
+			// Normal rendering for all other files
+			line = fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, displayName)
+
+			if i == m.cursor {
+				line = selectedStyle.Render(line)
+			} else {
+				line = style.Render(line)
+			}
 		}
 
 		s.WriteString(line)

@@ -1,335 +1,285 @@
-# TFE Session Summary - 2025-10-18
+# Next Session: Remove Grid View Display Mode
 
-**Session Focus:** Fillable Fields Polish & Launch Prep
-**Duration:** ~3 hours
-**Status:** ✅ Major features complete, ready for v1.0 push
+## Context
 
----
+Grid view (F2) doesn't display well on any monitor size and isn't useful. Remove it completely and simplify the display mode system to just:
+- **List View** (F1) - Simple vertical list
+- **Detail View** (F4) - Table with columns (default) ✨ Now with zebra striping!
+- **Tree View** (F5) - Hierarchical tree
 
-## 🎉 Completed This Session
+## Tasks
 
-### 1. Fillable Fields F3 File Picker (Phase 5 Complete!)
-**Problem:** User reported F3 didn't work when trying to select files for input fields.
+### 1. Remove Grid View Enum and Logic
 
-**What we built:**
-- ✅ F3 opens file picker mode from any input field
-- ✅ Navigate directories and select files with Enter
-- ✅ Esc cancels and returns to preview
-- ✅ Double-click files to select
-- ✅ Disables prompts filter temporarily (shows all files)
-- ✅ Restores preview state when returning
-- ✅ Title shows "[📁 File Picker]" indicator
+**File: `types.go`**
+```go
+// Find this:
+const (
+    modeList displayMode = iota
+    modeGrid    // ← DELETE THIS LINE
+    modeDetail
+    modeTree
+)
 
-**Bugs Fixed:**
-- Fixed prompts filter still active in file picker (couldn't see non-prompt files)
-- Fixed Enter key navigating directories vs selecting files
-- Fixed preview state not restoring when exiting file picker
-- Fixed double-click opening preview instead of selecting file
-- Added missing `fmt` import to `update_mouse.go`
-
-**Files Modified:**
-- `types.go` - Added `filePickerRestorePath` and `filePickerRestorePrompts` fields
-- `update_keyboard.go` - F3 handler, Enter/Esc handlers with state management
-- `update_mouse.go` - Double-click file selection in file picker mode
-- `view.go` - File picker mode indicator in title
-
-### 2. Consistent Enter Key Behavior
-**Problem:** In prompts mode, Enter copied to clipboard instead of previewing (inconsistent with rest of TFE).
-
-**Fix:**
-- ✅ Enter now ALWAYS previews files (consistent!)
-- ✅ F5 copies rendered prompts (clear and obvious)
-- ✅ Users can see prompts before copying
-
-**Files Modified:** `update_keyboard.go` (removed special Enter behavior)
-
-### 3. Glamour Markdown Rendering for Prompts
-**Problem:** Prompt templates were plain text, but regular markdown files had beautiful Glamour formatting. Why not both?
-
-**Fix:**
-- ✅ Markdown prompts now render with full Glamour formatting
-- ✅ Beautiful headers, lists, code blocks, emphasis
-- ✅ Variables get substituted FIRST, then Glamour renders
-- ✅ Smart mode switching: plain text when editing variables, formatted when viewing
-- ✅ Graceful fallback if Glamour fails
-
-**Files Modified:** `render_preview.go` - Added Glamour rendering to `renderPromptPreview()`
-
-### 4. Run Script Feature
-**Idea:** User noticed command prompt can run scripts with "press any key to continue" - why not add to context menu?
-
-**Implementation:**
-- ✅ Added "▶️ Run Script" to context menu for executable files
-- ✅ Auto-detects executables by extension (.sh, .bash, .zsh, .fish)
-- ✅ Auto-detects files with execute permission (chmod +x)
-- ✅ Reuses existing `runCommand()` infrastructure (zero bloat!)
-- ✅ Runs in script's directory
-- ✅ Shows output, waits for keypress, returns to TFE
-
-**Files Modified:** `context_menu.go` - Added `isExecutableFile()` and "runscript" action
-
-### 5. Documentation Updates
-
-**HOTKEYS.md:**
-- ✅ Added complete "Prompt Templates & Fillable Fields" section
-- ✅ Documented Tab/Shift+Tab navigation, F3 file picker, field types
-- ✅ Updated F-keys table (F3 and F5 descriptions)
-- ✅ Added tip #12 about prompts
-
-**README.md:**
-- ✅ Added Termux to platform badge
-- ✅ Enhanced intro highlighting mobile support
-- ✅ Added "Mobile Ready" to features list
-- ✅ Created full "Mobile & Termux Support" section with:
-  - Touch controls documentation
-  - Termux installation guide
-  - Mobile usage tips
-- ✅ Updated Prompts Library section with fillable fields
-- ✅ Enhanced Quick Start with field filling workflow
-
-**CHANGELOG.md:**
-- ✅ Added fillable fields feature (Phase 5) to [Unreleased]
-- ✅ Documented smart type classification
-- ✅ Documented F3 file picker mode
-- ✅ Listed all modified files
-
-**PLAN.md:**
-- ✅ Updated Phase 4 to prioritize copy/rename/new file as v1.0 blockers
-- ✅ Reorganized "Prioritized Next Steps" with launch focus
-- ✅ Added reference to LAUNCH_CHECKLIST.md
-- ✅ Marked fillable fields as complete
-
-**Created:** `docs/LAUNCH_CHECKLIST.md`
-- ✅ Complete v1.0 requirements (3 critical features)
-- ✅ Documentation needs (screenshots, comparison table)
-- ✅ Release process (binaries, marketing)
-- ✅ Timeline estimate (4-6 hours coding + 8-12 hours polish)
-- ✅ Marketing angles (prompts library + mobile support)
-
----
-
-## 📊 Current Project Status
-
-### ✅ Feature Complete
-- Core file browser (all 4 view modes)
-- Dual-pane preview
-- F7/F8 operations (create dir, delete)
-- Prompts library with fillable fields ✨
-- F3 file picker for prompts
-- Fuzzy search, directory search
-- Context menu, favorites
-- Run script feature
-- Mobile/Termux support
-
-### 🔴 Blocking v1.0 Launch (4-6 hours)
-1. **Copy Files** (2-3 hours) - Context menu + dialog
-2. **Rename Files** (1-2 hours) - Context menu + dialog
-3. **New File** (1 hour) - Context menu + auto-edit
-
-### 📸 Launch Prep Needed (8-12 hours)
-4. Screenshots/GIFs (2 hours)
-5. Documentation polish (1.5 hours)
-6. GitHub release + binaries (2-3 hours)
-7. Testing (2 hours)
-8. Marketing posts (1 hour)
-
-**Total to v1.0:** 12-18 hours = ~1-2 weeks of work
-
----
-
-## 🐛 Known Issues
-
-None! All reported bugs fixed this session.
-
----
-
-## 📝 Documentation Still Needs Updates
-
-### HOTKEYS.md
-- [ ] Add "Run Script" section under "File Operations"
-  - Explain ▶️ Run Script context menu option
-  - Mention auto-detection (.sh files, execute permission)
-
-### CHANGELOG.md (Today's Features)
-- [ ] Add to [Unreleased] section:
-  - Glamour rendering for markdown prompts
-  - Run Script feature for executable files
-  - Fixed Enter key consistency in prompts mode
-  - Enhanced mobile/Termux documentation
-
-### Example Prompts
-- [ ] Create example prompt library in `~/.prompts/` to demonstrate
-  - Code review prompts
-  - Debugging prompts
-  - Show off fillable fields with different types
-
----
-
-## 🚀 Next Session Priority
-
-### Option 1: Polish & Test Current Features
-- Test fillable fields end-to-end (all field types)
-- Test F3 file picker in various scenarios
-- Test Run Script with different file types
-- Create example prompt templates
-- Take screenshots/GIFs
-
-### Option 2: Push for v1.0 Launch
-Start implementing the 3 critical features:
-
-**Day 1: Copy Files (2-3 hours)**
-- Add context menu item "📋 Copy to..."
-- Create input dialog for destination path
-- Implement copy logic in new `file_copy.go` module
-- Handle errors (permissions, disk space, overwrite)
-- Add progress indicator for large files
-
-**Day 2: Rename Files (1-2 hours)**
-- Add context menu item "✏️ Rename..."
-- Pre-fill dialog with current filename
-- Validate input (no path separators, check conflicts)
-- Handle errors (permissions, already exists)
-
-**Day 3: New File (1 hour)**
-- Add context menu item "📄 New File..."
-- Create file and auto-open in editor
-- Handle errors (permissions, already exists)
-
-**After these 3:** Ready for v1.0 screenshots and launch! 🎉
-
----
-
-## 💡 Key Insights This Session
-
-### Architecture Wins
-1. **Modular design pays off:** Run Script feature took 5 minutes because `runCommand()` infrastructure existed
-2. **Reuse > Rebuild:** F3 file picker reused file browser, just added mode flag
-3. **Separation of concerns:** Glamour rendering added without touching input field logic
-
-### User Feedback is Gold
-- Enter key inconsistency - fixed immediately
-- Markdown rendering gap - obvious in hindsight, easy fix
-- F3 not working - bugs found and squashed
-- Run Script idea - brilliant observation, trivial to implement
-
-### Launch Strategy
-- Lead with TWO unique features: Prompts library + Mobile support
-- Both are rare/unique in terminal file managers
-- Perfect for r/commandline, r/unixporn, r/termux
-
----
-
-## 🔧 Quick Reference
-
-### Build & Run
-```bash
-go build
-./tfe
+// Replace with:
+const (
+    modeList displayMode = iota
+    modeDetail
+    modeTree
+)
 ```
 
-### Test Prompts Feature
-```bash
-# Create test prompt
-mkdir -p ~/.prompts
-cat > ~/.prompts/test.md <<'EOF'
-# Review {{file}}
+- Remove `modeGrid` from the `displayMode` enum
+- Update any comments referencing 4 display modes → 3 modes
+- Remove `gridColumns int` field from model struct (if it exists)
 
-Focus on:
-- Code quality
-- Performance
+**File: `render_file_list.go`**
+- Delete the entire `renderGridView()` function (~150 lines)
+- Remove grid-related imports if they become unused
 
-Date: {{DATE}}
-EOF
+**File: `model.go`**
+- Delete `calculateGridLayout()` function if it exists (~30 lines)
 
-# In TFE:
-# Press F11 → Navigate to ~/.prompts/test.md → Enter → Tab to fields → F3 for file picker
+### 2. Update Display Mode Cycling
+
+**File: `update_keyboard.go`**
+
+Find and update the F1/F2 key handlers:
+
+```go
+case "f1":
+    // OLD: Cycles through 4 modes
+    m.displayMode = (m.displayMode + 1) % 4
+
+    // NEW: Cycles through 3 modes
+    m.displayMode = (m.displayMode + 1) % 3
+
+case "f2":
+    // REMOVE: No longer cycles to grid view
+    // OPTION 1: Remove F2 handler entirely
+    // OPTION 2: Reassign to toggle hidden files
+    // OPTION 3: Quick toggle between List ↔ Detail
 ```
 
-### Test Run Script
-```bash
-# Create test script
-echo '#!/bin/bash
-echo "Hello from TFE!"
-sleep 2' > test.sh
-chmod +x test.sh
-
-# In TFE: Right-click test.sh → ▶️ Run Script
+**Suggested F2 Reassignment:**
+```go
+case "f2":
+    // Quick toggle between List and Detail (most common views)
+    if m.displayMode == modeList {
+        m.displayMode = modeDetail
+    } else {
+        m.displayMode = modeList
+    }
 ```
 
+### 3. Update View Rendering Switch
+
+**File: `view.go` or dispatch location**
+
+Find the switch statement that calls view renderers:
+
+```go
+switch m.displayMode {
+case modeList:
+    return m.renderListView(maxVisible)
+case modeGrid:    // ← DELETE THIS CASE
+    return m.renderGridView(maxVisible)
+case modeDetail:
+    return m.renderDetailView(maxVisible)
+case modeTree:
+    return m.renderTreeView(maxVisible)
+default:
+    return m.renderDetailView(maxVisible)  // Ensure safe default
+}
+```
+
+### 4. Verify Dual-Pane Compatibility
+
+**File: `helpers.go`**
+
+Check `isDualPaneCompatible()` - should still work correctly:
+```go
+func (m model) isDualPaneCompatible() bool {
+    return m.displayMode == modeList || m.displayMode == modeTree
+    // modeDetail incompatible (needs full width for columns)
+}
+```
+
+No changes needed here - just verify it still works after grid removal.
+
+### 5. Update Documentation
+
+**File: `HOTKEYS.md`**
+- Remove F2 grid view reference from F-keys table
+- Update display mode section:
+  ```markdown
+  ## Display Modes (3 total)
+
+  - F1: List View - Simple vertical list
+  - F2: (Available) or Quick toggle List ↔ Detail
+  - F4: Detail View - Table with columns (default)
+  - F5: Tree View - Hierarchical with folders
+  ```
+
+**File: `README.md`**
+- Update feature list: "4 display modes" → "3 display modes"
+- Remove grid view from any screenshots/descriptions
+- Update Quick Start if it mentions F2 grid view
+
+**File: `CLAUDE.md`**
+- Update Module Responsibilities if it mentions grid view
+- Update any examples showing display mode counts
+
+### 6. Clean Up Tests
+
+**File: `helpers_test.go`** (check if exists)
+- Remove any `modeGrid` test cases
+- Update `TestIsDualPaneCompatible` if it tests grid mode
+- Update any tests that enumerate all display modes (4 → 3)
+
+### 7. Search for All References
+
+Before starting, run these commands to find all grid references:
+
+```bash
+# Find all grid code references
+grep -rn "modeGrid" --include="*.go"
+grep -rn "renderGridView" --include="*.go"
+grep -rn "calculateGridLayout" --include="*.go"
+grep -rn "gridColumns" --include="*.go"
+
+# Find F2 key handler
+grep -rn '"f2"' --include="*.go"
+
+# Find display mode switches
+grep -rn "switch.*displayMode" --include="*.go"
+grep -rn "case modeGrid" --include="*.go"
+
+# Find documentation references
+grep -rn "grid" --include="*.md" -i
+grep -rn "F2" --include="*.md"
+```
+
+## Testing Checklist
+
+After removal:
+- [ ] Build succeeds: `go build -o tfe .`
+- [ ] All tests pass: `make test`
+- [ ] All 169 tests still passing
+- [ ] F1 cycles: List → Detail → Tree → List (no grid)
+- [ ] F4 goes directly to Detail view
+- [ ] F5 goes directly to Tree view
+- [ ] Detail view is default on startup
+- [ ] Detail view shows zebra striping ✨
+- [ ] Dual-pane mode works with List and Tree only
+- [ ] No grid references in UI or error messages
+- [ ] HOTKEYS.md updated
+- [ ] README.md updated
+
+## Expected Impact
+
+**Lines Removed:** ~200-300 lines total
+- `renderGridView()`: ~150 lines
+- `calculateGridLayout()`: ~30 lines
+- Enum/constants/tests: ~20-50 lines
+- Documentation cleanup: ~10-20 lines
+
+**Files Modified:** 6-8 files
+1. `types.go` - Remove enum value, gridColumns field
+2. `render_file_list.go` - Delete renderGridView()
+3. `update_keyboard.go` - Update F1/F2 handlers
+4. `view.go` - Remove case from switch
+5. `model.go` - Delete calculateGridLayout() if exists
+6. `HOTKEYS.md` - Update F-keys, remove grid references
+7. `README.md` - Update mode count, remove grid mentions
+8. `CLAUDE.md` - Update architecture docs
+
+**Benefits:**
+- ✅ Cleaner codebase (fewer modes to maintain)
+- ✅ Simpler UX (3 clear, useful view options)
+- ✅ Less confusion about when to use grid
+- ✅ More keyboard shortcuts available (F2 freed up)
+- ✅ Easier to explain and document
+- ✅ Focus on the modes that actually work well
+
+## Optional: F2 Key Reassignment Ideas
+
+**Option 1: Quick Toggle List ↔ Detail** (Recommended)
+```go
+case "f2":
+    // Toggle between two most common views
+    if m.displayMode == modeList {
+        m.displayMode = modeDetail
+    } else {
+        m.displayMode = modeList
+    }
+```
+Benefits: Fast switching between compact (List) and detailed (Detail)
+
+**Option 2: Toggle Hidden Files**
+```go
+case "f2":
+    m.showHidden = !m.showHidden
+    m.loadFiles()
+```
+Benefits: Currently no hotkey for this common operation
+
+**Option 3: Leave Unassigned**
+Keep F2 available for future features. Document as "Available for future use"
+
+## Git Commit Message Template
+
+```
+feat: Remove grid view display mode
+
+Grid view didn't display well on any monitor size and wasn't useful
+in practice. Simplified display modes to three focused options:
+
+- List View (F1) - Compact vertical list
+- Detail View (F4) - Table with columns & zebra striping (default)
+- Tree View (F5) - Hierarchical folder navigation
+
+Changes:
+- Removed modeGrid enum and renderGridView() function
+- Removed calculateGridLayout() helper function
+- Removed gridColumns field from model struct
+- Updated display mode cycling to skip grid (mod 3 instead of 4)
+- Updated documentation (HOTKEYS.md, README.md, CLAUDE.md)
+- F2 key reassigned to [quick toggle List↔Detail / hidden files / available]
+
+This reduces code complexity by ~250 lines and improves UX clarity.
+Users now have 3 distinct, well-working view modes instead of 4 with
+one problematic option.
+```
+
+## Success Criteria
+
+✅ Code compiles without errors
+✅ All 169 tests pass
+✅ No references to "grid" in code or docs (except git history)
+✅ F1 cycles through exactly 3 modes smoothly
+✅ F2 does something useful or is clearly unassigned
+✅ Detail view with zebra striping works perfectly
+✅ Dual-pane compatibility unaffected
+
 ---
 
-## 📂 Files Modified This Session
+**Priority:** Medium (code cleanup, improves maintainability)
+**Estimated Time:** 30-45 minutes
+**Difficulty:** Easy (straightforward removal, minimal refactoring)
+**Risk:** Low (grid view rarely used, well-isolated code)
 
-### Core Features
-- `types.go` - File picker state fields
-- `update_keyboard.go` - F3 handler, Enter/Esc logic, removed special Enter
-- `update_mouse.go` - Double-click file selection, added fmt import
-- `view.go` - File picker title indicator
-- `render_preview.go` - Glamour rendering for prompts
-- `context_menu.go` - Run Script feature, isExecutableFile()
+## Notes
 
-### Documentation
-- `HOTKEYS.md` - Fillable fields section, updated F-keys
-- `README.md` - Mobile support section, fillable fields
-- `CHANGELOG.md` - Fillable fields feature entry
-- `PLAN.md` - v1.0 priorities, launch focus
-- `docs/LAUNCH_CHECKLIST.md` - Created (complete v1.0 guide)
+- Keep List, Detail, and Tree views - they're all useful and distinct
+- Detail view is the default and most feature-rich (now with zebra striping!)
+- Tree view is unique for hierarchical browsing with expansion
+- List view is great for compact, fast navigation
+- This cleanup makes TFE easier to explain and maintain
+- F2 freed up for a more useful feature
 
 ---
 
-## 🎯 Recommended Next Steps
-
-### High Priority (Do First)
-1. ✅ **Test fillable fields thoroughly** - All field types, edge cases
-2. ✅ **Test file picker** - Different directories, Esc/Enter, prompts filter
-3. ✅ **Test Run Script** - .sh files, executables, output display
-4. ✅ **Update HOTKEYS.md** - Add Run Script documentation
-5. ✅ **Update CHANGELOG.md** - Add today's features
-
-### Medium Priority
-6. 🔧 **Create example prompts** - Show off the feature
-7. 🔧 **Take screenshots** - For future README (when ready to launch)
-8. 🔧 **Plan v1.0 sprint** - Schedule the 3 critical features
-
-### Low Priority (Post-Launch)
-9. 📦 Context Visualizer (Phase 3 from PLAN.md)
-10. 📦 Multi-select operations
-11. 📦 Archive handling
-
----
-
-## 💭 Notes for Claude
-
-### What Worked Well
-- User-driven feature development (F3 file picker, Run Script)
-- Quick iteration on bugs (Enter key, prompts filter, double-click)
-- Leveraging existing infrastructure (runCommand for scripts)
-- Documentation thoroughness (README, HOTKEYS, CHANGELOG, PLAN all updated)
-
-### What to Remember
-- TFE has excellent modular architecture - respect it!
-- Command prompt infrastructure is powerful - reuse it
-- User tests on Termux - mobile support is a real differentiator
-- Prompts library is the killer feature - market it prominently
-- Launch checklist exists - follow it for v1.0
-
-### Project Philosophy
-- Ship features fast, polish later
-- Reuse infrastructure > rebuild
-- User feedback drives priorities
-- Quality bar: no data loss, graceful errors, clear feedback
-- Target audience: AI-assisted developers, Claude Code users, Termux power users
-
----
-
-**Session Rating:** ⭐⭐⭐⭐⭐ (Extremely productive!)
-
-**Key Achievement:** Fillable fields feature is now COMPLETE with file picker! This was a "future enhancement" in the prompts spec - now it's done and polished. 🎉
-
-**Path to Launch:** Clear and achievable. Just 3 features away from v1.0 (copy/rename/new file), then screenshots and marketing. Launch in 1-2 weeks is realistic!
-
----
-
-**Last Updated:** 2025-10-18 (end of session)
-**Next Session:** Test current features + start v1.0 sprint (copy files)
-**Documentation Status:** Up to date except HOTKEYS.md (Run Script) and CHANGELOG.md (today's features)
+**Created:** 2025-10-19
+**Status:** Ready to implement
+**Session Type:** Quick cleanup task (< 1 hour)

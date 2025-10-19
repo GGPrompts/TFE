@@ -314,10 +314,11 @@ func convertTrashItemsToFileItems(items []trashItem) []fileItem {
 			continue
 		}
 
-		// Create fileItem with original name and info
+		// Create fileItem with clean original name (no location suffix)
+		// The location will be shown in the "Original Location" column in detail view
 		fileItem := fileItem{
-			name:    item.OriginalName + " (from " + filepath.Dir(item.OriginalPath) + ")",
-			path:    item.TrashedPath, // Use trashed path for operations
+			name:    item.OriginalName, // Clean name without "(from ...)"
+			path:    item.TrashedPath,  // Use trashed path for operations
 			isDir:   item.IsDir,
 			size:    item.Size,
 			modTime: item.DeletedAt, // Show deletion time instead of modtime
@@ -327,6 +328,17 @@ func convertTrashItemsToFileItems(items []trashItem) []fileItem {
 	}
 
 	return fileItems
+}
+
+// getTrashItemByPath looks up a trash item by its trashed path
+// Returns the trash item and true if found, or empty item and false if not found
+func getTrashItemByPath(trashItems []trashItem, trashedPath string) (trashItem, bool) {
+	for _, item := range trashItems {
+		if item.TrashedPath == trashedPath {
+			return item, true
+		}
+	}
+	return trashItem{}, false
 }
 
 // permanentlyDelete permanently deletes a single item from trash
