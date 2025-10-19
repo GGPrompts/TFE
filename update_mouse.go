@@ -68,7 +68,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [>_] [📦] [🔍]
+			// Toolbar: [🏠] [⭐/✨] [>_] [🔍] [📝] [🗑️]
 			// Note: Emojis render as 2 characters wide in terminals
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
@@ -123,6 +123,25 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 								m.expandedDirs[globalPromptsDir] = true
 							}
 						}
+					}
+					return m, nil
+				}
+				// Trash button [🗑️] or [♻️] (X=30-34: [ + emoji(2) + ])
+				if msg.X >= 30 && msg.X <= 34 {
+					// Toggle trash view
+					m.showTrashOnly = !m.showTrashOnly
+					m.showFavoritesOnly = false // Disable favorites filter
+					m.showPromptsOnly = false   // Disable prompts filter
+					m.cursor = 0
+
+					if m.showTrashOnly {
+						// Load trash items and convert to fileItems for display
+						// Default to detail view for trash
+						m.displayMode = modeDetail
+						m.loadFiles()
+					} else {
+						// Exit trash view, reload normal files
+						m.loadFiles()
 					}
 					return m, nil
 				}

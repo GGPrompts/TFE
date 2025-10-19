@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -46,18 +46,14 @@ func (m model) getWrappedLineCount() int {
 	// For markdown, we need to render it to count lines
 	if m.preview.isMarkdown {
 		markdownContent := strings.Join(m.preview.content, "\n")
-		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("auto"),
-			glamour.WithWordWrap(availableWidth),
-		)
+		// Use cached rendering with timeout to prevent hangs
+		// Note: renderMarkdownWithTimeout is in file_operations.go
+		rendered, err := renderMarkdownWithTimeout(markdownContent, availableWidth, 5*time.Second)
 		if err == nil {
-			rendered, err := renderer.Render(markdownContent)
-			if err == nil {
-				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-				return len(renderedLines)
-			}
+			renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+			return len(renderedLines)
 		}
-		// Fallback if glamour fails
+		// Fallback if glamour fails or times out
 	}
 
 	// For regular text, count wrapped lines
@@ -505,23 +501,13 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		isMarkdownPrompt = m.preview.isMarkdown
 
 		if isMarkdownPrompt {
-			// Render with Glamour for beautiful formatting
-			renderer, err := glamour.NewTermRenderer(
-				glamour.WithStandardStyle("auto"),
-				glamour.WithWordWrap(availableWidth),
-			)
+			// Render with Glamour for beautiful formatting (with timeout to prevent hangs)
+			rendered, err := renderMarkdownWithTimeout(contentText, availableWidth, 5*time.Second)
 			if err == nil {
-				rendered, err := renderer.Render(contentText)
-				if err == nil {
-					// Successfully rendered with Glamour
-					contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-				} else {
-					// Glamour failed, fall back to plain text
-					contentLines = m.preview.content
-					isMarkdownPrompt = false
-				}
+				// Successfully rendered with Glamour
+				contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
 			} else {
-				// Glamour init failed, fall back to plain text
+				// Glamour failed or timed out, fall back to plain text
 				contentLines = m.preview.content
 				isMarkdownPrompt = false
 			}

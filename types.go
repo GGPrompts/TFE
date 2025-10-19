@@ -217,6 +217,9 @@ type model struct {
 	showFavoritesOnly bool            // Filter to show only favorites
 	// Prompts system
 	showPromptsOnly bool // Filter to show only prompt files (.yaml, .md, .txt)
+	// Trash/Recycle bin system
+	showTrashOnly bool        // Filter to show trash contents
+	trashItems    []trashItem // Cached trash items when viewing trash
 	// Prompt input fields (fillable variables)
 	promptInputFields      []promptInputField // Input fields for prompt variables
 	focusedInputField      int                // Index of currently focused input field

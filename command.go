@@ -118,6 +118,41 @@ func (m *model) getNextCommand() string {
 	return ""
 }
 
+// runScript executes a script file safely without command injection
+// Similar to runCommand but for executing script files directly
+func runScript(scriptPath string) tea.Cmd {
+	return func() tea.Msg {
+		// Create a wrapper script that:
+		// 1. Shows the script being executed
+		// 2. Runs the script
+		// 3. Pauses for user input
+		wrapperScript := `
+echo "$ bash $0"
+echo ""
+bash "$0"
+exitCode=$?
+echo ""
+echo "Exit code: $exitCode"
+echo "Press any key to continue..."
+read -n 1 -s -r
+exit $exitCode
+`
+		// Execute bash with the wrapper script and pass scriptPath as $0
+		c := exec.Command("bash", "-c", wrapperScript, scriptPath)
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+
+		// Execute the command and restore the terminal
+		return tea.Sequence(
+			tea.ClearScreen,
+			tea.ExecProcess(c, func(err error) tea.Msg {
+				return commandFinishedMsg{err: err}
+			}),
+		)()
+	}
+}
+
 // shellQuote quotes a string for safe use in shell commands
 // Simple version that escapes single quotes
 func shellQuote(s string) string {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -80,8 +81,19 @@ func (m model) renderSinglePane() string {
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
 
-	// Home button
-	s.WriteString(homeButtonStyle.Render("[🏠]"))
+	// Home button (highlight if in home directory)
+	homeDir, _ := os.UserHomeDir()
+	if m.currentPath == homeDir {
+		// Active: gray background (in home directory)
+		activeHomeStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeHomeStyle.Render("[🏠]"))
+	} else {
+		// Inactive: normal styling
+		s.WriteString(homeButtonStyle.Render("[🏠]"))
+	}
 	s.WriteString(" ")
 
 	// Favorites filter toggle button
@@ -115,11 +127,25 @@ func (m model) renderSinglePane() string {
 	s.WriteString(" ")
 
 	// Prompts filter toggle button
-	promptIcon := "📝"
 	if m.showPromptsOnly {
-		promptIcon = "✨📝" // Different icon when filter is active
+		// Active: gray background (like command mode)
+		activeStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeStyle.Render("[📝]"))
+	} else {
+		// Inactive: normal styling
+		s.WriteString(homeButtonStyle.Render("[📝]"))
 	}
-	s.WriteString(homeButtonStyle.Render("[" + promptIcon + "]"))
+	s.WriteString(" ")
+
+	// Trash/Recycle bin button
+	trashIcon := "🗑️"
+	if m.showTrashOnly {
+		trashIcon = "♻️" // Recycle icon when viewing trash
+	}
+	s.WriteString(homeButtonStyle.Render("[" + trashIcon + "]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")

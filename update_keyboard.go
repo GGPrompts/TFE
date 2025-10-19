@@ -258,7 +258,9 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					if err != nil {
 						m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
 					} else {
-						file.Close()
+						// Always close the file handle
+						defer file.Close()
+
 						m.setStatusMessage(fmt.Sprintf("Created file: %s", m.dialog.input), false)
 						m.loadFiles()
 
@@ -315,7 +317,39 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 			case "y", "Y":
 				// Confirm action
-				if m.dialog.title == "Delete file" || m.dialog.title == "Delete directory" {
+				if m.dialog.title == "Permanently Delete" {
+					// Permanently delete item from trash
+					if m.contextMenuFile != nil {
+						if err := permanentlyDeleteFromTrash(m.contextMenuFile.path); err != nil {
+							m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+						} else {
+							m.setStatusMessage("Item permanently deleted", false)
+							m.loadFiles() // Refresh trash view
+						}
+						m.contextMenuFile = nil
+						m.contextMenuOpen = false
+					}
+				} else if m.dialog.title == "Empty Trash" {
+					// Empty entire trash
+					if err := emptyTrash(); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Error emptying trash: %s", err), true)
+					} else {
+						m.setStatusMessage("Trash emptied successfully", false)
+						m.loadFiles() // Refresh trash view
+					}
+				} else if m.dialog.title == "Move to Trash" {
+					// Move item to trash (from context menu)
+					if m.contextMenuFile != nil {
+						if err := m.deleteFileOrDir(m.contextMenuFile.path, m.contextMenuFile.isDir); err != nil {
+							m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+						} else {
+							m.setStatusMessage(fmt.Sprintf("Moved to trash: %s", m.contextMenuFile.name), false)
+							m.loadFiles()
+						}
+						m.contextMenuFile = nil
+						m.contextMenuOpen = false
+					}
+				} else if m.dialog.title == "Delete file" || m.dialog.title == "Delete directory" {
 					// Handle F8 deletion
 					if m.contextMenuFile != nil {
 						// Delete from context menu
@@ -1091,6 +1125,18 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.inputFieldsActive = false
 				m.focusedInputField = 0
 			}
+		}
+
+	case "f12":
+		// F12: Toggle trash/recycle bin view
+		m.showTrashOnly = !m.showTrashOnly
+		m.showFavoritesOnly = false // Disable favorites filter
+		m.showPromptsOnly = false   // Disable prompts filter
+		m.cursor = 0
+
+		if m.showTrashOnly {
+			// Default to detail view for trash
+			m.displayMode = modeDetail
 		}
 
 	case "f1":

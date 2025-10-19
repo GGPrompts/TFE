@@ -42,6 +42,15 @@ func (m model) getContextMenuItems() []contextMenuItem {
 
 	items := []contextMenuItem{}
 
+	// Special menu for trash view
+	if m.showTrashOnly {
+		items = append(items, contextMenuItem{"♻️  Restore", "restore"})
+		items = append(items, contextMenuItem{"🗑️  Delete Permanently", "permanent_delete"})
+		items = append(items, contextMenuItem{"─────────", "separator"})
+		items = append(items, contextMenuItem{"🧹 Empty Trash", "empty_trash"})
+		return items
+	}
+
 	if m.contextMenuFile.isDir {
 		// Directory menu items
 		items = append(items, contextMenuItem{"📂 Open", "open"})
@@ -194,10 +203,9 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 	case "runscript":
 		// Run executable script
 		if !m.contextMenuFile.isDir && isExecutableFile(*m.contextMenuFile) {
-			// Use bash to run the script
+			// Use bash to run the script safely (no command injection)
 			scriptPath := m.contextMenuFile.path
-			command := fmt.Sprintf("bash %s", scriptPath)
-			return m, runCommand(command, filepath.Dir(scriptPath))
+			return m, runScript(scriptPath)
 		}
 		return m, tea.ClearScreen
 
@@ -285,16 +293,42 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		}
 		return m, tea.ClearScreen
 
-	case "delete":
-		// Delete the selected file or folder
-		fileType := "file"
-		if m.contextMenuFile.isDir {
-			fileType = "directory"
+	case "restore":
+		// Restore item from trash
+		if err := restoreFromTrash(m.contextMenuFile.path); err != nil {
+			m.setStatusMessage(fmt.Sprintf("Failed to restore: %s", err), true)
+		} else {
+			m.setStatusMessage("Item restored successfully", false)
+			m.loadFiles() // Refresh trash view
 		}
+		return m, tea.ClearScreen
+
+	case "permanent_delete":
+		// Permanently delete item from trash
 		m.dialog = dialogModel{
 			dialogType: dialogConfirm,
-			title:      "Delete " + fileType,
-			message:    fmt.Sprintf("Delete '%s'?\nThis cannot be undone.", m.contextMenuFile.name),
+			title:      "Permanently Delete",
+			message:    fmt.Sprintf("Permanently delete '%s'?\nThis CANNOT be undone!", m.contextMenuFile.name),
+		}
+		m.showDialog = true
+		return m, tea.ClearScreen
+
+	case "empty_trash":
+		// Empty entire trash
+		m.dialog = dialogModel{
+			dialogType: dialogConfirm,
+			title:      "Empty Trash",
+			message:    "Permanently delete ALL items in trash?\nThis CANNOT be undone!",
+		}
+		m.showDialog = true
+		return m, tea.ClearScreen
+
+	case "delete":
+		// Delete the selected file or folder (move to trash)
+		m.dialog = dialogModel{
+			dialogType: dialogConfirm,
+			title:      "Move to Trash",
+			message:    fmt.Sprintf("Move '%s' to trash?", m.contextMenuFile.name),
 		}
 		m.showDialog = true
 		return m, tea.ClearScreen

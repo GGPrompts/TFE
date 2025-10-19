@@ -703,6 +703,21 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 
 // loadFiles loads the files from the current directory
 func (m *model) loadFiles() {
+	// Special handling for trash view
+	if m.showTrashOnly {
+		trashItems, err := getTrashItems()
+		if err != nil {
+			m.files = []fileItem{}
+			m.setStatusMessage(fmt.Sprintf("Error loading trash: %v", err), true)
+			return
+		}
+
+		// Convert trash items to file items for display
+		m.files = convertTrashItemsToFileItems(trashItems)
+		m.trashItems = trashItems // Cache for later use
+		return
+	}
+
 	entries, err := os.ReadDir(m.currentPath)
 	if err != nil {
 		m.files = []fileItem{}
@@ -1106,27 +1121,25 @@ func (m *model) populatePreviewCache() {
 			// Fall through to regular text wrapping below
 		} else {
 			markdownContent := strings.Join(m.preview.content, "\n")
-			renderer, err := glamour.NewTermRenderer(
-				glamour.WithStandardStyle("auto"),
-				glamour.WithWordWrap(availableWidth),
-			)
+
+			// Render with 5-second timeout to prevent hangs
+			rendered, err := renderMarkdownWithTimeout(markdownContent, availableWidth, 5*time.Second)
+
 			if err == nil {
-				rendered, err := renderer.Render(markdownContent)
-				if err == nil {
-					// Store rendered content even if empty (Glamour might return empty for some valid markdown)
-					m.preview.cachedRenderedContent = rendered
-					renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-					m.preview.cachedLineCount = len(renderedLines)
-					m.preview.cachedWidth = availableWidth
-					m.preview.cacheValid = true
-					return
-				} else {
-					// Glamour render failed - treat as plain text
-					m.preview.isMarkdown = false
-				}
+				// Store rendered content even if empty (Glamour might return empty for some valid markdown)
+				m.preview.cachedRenderedContent = rendered
+				renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+				m.preview.cachedLineCount = len(renderedLines)
+				m.preview.cachedWidth = availableWidth
+				m.preview.cacheValid = true
+				return
 			} else {
-				// Glamour renderer creation failed - treat as plain text
+				// Glamour render failed (error or timeout) - treat as plain text
 				m.preview.isMarkdown = false
+				// Log the error for debugging (appears in status message)
+				if strings.Contains(err.Error(), "timeout") {
+					m.setStatusMessage("Markdown rendering timed out, showing as plain text", true)
+				}
 			}
 			// Fall through to regular text wrapping
 		}
@@ -1142,6 +1155,51 @@ func (m *model) populatePreviewCache() {
 	m.preview.cachedLineCount = len(wrappedLines)
 	m.preview.cachedWidth = availableWidth
 	m.preview.cacheValid = true
+}
+
+// renderMarkdownWithTimeout renders markdown with a timeout to prevent hangs
+// Returns rendered content and any error (including timeout)
+func renderMarkdownWithTimeout(content string, width int, timeout time.Duration) (string, error) {
+	type renderResult struct {
+		rendered string
+		err      error
+	}
+
+	// Use buffered channel to prevent goroutine leak
+	resultChan := make(chan renderResult, 1)
+
+	go func() {
+		// Recover from panics in glamour rendering
+		defer func() {
+			if r := recover(); r != nil {
+				resultChan <- renderResult{
+					rendered: "",
+					err:      fmt.Errorf("markdown rendering panicked: %v", r),
+				}
+			}
+		}()
+
+		// Render markdown
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithStandardStyle("auto"),
+			glamour.WithWordWrap(width),
+		)
+		if err != nil {
+			resultChan <- renderResult{rendered: "", err: err}
+			return
+		}
+
+		rendered, err := renderer.Render(content)
+		resultChan <- renderResult{rendered: rendered, err: err}
+	}()
+
+	// Wait for result or timeout
+	select {
+	case result := <-resultChan:
+		return result.rendered, result.err
+	case <-time.After(timeout):
+		return "", fmt.Errorf("markdown rendering timeout after %v", timeout)
+	}
 }
 
 // renderMarkdownAsync renders markdown in a background goroutine
@@ -1185,6 +1243,25 @@ func (m *model) createDirectory(name string) error {
 // deleteFileOrDir deletes a file or directory
 func (m *model) deleteFileOrDir(path string, isDir bool) error {
 	// Check if exists
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file not found")
+		}
+		return err
+	}
+
+	// Move to trash instead of permanent delete for safety
+	if err := moveToTrash(path); err != nil {
+		return fmt.Errorf("failed to move to trash: %w", err)
+	}
+
+	return nil
+}
+
+// permanentDeleteFileOrDir permanently deletes a file without moving to trash
+// Used for emptying trash or when explicitly requested
+func (m *model) permanentDeleteFileOrDir(path string, isDir bool) error {
+	// Check if exists
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1194,19 +1271,8 @@ func (m *model) deleteFileOrDir(path string, isDir bool) error {
 	}
 
 	if isDir {
-		// Check if directory is empty
-		entries, err := os.ReadDir(path)
-		if err != nil {
-			return err
-		}
-
-		if len(entries) > 0 {
-			// For non-empty directories, we need to ask for recursive deletion
-			return fmt.Errorf("directory not empty (%d items)", len(entries))
-		}
-
-		// Delete empty directory
-		return os.Remove(path)
+		// For directories, use RemoveAll to handle non-empty directories
+		return os.RemoveAll(path)
 	}
 
 	// Delete file

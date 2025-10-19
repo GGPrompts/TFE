@@ -26,6 +26,18 @@ import (
 // 2. .yaml/.yml - Simple YAML with 'template' field
 // 3. .md/.txt - Plain text with {{variables}}
 func parsePromptFile(path string) (*promptTemplate, error) {
+	// Check file size before reading (defensive check)
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	// Limit prompt files to 1MB to prevent OOM
+	const maxPromptSize = 1024 * 1024 // 1MB
+	if info.Size() > maxPromptSize {
+		return nil, fmt.Errorf("prompt file too large (%d bytes, max %d bytes)", info.Size(), maxPromptSize)
+	}
+
 	// Read file content
 	content, err := os.ReadFile(path)
 	if err != nil {
