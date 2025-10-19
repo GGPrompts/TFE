@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -489,20 +490,58 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 	// Determine content to display based on input fields state
 	var contentLines []string
+	var isMarkdownPrompt bool
+
 	if m.inputFieldsActive {
-		// Show template with highlighted variables
+		// Show template with highlighted variables (no Glamour - colors would conflict)
 		highlightedTemplate := m.highlightPromptVariables(tmpl.template)
 		contentLines = strings.Split(highlightedTemplate, "\n")
+		isMarkdownPrompt = false // Don't apply Glamour when showing variable highlights
 	} else {
-		// Show substituted content (current behavior)
-		contentLines = m.preview.content
+		// Show substituted content - apply Glamour if markdown
+		contentText := strings.Join(m.preview.content, "\n")
+
+		// Check if this is a markdown file
+		isMarkdownPrompt = m.preview.isMarkdown
+
+		if isMarkdownPrompt {
+			// Render with Glamour for beautiful formatting
+			renderer, err := glamour.NewTermRenderer(
+				glamour.WithStandardStyle("auto"),
+				glamour.WithWordWrap(availableWidth),
+			)
+			if err == nil {
+				rendered, err := renderer.Render(contentText)
+				if err == nil {
+					// Successfully rendered with Glamour
+					contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+				} else {
+					// Glamour failed, fall back to plain text
+					contentLines = m.preview.content
+					isMarkdownPrompt = false
+				}
+			} else {
+				// Glamour init failed, fall back to plain text
+				contentLines = m.preview.content
+				isMarkdownPrompt = false
+			}
+		} else {
+			// Not markdown, use plain text
+			contentLines = m.preview.content
+		}
 	}
 
-	// Wrap content lines
+	// Wrap content lines (only if not markdown - Glamour already wraps)
 	var wrappedLines []string
-	for _, line := range contentLines {
-		wrapped := wrapLine(line, availableWidth)
-		wrappedLines = append(wrappedLines, wrapped...)
+	if isMarkdownPrompt {
+		// Glamour already wrapped the text, use as-is
+		wrappedLines = contentLines
+	} else {
+		// Plain text - wrap manually
+		for _, line := range contentLines {
+			wrapped := wrapLine(line, availableWidth)
+			wrappedLines = append(wrappedLines, wrapped...)
+		}
 	}
 
 	// Calculate available height for content and input fields
@@ -664,9 +703,9 @@ func (m model) renderFullPreview() string {
 	s.WriteString("\n")
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
 
-	// Show different F5 text if input fields are active
+	// Show different F5 text if viewing a prompt (with or without fillable fields)
 	f5Text := "copy path"
-	if m.inputFieldsActive && len(m.promptInputFields) > 0 {
+	if m.preview.isPrompt || (m.inputFieldsActive && len(m.promptInputFields) > 0) {
 		f5Text = "copy rendered prompt"
 	}
 	helpText := fmt.Sprintf("↑/↓: scroll • PgUp/PgDown: page • F4: edit • F5: %s • Esc: close • F10: quit", f5Text)
@@ -750,13 +789,6 @@ func (m model) renderDualPane() string {
 		s.WriteString(termStyle.Render(">_"))
 		s.WriteString(bracketStyle.Render("]"))
 	}
-	s.WriteString(" ")
-
-	// CellBlocks button
-	cellblocksButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(cellblocksButtonStyle.Render("[📦]"))
 	s.WriteString(" ")
 
 	// Fuzzy search button
@@ -913,7 +945,17 @@ func (m model) renderDualPane() string {
 	var selectedInfo string
 	if currentFile := m.getCurrentFile(); currentFile != nil {
 		if currentFile.isDir {
-			selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
+			// Special handling for ".." to show parent directory name
+			if currentFile.name == ".." {
+				parentPath := filepath.Dir(m.currentPath)
+				parentName := filepath.Base(parentPath)
+				if parentName == "/" || parentName == "." {
+					parentName = "root"
+				}
+				selectedInfo = fmt.Sprintf("Selected: .. (go up to %s)", parentName)
+			} else {
+				selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
+			}
 		} else {
 			fileType := getFileType(*currentFile)
 			selectedInfo = fmt.Sprintf("Selected: %s (%s, %s, %s)",

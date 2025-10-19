@@ -31,3 +31,5 @@ test_*.md
 # OS files
 .DS_Store
 Thumbs.db
+# Session summaries (optional - can also commit for history)
+#docs/NEXT_SESSION.md

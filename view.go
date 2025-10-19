@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -52,6 +53,9 @@ func (m model) renderSinglePane() string {
 	titleText := "(T)erminal (F)ile (E)xplorer"
 	if m.commandFocused {
 		titleText += " [Command Mode]"
+	}
+	if m.filePickerMode {
+		titleText += " [📁 File Picker]"
 	}
 
 	// Create GitHub link (OSC 8 hyperlink format)
@@ -244,7 +248,17 @@ func (m model) renderSinglePane() string {
 		var selectedInfo string
 		if currentFile := m.getCurrentFile(); currentFile != nil {
 			if currentFile.isDir {
-				selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
+				// Special handling for ".." to show parent directory name
+				if currentFile.name == ".." {
+					parentPath := filepath.Dir(m.currentPath)
+					parentName := filepath.Base(parentPath)
+					if parentName == "/" || parentName == "." {
+						parentName = "root"
+					}
+					selectedInfo = fmt.Sprintf("Selected: .. (go up to %s)", parentName)
+				} else {
+					selectedInfo = fmt.Sprintf("Selected: %s (folder)", currentFile.name)
+				}
 			} else {
 				fileType := getFileType(*currentFile)
 				selectedInfo = fmt.Sprintf("Selected: %s (%s, %s, %s)",

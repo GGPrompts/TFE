@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -244,12 +245,22 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Calculate visible range to account for scrolling
-			// Must match view.go calculation:
-			// maxVisible = m.height - 9 (header lines)
-			// contentHeight = maxVisible - 2 (box borders)
-			// Therefore: effective content = m.height - 11
-			maxVisible := m.height - 9
-			contentHeight := maxVisible - 2
+			// Must match view.go and render_preview.go calculations
+			var maxVisible int
+			var contentHeight int
+
+			if m.viewMode == viewDualPane {
+				// Dual-pane: maxVisible = m.height - 7 (total pane height INCLUDING borders)
+				// See render_preview.go:845
+				maxVisible = m.height - 7
+				contentHeight = maxVisible - 2 // Content area inside borders
+			} else {
+				// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
+				// See view.go:154
+				maxVisible = m.height - 9
+				contentHeight = maxVisible - 2 // Content area inside borders
+			}
+
 			maxVisible = contentHeight // Use contentHeight for consistency with rendering
 			if m.displayMode == modeDetail {
 				maxVisible -= 1 // Account for detail header only
@@ -379,13 +390,43 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 
 				if isDoubleClick {
+					// In file picker mode, double-click on file should select it
+					if m.filePickerMode && !clickedFile.isDir {
+						// IMPORTANT: Set the value AFTER reloading preview to avoid field recreation overwriting it
+						selectedPath := clickedFile.path
+						selectedName := clickedFile.name
+
+						// Return to preview mode
+						m.filePickerMode = false
+						m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
+						m.loadFiles()                                   // Reload files with restored filter
+						m.viewMode = viewFullPreview
+						m.inputFieldsActive = true // Re-enable input fields
+
+						// Reload the original preview (this recreates input fields)
+						if m.filePickerRestorePath != "" {
+							m.loadPreview(m.filePickerRestorePath)
+							m.populatePreviewCache()
+						}
+
+						// NOW set the value after fields have been recreated
+						if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
+							m.promptInputFields[m.focusedInputField].value = selectedPath
+							m.setStatusMessage(fmt.Sprintf("✓ Selected: %s", selectedName), false)
+						}
+
+						m.lastClickIndex = -1
+						m.lastClickTime = time.Time{}
+						return m, tea.ClearScreen
+					}
+
 					// Double-click: navigate or full-screen preview
 					if clickedFile.isDir {
 						m.currentPath = clickedFile.path
 						m.cursor = 0
 						m.loadFiles()
-					} else {
-						// Enter full-screen preview (same as Enter key)
+					} else if !m.filePickerMode {
+						// Enter full-screen preview (only if NOT in file picker mode)
 						m.loadPreview(clickedFile.path)
 						m.viewMode = viewFullPreview
 						m.calculateLayout() // Update widths for full-screen
@@ -437,9 +478,20 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				headerOffset += 1 // Add 1 for detail view's header only (separator removed)
 			}
 
-			// Must match view.go calculation (same as left-click handler)
-			maxVisible := m.height - 9
-			contentHeight := maxVisible - 2
+			// Must match view.go and render_preview.go calculations (same as left-click handler)
+			var maxVisible int
+			var contentHeight int
+
+			if m.viewMode == viewDualPane {
+				// Dual-pane: maxVisible = m.height - 7 (total pane height INCLUDING borders)
+				maxVisible = m.height - 7
+				contentHeight = maxVisible - 2
+			} else {
+				// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
+				maxVisible = m.height - 9
+				contentHeight = maxVisible - 2
+			}
+
 			maxVisible = contentHeight
 			if m.displayMode == modeDetail {
 				maxVisible -= 1 // Account for detail header only

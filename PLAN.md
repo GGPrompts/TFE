@@ -159,20 +159,44 @@ filteredFiles []fileItem  // Subset of m.files matching search
 
 ---
 
-### Phase 4: File Operations (Extended)
+### Phase 4: Essential File Operations 🔥 **REQUIRED FOR v1.0**
 
-**Goal:** Complete file management capabilities
+**Goal:** Complete essential file management before public launch
 
-#### Features:
-- Copy file/directory
-- Move/rename file/directory
+**Status:** Not started - **CRITICAL for v1.0 release**
+
+#### Required for Launch (4-6 hours):
+1. **Copy Files** (2-3 hours) - ⚠️ BLOCKING v1.0
+   - Context menu: "📋 Copy to..."
+   - Input dialog for destination
+   - Progress indicator for large files
+   - Error handling (permissions, disk space)
+
+2. **Rename Files** (1-2 hours) - ⚠️ BLOCKING v1.0
+   - Context menu: "✏️ Rename..."
+   - Input dialog pre-filled with current name
+   - Validation and error handling
+
+3. **New File Creation** (1 hour) - ⚠️ BLOCKING v1.0
+   - Context menu: "📄 New File..."
+   - Auto-open in editor after creation
+   - Error handling
+
+**Implementation Plan:**
+- Create `file_copy.go` module for copy operations
+- Extend `context_menu.go` with new actions
+- Extend `dialog.go` for filename/path inputs
+- Add error feedback for all operations
+
+#### Nice to Have (v1.1+):
+- Move files between panes in dual-pane mode
 - Batch operations (multi-select with Space)
-- Progress indicators for long operations
-- Undo/trash support (optional)
+- Progress bars for long operations
+- Undo/trash support
 
-**Note:** Lower priority than Phase 1-3
+**See:** `docs/LAUNCH_CHECKLIST.md` for complete v1.0 requirements
 
-**Estimated Time:** 2-3 weeks
+**Estimated Time:** 4-6 hours (critical features only)
 
 ---
 
@@ -194,32 +218,40 @@ filteredFiles []fileItem  // Subset of m.files matching search
 
 ## Prioritized Next Steps
 
-### 🔥 Immediate (Do First)
-1. **Implement F7/F8** - Most visible gap
-   - Create dialog system
-   - F7 create directory
-   - F8 delete file/folder
-   - Add error feedback
+### 🔥 **CRITICAL - Required for v1.0 Launch (4-6 hours)**
+1. **✅ Copy Files** - Context menu + dialog (2-3 hours) - **DO FIRST**
+2. **✅ Rename Files** - Context menu + dialog (1-2 hours) - **DO SECOND**
+3. **✅ New File Creation** - Context menu + dialog (1 hour) - **DO THIRD**
 
-2. **Fix Silent Errors** - Critical UX issue
-   - Add status message system
-   - Show all error messages
+**After these 3 features:** Ready for v1.0 launch! 🚀
 
-3. **Add Search** - Highly valuable, quick to implement
-   - `/` to search
-   - Filter current directory
+### 📸 **Launch Preparation (8-12 hours total)**
+4. **Screenshots/GIFs** - Show off the UI (2 hours)
+5. **Documentation Polish** - Installation, features, comparison (1.5 hours)
+6. **GitHub Release** - Binaries for Linux/macOS (2-3 hours)
+7. **Testing** - Platform testing, edge cases (2 hours)
+8. **Marketing Posts** - Reddit, HN, lobste.rs (1 hour)
 
-### ⭐ High Value (Do Soon)
-4. **Context Visualizer** - Unique differentiator
-   - This makes TFE special
-   - No other tool has this
+**See:** `docs/LAUNCH_CHECKLIST.md` for complete checklist
 
-5. **Fix Grid View Bugs** - Prevent potential crashes
+### ⭐ **Post-Launch (v1.1+)**
+9. **Context Visualizer** - Unique differentiator (Phase 3)
+   - Show Claude Code context and token counts
+   - .claudeignore optimization suggestions
+   - This makes TFE special!
 
-### 🔧 Nice to Have (Do Later)
-6. **Refactor update.go** - Only if feeling unwieldy
-7. **Extended File Ops** - Copy, move, batch operations
-8. **Windows Features** - Terminology, permissions editor
+10. **Multi-Select Operations** - Batch copy/delete/move
+11. **Archive Operations** - Extract/create .zip, .tar.gz
+12. **Permissions Editor** - GUI for chmod
+
+### ✅ **Already Complete**
+- ~~F7/F8 operations~~ ✅
+- ~~Silent errors fixed~~ ✅
+- ~~Directory search (`/`)~~ ✅
+- ~~Refactor update.go~~ ✅
+- ~~Grid view bugs~~ ✅
+- ~~Prompts library~~ ✅
+- ~~Fillable fields for prompts~~ ✅ (Just finished!)
 
 ---
 
@@ -317,13 +349,16 @@ Right now: **Ship features first, refactor later**
 
 ## Notes
 
-- **Focus:** Ship F7/F8 next - most visible incomplete feature
-- **Differentiator:** Context Visualizer is what makes TFE unique
+- **Current Focus:** Phase 4 (Copy/Rename/New File) - **CRITICAL FOR v1.0**
+- **Primary Differentiator:** Prompts library with fillable fields ✨ (unique feature!)
+- **Secondary Differentiator:** Context Visualizer (future - Phase 3)
 - **Philosophy:** Hybrid approach (native preview + external editor)
-- **Target:** Windows→WSL developers, Claude Code users
+- **Target:** AI-assisted developers, Claude Code users, terminal power users
 - **Keep:** Fast, simple, modular
+- **Launch Goal:** v1.0 ready in 1 week (4-6 hours coding + 8-12 hours polish)
 
 ---
 
-**Last Updated:** 2025-10-16
-**Next Session:** Implement F7/F8 + Dialog System (Phase 1)
+**Last Updated:** 2025-10-18
+**Next Session:** Implement Copy/Rename/New File (Phase 4 - v1.0 blockers)
+**Launch Checklist:** See `docs/LAUNCH_CHECKLIST.md` for complete v1.0 requirements

@@ -123,7 +123,7 @@ func (m model) renderListView(maxVisible int) string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return strings.TrimRight(s.String(), "\n")
 }
 
 // renderGridView renders files in a multi-column grid layout
@@ -218,7 +218,7 @@ func (m model) renderGridView(maxVisible int) string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return strings.TrimRight(s.String(), "\n")
 }
 
 // renderDetailView renders files in a detailed table with columns
@@ -396,7 +396,7 @@ func (m model) renderDetailView(maxVisible int) string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return strings.TrimRight(s.String(), "\n")
 }
 
 // buildTreeItems builds a flattened list of tree items including expanded directories
@@ -601,5 +601,5 @@ func (m model) renderTreeView(maxVisible int) string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return strings.TrimRight(s.String(), "\n")
 }

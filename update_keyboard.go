@@ -74,6 +74,17 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case "f3":
+			// Activate file picker mode - exit to file browser to select a file
+			m.filePickerMode = true
+			m.filePickerRestorePath = m.preview.filePath // Store preview path to restore later
+			m.filePickerRestorePrompts = m.showPromptsOnly // Store prompts filter state
+			m.showPromptsOnly = false // Disable prompts filter to show all files
+			m.viewMode = viewSinglePane // Exit preview mode
+			m.loadFiles() // Reload files without prompts filter
+			m.setStatusMessage("📁 File Picker: Navigate and press Enter to select file (Esc to cancel)", false)
+			return m, nil
+
 		case "enter":
 			// Move to next field on Enter
 			m.focusedInputField++
@@ -437,6 +448,66 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Handle file picker mode (F3 from input fields)
+	if m.filePickerMode {
+		switch msg.String() {
+		case "esc":
+			// Cancel file picker and return to preview mode
+			m.filePickerMode = false
+			m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
+			m.loadFiles() // Reload files with restored filter
+			m.viewMode = viewFullPreview
+			m.inputFieldsActive = true // Re-enable input fields
+			// Reload the original preview
+			if m.filePickerRestorePath != "" {
+				m.loadPreview(m.filePickerRestorePath)
+				m.populatePreviewCache()
+			}
+			m.setStatusMessage("File picker cancelled", false)
+			return m, nil
+
+		case "enter":
+			// Get current file (handles tree mode correctly)
+			selectedFile := m.getCurrentFile()
+			if selectedFile != nil {
+				if selectedFile.isDir {
+					// It's a directory - navigate into it (consistent across all views)
+					m.currentPath = selectedFile.path
+					m.cursor = 0
+					m.loadFiles()
+					return m, nil
+				} else {
+					// It's a file - select it and populate the input field
+					// IMPORTANT: Set the value AFTER reloading preview to avoid field recreation overwriting it
+					selectedPath := selectedFile.path
+					selectedName := selectedFile.name
+
+					// Return to preview mode
+					m.filePickerMode = false
+					m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
+					m.loadFiles() // Reload files with restored filter
+					m.viewMode = viewFullPreview
+					m.inputFieldsActive = true // Re-enable input fields
+
+					// Reload the original preview (this recreates input fields)
+					if m.filePickerRestorePath != "" {
+						m.loadPreview(m.filePickerRestorePath)
+						m.populatePreviewCache()
+					}
+
+					// NOW set the value after fields have been recreated
+					if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
+						m.promptInputFields[m.focusedInputField].value = selectedPath
+						m.setStatusMessage(fmt.Sprintf("✓ Selected: %s", selectedName), false)
+					}
+
+					return m, nil
+				}
+			}
+		}
+		// For all other keys in file picker mode, fall through to normal navigation
+	}
+
 	// Handle command prompt input (focus-based: only active when commandFocused)
 	// Special keys that interact with command prompt
 	switch msg.String() {
@@ -626,24 +697,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		if currentFile := m.getCurrentFile(); currentFile != nil {
-			// Special handling for prompts mode: copy rendered prompt to clipboard
-			if m.showPromptsOnly && !currentFile.isDir && isPromptFile(*currentFile) {
-				if m.preview.isPrompt && m.preview.promptTemplate != nil {
-					// Get context variables
-					contextVars := getContextVariables(&m)
-					// Render the template with variables substituted
-					rendered := renderPromptTemplate(m.preview.promptTemplate, contextVars)
-
-					// Copy to clipboard
-					if err := copyToClipboard(rendered); err != nil {
-						m.setStatusMessage(fmt.Sprintf("Failed to copy prompt: %s", err), true)
-					} else {
-						m.setStatusMessage("✓ Prompt copied to clipboard", false)
-					}
-					return m, nil
-				}
-			}
-
 			// If in favorites mode, check if we need to navigate to a different directory
 			if m.showFavoritesOnly && currentFile.name != ".." {
 				// Check if favorite is in a different location than current path
@@ -677,15 +730,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			} else if currentFile.isDir {
-				// In tree view: toggle expansion instead of navigating
-				if m.displayMode == modeTree && currentFile.name != ".." {
-					m.expandedDirs[currentFile.path] = !m.expandedDirs[currentFile.path]
-				} else {
-					// Other modes: navigate into directory
-					m.currentPath = currentFile.path
-					m.cursor = 0
-					m.loadFiles()
-				}
+				// Navigate into directory (consistent across all views)
+				// Arrow keys (←/→) handle tree expansion/collapse
+				m.currentPath = currentFile.path
+				m.cursor = 0
+				m.loadFiles()
 			} else {
 				// Enter full-screen preview (regardless of current mode)
 				m.loadPreview(currentFile.path)

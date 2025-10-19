@@ -98,6 +98,12 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		}
 
 		items = append(items, contextMenuItem{"✏  Edit", "edit"})
+
+		// Add "Run Script" for executable files
+		if isExecutableFile(*m.contextMenuFile) {
+			items = append(items, contextMenuItem{"▶️  Run Script", "runscript"})
+		}
+
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
 		if m.isFavorite(m.contextMenuFile.path) {
@@ -181,6 +187,16 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 				editor = "micro"
 			}
 			return m, openEditor(editor, m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "runscript":
+		// Run executable script
+		if !m.contextMenuFile.isDir && isExecutableFile(*m.contextMenuFile) {
+			// Use bash to run the script
+			scriptPath := m.contextMenuFile.path
+			command := fmt.Sprintf("bash %s", scriptPath)
+			return m, runCommand(command, filepath.Dir(scriptPath))
 		}
 		return m, tea.ClearScreen
 
@@ -333,4 +349,22 @@ func (m model) renderContextMenu() string {
 		Background(lipgloss.Color("236"))         // Background for content area
 
 	return menuStyle.Render(menuContent)
+}
+
+// isExecutableFile checks if a file is executable (has execute permission or is a shell script)
+func isExecutableFile(file fileItem) bool {
+	// Check file extension for common script types
+	ext := strings.ToLower(filepath.Ext(file.path))
+	if ext == ".sh" || ext == ".bash" || ext == ".zsh" || ext == ".fish" {
+		return true
+	}
+
+	// Check if file has execute permission
+	// The mode contains permission bits - check if any execute bit is set
+	// 0111 = user, group, or other has execute permission
+	if file.mode&0111 != 0 {
+		return true
+	}
+
+	return false
 }

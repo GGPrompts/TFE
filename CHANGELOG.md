@@ -4,6 +4,50 @@ All notable changes to the Terminal File Explorer (TFE) project.
 
 ## [Unreleased]
 
+### Added
+- **Fillable Fields for Prompt Templates (Phase 5 Complete!)**
+  - Automatic detection of `{{VARIABLE}}` placeholders in prompt templates
+  - Interactive input fields with smart type classification:
+    - **File fields** (blue): For file/path variables - supports F3 file picker
+    - **Long fields** (yellow): For multi-line content (code, text, body)
+    - **Short fields** (yellow): For single-line input (priority, name, etc.)
+    - **Auto-filled fields** (green): Pre-filled with context (DATE, TIME, FILE, DIRECTORY)
+  - Tab/Shift+Tab navigation between fields
+  - Real-time preview highlighting shows where variables will be inserted
+  - Character count display for long content (e.g., "2.5k chars")
+  - Ctrl+U to clear field content
+  - **F3 File Picker Mode:**
+    - Browse and select files to populate input fields
+    - Navigate directories with full file browser features
+    - Enter to select file, Esc to cancel
+    - Double-click support for quick file selection
+    - Automatically disables prompts filter to show all files
+    - Restores preview and field state when returning
+  - F5 copies fully rendered prompt with all variables substituted
+  - Paste detection and handling (shows "✓ Pasted X characters")
+  - Files modified: `types.go`, `prompt_parser.go`, `render_preview.go`, `update_keyboard.go`, `update_mouse.go`, `view.go`
+- **Glamour Markdown Rendering for Prompts**
+  - Prompt templates (.md files) now render with beautiful Glamour formatting
+  - Full markdown support: headers, lists, code blocks, emphasis, links
+  - Variables get substituted first, then Glamour renders the result
+  - Smart mode switching: plain text when editing fields, formatted when viewing
+  - Graceful fallback to plain text if Glamour fails
+  - Files modified: `render_preview.go`
+- **Run Script Feature**
+  - New context menu option "▶️ Run Script" for executable files
+  - Auto-detects executables by extension (.sh, .bash, .zsh, .fish)
+  - Auto-detects files with execute permission (chmod +x)
+  - Runs script in its directory with full output display
+  - "Press any key to continue" prompt to review output
+  - Reuses existing `runCommand()` infrastructure
+  - Files modified: `context_menu.go`
+- **Enhanced Mobile/Termux Documentation**
+  - Added Termux to platform badges in README
+  - Created full "Mobile & Termux Support" section
+  - Documented touch controls and mobile usage tips
+  - Added Termux installation guide
+  - Updated features list with mobile support
+
 ### Fixed
 - **Silent Error Handling (Phase 2.1 Complete)**
   - Editor availability: Now shows "No editor available (tried micro, nano, vim, vi)" when F4 pressed without editors
@@ -20,6 +64,19 @@ All notable changes to the Terminal File Explorer (TFE) project.
     - Fixed in context menu (context_menu.go:145)
   - All operations now use the existing status message system (auto-dismiss after 3 seconds)
   - No more silent failures - users always get feedback
+- **Enter Key Consistency in Prompts Mode**
+  - Fixed inconsistent Enter behavior when viewing prompt templates
+  - Enter now always previews files (consistent with rest of TFE)
+  - F5 copies rendered prompts (clear and obvious)
+  - Allows users to see prompts before copying
+  - Files modified: `update_keyboard.go`
+- **UI Polish and Alignment Fixes**
+  - Removed CellBlocks emoji button from dual-pane mode header
+  - Fixed preview pane alignment in tree view split-pane mode
+  - Fixed mouse click offset issue in dual-pane tree view (clicks now accurate throughout entire file tree)
+  - All file list rendering functions now trim trailing newlines for consistent box heights
+  - Mouse click calculations now correctly account for dual-pane vs single-pane header differences
+  - Files modified: `render_preview.go`, `render_file_list.go`, `update_mouse.go`
 
 ### Added
 - **Directory Search Feature (Phase 2.2 Complete)**

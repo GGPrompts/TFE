@@ -2,14 +2,15 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/GGPrompts/TFE)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20Termux-lightgrey)](https://github.com/GGPrompts/TFE)
 
-A powerful and clean terminal-based file explorer built with Go and Bubbletea. TFE combines traditional file management with modern features like dual-pane preview, syntax highlighting, and an integrated AI prompts library.
+A powerful and clean terminal-based file explorer built with Go and Bubbletea. TFE combines traditional file management with modern features like dual-pane preview, syntax highlighting, and an integrated AI prompts library. **Works beautifully on desktop and mobile (Termux) with full touch support.**
 
 ## Features
 
 - **Clean Interface**: Minimalist design focused on usability
-- **Dual Navigation**: Both keyboard shortcuts and mouse support
+- **Dual Navigation**: Both keyboard shortcuts and mouse/touch support
+- **Mobile Ready**: Full touch controls and optimized single-pane modes for Termux/Android
 - **F-Key Controls**: Midnight Commander-style F1-F10 hotkeys for common operations
 - **Fuzzy Search**: Fast file search with go-fzf (Ctrl+P or click 🔍)
 - **Context Menu**: Right-click or F2 for quick access to file operations
@@ -28,7 +29,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Scrolling Support**: Handles large directories with auto-scrolling
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
 - **Double-Click Support**: Double-click to navigate folders or preview files
-- **Prompts Library**: F11 mode for AI prompt templates with variable substitution and clipboard copy
+- **Prompts Library**: F11 mode for AI prompt templates with fillable input fields, file picker (F3), and clipboard copy
 
 ## Installation
 
@@ -145,6 +146,45 @@ The file explorer will start in your current working directory.
 - **Text Selection**: Enabled in preview mode - select and copy text with mouse
 - **Column Headers** (Detail view): Click to sort by Name, Size, Modified, or Type
 
+### Mobile & Termux Support
+
+TFE has been **extensively tested on Termux/Android** throughout development and works beautifully with touch controls:
+
+**Touch Controls:**
+- **Tap**: Select file/folder (same as left click)
+- **Double Tap**: Navigate into folder or preview file
+- **Long Press**: Open context menu (same as right click)
+- **Swipe Up/Down**: Scroll through file list
+- **Pinch/Spread**: Not needed - use keyboard for view switching
+
+**Optimized for Mobile:**
+- **Single-pane modes**: List, Grid, Detail, and Tree views all work excellently on small screens
+- **Toolbar buttons**: Large touch targets for easy tapping
+- **Context menu**: Touch-friendly menu system
+- **Full preview mode**: Distraction-free reading on mobile
+- **F-key access**: Use on-screen keyboard or external keyboard (many Termux keyboards have F-keys)
+
+**Termux Installation:**
+```bash
+# Install required packages
+pkg install golang-1.21 git termux-api
+
+# Clone and build
+git clone https://github.com/GGPrompts/tfe.git
+cd tfe
+go build -o tfe
+
+# Run
+./tfe
+```
+
+**Tips for Mobile:**
+- Use **List** or **Detail** view for best readability on small screens
+- **Tree view** works great for hierarchical navigation
+- Access **context menu** with long press instead of F2
+- **Prompts library** (F11) is perfect for managing AI prompts on mobile
+- Install `termux-api` package for clipboard support
+
 ### Context Menu Actions
 
 Right-click (or press F2) on any file or folder to access:
@@ -170,6 +210,12 @@ TFE includes a built-in **Prompts Library** system for managing AI prompt templa
 - **Global prompts section**: Quick access to `~/.prompts/` from any directory (shown at top of file list)
 - **Template parsing**: Supports `.prompty` (Microsoft Prompty format), `.yaml`, `.md`, and `.txt` files
 - **Variable substitution**: Auto-fills `{{file}}`, `{{filename}}`, `{{project}}`, `{{path}}`, `{{DATE}}`, `{{TIME}}` from current context
+- **Fillable Fields**: Interactive input fields for custom `{{VARIABLES}}` with smart type detection
+  - **Tab/Shift+Tab** navigation between fields
+  - **File fields** (📁 blue): Use **F3** to browse and select files
+  - **Auto-filled fields** (🕐 green): Pre-populated with context (editable)
+  - **Text fields** (📝 yellow): Short or long text input with paste support
+  - **F5** copies fully rendered prompt with all filled values
 - **Clipboard copy**: Press **Enter** or **F5** to copy rendered prompt to clipboard
 - **Smart filtering**: Only shows prompt files and folders containing prompts
 - **Preview rendering**: View prompts with metadata (name, description, source, variables)
@@ -203,8 +249,12 @@ Analyze {{file}} and suggest improvements for the {{project}} project.
 1. Press **F11** to enable Prompts Mode
 2. Navigate to `🌐 ~/.prompts/ (Global Prompts)` or `.claude/` folders
 3. Select a prompt file to preview it with auto-filled variables
-4. Press **Enter** or **F5** to copy the rendered prompt to clipboard
-5. Paste into your AI chat (Claude, ChatGPT, etc.)
+4. **If the prompt has `{{VARIABLES}}`:**
+   - Use **Tab/Shift+Tab** to navigate between input fields
+   - Type to fill in text fields, or press **F3** to pick files
+   - Press **Ctrl+U** to clear a field
+5. Press **F5** to copy the fully rendered prompt to clipboard
+6. Paste into your AI chat (Claude, ChatGPT, etc.)
 
 ## Interface
 

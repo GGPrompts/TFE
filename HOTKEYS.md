@@ -6,9 +6,9 @@
 |-----|--------|
 | **F1** | Show this help reference |
 | **F2** | Open context menu (keyboard alternative to right-click) |
-| **F3** | Open images/HTML in browser OR view/preview file in full-screen |
+| **F3** | Open images/HTML in browser OR view/preview file OR file picker (in input fields) |
 | **F4** | Edit file in external editor |
-| **F5** | Copy file path to clipboard |
+| **F5** | Copy file path to clipboard (or rendered prompt in fillable fields mode) |
 | **F6** | Toggle favorites filter (show only favorites) |
 | **F7** | Create new directory (prompts for name) |
 | **F8** | Delete file/folder (prompts for confirmation) |
@@ -55,13 +55,46 @@
 | **PgDn** | Page down in preview |
 | **Mouse Wheel** | Scroll preview (in full-screen or focused right pane) |
 
+## Prompt Templates & Fillable Fields
+
+When viewing a prompt template with `{{VARIABLES}}` placeholders:
+
+| Key | Action |
+|-----|--------|
+| **Tab** | Navigate to next input field |
+| **Shift+Tab** | Navigate to previous input field |
+| **Type** | Enter text into focused field |
+| **Backspace** | Delete last character from field |
+| **Ctrl+U** | Clear entire field |
+| **Enter** | Move to next field (wraps around) |
+| **F3** | Open file picker to select a file path |
+| **F5** | Copy rendered prompt (with filled values) to clipboard |
+
+### File Picker Mode (F3)
+When selecting a file for a prompt variable:
+
+| Key | Action |
+|-----|--------|
+| **↑/↓** or **k/j** | Navigate file list |
+| **←/→** or **h/l** | Navigate directories |
+| **Enter** (on directory) | Navigate into directory |
+| **Enter** (on file) | Select file and return to prompt |
+| **Double-Click** (on file) | Select file and return to prompt |
+| **Esc** | Cancel file picker and return to prompt |
+
+### Field Types
+- **📁 File fields** (blue): For file paths - use F3 to pick files
+- **📝 Short fields** (yellow): For single-line text input
+- **📝 Long fields** (yellow): For multi-line text (shows truncated with char count)
+- **🕐 Auto-filled** (green): Pre-filled with context (DATE, TIME) - editable
+
 ## File Operations
 
 | Key | Action |
 |-----|--------|
 | **F4** | Edit file in external editor (Micro preferred, then nano/vim) |
 | **n** / **N** | Edit file in nano specifically |
-| **F5** | Copy file path to clipboard |
+| **F5** | Copy file path to clipboard (or rendered prompt in F11 mode) |
 | **F7** | Create new directory (prompts for name) |
 | **F8** | Delete selected file/folder (prompts for confirmation) |
 
@@ -80,6 +113,7 @@ Context menu actions include:
 - 👁️ Preview file
 - 🌐 Open in browser (images/HTML files only)
 - ✏️ Edit file
+- ▶️ Run Script (executable files: .sh, .bash, .zsh, .fish or chmod +x)
 - 📋 Copy path to clipboard
 - 📁 New folder (for directories)
 - 🗑️ Delete file/folder
@@ -179,6 +213,8 @@ TFE uses emoji icons to indicate file types:
 9. **Favorites:** Use the context menu (F2/right-click) to bookmark files/folders, then **F6** to filter by favorites
 10. **Tree Navigation:** In tree view (4), use ← to collapse, → to expand folders (Windows Explorer style)
 11. **ESC to Go Back:** Press ESC to navigate back like Windows Explorer's back button
+12. **Prompt Templates:** Press **F11** for prompts mode, open a template with `{{VARIABLES}}`, fill fields with Tab navigation, and F5 to copy the rendered result
+13. **Run Scripts:** Right-click executable files (.sh, .bash, etc. or chmod +x) and select "▶️ Run Script" to execute them with output - press any key to return to TFE
 
 ---
 
