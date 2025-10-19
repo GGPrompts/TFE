@@ -399,24 +399,24 @@ TFE offers three distinct interface modes:
 
 ### Command Prompt (Always Visible)
 
-The command prompt is always visible at the bottom of the screen. Simply start typing any command and it will automatically focus and capture your input. Press Enter to execute commands in the current directory context:
+The command prompt is always visible at the top of the screen (3rd row). Simply start typing any command and it will automatically focus and capture your input. Press Enter to execute commands in the current directory context:
 
 ```
 ┌─────────────────────────────────────────┐
 │ TFE - Terminal File Explorer            │
 │ /current/path/here                      │
+│ /current/path/here $ ls -la█           │  ← Command prompt (3rd row)
 │                                         │
 │   ▸ folder1                             │
 │   ▸ folder2                             │
 │   • file1.txt                           │
 │                                         │
 │ 3 folders, 12 files • List             │
-│ /current/path/here $ ls -la█           │  ← Command prompt
 └─────────────────────────────────────────┘
 ```
 
 **Command Prompt Features:**
-- Always visible at the bottom - no need to enter a special mode
+- Always visible at the top (3rd row) - no need to enter a special mode
 - Start typing any character to automatically focus the prompt
 - Execute any shell command in the current directory
 - TFE suspends while the command runs, then resumes automatically
@@ -436,10 +436,10 @@ The command prompt is always visible at the bottom of the screen. Simply start t
 
 1. **Title Bar**: Application name and current mode
 2. **Path Display**: Shows current directory path
-3. **File List**: Scrollable list of folders and files with type indicators
-4. **Preview Pane**: Live file preview with line numbers (dual-pane/full modes)
-5. **Status Bar**: File counts, view mode, and selection info
-6. **Command Prompt**: Always-visible shell command input at the bottom
+3. **Command Prompt**: Always-visible shell command input (3rd row)
+4. **File List**: Scrollable list of folders and files with type indicators
+5. **Preview Pane**: Live file preview with line numbers (dual-pane/full modes)
+6. **Status Bar**: File counts, view mode, and selection info
 
 ## Technical Details
 
