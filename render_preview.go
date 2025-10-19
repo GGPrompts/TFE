@@ -803,14 +803,31 @@ func (m model) renderDualPane() string {
 	s.WriteString(" ")
 
 	// Prompts filter toggle button
-	promptIcon := "📝"
 	if m.showPromptsOnly {
-		promptIcon = "✨📝" // Different icon when filter is active
+		// Active: gray background (like command mode)
+		activeStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeStyle.Render("[📝]"))
+	} else {
+		// Inactive: normal styling
+		promptButtonStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true)
+		s.WriteString(promptButtonStyle.Render("[📝]"))
 	}
-	promptButtonStyle := lipgloss.NewStyle().
+	s.WriteString(" ")
+
+	// Trash/Recycle bin button
+	trashIcon := "🗑️"
+	if m.showTrashOnly {
+		trashIcon = "♻️" // Recycle icon when viewing trash
+	}
+	trashButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
-	s.WriteString(promptButtonStyle.Render("[" + promptIcon + "]"))
+	s.WriteString(trashButtonStyle.Render("[" + trashIcon + "]"))
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")

@@ -93,6 +93,11 @@ func isPromptFile(item fileItem) bool {
 
 	// For other extensions, only consider them prompts if in special directories
 	if ext == ".md" || ext == ".yaml" || ext == ".yml" || ext == ".txt" {
+		// Exclude .claude/agents/ - those are documentation files, not prompt templates
+		if strings.Contains(item.path, "/.claude/agents/") {
+			return false
+		}
+
 		// Check if in .claude/ or any subfolder
 		if strings.Contains(item.path, "/.claude/") || strings.HasSuffix(item.path, "/.claude") {
 			return true
@@ -101,10 +106,6 @@ func isPromptFile(item fileItem) bool {
 		homeDir, _ := os.UserHomeDir()
 		promptsDir := filepath.Join(homeDir, ".prompts")
 		if strings.HasPrefix(item.path, promptsDir) {
-			return true
-		}
-		// Check if path ends with .claude (for the .claude folder itself)
-		if strings.Contains(item.path, "/.claude/") {
 			return true
 		}
 	}

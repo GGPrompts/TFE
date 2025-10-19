@@ -1040,6 +1040,12 @@ func (m *model) loadPreview(path string) {
 			m.preview.content = lines
 			m.preview.loaded = true
 
+			// Mark as markdown if it's a .md file, so it can be rendered with Glamour
+			// when prompts mode is off (and inputFieldsActive == false)
+			if isMarkdownFile(path) {
+				m.preview.isMarkdown = true
+			}
+
 			// Create input fields for prompt variables
 			// Only activate fields when in prompts mode (F11)
 			if m.showPromptsOnly {
