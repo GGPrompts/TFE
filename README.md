@@ -165,9 +165,8 @@ tfe    # Launch from any directory with Quick CD support
 |-----|--------|
 | `F9` | Cycle through display modes |
 | `1` | Switch to List view |
-| `2` | Quick toggle List ↔ Detail |
-| `3` | Switch to Detail view |
-| `4` | Switch to Tree view |
+| `2` | Switch to Detail view |
+| `3` | Switch to Tree view |
 | `.` / `Ctrl+h` | Toggle hidden files |
 
 #### Favorites

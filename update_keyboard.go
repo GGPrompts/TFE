@@ -1011,20 +1011,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.displayMode = modeList
 
 	case "2":
-		// Quick toggle between List and Detail (most common views)
-		if m.displayMode == modeList {
-			m.displayMode = modeDetail
-			// Auto-exit dual-pane (detail view needs full width)
-			if m.viewMode == viewDualPane {
-				m.viewMode = viewSinglePane
-				m.calculateLayout()
-				m.populatePreviewCache()
-			}
-		} else {
-			m.displayMode = modeList
-		}
-
-	case "3":
 		// Switch to detail view
 		m.displayMode = modeDetail
 		// Auto-exit dual-pane (detail view needs full width)
@@ -1034,7 +1020,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.populatePreviewCache()
 		}
 
-	case "4":
+	case "3":
 		// Switch to tree view
 		m.displayMode = modeTree
 
