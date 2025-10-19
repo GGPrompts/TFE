@@ -47,6 +47,57 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
   - **macOS/Linux**: Depends on your terminal emulator (iTerm2, Alacritty, etc.)
 - **For Termux users**: Install `termux-api` for clipboard support: `pkg install termux-api`
 
+### Optional Dependencies
+
+TFE works great without these, but install them for additional features:
+
+**For Image Support:**
+- **viu** (recommended) - View images in terminal with best quality
+  ```bash
+  # Install via cargo (Rust package manager)
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  source $HOME/.cargo/env
+  cargo install viu
+  ```
+  ```bash
+  # Termux
+  pkg install rust
+  cargo install viu
+  ```
+- **timg** (alternative) - Another excellent image viewer
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install timg
+  ```
+- **chafa** (fallback) - ASCII art image viewer (works everywhere)
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install chafa
+
+  # Termux
+  pkg install chafa
+  ```
+
+**For Image Editing:**
+- **textual-paint** - MS Paint in your terminal! (Python-based)
+  ```bash
+  # Ubuntu/Debian (requires system dependencies)
+  sudo apt install -y python3-dev libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libwebp-dev
+  pipx install textual-paint
+
+  # Or via pip
+  pip3 install --user textual-paint
+
+  # Termux
+  pkg install python-pillow
+  pip install textual-paint
+  ```
+
+**Notes:**
+- TFE checks for these tools and only shows image options if they're installed
+- If none are installed, you can still open images in your browser (F3 or context menu)
+- Priority order: viu > timg > chafa for viewing, textual-paint for editing
+
 > 💡 **Need help installing?** Ask Claude or your AI assistant: *"Help me install TFE from https://github.com/GGPrompts/TFE on [your OS]"*
 
 ### Option 1: Quick Install (Recommended for Most Users)
