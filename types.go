@@ -106,6 +106,83 @@ type promptTemplate struct {
 	raw         string   // Original file content
 }
 
+// inputFieldType represents the type of input field for variable entry
+type inputFieldType int
+
+const (
+	fieldTypeShort inputFieldType = iota // Short text input (single line)
+	fieldTypeLong                         // Long text input (shows truncated)
+	fieldTypeFile                         // File path (supports file picker)
+)
+
+// promptInputField represents a fillable field for a prompt template variable
+type promptInputField struct {
+	name         string         // Variable name (e.g., "file", "priority")
+	value        string         // User's input (full content, no limit)
+	defaultValue string         // Auto-filled default value
+	fieldType    inputFieldType // Type of field (short/long/file)
+	displayWidth int            // Available width for display
+	color        string         // Color for highlighting in preview (e.g., "39", "220")
+}
+
+// getDisplayValue returns the value to display in the input field
+// For long content, shows trailing end with [...] prefix and char count
+func (f *promptInputField) getDisplayValue() string {
+	// Use current value if filled, otherwise use default
+	content := f.value
+	if content == "" {
+		content = f.defaultValue
+	}
+
+	// Calculate max display width (reserve space for brackets and char count)
+	maxDisplay := f.displayWidth - 20
+	if maxDisplay < 20 {
+		maxDisplay = 20
+	}
+
+	// If content fits, show it all
+	if len(content) <= maxDisplay {
+		return content
+	}
+
+	// Long content - show trailing end with ellipsis and char count
+	suffix := content[len(content)-maxDisplay:]
+	return suffix // We'll add [...] and (X chars) in the rendering code
+}
+
+// getCharCountDisplay returns a formatted character count string
+func (f *promptInputField) getCharCountDisplay() string {
+	length := len(f.value)
+	if length == 0 {
+		return ""
+	}
+
+	formatted := formatCharCount(length)
+	if formatted == "" {
+		return ""
+	}
+	return " (" + formatted + ")"
+}
+
+// formatCharCount formats character count in human-readable form
+func formatCharCount(count int) string {
+	if count < 1000 {
+		return ""
+	} else if count < 10000 {
+		// Show as "1.2k chars"
+		major := count / 1000
+		minor := (count % 1000) / 100
+		return string(rune('0'+major)) + "." + string(rune('0'+minor)) + "k chars"
+	}
+	// Show as "12k chars"
+	return string(rune('0'+count/1000)) + "k chars"
+}
+
+// hasContent returns whether the field has user-entered content
+func (f *promptInputField) hasContent() bool {
+	return f.value != ""
+}
+
 // model represents the main application state
 type model struct {
 	currentPath string
@@ -140,6 +217,11 @@ type model struct {
 	showFavoritesOnly bool            // Filter to show only favorites
 	// Prompts system
 	showPromptsOnly bool // Filter to show only prompt files (.yaml, .md, .txt)
+	// Prompt input fields (fillable variables)
+	promptInputFields  []promptInputField // Input fields for prompt variables
+	focusedInputField  int                // Index of currently focused input field
+	inputFieldsActive  bool               // Whether input fields are active/shown
+	filePickerMode     bool               // Whether file picker mode is active (F3)
 	// Tree view expansion
 	expandedDirs map[string]bool // Path -> expanded state
 	treeItems    []treeItem       // Cached tree items for tree view

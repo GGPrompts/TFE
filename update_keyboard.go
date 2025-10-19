@@ -37,9 +37,79 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle preview mode keys first
-	if m.viewMode == viewFullPreview {
+	// Handle input field editing FIRST (works in both dual-pane and full preview)
+	// This must come before preview mode and dialog handling
+	if m.inputFieldsActive && len(m.promptInputFields) > 0 {
+		switch msg.String() {
+		case "tab":
+			// Navigate to next field
+			m.focusedInputField++
+			if m.focusedInputField >= len(m.promptInputFields) {
+				m.focusedInputField = 0 // Wrap around
+			}
+			return m, nil
 
+		case "shift+tab":
+			// Navigate to previous field
+			m.focusedInputField--
+			if m.focusedInputField < 0 {
+				m.focusedInputField = len(m.promptInputFields) - 1 // Wrap around
+			}
+			return m, nil
+
+		case "backspace":
+			// Delete last character from focused field
+			if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
+				field := &m.promptInputFields[m.focusedInputField]
+				if len(field.value) > 0 {
+					field.value = field.value[:len(field.value)-1]
+				}
+			}
+			return m, nil
+
+		case "ctrl+u":
+			// Clear entire field
+			if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
+				m.promptInputFields[m.focusedInputField].value = ""
+			}
+			return m, nil
+
+		case "enter":
+			// Move to next field on Enter
+			m.focusedInputField++
+			if m.focusedInputField >= len(m.promptInputFields) {
+				m.focusedInputField = 0 // Wrap around
+			}
+			return m, nil
+
+		default:
+			// Handle regular character input
+			keyStr := msg.String()
+
+			// Filter out function keys and special keys
+			if !isSpecialKey(keyStr) && len(keyStr) > 0 {
+				// Detect paste (multiple characters at once)
+				isPaste := len(keyStr) > 1
+
+				if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
+					field := &m.promptInputFields[m.focusedInputField]
+
+					// Add the input to the field value
+					field.value += keyStr
+
+					// If it's a paste, show status message
+					if isPaste {
+						charCount := len(keyStr)
+						m.setStatusMessage(fmt.Sprintf("✓ Pasted %d characters", charCount), false)
+					}
+				}
+				return m, nil
+			}
+		}
+	}
+
+	// Handle preview mode keys
+	if m.viewMode == viewFullPreview {
 		switch msg.String() {
 		case "f10", "ctrl+c", "esc":
 			// Exit preview mode (F10 replaces q)
@@ -77,10 +147,16 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.preview.loaded && m.preview.filePath != "" {
 				// If this is a prompt, copy the rendered template
 				if m.preview.isPrompt && m.preview.promptTemplate != nil {
-					// Get context variables
-					contextVars := getContextVariables(&m)
+					// Get variables (use filled fields if active, otherwise context defaults)
+					var vars map[string]string
+					if m.inputFieldsActive && len(m.promptInputFields) > 0 {
+						vars = getFilledVariables(m.promptInputFields, &m)
+					} else {
+						vars = getContextVariables(&m)
+					}
+
 					// Render the template with variables substituted
-					rendered := renderPromptTemplate(m.preview.promptTemplate, contextVars)
+					rendered := renderPromptTemplate(m.preview.promptTemplate, vars)
 
 					// Copy to clipboard
 					if err := copyToClipboard(rendered); err != nil {
@@ -596,11 +672,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.viewMode = viewFullPreview
 					m.searchMode = false // Disable search mode in preview
 					m.calculateLayout() // Update widths for full-screen
-					// For markdown, render asynchronously to avoid blocking
-					if m.preview.isMarkdown {
-						return m, renderMarkdownAsync(&m)
-					}
-					// For other files, populate cache now
+					// Populate cache synchronously for full preview (user expects instant display)
 					m.populatePreviewCache()
 					return m, nil
 				}
@@ -619,19 +691,24 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.loadPreview(currentFile.path)
 				m.viewMode = viewFullPreview
 				m.calculateLayout() // Update widths for full-screen
-				// For markdown, render asynchronously to avoid blocking
-				if m.preview.isMarkdown {
-					return m, renderMarkdownAsync(&m)
-				}
-				// For other files, populate cache now
+				// Populate cache synchronously for full preview (user expects instant display)
 				m.populatePreviewCache()
 				return m, nil
 			}
 		}
 
 	case "tab":
-		// In dual-pane mode: cycle focus between left and right pane
-		// In single-pane mode: enter dual-pane mode
+		// Priority 1: If input fields are active, navigate between fields
+		if m.inputFieldsActive && len(m.promptInputFields) > 0 {
+			m.focusedInputField++
+			if m.focusedInputField >= len(m.promptInputFields) {
+				m.focusedInputField = 0 // Wrap around
+			}
+			return m, nil
+		}
+
+		// Priority 2: In dual-pane mode: cycle focus between left and right pane
+		// Priority 3: In single-pane mode: enter dual-pane mode
 		if m.viewMode == viewDualPane {
 			// Cycle through: left → right → left
 			if m.focusedPane == leftPane {
@@ -912,6 +989,21 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// Expand the ~/.prompts directory
 					m.expandedDirs[globalPromptsDir] = true
 				}
+			}
+		}
+
+		// If currently viewing a prompt file, create/clear input fields
+		if m.preview.isPrompt && m.preview.promptTemplate != nil {
+			if m.showPromptsOnly {
+				// Entering prompts mode - create input fields
+				m.promptInputFields = createInputFields(m.preview.promptTemplate, &m)
+				m.inputFieldsActive = len(m.promptInputFields) > 0
+				m.focusedInputField = 0
+			} else {
+				// Exiting prompts mode - clear input fields
+				m.promptInputFields = nil
+				m.inputFieldsActive = false
+				m.focusedInputField = 0
 			}
 		}
 

@@ -1005,6 +1005,19 @@ func (m *model) loadPreview(path string) {
 			m.preview.content = lines
 			m.preview.loaded = true
 
+			// Create input fields for prompt variables
+			// Only activate fields when in prompts mode (F11)
+			if m.showPromptsOnly {
+				m.promptInputFields = createInputFields(tmpl, m)
+				m.inputFieldsActive = len(m.promptInputFields) > 0
+				m.focusedInputField = 0 // Focus first field by default
+			} else {
+				// Not in prompts mode - clear fields
+				m.promptInputFields = nil
+				m.inputFieldsActive = false
+				m.focusedInputField = 0
+			}
+
 			// Populate cache for better scroll performance
 			m.populatePreviewCache()
 			return
@@ -1100,18 +1113,13 @@ func (m *model) populatePreviewCache() {
 			if err == nil {
 				rendered, err := renderer.Render(markdownContent)
 				if err == nil {
-					// DEBUG: Check if rendered content is empty
-					if rendered == "" {
-						// Empty rendering - treat as plain text
-						m.preview.isMarkdown = false
-					} else {
-						m.preview.cachedRenderedContent = rendered
-						renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-						m.preview.cachedLineCount = len(renderedLines)
-						m.preview.cachedWidth = availableWidth
-						m.preview.cacheValid = true
-						return
-					}
+					// Store rendered content even if empty (Glamour might return empty for some valid markdown)
+					m.preview.cachedRenderedContent = rendered
+					renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+					m.preview.cachedLineCount = len(renderedLines)
+					m.preview.cachedWidth = availableWidth
+					m.preview.cacheValid = true
+					return
 				} else {
 					// Glamour render failed - treat as plain text
 					m.preview.isMarkdown = false

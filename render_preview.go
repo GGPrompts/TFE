@@ -260,6 +260,156 @@ func (m model) renderPreview(maxVisible int) string {
 	return strings.TrimRight(s.String(), "\n")
 }
 
+// highlightPromptVariables highlights {{variables}} in template text with assigned colors
+func (m model) highlightPromptVariables(templateText string) string {
+	if !m.inputFieldsActive || len(m.promptInputFields) == 0 {
+		return templateText
+	}
+
+	// Build a map of variable names to colors
+	colorMap := make(map[string]string)
+	for _, field := range m.promptInputFields {
+		colorMap[field.name] = field.color
+	}
+
+	// Auto-filled variables (DATE, TIME) should already be in fields with green color
+	// But check template variables in case they exist but weren't added as fields
+	if m.preview.promptTemplate != nil {
+		for _, varName := range m.preview.promptTemplate.variables {
+			// Only add if not already in colorMap (from fields)
+			if _, exists := colorMap[varName]; !exists {
+				varLower := strings.ToLower(varName)
+				if varLower == "date" || varLower == "time" {
+					colorMap[varName] = "34" // Green
+				}
+			}
+		}
+	}
+
+	result := templateText
+
+	// Replace each {{variable}} with colored version
+	// Try all case variations for each variable
+	for varName, color := range colorMap {
+		variations := []string{
+			varName,
+			strings.ToUpper(varName),
+			strings.ToLower(varName),
+			strings.Title(strings.ToLower(varName)),
+		}
+
+		for _, variant := range variations {
+			pattern := "{{" + variant + "}}"
+			// ANSI color: \033[38;5;<color>m for foreground
+			colored := fmt.Sprintf("\033[38;5;%sm{{%s}}\033[0m", color, variant)
+			result = strings.ReplaceAll(result, pattern, colored)
+		}
+	}
+
+	return result
+}
+
+// renderInputFields renders the input fields section below the preview
+func (m model) renderInputFields(availableWidth, availableHeight int) string {
+	if !m.inputFieldsActive || len(m.promptInputFields) == 0 {
+		return ""
+	}
+
+	var s strings.Builder
+
+	// Title for input fields section
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	s.WriteString(titleStyle.Render("📝 Fillable Fields"))
+	s.WriteString("\n")
+
+	// Help text
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
+	s.WriteString(helpStyle.Render("Tab: Navigate • Type: Edit • F3: File Picker • F5: Copy • 🕐 Auto-filled"))
+	s.WriteString("\n\n")
+
+	// Calculate how many fields we can show (reserve 3 lines: title + help + blank)
+	headerLines := 3
+	linesPerField := 2 // Label line + input line
+	maxFields := (availableHeight - headerLines) / linesPerField
+	if maxFields < 1 {
+		maxFields = 1
+	}
+
+	// Render each field
+	fieldsShown := 0
+	for i, field := range m.promptInputFields {
+		if fieldsShown >= maxFields {
+			// Show "... X more fields" message
+			remainingCount := len(m.promptInputFields) - fieldsShown
+			moreStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
+			s.WriteString(moreStyle.Render(fmt.Sprintf("... %d more field(s) below", remainingCount)))
+			break
+		}
+
+		// Field label (no indicator - it goes on the value line)
+		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(field.color))
+		fieldTypeIndicator := ""
+
+		// Check if this is an auto-filled field (DATE/TIME)
+		fieldNameLower := strings.ToLower(field.name)
+		isAutoFilled := fieldNameLower == "date" || fieldNameLower == "time"
+
+		if isAutoFilled {
+			fieldTypeIndicator = " 🕐" // Clock icon for auto-filled time/date
+		} else {
+			switch field.fieldType {
+			case fieldTypeFile:
+				fieldTypeIndicator = " 📁"
+			case fieldTypeLong:
+				fieldTypeIndicator = " 📝"
+			}
+		}
+
+		s.WriteString("  ")
+		s.WriteString(labelStyle.Render(field.name + fieldTypeIndicator + ":"))
+		s.WriteString("\n")
+
+		// Field value with focus indicator
+		focusIndicator := "  "
+		if i == m.focusedInputField {
+			focusIndicator = "▶ "
+		}
+
+		displayValue := field.getDisplayValue()
+		charCount := field.getCharCountDisplay()
+
+		// Build the input display
+		inputStyle := lipgloss.NewStyle()
+		if i == m.focusedInputField {
+			// Focused field - highlighted background
+			inputStyle = inputStyle.Background(lipgloss.Color("235"))
+		}
+
+		// Show [...] prefix for truncated long content
+		valueDisplay := displayValue
+		if field.hasContent() && len(field.value) > len(displayValue) {
+			// Truncated - add prefix
+			valueDisplay = "[...]" + displayValue + charCount
+		} else if charCount != "" {
+			valueDisplay = displayValue + charCount
+		}
+
+		// Dim style if showing default (not user-entered)
+		if !field.hasContent() {
+			inputStyle = inputStyle.Foreground(lipgloss.Color("242"))
+			valueDisplay = displayValue + " (default)"
+		}
+
+		s.WriteString(focusIndicator)
+		s.WriteString(inputStyle.Render(valueDisplay))
+		s.WriteString("\n")
+
+		fieldsShown++
+	}
+
+	return s.String()
+}
+
 // renderPromptPreview renders a prompt file with metadata header
 func (m model) renderPromptPreview(maxVisible int) string {
 	var s strings.Builder
@@ -320,12 +470,6 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	// Calculate how many lines the header takes
 	headerHeight := len(headerLines)
 
-	// Calculate available height for content
-	contentHeight := maxVisible - headerHeight
-	if contentHeight < 5 {
-		contentHeight = 5 // Minimum content height
-	}
-
 	// Calculate available width
 	var availableWidth int
 	var boxContentWidth int
@@ -343,11 +487,47 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		availableWidth = 20
 	}
 
+	// Determine content to display based on input fields state
+	var contentLines []string
+	if m.inputFieldsActive {
+		// Show template with highlighted variables
+		highlightedTemplate := m.highlightPromptVariables(tmpl.template)
+		contentLines = strings.Split(highlightedTemplate, "\n")
+	} else {
+		// Show substituted content (current behavior)
+		contentLines = m.preview.content
+	}
+
 	// Wrap content lines
 	var wrappedLines []string
-	for _, line := range m.preview.content {
+	for _, line := range contentLines {
 		wrapped := wrapLine(line, availableWidth)
 		wrappedLines = append(wrappedLines, wrapped...)
+	}
+
+	// Calculate available height for content and input fields
+	var contentHeight int
+	var inputFieldsSection string
+
+	if m.inputFieldsActive {
+		// Reserve space for input fields (approximately 1/3 of available space)
+		inputFieldsHeight := maxVisible / 3
+		if inputFieldsHeight < 8 {
+			inputFieldsHeight = 8 // Minimum for at least 2 fields
+		}
+		contentHeight = maxVisible - headerHeight - inputFieldsHeight
+		if contentHeight < 5 {
+			contentHeight = 5
+		}
+
+		// Render input fields section
+		inputFieldsSection = m.renderInputFields(availableWidth, inputFieldsHeight)
+	} else {
+		// No input fields - use all available space for content
+		contentHeight = maxVisible - headerHeight
+		if contentHeight < 5 {
+			contentHeight = 5
+		}
 	}
 
 	// Calculate visible range for content
@@ -378,6 +558,15 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		s.WriteString(wrappedLines[i])
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
+	}
+
+	// Render input fields section if active
+	if m.inputFieldsActive && inputFieldsSection != "" {
+		s.WriteString("\n")
+		separatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+		s.WriteString(separatorStyle.Render("─────────────────────────────────────"))
+		s.WriteString("\n")
+		s.WriteString(inputFieldsSection)
 	}
 
 	return strings.TrimRight(s.String(), "\n")
@@ -474,7 +663,14 @@ func (m model) renderFullPreview() string {
 	// Help text
 	s.WriteString("\n")
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
-	s.WriteString(helpStyle.Render("↑/↓: scroll • PgUp/PgDown: page • F4: edit • F5: copy path • Esc: close • F10: quit"))
+
+	// Show different F5 text if input fields are active
+	f5Text := "copy path"
+	if m.inputFieldsActive && len(m.promptInputFields) > 0 {
+		f5Text = "copy rendered prompt"
+	}
+	helpText := fmt.Sprintf("↑/↓: scroll • PgUp/PgDown: page • F4: edit • F5: %s • Esc: close • F10: quit", f5Text)
+	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
 	return s.String()

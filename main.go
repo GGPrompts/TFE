@@ -37,10 +37,27 @@ func main() {
 
 // cleanupTerminal resets terminal state to prevent formatting bleed
 func cleanupTerminal() {
+	// Exit alt screen (in case Bubbletea didn't clean up)
+	fmt.Print("\033[?1049l")
+
+	// Disable mouse tracking (in case it was left on)
+	fmt.Print("\033[?1000l") // Disable X10 mouse
+	fmt.Print("\033[?1002l") // Disable cell motion mouse tracking
+	fmt.Print("\033[?1003l") // Disable all motion mouse tracking
+	fmt.Print("\033[?1006l") // Disable SGR mouse mode
+
 	// Reset all ANSI formatting
 	fmt.Print("\033[0m")
+
 	// Show cursor (in case it was hidden)
 	fmt.Print("\033[?25h")
+
 	// Reset scrolling region
 	fmt.Print("\033[r")
+
+	// Clear from cursor to end of screen (clean up any leftover artifacts)
+	fmt.Print("\033[J")
+
+	// Move cursor to start of line
+	fmt.Print("\r")
 }
