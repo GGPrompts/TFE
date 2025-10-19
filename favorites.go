@@ -205,6 +205,25 @@ func (m *model) getFilteredFiles() []fileItem {
 					filtered = append(filtered, helperItem)
 				}
 			}
+
+			// Add global .claude/ folder (if not already in ~/.claude/)
+			globalClaudeDir := filepath.Join(homeDir, ".claude")
+			// Only show if we're not already in ~/.claude/
+			if m.currentPath != globalClaudeDir && !strings.HasPrefix(m.currentPath, globalClaudeDir+string(filepath.Separator)) {
+				// Check if ~/.claude/ exists
+				if info, err := os.Stat(globalClaudeDir); err == nil && info.IsDir() {
+					// Create a virtual folder item for ~/.claude/
+					globalClaudeItem := fileItem{
+						name:    "🤖 ~/.claude/ (Global Commands & Agents)",
+						path:    globalClaudeDir,
+						isDir:   true,
+						size:    info.Size(),
+						modTime: info.ModTime(),
+						mode:    info.Mode(),
+					}
+					filtered = append(filtered, globalClaudeItem)
+				}
+			}
 		}
 
 		for _, item := range m.files {

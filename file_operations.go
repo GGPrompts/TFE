@@ -50,6 +50,11 @@ func isGlobalPromptsVirtualFolder(name string) bool {
 	return strings.HasPrefix(name, "🌐 ~/.prompts/")
 }
 
+// isGlobalClaudeVirtualFolder checks if this is the virtual "🤖 ~/.claude/" folder
+func isGlobalClaudeVirtualFolder(name string) bool {
+	return strings.HasPrefix(name, "🤖 ~/.claude/")
+}
+
 // isClaudePromptsSubfolder checks if a folder is a .claude subfolder (commands, agents, skills)
 func isClaudePromptsSubfolder(name string) bool {
 	return name == "commands" || name == "agents" || name == "skills"
@@ -82,6 +87,10 @@ func getFileIcon(item fileItem) string {
 		// Virtual global prompts folder - no icon since name already has 🌐
 		if isGlobalPromptsVirtualFolder(item.name) {
 			return "" // Name already contains 🌐 emoji
+		}
+		// Virtual global claude folder - no icon since name already has 🤖
+		if isGlobalClaudeVirtualFolder(item.name) {
+			return "" // Name already contains 🤖 emoji
 		}
 		// Special folder icons
 		switch item.name {
@@ -729,11 +738,21 @@ func (m *model) loadFiles() {
 
 	// Add parent directory if not at root
 	if m.currentPath != "/" {
-		m.files = append(m.files, fileItem{
+		parentPath := filepath.Dir(m.currentPath)
+		parentItem := fileItem{
 			name:  "..",
-			path:  filepath.Dir(m.currentPath),
+			path:  parentPath,
 			isDir: true,
-		})
+		}
+
+		// Get parent directory's actual modification time
+		if info, err := os.Stat(parentPath); err == nil {
+			parentItem.modTime = info.ModTime()
+			parentItem.size = info.Size()
+			parentItem.mode = info.Mode()
+		}
+
+		m.files = append(m.files, parentItem)
 	}
 
 	// Add directories first, then files
