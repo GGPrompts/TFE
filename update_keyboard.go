@@ -119,6 +119,47 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Handle preview search mode input
+	if m.viewMode == viewFullPreview && m.preview.searchActive {
+		switch msg.String() {
+		case "esc":
+			// Exit search mode
+			m.preview.searchActive = false
+			m.preview.searchQuery = ""
+			m.preview.searchMatches = nil
+			m.preview.currentMatch = -1
+			m.setStatusMessage("Search cancelled", false)
+			return m, nil
+
+		case "enter", "n":
+			// Find next match
+			m.findNextSearchMatch()
+			return m, nil
+
+		case "shift+n":
+			// Find previous match
+			m.findPreviousSearchMatch()
+			return m, nil
+
+		case "backspace":
+			// Delete last character from search query
+			if len(m.preview.searchQuery) > 0 {
+				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-1]
+				m.performPreviewSearch()
+			}
+			return m, nil
+
+		default:
+			// Add printable characters to search query
+			keyStr := msg.String()
+			if !isSpecialKey(keyStr) && len(keyStr) > 0 {
+				m.preview.searchQuery += keyStr
+				m.performPreviewSearch()
+			}
+			return m, nil
+		}
+	}
+
 	// Handle preview mode keys
 	if m.viewMode == viewFullPreview {
 		switch msg.String() {
@@ -131,6 +172,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.commandInput = ""
 			m.commandFocused = false
 			// Re-enable mouse when exiting preview
+			m.previewMouseEnabled = true
 			return m, tea.EnableMouseCellMotion
 
 		case "f4":
@@ -184,6 +226,29 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+
+		case "m", "M":
+			// Toggle mouse in preview mode
+			m.previewMouseEnabled = !m.previewMouseEnabled
+
+			if m.previewMouseEnabled {
+				m.setStatusMessage("🖱️  Mouse ON - Border visible, wheel scrolling works", false)
+				return m, tea.EnableMouseCellMotion
+			} else {
+				m.setStatusMessage("⌨️  Mouse OFF - Border removed, clean text selection enabled", false)
+				return m, tea.DisableMouse
+			}
+
+		case "ctrl+f":
+			// Activate search mode in preview
+			if !m.preview.searchActive {
+				m.preview.searchActive = true
+				m.preview.searchQuery = ""
+				m.preview.searchMatches = nil
+				m.preview.currentMatch = -1
+				m.setStatusMessage("🔍 Search: (type to search, Enter/n: next, Esc: exit)", false)
+			}
+			return m, nil
 
 		case "up", "k":
 			// Scroll preview up
@@ -272,6 +337,51 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							m.showDialog = false
 							m.dialog = dialogModel{}
 							return m, openEditor(editor, filepath)
+						}
+					}
+				} else if m.dialog.title == "Copy File" {
+					// Handle copy
+					destPath := m.dialog.input
+
+					// Handle relative vs absolute paths
+					if !filepath.IsAbs(destPath) {
+						destPath = filepath.Join(m.currentPath, destPath)
+					}
+
+					// Copy the file
+					if err := m.copyFile(m.contextMenuFile.path, destPath); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+					} else {
+						m.setStatusMessage(fmt.Sprintf("Copied to: %s", destPath), false)
+						m.loadFiles()
+					}
+				} else if m.dialog.title == "Rename" {
+					// Handle rename
+					newName := m.dialog.input
+
+					// Validate name
+					if newName == "" || newName == m.contextMenuFile.name {
+						m.setStatusMessage("Rename cancelled", false)
+					} else if strings.Contains(newName, "/") {
+						m.setStatusMessage("Error: Filename cannot contain '/'", true)
+					} else {
+						// Rename the file
+						oldPath := m.contextMenuFile.path
+						newPath := filepath.Join(filepath.Dir(oldPath), newName)
+
+						if err := os.Rename(oldPath, newPath); err != nil {
+							m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+						} else {
+							m.setStatusMessage(fmt.Sprintf("Renamed to: %s", newName), false)
+							m.loadFiles()
+
+							// Move cursor to renamed file
+							for i, f := range m.files {
+								if f.name == newName {
+									m.cursor = i
+									break
+								}
+							}
 						}
 					}
 				}
@@ -657,6 +767,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f10", "ctrl+c":
 		// F10: Quit (replaces q)
 		return m, tea.Quit
+
+	case "ctrl+z":
+		// Ctrl+Z: Suspend TFE and drop to shell
+		// User can check background processes, view logs, etc.
+		// Type 'fg' to resume TFE
+		return m, tea.Suspend
 
 	case "esc":
 		// Context-aware ESC behavior:

@@ -8,12 +8,14 @@
 | **F2** | Open context menu (keyboard alternative to right-click) |
 | **F3** | Open images/HTML in browser OR view/preview file OR file picker (in input fields) |
 | **F4** | Edit file in external editor |
-| **F5** | Copy file path to clipboard (or rendered prompt in fillable fields mode) |
+| **F5** | Copy file path to clipboard (or rendered prompt in prompts mode) |
 | **F6** | Toggle favorites filter (show only favorites) |
 | **F7** | Create new directory (prompts for name) |
-| **F8** | Delete file/folder (prompts for confirmation) |
+| **F8** | Delete file/folder (moves to trash - use F12 to view/restore) |
 | **F9** | Cycle through display modes (List → Detail → Tree) |
 | **F10** | Quit TFE |
+| **F11** | Toggle prompts filter (show only .yaml, .md, .txt files + ~/.prompts & ~/.claude) |
+| **F12** | Toggle trash/recycle bin view (restore/permanently delete items) |
 
 ## Navigation
 
@@ -52,7 +54,13 @@
 | **↓** / **j** | Scroll preview down (in full-screen or dual-pane right) |
 | **PgUp** | Page up in preview |
 | **PgDn** | Page down in preview |
-| **Mouse Wheel** | Scroll preview (in full-screen or focused right pane) |
+| **m** / **M** | Toggle mouse & border (FULL PREVIEW ONLY - removes border for clean text selection) |
+| **Ctrl+F** | Search within file preview |
+| **n** | Next search match (when searching) |
+| **Shift+N** | Previous search match (when searching) |
+| **Mouse Wheel** | Scroll preview (when mouse is enabled) |
+
+**Note:** To copy text from files, the best method is to press **F4** to open the file in Micro editor, where you can select and copy text normally. The **m** key (mouse toggle) works in full-screen preview mode only - when you press **m**, the decorative border disappears and mouse is disabled, giving you clean terminal text selection. Press **m** again to restore the border and mouse scrolling.
 
 ## Prompt Templates & Fillable Fields
 
@@ -110,17 +118,27 @@ When selecting a file for a prompt variable:
 Context menu actions include:
 - 📂 Open / Quick CD (for directories)
 - 👁️ Preview file
+- 🖼️ View Image (images only - viu/timg/chafa)
+- 🎨 Edit Image (images only - textual-paint/durdraw)
 - 🌐 Open in browser (images/HTML files only)
 - ✏️ Edit file
 - ▶️ Run Script (executable files: .sh, .bash, .zsh, .fish or chmod +x)
 - 📋 Copy path to clipboard
+- 📋 Copy to... (copy files/folders)
+- ✏️ Rename... (rename files/folders)
 - 📁 New folder (for directories)
+- 📄 New file (for directories)
 - 🗑️ Delete file/folder
 - ⭐ Toggle favorite
 - 🌿 Git (lazygit) - if available
 - 🐋 Docker (lazydocker) - if available
 - 📜 Logs (lnav) - if available
 - 📊 Processes (htop) - if available
+
+**Image files** get special menu options:
+- **🖼️ View Image** - Opens in terminal image viewer (requires viu, timg, or chafa)
+- **🎨 Edit Image** - Opens in terminal paint program (requires textual-paint or durdraw)
+- Works best in Kitty, iTerm2, or WezTerm terminals (fallback to ASCII art in others)
 
 ## Favorites
 
@@ -133,19 +151,64 @@ To add or remove favorites, use the context menu (F2 or right-click) and select 
 
 When in favorites mode, press Enter on a favorite to navigate to its location.
 
-## Command Prompt (MC-Style - Always Active)
+## Prompts Mode (F11)
 
 | Key | Action |
 |-----|--------|
-| **Any letter/number** | Type into command prompt |
+| **F11** | Toggle prompts filter on/off |
+
+When prompts filter is active:
+- Shows only `.yaml`, `.md`, and `.txt` files (prompt templates)
+- Auto-displays **🌐 ~/.prompts/** folder at the top (global prompts library)
+- Auto-displays **🌐 ~/.claude/** folder (slash commands, agents, skills)
+- Shows local `.claude/` and `.prompts/` folders if they exist
+- Folders containing prompt files are always shown
+- Navigate to virtual folders (🌐 ~/.prompts/) to browse global prompts
+
+**Fillable Fields:**
+When viewing a prompt with `{{VARIABLES}}`:
+- Input fields appear automatically
+- Press **Tab** to navigate between fields
+- Press **F3** in a file field to open file picker
+- Press **F5** to copy rendered prompt to clipboard
+- See "Prompt Templates & Fillable Fields" section above for full details
+
+## Trash/Recycle Bin (F12)
+
+| Key | Action |
+|-----|--------|
+| **F12** | Toggle trash view on/off |
+| **F8** (in normal mode) | Move file/folder to trash (safe deletion) |
+
+When in trash view:
+- Shows all deleted items with deletion timestamps
+- Right-click or press **F2** for trash context menu:
+  - ♻️ **Restore** - Move item back to original location
+  - 🗑️ **Delete Permanently** - Cannot be undone!
+  - 🧹 **Empty Trash** - Permanently delete all items in trash
+
+**Trash location:** `~/.config/tfe/trash/`
+
+**Safety features:**
+- F8 moves to trash instead of permanent deletion
+- Original paths are tracked for restoration
+- Trash can be browsed like a normal directory
+- Empty trash requires confirmation
+
+## Command Prompt (Vim-Style)
+
+| Key | Action |
+|-----|--------|
+| **:** | Enter command mode (focus command prompt) |
+| **Type** | Type command while in command mode |
 | **Backspace** | Delete last character from command |
 | **Enter** | Execute command (or navigate if empty) |
-| **Esc** | Clear command prompt (then other ESC behaviors) |
-| **↑** (with input) | Previous command in history |
-| **↓** (with input) | Next command in history |
+| **Esc** | Exit command mode and clear prompt |
+| **↑** (in command mode) | Previous command in history |
+| **↓** (in command mode) | Next command in history |
 | **exit** / **quit** | Exit TFE (type and press Enter) |
 
-> **Note:** The command prompt is MC (Midnight Commander) style - you can start typing anywhere without pressing a special key. Your input appears at the top of the screen. ANSI codes are automatically stripped from pasted text.
+> **Note:** Press **:** (colon) to enter command mode - your input appears at the top of the screen. Press **Esc** to exit command mode. Command history navigation works while in command mode.
 
 ## Dual-Pane Mode
 
@@ -157,12 +220,24 @@ When in favorites mode, press Enter on a favorite to navigate to its location.
 | **PgUp/PgDn** | Page up/down in preview (when right pane focused) |
 | **Mouse Click** | Click on pane to switch focus |
 
+## Background Processes & Shell Access
+
+| Key | Action |
+|-----|--------|
+| **Ctrl+Z** | Suspend TFE and drop to shell (type `fg` to resume) |
+
+When you run scripts that start background processes (like servers, tmux sessions, etc.), you can:
+1. Press **Ctrl+Z** to suspend TFE
+2. Check on background processes, view logs, run commands
+3. Type `fg` to resume TFE exactly where you left off
+
 ## Quitting
 
 | Key | Action |
 |-----|--------|
 | **F10** | Quit TFE |
 | **Ctrl+C** | Force quit TFE |
+| **Ctrl+Z** | Suspend TFE (drop to shell - type `fg` to resume) |
 | **exit** or **quit** | Exit TFE (type in command prompt + Enter) |
 
 ## File Type Indicators
@@ -204,16 +279,23 @@ TFE uses emoji icons to indicate file types:
 1. **Quick Preview:** Press **Tab** to enter dual-pane mode and see file previews as you navigate
 2. **Full-Screen Reading:** Press **Enter** or **F3** on a file for distraction-free viewing
 3. **Browser Support:** Press **F3** on images (.png, .jpg, .gif, .svg, etc.) or HTML files to open them in your default browser
-4. **Command Execution:** Type any shell command and press Enter - TFE pauses, runs it, and returns
+4. **Command Execution:** Press **:** to enter command mode, type any shell command, and press Enter - TFE pauses, runs it, and returns
 5. **Fast Editing:** Press **F4** on any file to jump straight into Micro/nano editor
 6. **Copy Paths:** Press **F5** to copy file paths for pasting elsewhere
-7. **Command History:** Use ↑/↓ arrows when typing to recall previous commands
+7. **Command History:** Press **:** to enter command mode, then use ↑/↓ arrows to recall previous commands
 8. **Context Menu:** Press **F2** or right-click for quick access to common actions (including TUI tools like lazygit!)
 9. **Favorites:** Use the context menu (F2/right-click) to bookmark files/folders, then **F6** to filter by favorites
 10. **Tree Navigation:** In tree view (4), use ← to collapse, → to expand folders (Windows Explorer style)
 11. **ESC to Go Back:** Press ESC to navigate back like Windows Explorer's back button
 12. **Prompt Templates:** Press **F11** for prompts mode, open a template with `{{VARIABLES}}`, fill fields with Tab navigation, and F5 to copy the rendered result
 13. **Run Scripts:** Right-click executable files (.sh, .bash, etc. or chmod +x) and select "▶️ Run Script" to execute them with output - press any key to return to TFE
+14. **Background Processes:** Run a script that starts servers/background processes, press **Ctrl+Z** to suspend TFE and check on them, then `fg` to resume
+15. **Safe Deletion:** Press **F8** to move files to trash (not permanent!), press **F12** to view trash and restore or permanently delete
+16. **Global Prompts:** Press **F11** to see your ~/.prompts and ~/.claude folders from anywhere - perfect for AI-assisted development
+17. **Command Mode:** Press **:** to focus the command line (see gray hint text), type any shell command, press Enter to execute
+18. **Copying Text from Files:** Press **F4** to open in Micro editor - this is the easiest way to select and copy text. In full-screen preview (F3/Enter), you can also press **m** to remove the border and disable mouse, enabling clean terminal text selection. The border disappears as visual feedback
+19. **Search in Preview:** Press **Ctrl+F** while viewing a file to search, type your query, press **n** for next match, **Shift+N** for previous, **Esc** to exit search
+20. **Viewing Images:** Right-click on image files (.png, .jpg, .gif, etc.) and select "🖼️ View Image" to see them in your terminal! Requires viu, timg, or chafa. For editing, select "🎨 Edit Image" to use textual-paint (MS Paint in terminal!)
 
 ---
 

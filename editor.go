@@ -170,8 +170,9 @@ func openInBrowser(path string) tea.Cmd {
 	return func() tea.Msg {
 		var c *exec.Cmd
 		if browser == "cmd.exe" {
-			// Windows via WSL - use cmd.exe /c start
-			c = exec.Command("cmd.exe", "/c", "start", path)
+			// Windows via WSL - use cmd.exe /c start with empty title ""
+			// The empty title "" prevents cmd from treating first arg as window title
+			c = exec.Command("cmd.exe", "/c", "start", "", path)
 		} else {
 			// Linux/macOS/wslview
 			c = exec.Command(browser, path)
@@ -192,4 +193,73 @@ func openInBrowser(path string) tea.Cmd {
 			err:     nil,
 		}
 	}
+}
+
+// getAvailableImageViewer returns the first available image viewer
+func getAvailableImageViewer() string {
+	viewers := []string{"viu", "timg", "chafa"}
+	for _, viewer := range viewers {
+		if editorAvailable(viewer) {
+			return viewer
+		}
+	}
+	return ""
+}
+
+// openImageViewer opens an image in a TUI viewer
+func openImageViewer(path string) tea.Cmd {
+	viewer := getAvailableImageViewer()
+	if viewer == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{fmt.Errorf("no image viewer found (install viu, timg, or chafa)")}
+		}
+	}
+
+	var c *exec.Cmd
+	if viewer == "viu" {
+		// viu with transparent background and size to terminal
+		c = exec.Command("viu", "-t", path)
+	} else if viewer == "timg" {
+		// timg with grid view support
+		c = exec.Command("timg", path)
+	} else {
+		// chafa or other
+		c = exec.Command(viewer, path)
+	}
+
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
+// getAvailableImageEditor returns the first available image editor
+func getAvailableImageEditor() string {
+	editors := []string{"textual-paint", "durdraw"}
+	for _, editor := range editors {
+		if editorAvailable(editor) {
+			return editor
+		}
+	}
+	return ""
+}
+
+// openImageEditor opens an image in a TUI editor
+func openImageEditor(path string) tea.Cmd {
+	editor := getAvailableImageEditor()
+	if editor == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{fmt.Errorf("no image editor found (install textual-paint)")}
+		}
+	}
+
+	c := exec.Command(editor, path)
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
 }

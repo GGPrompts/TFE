@@ -91,6 +91,11 @@ type previewModel struct {
 	// Prompt template (for prompt files)
 	isPrompt       bool            // Whether the file is a prompt template
 	promptTemplate *promptTemplate // Parsed prompt template
+	// Search within preview
+	searchActive  bool   // Whether search mode is active in preview
+	searchQuery   string // Current search query
+	searchMatches []int  // Line numbers with matches
+	currentMatch  int    // Index in searchMatches array
 }
 
 // promptTemplate represents a parsed prompt with metadata and template
@@ -197,6 +202,8 @@ type model struct {
 	leftWidth   int // Width of left pane in dual-pane mode
 	rightWidth  int // Width of right pane in dual-pane mode
 	focusedPane paneType // Which pane has focus in dual-pane mode
+	// Mouse state for preview mode
+	previewMouseEnabled bool // Whether mouse is enabled in preview mode (default: true)
 	// Double-click detection
 	lastClickTime  time.Time
 	lastClickIndex int

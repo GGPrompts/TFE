@@ -17,18 +17,26 @@
 - **F-Key Hotkeys** - Midnight Commander style (F1-F10)
 - **Context Menu** - Right-click + F2 keyboard access
 - **Favorites System** - Bookmarks with F6 filter
-- **Command Prompt** - MC-style always-active shell
+- **Command Prompt** - Vim-style focus with `:` key
 - **Clipboard Integration** - Multi-platform path copying
 - **Mouse Support** - Click, double-click, scroll
 - **TUI Tool Launcher** - lazygit, lazydocker, lnav, htop
-- **F7: Create Directory** - ✨ NEW! Dialog system with validation
-- **F8: Delete Files** - ✨ NEW! Safe deletion with confirmations
+- **F7: Create Directory** - Dialog system with validation
+- **F8: Delete Files** - Safe deletion with confirmations (moves to trash)
 - **Dialog System** - Input, confirmation, and status messages
+- **Trash/Recycle Bin** - ✨ NEW! F12 to view trash, restore/permanently delete (F8 moves to trash)
+- **Prompts Library** - ✨ NEW! F11 to filter prompts, fillable `{{VARIABLES}}`, auto-shows ~/.prompts and ~/.claude
+- **New File Creation** - ✨ NEW! Context menu creates file and opens in editor
+- **Suspend/Resume** - ✨ NEW! Ctrl+Z to drop to shell, `fg` to resume
+- **Error Feedback** - All operations show success/error status messages
+- **Copy Files** - ✨ NEW! Context menu → "📋 Copy to..." with recursive directory support
+- **Rename Files** - ✨ NEW! Context menu → "✏️ Rename..." with validation
+- **Image Support** - ✨ NEW! View (viu/timg/chafa) and Edit (textual-paint) images in terminal
+- **Preview Search** - ✨ NEW! Ctrl-F to search within file previews
+- **Mouse Toggle** - ✨ NEW! Press 'm' in preview to toggle border/mouse for clean text selection
 
 ### 🚧 Known Limitations
-- **No directory search** - Can't filter files by name pattern (have fuzzy search via Ctrl+P)
-- **No multi-select** - Operations limited to single files
-- **No copy/move** - Can't move files between directories yet
+- **No multi-select** - Operations limited to single files (planned for v1.1+)
 
 ---
 
@@ -49,67 +57,42 @@ See **CHANGELOG.md** for full details.
 
 ---
 
-### Phase 2: Code Quality & Stability 🔧
+### Phase 2: Code Quality & Stability ✅ **COMPLETED**
 
 **Goal:** Improve maintainability and fix bugs
 
-#### 2.1 Fix Silent Errors
-**Issue:** 4 locations where errors are ignored without user feedback
+#### 2.1 Fix Silent Errors - ✅ **COMPLETED**
+**Status:** ✅ All 4 locations fixed with status messages
 
-Fix locations:
-- `update.go:491` - Editor not available
-- `context_menu.go:136` - Quick CD write failure
-- `context_menu.go:167` - Clipboard copy failure
-- `update.go:91` - Clipboard copy failure in preview
+Fixed locations:
+- ✅ Editor not available - Shows "No editor available" message
+- ✅ Quick CD write failure - Shows error with setStatusMessage
+- ✅ Clipboard copy failure (context menu) - Shows error with setStatusMessage
+- ✅ Clipboard copy failure (preview) - Shows error with setStatusMessage
 
-**Solution:** Use new status message system from Phase 1.4
+**Solution:** Uses status message system throughout
 
-#### 2.2 Add Search Feature
-**Goal:** Filter files in current directory by name
+#### 2.2 Add Search Feature - ✅ **COMPLETED**
+**Status:** ✅ Fully implemented with `/` key
 
-**Keybinding:** `/` to enter search mode
-
-**Implementation:**
-```go
-// In model:
-searchMode   bool
-searchQuery  string
-filteredFiles []fileItem  // Subset of m.files matching search
-```
-
-**Features:**
+**Features Delivered:**
 - Type `/` to enter search mode
 - Incremental filtering as you type
 - ESC to clear search
-- Display: "Search: [query] (5 matches)"
-- Fuzzy matching optional
+- Search state tracked in model
 
-**Files to Update:**
-- `types.go` - Add search fields to model
-- `update.go` - Add search mode key handling
-- `render_file_list.go` - Render filtered files
-- `file_operations.go` - Add search filtering function
+#### 2.3 Fix Grid View Bugs - ✅ **OBSOLETE**
+**Status:** ✅ Grid view removed entirely (3 display modes now: List, Detail, Tree)
 
-**Estimated Time:** 2-3 hours
-
-#### 2.3 Fix Grid View Bugs
-**Issue:** Potential off-by-one errors in click detection (update.go:762-768)
-
-**Problems:**
-- Uses `clickedRow` but should check `actualRow` in validation
-- No check for `clickedCol >= m.gridColumns`
-
-**Solution:** Add proper bounds checking
-
-**Estimated Time:** 30 minutes
+**Result:** Simplified to 3 focused view modes, removed ~250 lines of code
 
 #### 2.4 Refactor update.go - ✅ **COMPLETED**
 **Status:** ✅ Completed during Phase 1
 
 **Result:** Successfully split into 3 focused files:
-- `update.go` (138 lines) - Main dispatcher
-- `update_keyboard.go` (821 lines) - Keyboard event handling
-- `update_mouse.go` (663 lines) - Mouse event handling
+- `update.go` (111 lines) - Main dispatcher
+- `update_keyboard.go` (714 lines) - Keyboard event handling
+- `update_mouse.go` (383 lines) - Mouse event handling
 
 **Benefits Achieved:**
 - Much easier to maintain and navigate
@@ -159,44 +142,48 @@ filteredFiles []fileItem  // Subset of m.files matching search
 
 ---
 
-### Phase 4: Essential File Operations 🔥 **REQUIRED FOR v1.0**
+### Phase 4: Essential File Operations ✅ **COMPLETED 2025-10-19**
 
 **Goal:** Complete essential file management before public launch
 
-**Status:** Not started - **CRITICAL for v1.0 release**
+**Status:** ✅ **ALL 3 FEATURES COMPLETE - v1.0 UNBLOCKED!** 🎉
 
-#### Required for Launch (4-6 hours):
-1. **Copy Files** (2-3 hours) - ⚠️ BLOCKING v1.0
-   - Context menu: "📋 Copy to..."
-   - Input dialog for destination
-   - Progress indicator for large files
-   - Error handling (permissions, disk space)
+#### ✅ Completed Features:
+1. **Copy Files** ✅ **COMPLETED**
+   - ✅ Context menu: "📋 Copy to..."
+   - ✅ Input dialog for destination (absolute or relative paths)
+   - ✅ Recursive directory copying with permission preservation
+   - ✅ Error handling (permissions, disk space)
+   - ✅ Status messages for feedback
+   - Files: `context_menu.go`, `update_keyboard.go`, `file_operations.go`
 
-2. **Rename Files** (1-2 hours) - ⚠️ BLOCKING v1.0
-   - Context menu: "✏️ Rename..."
-   - Input dialog pre-filled with current name
-   - Validation and error handling
+2. **Rename Files** ✅ **COMPLETED**
+   - ✅ Context menu: "✏️ Rename..."
+   - ✅ Input dialog pre-filled with current name
+   - ✅ Validation (no empty names, no "/" characters)
+   - ✅ Cursor moves to renamed file
+   - ✅ Error handling with status messages
+   - Files: `context_menu.go`, `update_keyboard.go`
 
-3. **New File Creation** (1 hour) - ⚠️ BLOCKING v1.0
-   - Context menu: "📄 New File..."
-   - Auto-open in editor after creation
-   - Error handling
+3. **New File Creation** ✅ **COMPLETED**
+   - ✅ Context menu: "📄 New File..."
+   - ✅ Auto-opens in editor after creation
+   - ✅ Full error handling with status messages
 
-**Implementation Plan:**
-- Create `file_copy.go` module for copy operations
-- Extend `context_menu.go` with new actions
-- Extend `dialog.go` for filename/path inputs
-- Add error feedback for all operations
+**BONUS Features Delivered:**
+- **Image Support:** View (viu/timg/chafa) and edit (textual-paint) images
+- **Preview Search:** Ctrl-F to search within files
+- **Mouse Toggle:** Press 'm' in preview for clean text selection
+- **Browser Fix:** Fixed WSL cmd.exe bug for opening images/HTML
 
 #### Nice to Have (v1.1+):
 - Move files between panes in dual-pane mode
 - Batch operations (multi-select with Space)
 - Progress bars for long operations
-- Undo/trash support
 
 **See:** `docs/LAUNCH_CHECKLIST.md` for complete v1.0 requirements
 
-**Estimated Time:** 4-6 hours (critical features only)
+**Time Spent:** ~4 hours (all critical features + bonuses!)
 
 ---
 
@@ -218,12 +205,12 @@ filteredFiles []fileItem  // Subset of m.files matching search
 
 ## Prioritized Next Steps
 
-### 🔥 **CRITICAL - Required for v1.0 Launch (4-6 hours)**
-1. **✅ Copy Files** - Context menu + dialog (2-3 hours) - **DO FIRST**
-2. **✅ Rename Files** - Context menu + dialog (1-2 hours) - **DO SECOND**
-3. **✅ New File Creation** - Context menu + dialog (1 hour) - **DO THIRD**
+### ✅ **CRITICAL FEATURES - ALL COMPLETE!** 🎉
+1. ~~**Copy Files**~~ - ✅ **COMPLETED 2025-10-19**
+2. ~~**Rename Files**~~ - ✅ **COMPLETED 2025-10-19**
+3. ~~**New File Creation**~~ - ✅ **COMPLETED**
 
-**After these 3 features:** Ready for v1.0 launch! 🚀
+**Status:** Ready for v1.0 launch! 🚀 All coding is DONE!
 
 ### 📸 **Launch Preparation (8-12 hours total)**
 4. **Screenshots/GIFs** - Show off the UI (2 hours)
@@ -235,23 +222,45 @@ filteredFiles []fileItem  // Subset of m.files matching search
 **See:** `docs/LAUNCH_CHECKLIST.md` for complete checklist
 
 ### ⭐ **Post-Launch (v1.1+)**
-9. **Context Visualizer** - Unique differentiator (Phase 3)
-   - Show Claude Code context and token counts
-   - .claudeignore optimization suggestions
-   - This makes TFE special!
+9. **Command Pre-filling** - 🔥 **REVOLUTIONARY FEATURE**
+   - Pre-fill command line instead of executing operations directly
+   - Educational: Users learn Linux commands as they work
+   - Safe: Review before execution (Esc to cancel)
+   - Powerful: Modify commands, add flags, chain operations
+   - Examples:
+     - Rename → Pre-fills `mv 'old.txt' '█'`
+     - Copy → Pre-fills `cp 'file.txt' '█'`
+     - Bulk operations → Pre-fills shell loops/patterns
+   - **Marketing angle:** "The File Manager That Teaches You Linux"
+   - Platform-aware templates (GNU vs BSD, WSL, Termux)
+   - See session notes for full design
 
-10. **Multi-Select Operations** - Batch copy/delete/move
-11. **Archive Operations** - Extract/create .zip, .tar.gz
-12. **Permissions Editor** - GUI for chmod
+10. **Context Visualizer** - Unique differentiator (Phase 3)
+    - Show Claude Code context and token counts
+    - .claudeignore optimization suggestions
+    - This makes TFE special!
+
+11. **Multi-Select Operations** - Batch copy/delete/move
+12. **Archive Operations** - Extract/create .zip, .tar.gz
+13. **Permissions Editor** - GUI for chmod
 
 ### ✅ **Already Complete**
 - ~~F7/F8 operations~~ ✅
 - ~~Silent errors fixed~~ ✅
 - ~~Directory search (`/`)~~ ✅
 - ~~Refactor update.go~~ ✅
-- ~~Grid view bugs~~ ✅
-- ~~Prompts library~~ ✅
-- ~~Fillable fields for prompts~~ ✅ (Just finished!)
+- ~~Grid view removed~~ ✅ (simplified to 3 view modes)
+- ~~Prompts library (F11)~~ ✅
+- ~~Fillable fields for prompts~~ ✅
+- ~~New file creation~~ ✅
+- ~~Trash/Recycle bin (F12)~~ ✅
+- ~~Suspend/Resume (Ctrl+Z)~~ ✅
+- ~~Command prompt helper text~~ ✅
+- ~~Copy files~~ ✅ **COMPLETED 2025-10-19**
+- ~~Rename files~~ ✅ **COMPLETED 2025-10-19**
+- ~~Image support (view/edit)~~ ✅ **COMPLETED 2025-10-19**
+- ~~Preview search (Ctrl-F)~~ ✅ **COMPLETED 2025-10-19**
+- ~~Mouse toggle~~ ✅ **COMPLETED 2025-10-19**
 
 ---
 
@@ -349,16 +358,19 @@ Right now: **Ship features first, refactor later**
 
 ## Notes
 
-- **Current Focus:** Phase 4 (Copy/Rename/New File) - **CRITICAL FOR v1.0**
+- **Current Focus:** ✅ Phase 4 COMPLETE - **v1.0 READY FOR LAUNCH!** 🚀
 - **Primary Differentiator:** Prompts library with fillable fields ✨ (unique feature!)
-- **Secondary Differentiator:** Context Visualizer (future - Phase 3)
+- **Secondary Differentiator:** Image support in terminal (view/edit)
+- **Future Differentiator:** Command pre-filling (v1.1) - Educational file manager
+- **Tertiary Differentiator:** Context Visualizer (v1.2+) - Claude Code integration
 - **Philosophy:** Hybrid approach (native preview + external editor)
-- **Target:** AI-assisted developers, Claude Code users, terminal power users
-- **Keep:** Fast, simple, modular
-- **Launch Goal:** v1.0 ready in 1 week (4-6 hours coding + 8-12 hours polish)
+- **Target:** AI-assisted developers, Claude Code users, Windows→Linux learners
+- **Keep:** Fast, simple, modular, educational
+- **Launch Status:** All critical coding DONE! Ready for documentation & release (8-12 hours)
 
 ---
 
-**Last Updated:** 2025-10-18
-**Next Session:** Implement Copy/Rename/New File (Phase 4 - v1.0 blockers)
+**Last Updated:** 2025-10-19
+**Status:** ✅ ALL v1.0 FEATURES COMPLETE
+**Next Session:** Launch preparation (screenshots, docs, binaries, marketing)
 **Launch Checklist:** See `docs/LAUNCH_CHECKLIST.md` for complete v1.0 requirements

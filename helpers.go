@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,4 +110,68 @@ func isPromptFile(item fileItem) bool {
 	}
 
 	return false
+}
+
+// performPreviewSearch searches the preview content for the current query
+// and populates searchMatches with line numbers
+func (m *model) performPreviewSearch() {
+	m.preview.searchMatches = nil
+	m.preview.currentMatch = -1
+
+	if m.preview.searchQuery == "" {
+		m.setStatusMessage("🔍 Search: (type to search, Enter/n: next, Esc: exit)", false)
+		return
+	}
+
+	queryLower := strings.ToLower(m.preview.searchQuery)
+
+	// Search through preview content
+	for i, line := range m.preview.content {
+		if strings.Contains(strings.ToLower(line), queryLower) {
+			m.preview.searchMatches = append(m.preview.searchMatches, i)
+		}
+	}
+
+	if len(m.preview.searchMatches) > 0 {
+		m.preview.currentMatch = 0
+		// Scroll to first match
+		m.preview.scrollPos = m.preview.searchMatches[0]
+		m.setStatusMessage(fmt.Sprintf("🔍 Found %d matches (1/%d) - n: next, Shift+n: prev, Esc: exit", len(m.preview.searchMatches), len(m.preview.searchMatches)), false)
+	} else {
+		m.setStatusMessage(fmt.Sprintf("🔍 No matches for '%s' - Esc: exit", m.preview.searchQuery), false)
+	}
+}
+
+// findNextSearchMatch navigates to the next search match
+func (m *model) findNextSearchMatch() {
+	if len(m.preview.searchMatches) == 0 {
+		m.setStatusMessage("🔍 No matches found", false)
+		return
+	}
+
+	m.preview.currentMatch++
+	if m.preview.currentMatch >= len(m.preview.searchMatches) {
+		m.preview.currentMatch = 0 // Wrap around
+	}
+
+	// Scroll to the match
+	m.preview.scrollPos = m.preview.searchMatches[m.preview.currentMatch]
+	m.setStatusMessage(fmt.Sprintf("🔍 Match %d/%d - n: next, Shift+n: prev, Esc: exit", m.preview.currentMatch+1, len(m.preview.searchMatches)), false)
+}
+
+// findPreviousSearchMatch navigates to the previous search match
+func (m *model) findPreviousSearchMatch() {
+	if len(m.preview.searchMatches) == 0 {
+		m.setStatusMessage("🔍 No matches found", false)
+		return
+	}
+
+	m.preview.currentMatch--
+	if m.preview.currentMatch < 0 {
+		m.preview.currentMatch = len(m.preview.searchMatches) - 1 // Wrap around
+	}
+
+	// Scroll to the match
+	m.preview.scrollPos = m.preview.searchMatches[m.preview.currentMatch]
+	m.setStatusMessage(fmt.Sprintf("🔍 Match %d/%d - n: next, Shift+n: prev, Esc: exit", m.preview.currentMatch+1, len(m.preview.searchMatches)), false)
 }

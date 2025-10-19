@@ -4,6 +4,51 @@ All notable changes to the Terminal File Explorer (TFE) project.
 
 ## [Unreleased]
 
+### Added (2025-10-19 Session)
+- **Image Viewing & Editing Integration**
+  - New context menu options for image files (.png, .jpg, .gif, .bmp, .svg, .webp, .ico, .tiff):
+    - **🖼️ View Image**: Opens images in terminal viewer (viu > timg > chafa)
+    - **🎨 Edit Image**: Opens images in terminal paint program (textual-paint > durdraw)
+  - Smart tool detection with graceful fallbacks
+  - Works best in Kitty, iTerm2, WezTerm (graphics protocol support)
+  - Fallback to ASCII art in other terminals
+  - Files modified: `editor.go`, `context_menu.go`, `HOTKEYS.md`
+
+- **File Operations (v1.0 Critical Features)**
+  - **Rename Files/Folders**: Context menu → "✏️ Rename..."
+    - Pre-fills current name for easy editing
+    - Validation (no empty names, no "/" characters)
+    - Cursor automatically moves to renamed item
+    - Works for both files and directories
+  - **Copy Files/Folders**: Context menu → "📋 Copy to..."
+    - Supports absolute and relative destination paths
+    - Recursive directory copying with permission preservation
+    - Progress feedback via status messages
+    - Handles errors gracefully
+  - Files modified: `context_menu.go`, `update_keyboard.go`, `file_operations.go`
+
+- **Preview Mode Enhancements**
+  - **Mouse Toggle (m key)**: Press 'm' in full-screen preview to toggle mouse
+    - Mouse ON: Beautiful border, wheel scrolling, wonky text selection
+    - Mouse OFF: Border removed, clean text selection, keyboard scrolling
+    - Visual feedback: border disappears to show mode is active
+    - Status messages: "🖱️ Mouse ON" / "⌨️ Mouse OFF"
+  - **Ctrl-F Search**: Search within file previews
+    - Type query for incremental search (case-insensitive)
+    - Press 'n' or Enter for next match
+    - Press Shift+N for previous match
+    - Shows match counter (e.g., "Match 3/15")
+    - Auto-scrolls to matches
+    - ESC to exit search mode
+  - Files modified: `types.go`, `model.go`, `update_keyboard.go`, `render_preview.go`, `helpers.go`, `HOTKEYS.md`
+
+### Fixed (2025-10-19 Session)
+- **Browser Opening on WSL**
+  - Fixed `cmd.exe /c start` treating first argument as window title
+  - Now uses: `cmd.exe /c start "" <path>` (empty title)
+  - Browser opening now works correctly for images and HTML files
+  - Files modified: `editor.go`
+
 ### Added
 - **Fillable Fields for Prompt Templates (Phase 5 Complete!)**
   - Automatic detection of `{{VARIABLE}}` placeholders in prompt templates

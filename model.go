@@ -38,6 +38,7 @@ func initialModel() model {
 		showFavoritesOnly: false,
 		expandedDirs:      make(map[string]bool),
 		commandFocused:    false, // Start in file browser mode, not command mode
+		previewMouseEnabled: true, // Mouse enabled by default
 	}
 
 	m.loadFiles()

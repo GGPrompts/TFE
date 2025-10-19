@@ -30,6 +30,11 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
 - **Double-Click Support**: Double-click to navigate folders or preview files
 - **Prompts Library**: F11 mode for AI prompt templates with fillable input fields, file picker (F3), and clipboard copy
+- **Trash/Recycle Bin**: F12 to view deleted items, restore or permanently delete (F8 moves to trash)
+- **Image Support**: View images with viu/timg/chafa and edit with textual-paint (MS Paint in terminal!)
+- **File Operations**: Copy files/folders (📋 Copy to...), rename (✏️ Rename...) via context menu
+- **Preview Search**: Ctrl-F to search within file previews, 'n' for next match, Shift-N for previous
+- **Mouse Toggle**: Press 'm' in full preview to remove border for clean text selection
 
 ## Installation
 
@@ -147,6 +152,7 @@ tfe    # Launch from any directory with Quick CD support
 | `F9` | Cycle through display modes |
 | `F10` | Quit application |
 | `F11` | Toggle Prompts Library mode |
+| `F12` | Toggle Trash/Recycle Bin view |
 
 #### Navigation
 | Key | Action |
@@ -179,6 +185,8 @@ tfe    # Launch from any directory with Quick CD support
 | Key | Action |
 |-----|--------|
 | `Ctrl+P` | Launch fuzzy file search |
+| `Ctrl+F` | Search within file preview (n: next, Shift-N: previous, Esc: exit) |
+| `m` / `M` | Toggle mouse & border in full preview mode (for clean text selection) |
 | `n` / `N` | Edit file in nano specifically |
 | `Esc` | Exit dual-pane/preview mode / close context menu |
 | `Ctrl+C` | Force quit application |
@@ -239,14 +247,28 @@ Right-click (or press F2) on any file or folder to access:
 **For Folders:**
 - 📂 **Open** - Navigate into the directory
 - 📂 **Quick CD** - Exit TFE and change shell to this directory (requires wrapper setup)
+- 📁 **New Folder...** - Create a new subdirectory
+- 📄 **New File...** - Create a new file (auto-opens in editor)
 - 📋 **Copy Path** - Copy full path to clipboard
+- 📋 **Copy to...** - Copy directory recursively to destination
+- ✏️ **Rename...** - Rename directory
 - ⭐/**☆ Favorite** - Add/remove from favorites
 
 **For Files:**
 - 👁 **Preview** - View file in full-screen preview
 - ✏ **Edit** - Open in external editor (micro/nano/vim)
 - 📋 **Copy Path** - Copy full path to clipboard
+- 📋 **Copy to...** - Copy file to destination
+- ✏️ **Rename...** - Rename file
 - ⭐/**☆ Favorite** - Add/remove from favorites
+
+**For Images (PNG, JPG, GIF, SVG, etc.):**
+- 🖼️ **View Image** - Display in terminal (requires viu, timg, or chafa)
+- 🎨 **Edit Image** - Edit in terminal paint program (requires textual-paint)
+- 🌐 **Open in Browser** - Open with default browser
+
+**For HTML Files:**
+- 🌐 **Open in Browser** - Open with default browser
 
 ### Prompts Library (F11)
 
@@ -541,15 +563,19 @@ TFE follows a modular architecture with 13 focused files:
 - ✅ Rounded borders and polished UI
 - ✅ Syntax highlighting for code files (Chroma)
 - ✅ Prompts Library with template parsing and variable substitution (F11)
-- ✅ File operations (F7: Create Directory, F8: Delete)
+- ✅ File operations: Create (F7), Delete to Trash (F8), Copy, Rename
+- ✅ Trash/Recycle Bin (F12) - restore or permanently delete items
+- ✅ Image viewing (viu/timg/chafa) and editing (textual-paint)
+- ✅ Preview search (Ctrl-F) with match navigation (n/Shift-N)
+- ✅ Mouse toggle in preview ('m' key) for clean text selection
 
-### Planned Features
-- File operations (copy, move, rename) - extending F7/F8 functionality
+### Planned Features (v1.1+)
 - Configurable color schemes and themes
 - Custom hidden file patterns
 - Archive file browsing (.zip, .tar.gz)
 - Git status indicators
 - Multi-select and bulk operations
+- Context Visualizer - show Claude Code context and token counts
 
 ## License
 

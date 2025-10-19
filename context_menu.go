@@ -92,6 +92,8 @@ func (m model) getContextMenuItems() []contextMenuItem {
 
 		// Add separator and favorites
 		items = append(items, contextMenuItem{"─────────", "separator"})
+		items = append(items, contextMenuItem{"📋 Copy to...", "copy"})
+		items = append(items, contextMenuItem{"✏️  Rename...", "rename"})
 		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
 		if m.isFavorite(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
@@ -102,8 +104,13 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		// File menu items
 		items = append(items, contextMenuItem{"👁  Preview", "preview"})
 
-		// Add "Open in Browser" for images and HTML files
-		if isBrowserFile(m.contextMenuFile.path) {
+		// Add image-specific options
+		if isImageFile(m.contextMenuFile.path) {
+			items = append(items, contextMenuItem{"🖼️  View Image", "viewimage"})
+			items = append(items, contextMenuItem{"🎨 Edit Image", "editimage"})
+			items = append(items, contextMenuItem{"🌐 Open in Browser", "browser"})
+		} else if isHTMLFile(m.contextMenuFile.path) {
+			// Add "Open in Browser" for HTML files only
 			items = append(items, contextMenuItem{"🌐 Open in Browser", "browser"})
 		}
 
@@ -115,6 +122,8 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		}
 
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
+		items = append(items, contextMenuItem{"📋 Copy to...", "copy"})
+		items = append(items, contextMenuItem{"✏️  Rename...", "rename"})
 		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
 		if m.isFavorite(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
@@ -175,6 +184,20 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			m.populatePreviewCache() // Repopulate cache with correct width
 			// Disable mouse to allow text selection
 			return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
+		}
+		return m, tea.ClearScreen
+
+	case "viewimage":
+		// View image in TUI viewer (viu, timg, chafa)
+		if !m.contextMenuFile.isDir && isImageFile(m.contextMenuFile.path) {
+			return m, openImageViewer(m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "editimage":
+		// Edit image in TUI editor (textual-paint)
+		if !m.contextMenuFile.isDir && isImageFile(m.contextMenuFile.path) {
+			return m, openImageEditor(m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 
@@ -319,6 +342,28 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			dialogType: dialogConfirm,
 			title:      "Empty Trash",
 			message:    "Permanently delete ALL items in trash?\nThis CANNOT be undone!",
+		}
+		m.showDialog = true
+		return m, tea.ClearScreen
+
+	case "copy":
+		// Copy file or folder to destination
+		m.dialog = dialogModel{
+			dialogType: dialogInput,
+			title:      "Copy File",
+			message:    fmt.Sprintf("Copy '%s' to:", m.contextMenuFile.name),
+			input:      "", // User types destination path
+		}
+		m.showDialog = true
+		return m, tea.ClearScreen
+
+	case "rename":
+		// Rename the selected file or folder
+		m.dialog = dialogModel{
+			dialogType: dialogInput,
+			title:      "Rename",
+			message:    "New name:",
+			input:      m.contextMenuFile.name, // Pre-fill current name
 		}
 		m.showDialog = true
 		return m, tea.ClearScreen

@@ -178,8 +178,13 @@ func (m *model) getFilteredFiles() []fileItem {
 		homeDir, err := os.UserHomeDir()
 		if err == nil {
 			globalPromptsDir := filepath.Join(homeDir, ".prompts")
-			// Only show if we're not already in ~/.prompts/
-			if m.currentPath != globalPromptsDir && !strings.HasPrefix(m.currentPath, globalPromptsDir+string(filepath.Separator)) {
+			// Only show virtual folder if:
+			// 1. We're not already in ~/.prompts/ (or subdirectory)
+			// 2. We're not in the home directory (where it would show as a regular folder)
+			inHomeDir := m.currentPath == homeDir
+			inPromptsDir := m.currentPath == globalPromptsDir || strings.HasPrefix(m.currentPath, globalPromptsDir+string(filepath.Separator))
+
+			if !inHomeDir && !inPromptsDir {
 				// Check if ~/.prompts/ exists
 				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
 					// Create a virtual folder item for ~/.prompts/
@@ -208,8 +213,12 @@ func (m *model) getFilteredFiles() []fileItem {
 
 			// Add global .claude/ folder (if not already in ~/.claude/)
 			globalClaudeDir := filepath.Join(homeDir, ".claude")
-			// Only show if we're not already in ~/.claude/
-			if m.currentPath != globalClaudeDir && !strings.HasPrefix(m.currentPath, globalClaudeDir+string(filepath.Separator)) {
+			// Only show virtual folder if:
+			// 1. We're not already in ~/.claude/ (or subdirectory)
+			// 2. We're not in the home directory (where it would show as a regular folder)
+			inClaudeDir := m.currentPath == globalClaudeDir || strings.HasPrefix(m.currentPath, globalClaudeDir+string(filepath.Separator))
+
+			if !inHomeDir && !inClaudeDir {
 				// Check if ~/.claude/ exists
 				if info, err := os.Stat(globalClaudeDir); err == nil && info.IsDir() {
 					// Create a virtual folder item for ~/.claude/

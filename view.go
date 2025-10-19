@@ -158,7 +158,14 @@ func (m model) renderSinglePane() string {
 	s.WriteString(promptPrefix)
 	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
-	s.WriteString(inputStyle.Render(m.commandInput))
+
+	// Show helper text when not focused and empty, otherwise show input
+	if !m.commandFocused && m.commandInput == "" {
+		helperStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+		s.WriteString(helperStyle.Render(": to focus"))
+	} else {
+		s.WriteString(inputStyle.Render(m.commandInput))
+	}
 
 	// Show cursor only when command mode is active
 	if m.commandFocused {

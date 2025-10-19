@@ -674,14 +674,23 @@ func (m model) renderFullPreview() string {
 
 	// Wrap preview in bordered box with fixed dimensions
 	// Content is constrained to contentHeight lines to fit within the box
+	// When mouse is disabled (for text selection), remove border for cleaner copying
 	previewBoxStyle := lipgloss.NewStyle().
 		Width(m.width - 6).       // Leave margin for borders
-		Height(contentHeight).    // Content area height (borders added by Lipgloss)
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.AdaptiveColor{
-			Light: "#00af87", // Teal for light
-			Dark:  "#5faf87",  // Light teal for dark
-		})
+		Height(contentHeight)     // Content area height (borders added by Lipgloss)
+
+	if m.previewMouseEnabled {
+		// Mouse enabled: show decorative border
+		previewBoxStyle = previewBoxStyle.
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.AdaptiveColor{
+				Light: "#00af87", // Teal for light
+				Dark:  "#5faf87",  // Light teal for dark
+			})
+	} else {
+		// Mouse disabled (text selection mode): no border for cleaner copying
+		previewBoxStyle = previewBoxStyle.Padding(0, 1) // Just add side padding
+	}
 
 	s.WriteString(previewBoxStyle.Render(previewContent))
 
@@ -694,7 +703,16 @@ func (m model) renderFullPreview() string {
 	if m.preview.isPrompt || (m.inputFieldsActive && len(m.promptInputFields) > 0) {
 		f5Text = "copy rendered prompt"
 	}
-	helpText := fmt.Sprintf("↑/↓: scroll • PgUp/PgDown: page • F4: edit • F5: %s • Esc: close • F10: quit", f5Text)
+
+	// Mouse toggle indicator and help text
+	var mouseStatus, helpText string
+	if m.previewMouseEnabled {
+		mouseStatus = "ON"
+		helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (🖱️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
+	} else {
+		mouseStatus = "OFF"
+		helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (⌨️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
+	}
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
@@ -805,7 +823,14 @@ func (m model) renderDualPane() string {
 	s.WriteString(promptPrefix)
 	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
-	s.WriteString(inputStyle.Render(m.commandInput))
+
+	// Show helper text when not focused and empty, otherwise show input
+	if !m.commandFocused && m.commandInput == "" {
+		helperStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+		s.WriteString(helperStyle.Render(": to focus"))
+	} else {
+		s.WriteString(inputStyle.Render(m.commandInput))
+	}
 
 	// Show cursor only when command mode is active
 	if m.commandFocused {

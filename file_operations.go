@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -1332,4 +1333,77 @@ func (m *model) filterFilesBySearch(query string) []int {
 	}
 
 	return matchingIndices
+}
+
+// copyFile copies a file from src to dst
+// Handles both files and directories (recursive copy)
+func (m *model) copyFile(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to stat source: %w", err)
+	}
+
+	if srcInfo.IsDir() {
+		return copyDirectory(src, dst)
+	}
+
+	return copyFileContent(src, dst)
+}
+
+// copyFileContent copies a single file
+func copyFileContent(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source: %w", err)
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination: %w", err)
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return fmt.Errorf("failed to copy: %w", err)
+	}
+
+	// Preserve permissions
+	srcInfo, _ := os.Stat(src)
+	return os.Chmod(dst, srcInfo.Mode())
+}
+
+// copyDirectory recursively copies a directory
+func copyDirectory(src, dst string) error {
+	// Create destination directory
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDirectory(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFileContent(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
