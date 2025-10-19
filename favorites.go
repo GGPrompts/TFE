@@ -184,7 +184,7 @@ func (m *model) getFilteredFiles() []fileItem {
 				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
 					// Create a virtual folder item for ~/.prompts/
 					globalPromptsItem := fileItem{
-						name:    "🌐 ~/.prompts/ (Global Prompts)",
+						name:    "🌐 ~/.prompts/ (Prompts)",
 						path:    globalPromptsDir,
 						isDir:   true,
 						size:    info.Size(),
@@ -195,7 +195,7 @@ func (m *model) getFilteredFiles() []fileItem {
 				} else {
 					// ~/.prompts doesn't exist - show helper to create it
 					helperItem := fileItem{
-						name:    "💡 Setup: Create ~/.prompts/ for global prompts (press Enter)",
+						name:    "💡 Setup: Create ~/.prompts/ for prompts (press Enter)",
 						path:    globalPromptsDir, // Use the path we want to create
 						isDir:   true,
 						size:    0,
