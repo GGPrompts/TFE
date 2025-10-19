@@ -399,19 +399,19 @@ TFE offers three distinct interface modes:
 
 ### Command Prompt (Always Visible)
 
-The command prompt is always visible at the top of the screen (3rd row). Simply start typing any command and it will automatically focus and capture your input. Press Enter to execute commands in the current directory context:
+The command prompt is always visible at the top of the screen (3rd row, below the toolbar). Simply start typing any command and it will automatically focus and capture your input. Press Enter to execute commands in the current directory context:
 
 ```
 ┌─────────────────────────────────────────┐
-│ TFE - Terminal File Explorer            │
-│ /current/path/here                      │
-│ /current/path/here $ ls -la█           │  ← Command prompt (3rd row)
+│ TFE - Terminal File Explorer            │  ← Title bar
+│ 🏠 ⭐ 📝 🗑️                              │  ← Toolbar (clickable buttons)
+│ $ ls -la█                               │  ← Command prompt (3rd row)
 │                                         │
-│   ▸ folder1                             │
+│   ▸ folder1                             │  ← File list
 │   ▸ folder2                             │
 │   • file1.txt                           │
 │                                         │
-│ 3 folders, 12 files • List             │
+│ /current/path • 3 folders, 12 files    │  ← Status bar
 └─────────────────────────────────────────┘
 ```
 
@@ -435,11 +435,11 @@ The command prompt is always visible at the top of the screen (3rd row). Simply 
 #### Key Interface Elements
 
 1. **Title Bar**: Application name and current mode
-2. **Path Display**: Shows current directory path
+2. **Toolbar**: Clickable emoji buttons (🏠 Home, ⭐ Favorites, 📝 Prompts, 🗑️ Trash)
 3. **Command Prompt**: Always-visible shell command input (3rd row)
 4. **File List**: Scrollable list of folders and files with type indicators
 5. **Preview Pane**: Live file preview with line numbers (dual-pane/full modes)
-6. **Status Bar**: File counts, view mode, and selection info
+6. **Status Bar**: Current path, file counts, view mode, and selection info
 
 ## Technical Details
 
