@@ -67,8 +67,8 @@ func (m model) renderListView(maxVisible int) string {
 			style = folderStyle
 		}
 
-		// Override with orange color if it's a Claude context file
-		if isClaudeContextFile(file.name) {
+		// Override with orange color if it's a Claude context file or global .claude virtual folder
+		if isClaudeContextFile(file.name) || isGlobalClaudeVirtualFolder(file.name) {
 			style = claudeContextStyle
 		}
 
@@ -316,7 +316,7 @@ func (m model) renderDetailView(maxVisible int) string {
 		if file.isDir {
 			style = folderStyle
 		}
-		if isClaudeContextFile(file.name) {
+		if isClaudeContextFile(file.name) || isGlobalClaudeVirtualFolder(file.name) {
 			style = claudeContextStyle
 		}
 		if isAgentsFile(file.name) {
@@ -490,7 +490,7 @@ func (m model) renderTreeView(maxVisible int) string {
 			style = folderStyle
 		}
 
-		if isClaudeContextFile(file.name) {
+		if isClaudeContextFile(file.name) || isGlobalClaudeVirtualFolder(file.name) {
 			style = claudeContextStyle
 		}
 
