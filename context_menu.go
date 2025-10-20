@@ -89,6 +89,13 @@ func (m model) getContextMenuItems() []contextMenuItem {
 			}
 			items = append(items, contextMenuItem{"📊 Processes (htop)", "htop"})
 		}
+		if editorAvailable("bottom") {
+			if !hasTools {
+				items = append(items, contextMenuItem{"─────────", "separator"})
+				hasTools = true
+			}
+			items = append(items, contextMenuItem{"📊 Monitor (bottom)", "bottom"})
+		}
 
 		// Add separator and favorites
 		items = append(items, contextMenuItem{"─────────", "separator"})
@@ -275,6 +282,13 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Launch htop (doesn't need directory context but launch from directory anyway)
 		if m.contextMenuFile.isDir {
 			return m, openTUITool("htop", m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "bottom":
+		// Launch bottom system monitor
+		if m.contextMenuFile.isDir {
+			return m, openTUITool("bottom", m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 
