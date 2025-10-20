@@ -324,24 +324,54 @@ func (m model) renderInputFields(availableWidth, availableHeight int) string {
 	s.WriteString(helpStyle.Render("Tab: Navigate • Type: Edit • F3: File Picker • F5: Copy • 🕐 Auto-filled"))
 	s.WriteString("\n\n")
 
-	// Calculate how many fields we can show (reserve 3 lines: title + help + blank)
+	// Calculate how many fields we can show (reserve lines for: title + help + blank + indicators)
 	headerLines := 3
 	linesPerField := 2 // Label line + input line
-	maxFields := (availableHeight - headerLines) / linesPerField
+	totalFields := len(m.promptInputFields)
+
+	// Reserve space for scroll indicators if needed
+	availableLinesForFields := availableHeight - headerLines
+	maxFields := availableLinesForFields / linesPerField
 	if maxFields < 1 {
 		maxFields = 1
 	}
 
-	// Render each field
-	fieldsShown := 0
-	for i, field := range m.promptInputFields {
-		if fieldsShown >= maxFields {
-			// Show "... X more fields" message
-			remainingCount := len(m.promptInputFields) - fieldsShown
-			moreStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
-			s.WriteString(moreStyle.Render(fmt.Sprintf("... %d more field(s) below", remainingCount)))
-			break
+	// Calculate scroll window to keep focused field visible
+	startField := 0
+	endField := totalFields
+
+	if totalFields > maxFields {
+		// We'll need scroll indicators, so reduce maxFields by 1 to account for them
+		if maxFields > 1 {
+			maxFields = maxFields - 1
 		}
+
+		// Calculate which fields to show based on focused field
+		// Try to center the focused field in the view
+		startField = m.focusedInputField - (maxFields / 2)
+		if startField < 0 {
+			startField = 0
+		}
+		endField = startField + maxFields
+		if endField > totalFields {
+			endField = totalFields
+			startField = totalFields - maxFields
+			if startField < 0 {
+				startField = 0
+			}
+		}
+	}
+
+	// Show indicator if there are fields above
+	if startField > 0 {
+		moreStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
+		s.WriteString(moreStyle.Render(fmt.Sprintf("... %d field(s) above ↑", startField)))
+		s.WriteString("\n")
+	}
+
+	// Render visible fields
+	for i := startField; i < endField; i++ {
+		field := m.promptInputFields[i]
 
 		// Field label (no indicator - it goes on the value line)
 		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(field.color))
@@ -400,8 +430,13 @@ func (m model) renderInputFields(availableWidth, availableHeight int) string {
 		s.WriteString(focusIndicator)
 		s.WriteString(inputStyle.Render(valueDisplay))
 		s.WriteString("\n")
+	}
 
-		fieldsShown++
+	// Show indicator if there are fields below
+	if endField < totalFields {
+		remainingCount := totalFields - endField
+		moreStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
+		s.WriteString(moreStyle.Render(fmt.Sprintf("... %d field(s) below ↓", remainingCount)))
 	}
 
 	return s.String()

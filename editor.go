@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -129,6 +130,20 @@ func isBrowserFile(path string) bool {
 	return isImageFile(path) || isHTMLFile(path)
 }
 
+// isWSL checks if we're running in Windows Subsystem for Linux
+func isWSL() bool {
+	// Check for WSL-specific indicators
+	if _, err := os.Stat("/proc/version"); err == nil {
+		data, err := os.ReadFile("/proc/version")
+		if err == nil {
+			version := string(data)
+			return strings.Contains(strings.ToLower(version), "microsoft") ||
+				strings.Contains(strings.ToLower(version), "wsl")
+		}
+	}
+	return false
+}
+
 // getAvailableBrowser returns the command to open files in the default browser
 func getAvailableBrowser() string {
 	// WSL - try wslview first (from wslu package), then use Windows commands
@@ -170,13 +185,26 @@ func openInBrowser(path string) tea.Cmd {
 
 	return func() tea.Msg {
 		var c *exec.Cmd
+		browserPath := path
+
+		// In WSL, convert Linux paths to Windows paths for better compatibility
+		if isWSL() && browser != "wslview" {
+			// Use wslpath to convert WSL path to Windows path
+			cmd := exec.Command("wslpath", "-w", path)
+			output, err := cmd.Output()
+			if err == nil {
+				browserPath = strings.TrimSpace(string(output))
+			}
+			// If conversion fails, fall back to original path
+		}
+
 		if browser == "cmd.exe" {
 			// Windows via WSL - use cmd.exe /c start with empty title ""
 			// The empty title "" prevents cmd from treating first arg as window title
-			c = exec.Command("cmd.exe", "/c", "start", "", path)
+			c = exec.Command("cmd.exe", "/c", "start", "", browserPath)
 		} else {
 			// Linux/macOS/wslview
-			c = exec.Command(browser, path)
+			c = exec.Command(browser, browserPath)
 		}
 
 		// Start the browser without blocking (browsers run in background)
