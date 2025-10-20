@@ -12,6 +12,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Dual Navigation**: Both keyboard shortcuts and mouse/touch support
 - **Mobile Ready**: Full touch controls and optimized single-pane modes for Termux/Android
 - **F-Key Controls**: Midnight Commander-style F1-F10 hotkeys for common operations
+- **Context-Aware Help**: F1 automatically jumps to relevant help section based on current mode
 - **Fuzzy Search**: Fast file search with go-fzf (Ctrl+P or click 🔍)
 - **Context Menu**: Right-click or F2 for quick access to file operations
 - **Quick CD**: Exit TFE and change shell directory to selected folder
@@ -192,7 +193,7 @@ tfe    # Launch from any directory with Quick CD support
 #### F-Keys (Midnight Commander Style)
 | Key | Action |
 |-----|--------|
-| `F1` | Show help (HOTKEYS.md reference) |
+| `F1` | Show context-aware help (automatically jumps to relevant section based on current mode) |
 | `F2` | Open context menu for current file |
 | `F3` | View/Preview file in full-screen |
 | `F4` | Edit file in external editor |
@@ -241,6 +242,21 @@ tfe    # Launch from any directory with Quick CD support
 | `n` / `N` | Edit file in nano specifically |
 | `Esc` | Exit dual-pane/preview mode / close context menu |
 | `Ctrl+C` | Force quit application |
+
+### Context-Aware Help (F1)
+
+Press **F1** from anywhere in TFE to open the complete keyboard shortcuts reference. The help system is **context-aware** and automatically jumps to the most relevant section based on what you're currently doing:
+
+| When you press F1... | Help opens to... |
+|---------------------|------------------|
+| From single-pane mode | **Navigation** section |
+| From dual-pane mode | **Dual-Pane Mode** section |
+| While viewing a file (full preview) | **Preview & Full-Screen Mode** section |
+| With context menu open | **Context Menu** section |
+| While filling prompt fields | **Prompt Templates & Fillable Fields** section |
+| While typing a command | **Command Prompt** section |
+
+This means you get **instant access to the shortcuts that matter** for what you're currently doing, without scrolling through the entire help file. You can still manually scroll to other sections if needed.
 
 ### Mouse Controls
 
@@ -619,6 +635,7 @@ TFE follows a modular architecture with 13 focused files:
 - ✅ Image viewing (viu/timg/chafa) and editing (textual-paint)
 - ✅ Preview search (Ctrl-F) with match navigation (n/Shift-N)
 - ✅ Mouse toggle in preview ('m' key) for clean text selection
+- ✅ Context-aware F1 help - jumps to relevant section based on current mode
 
 ### Planned Features (v1.1+)
 - Configurable color schemes and themes

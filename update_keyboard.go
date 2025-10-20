@@ -1292,6 +1292,13 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Load and show the hotkeys file if it exists
 		if _, err := os.Stat(hotkeysPath); err == nil {
 			m.loadPreview(hotkeysPath)
+
+			// Context-aware help: Jump to relevant section based on current mode
+			sectionName := m.getHelpSectionName()
+			if sectionLine := findSectionLine(m.preview.content, sectionName); sectionLine >= 0 {
+				m.preview.scrollPos = sectionLine
+			}
+
 			m.viewMode = viewFullPreview
 			m.searchMode = false // Disable search mode in preview
 			m.calculateLayout() // Update widths for full-screen

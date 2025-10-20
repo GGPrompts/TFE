@@ -5,6 +5,18 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added (2025-10-19 Session)
+- **Context-Aware F1 Help**
+  - F1 now automatically jumps to the most relevant help section based on current mode
+  - Smart context detection:
+    - Input fields active → "Prompt Templates & Fillable Fields" section
+    - Context menu open → "Context Menu" section
+    - Command mode → "Command Prompt" section
+    - Full preview mode → "Preview & Full-Screen Mode" section
+    - Dual-pane mode → "Dual-Pane Mode" section
+    - Single-pane mode → "Navigation" section (default)
+  - Improves discoverability of relevant shortcuts
+  - Users can still manually scroll to other sections if needed
+  - Files modified: `helpers.go` (added getHelpSectionName() and findSectionLine()), `update_keyboard.go`
 - **Image Viewing & Editing Integration**
   - New context menu options for image files (.png, .jpg, .gif, .bmp, .svg, .webp, .ico, .tiff):
     - **🖼️ View Image**: Opens images in terminal viewer (viu > timg > chafa)

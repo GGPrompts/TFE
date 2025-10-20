@@ -176,3 +176,37 @@ func (m *model) findPreviousSearchMatch() {
 	m.preview.scrollPos = m.preview.searchMatches[m.preview.currentMatch]
 	m.setStatusMessage(fmt.Sprintf("🔍 Match %d/%d - n: next, Shift+n: prev, Esc: exit", m.preview.currentMatch+1, len(m.preview.searchMatches)), false)
 }
+
+// getHelpSectionName returns the appropriate help section name based on current context
+// This is used for context-aware F1 help navigation
+func (m model) getHelpSectionName() string {
+	// Check context in priority order (most specific first)
+	if m.inputFieldsActive {
+		return "## Prompt Templates & Fillable Fields"
+	}
+	if m.contextMenuOpen {
+		return "## Context Menu"
+	}
+	if m.commandFocused {
+		return "## Command Prompt (Vim-Style)"
+	}
+	if m.viewMode == viewFullPreview {
+		return "## Preview & Full-Screen Mode"
+	}
+	if m.viewMode == viewDualPane {
+		return "## Dual-Pane Mode"
+	}
+	// Default to Navigation section for single-pane mode
+	return "## Navigation"
+}
+
+// findSectionLine searches for a section heading in content and returns its line number
+// Returns -1 if not found, otherwise returns the 0-based line index
+func findSectionLine(content []string, sectionName string) int {
+	for i, line := range content {
+		if strings.Contains(line, sectionName) {
+			return i
+		}
+	}
+	return -1
+}
