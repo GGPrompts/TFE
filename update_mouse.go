@@ -68,8 +68,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [>_] [🔍] [📝] [🗑️]
-			// Layout:  0-4   5-9    10-14 15-19 20-24 25-29
+			// Toolbar: [🏠] [⭐/✨] [👁️] [⬜/⬌] [>_] [🔍] [📝] [🗑️]
+			// Layout:  0-4   5-9    10-14 15-19 20-24 25-29 30-34 35-39
 			// Note: Each button is 5 chars: [ + emoji(2) + ] + space
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
@@ -93,8 +93,32 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Terminal button [>_] (X=10-14: [ + >_(2) + ] + space)
+				// View mode toggle button [👁️] (X=10-14: [ + emoji(2) + ] + space)
 				if msg.X >= 10 && msg.X <= 14 {
+					// Cycle through display modes (List → Detail → Tree)
+					if m.displayMode == modeList {
+						m.displayMode = modeDetail
+					} else if m.displayMode == modeDetail {
+						m.displayMode = modeTree
+					} else {
+						m.displayMode = modeList
+					}
+					return m, nil
+				}
+				// Pane toggle button [⬜/⬌] (X=15-19: [ + emoji(2) + ] + space)
+				if msg.X >= 15 && msg.X <= 19 {
+					// Toggle between single and dual-pane (like Tab or Space)
+					if m.viewMode == viewDualPane {
+						m.viewMode = viewSinglePane
+					} else {
+						m.viewMode = viewDualPane
+					}
+					m.calculateLayout()
+					m.populatePreviewCache() // Refresh cache with new layout
+					return m, nil
+				}
+				// Terminal button [>_] (X=20-24: [ + >_(2) + ] + space)
+				if msg.X >= 20 && msg.X <= 24 {
 					// Toggle command mode focus
 					m.commandFocused = !m.commandFocused
 					if !m.commandFocused {
@@ -103,8 +127,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Fuzzy search button [🔍] (X=15-19: [ + emoji(2) + ])
-				if msg.X >= 15 && msg.X <= 19 {
+				// Fuzzy search button [🔍] (X=25-29: [ + emoji(2) + ] + space)
+				if msg.X >= 25 && msg.X <= 29 {
 					// Launch fuzzy search
 					m.fuzzySearchActive = true
 					// Clear screen before launching fuzzy search to ensure clean terminal state
@@ -113,8 +137,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						m.launchFuzzySearch(),
 					)
 				}
-				// Prompts filter button [📝] (X=20-24: [ + emoji(2) + ] + space)
-				if msg.X >= 20 && msg.X <= 24 {
+				// Prompts filter button [📝] (X=30-34: [ + emoji(2) + ] + space)
+				if msg.X >= 30 && msg.X <= 34 {
 					// Toggle prompts filter
 					m.showPromptsOnly = !m.showPromptsOnly
 
@@ -131,8 +155,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Trash button [🗑️] or [♻️] (X=25-29: [ + emoji(2) + ])
-				if msg.X >= 25 && msg.X <= 29 {
+				// Trash button [🗑️] or [♻️] (X=35-39: [ + emoji(2) + ] + space)
+				if msg.X >= 35 && msg.X <= 39 {
 					// Toggle trash view
 					m.showTrashOnly = !m.showTrashOnly
 					m.showFavoritesOnly = false // Disable favorites filter

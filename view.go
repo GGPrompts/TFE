@@ -104,6 +104,18 @@ func (m model) renderSinglePane() string {
 	s.WriteString(homeButtonStyle.Render("[" + starIcon + "]"))
 	s.WriteString(" ")
 
+	// View mode toggle button (cycles List → Detail → Tree)
+	s.WriteString(homeButtonStyle.Render("[👁️]"))
+	s.WriteString(" ")
+
+	// Pane toggle button (toggles single ↔ dual-pane)
+	paneIcon := "⬜"
+	if m.viewMode == viewDualPane {
+		paneIcon = "⬌"
+	}
+	s.WriteString(homeButtonStyle.Render("[" + paneIcon + "]"))
+	s.WriteString(" ")
+
 	// Command mode toggle button with green >_ and blue brackets
 	if m.commandFocused {
 		// Active: gray background

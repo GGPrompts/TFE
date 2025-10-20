@@ -1210,11 +1210,27 @@ func renderMarkdownWithTimeout(content string, width int, timeout time.Duration)
 			}
 		}()
 
-		// Render markdown
-		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("auto"),
-			glamour.WithWordWrap(width),
-		)
+		// Render markdown with custom TFE style
+		// First try custom style file, fall back to "dark" if not found
+		exePath, _ := os.Executable()
+		exeDir := filepath.Dir(exePath)
+		customStylePath := filepath.Join(exeDir, "styles", "tfe.json")
+
+		// Check if custom style exists, otherwise use built-in dark style
+		var renderer *glamour.TermRenderer
+		var err error
+		if _, statErr := os.Stat(customStylePath); statErr == nil {
+			renderer, err = glamour.NewTermRenderer(
+				glamour.WithStylePath(customStylePath),
+				glamour.WithWordWrap(width),
+			)
+		} else {
+			// Fall back to dark style if custom style not found
+			renderer, err = glamour.NewTermRenderer(
+				glamour.WithStandardStyle("dark"),
+				glamour.WithWordWrap(width),
+			)
+		}
 		if err != nil {
 			resultChan <- renderResult{rendered: "", err: err}
 			return
@@ -1248,6 +1264,16 @@ func (m *model) setStatusMessage(message string, isError bool) {
 	m.statusIsError = isError
 	m.statusTime = time.Now()
 }
+
+// statusTimeoutCmd returns a command that triggers a redraw after the status message expires
+func statusTimeoutCmd() tea.Cmd {
+	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+		return statusTimeoutMsg{}
+	})
+}
+
+// statusTimeoutMsg is sent when the status message should be cleared
+type statusTimeoutMsg struct{}
 
 // createDirectory creates a new directory in the current path
 func (m *model) createDirectory(name string) error {

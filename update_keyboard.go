@@ -171,7 +171,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Clear any stray command input that might have captured terminal responses
 			m.commandInput = ""
 			m.commandFocused = false
-			// Re-enable mouse when exiting preview
+			// Reset mouse mode when exiting preview
 			m.previewMouseEnabled = true
 			return m, tea.EnableMouseCellMotion
 
@@ -228,15 +228,15 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 		case "m", "M":
-			// Toggle mouse in preview mode
+			// Toggle mouse mode in preview
 			m.previewMouseEnabled = !m.previewMouseEnabled
 
 			if m.previewMouseEnabled {
 				m.setStatusMessage("🖱️  Mouse ON - Border visible, wheel scrolling works", false)
-				return m, tea.EnableMouseCellMotion
+				return m, tea.Batch(tea.EnableMouseCellMotion, statusTimeoutCmd())
 			} else {
-				m.setStatusMessage("⌨️  Mouse OFF - Border removed, clean text selection enabled", false)
-				return m, tea.DisableMouse
+				m.setStatusMessage("⌨️  Mouse OFF - Border removed, text selection enabled", false)
+				return m, tea.Batch(tea.DisableMouse, statusTimeoutCmd())
 			}
 
 		case "v", "V":
@@ -335,14 +335,26 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.setStatusMessage(fmt.Sprintf("Created file: %s", m.dialog.input), false)
 						m.loadFiles()
 
-						// Open in editor
-						editor := getAvailableEditor()
-						if editor == "" {
-							m.setStatusMessage("File created, but no editor available", true)
+						// Check if it's an image file - open in image editor
+						if isImageFile(filepath) {
+							editor := getAvailableImageEditor()
+							if editor == "" {
+								m.setStatusMessage("File created, but no image editor available (install textual-paint)", true)
+							} else {
+								m.showDialog = false
+								m.dialog = dialogModel{}
+								return m, openImageEditor(filepath)
+							}
 						} else {
-							m.showDialog = false
-							m.dialog = dialogModel{}
-							return m, openEditor(editor, filepath)
+							// Open text file in text editor
+							editor := getAvailableEditor()
+							if editor == "" {
+								m.setStatusMessage("File created, but no editor available", true)
+							} else {
+								m.showDialog = false
+								m.dialog = dialogModel{}
+								return m, openEditor(editor, filepath)
+							}
 						}
 					}
 				} else if m.dialog.title == "Copy File" {

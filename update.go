@@ -100,6 +100,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
+	case statusTimeoutMsg:
+		// Status message timeout - force full screen redraw
+		// Clear screen to ensure proper redraw of footer
+		return m, tea.ClearScreen
+
 	case editorFinishedMsg:
 		// Editor has closed, we're back in TFE
 		// Refresh file list in case file was modified

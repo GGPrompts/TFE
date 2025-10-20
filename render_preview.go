@@ -704,27 +704,39 @@ func (m model) renderFullPreview() string {
 		f5Text = "copy rendered prompt"
 	}
 
-	// Mouse toggle indicator and help text
-	var mouseStatus, helpText string
+	// Mouse toggle indicator - compact format with just emoji
+	var modeEmoji, helpText string
 	if m.previewMouseEnabled {
-		mouseStatus = "ON"
-		// Show 'V: view image' for binary image files
-		if m.preview.isBinary && isImageFile(m.preview.filePath) {
-			helpText = fmt.Sprintf("V: view image • m: toggle border/mouse (🖱️  %s) • F4: edit • Esc: close", mouseStatus)
-		} else {
-			helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (🖱️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
-		}
+		modeEmoji = "🖱️"
 	} else {
-		mouseStatus = "OFF"
-		// Show 'V: view image' for binary image files
-		if m.preview.isBinary && isImageFile(m.preview.filePath) {
-			helpText = fmt.Sprintf("V: view image • m: toggle border/mouse (⌨️  %s) • F4: edit • Esc: close", mouseStatus)
-		} else {
-			helpText = fmt.Sprintf("↑/↓: scroll • m: toggle border/mouse (⌨️  %s) • F4: edit • F5: %s • Esc: close", mouseStatus, f5Text)
-		}
+		modeEmoji = "⌨️"
+	}
+
+	// Build help text
+	if m.preview.isBinary && isImageFile(m.preview.filePath) {
+		helpText = fmt.Sprintf("V: view image • m: %s mode • F4: edit • Esc: close", modeEmoji)
+	} else {
+		helpText = fmt.Sprintf("↑/↓: scroll • m: %s mode • F4: edit • F5: %s • Esc: close", modeEmoji, f5Text)
 	}
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes
+
+	// Show status message if present (auto-dismiss after 3s)
+	if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
+		s.WriteString("\n")
+		msgStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("28")). // Green
+			Foreground(lipgloss.Color("0")).
+			Bold(true).
+			Padding(0, 1)
+
+		if m.statusIsError {
+			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
+		}
+
+		s.WriteString(msgStyle.Render(m.statusMessage))
+		s.WriteString("\033[0m") // Reset ANSI codes
+	}
 
 	return s.String()
 }
@@ -785,6 +797,24 @@ func (m model) renderDualPane() string {
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
 	s.WriteString(favButtonStyle.Render("[" + starIcon + "]"))
+	s.WriteString(" ")
+
+	// View mode toggle button (cycles List → Detail → Tree)
+	viewButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(viewButtonStyle.Render("[👁️]"))
+	s.WriteString(" ")
+
+	// Pane toggle button (toggles single ↔ dual-pane)
+	paneIcon := "⬜"
+	if m.viewMode == viewDualPane {
+		paneIcon = "⬌"
+	}
+	paneButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(paneButtonStyle.Render("[" + paneIcon + "]"))
 	s.WriteString(" ")
 
 	// Command mode toggle button with green >_ and blue brackets
@@ -1013,6 +1043,23 @@ func (m model) renderDualPane() string {
 	statusLine2 := selectedInfo
 	s.WriteString(statusStyle.Render(statusLine2))
 	s.WriteString("\033[0m") // Reset ANSI codes
+
+	// Show status message if present (auto-dismiss after 3s)
+	if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
+		s.WriteString("\n")
+		msgStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("28")). // Green
+			Foreground(lipgloss.Color("0")).
+			Bold(true).
+			Padding(0, 1)
+
+		if m.statusIsError {
+			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
+		}
+
+		s.WriteString(msgStyle.Render(m.statusMessage))
+		s.WriteString("\033[0m") // Reset ANSI codes
+	}
 
 	return s.String()
 }
