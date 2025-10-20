@@ -256,6 +256,42 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case "f1":
+			// F1: Show hotkeys reference from preview mode
+			hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")
+			// Try to find HOTKEYS.md in the TFE directory
+			// First check if it exists in current directory
+			if _, err := os.Stat(hotkeysPath); os.IsNotExist(err) {
+				// Try executable directory
+				if exePath, err := os.Executable(); err == nil {
+					hotkeysPath = filepath.Join(filepath.Dir(exePath), "HOTKEYS.md")
+				}
+			}
+			// Load and show the hotkeys file if it exists
+			if _, err := os.Stat(hotkeysPath); err == nil {
+				// Store current preview state to restore later
+				previousPath := m.preview.filePath
+				previousScrollPos := m.preview.scrollPos
+
+				// Load hotkeys file
+				m.loadPreview(hotkeysPath)
+
+				// Context-aware help: Jump to relevant section based on current mode
+				sectionName := m.getHelpSectionName()
+				if sectionLine := findSectionLine(m.preview.content, sectionName); sectionLine >= 0 {
+					m.preview.scrollPos = sectionLine
+				}
+
+				// Store the previous preview so user can return to it
+				// (Note: User would press Esc to go back to file list, then re-enter preview)
+				_ = previousPath
+				_ = previousScrollPos
+
+				m.calculateLayout()
+				m.populatePreviewCache()
+				return m, tea.ClearScreen
+			}
+
 		case "up", "k":
 			// Scroll preview up
 			if m.preview.scrollPos > 0 {

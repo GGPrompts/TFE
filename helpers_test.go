@@ -156,7 +156,7 @@ func TestIsPromptFile(t *testing.T) {
 			name: ".yaml in .claude directory",
 			fileItem: fileItem{
 				name:  "config.yaml",
-				path:  "/project/.claude/agents/config.yaml",
+				path:  "/project/.claude/commands/config.yaml",
 				isDir: false,
 			},
 			expected: true,

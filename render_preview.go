@@ -749,9 +749,9 @@ func (m model) renderFullPreview() string {
 
 	// Build help text
 	if m.preview.isBinary && isImageFile(m.preview.filePath) {
-		helpText = fmt.Sprintf("V: view image • m: %s mode • F4: edit • Esc: close", modeEmoji)
+		helpText = fmt.Sprintf("F1: help • V: view image • m: %s mode • F4: edit • Esc: close", modeEmoji)
 	} else {
-		helpText = fmt.Sprintf("↑/↓: scroll • m: %s mode • F4: edit • F5: %s • Esc: close", modeEmoji, f5Text)
+		helpText = fmt.Sprintf("F1: help • ↑/↓: scroll • m: %s mode • F4: edit • F5: %s • Esc: close", modeEmoji, f5Text)
 	}
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes

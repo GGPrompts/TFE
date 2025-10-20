@@ -1,0 +1,18 @@
+---
+name: Refactor Suggestions
+description: Get ideas for improving code structure
+---
+Please suggest refactorings for this code:
+
+**File:** {{file}}
+
+Focus on:
+- Code organization and structure
+- Removing duplication
+- Improving naming
+- Simplifying complex logic
+- Performance optimizations
+
+Be specific about what to change and why.
+
+**Project:** {{project}}

@@ -1,0 +1,49 @@
+═══════════════════════════════════════════════════
+  OBS QUICK SETUP FOR TFE DEMO
+═══════════════════════════════════════════════════
+
+STEP 1: ADD SOURCE
+  Sources panel → + → Window Capture
+  Name: "TFE Terminal"
+  Window: Select "Windows Terminal"
+  ✓ Capture Cursor
+
+STEP 2: CROP TO TERMINAL ONLY
+  Right-click source → Transform → Edit Transform
+  Crop left/right/top/bottom to remove desktop/taskbar
+  Goal: Only show terminal window
+
+STEP 3: SETTINGS → OUTPUT
+  Output Mode: Simple
+  Recording Quality: High Quality (medium for smaller files)
+  Recording Format: MP4
+  Recording Path: Default (Videos folder)
+
+STEP 4: SETTINGS → VIDEO
+  Base Resolution: 1920x1080 (or your screen res)
+  Output Resolution: 1280x720 (good balance!)
+  FPS: 30 (or 24 for smaller files)
+
+STEP 5: RECORD
+  Click "Start Recording" button
+  Or: Set hotkey in Settings → Hotkeys
+
+═══════════════════════════════════════════════════
+
+TIPS:
+  • Position terminal in center of screen before recording
+  • Size terminal reasonably (~1200x700)
+  • Clear terminal (Ctrl+L) before starting
+  • Practice once without recording!
+
+FILE SIZES:
+  45 sec @ 1280x720 @ 30fps ≈ 5-10 MB (MP4)
+  Converting to GIF ≈ 2-4 MB
+
+WHERE FILES SAVE:
+  Default: C:\Users\YourName\Videos
+  Or: Whatever you set in Settings → Output → Recording Path
+
+═══════════════════════════════════════════════════
+Ready to record! ☕🎥
+═══════════════════════════════════════════════════

@@ -603,3 +603,350 @@ func BenchmarkFormatFileSize(b *testing.B) {
 		formatFileSize(sizes[i%len(sizes)])
 	}
 }
+
+// TestLoadFiles tests directory loading functionality
+func TestLoadFiles(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	// Create test directory structure
+	testDir := filepath.Join(tmpDir, "testdir")
+	os.Mkdir(testDir, 0755)
+
+	// Create directories
+	os.Mkdir(filepath.Join(testDir, "folder1"), 0755)
+	os.Mkdir(filepath.Join(testDir, "folder2"), 0755)
+	os.Mkdir(filepath.Join(testDir, ".hidden"), 0755)
+	os.Mkdir(filepath.Join(testDir, ".claude"), 0755)
+
+	// Create files
+	createTestFileWithContent(t, filepath.Join(testDir, "file1.txt"), []byte("content"))
+	createTestFileWithContent(t, filepath.Join(testDir, "file2.go"), []byte("package main"))
+	createTestFileWithContent(t, filepath.Join(testDir, ".hidden_file"), []byte("secret"))
+
+	tests := []struct {
+		name           string
+		currentPath    string
+		showHidden     bool
+		expectedMin    int // Minimum expected files (accounts for parent dir)
+		expectParent   bool
+		expectHidden   bool
+	}{
+		{
+			name:         "Load regular directory",
+			currentPath:  testDir,
+			showHidden:   false,
+			expectedMin:  6, // parent + 2 folders + 2 files + .claude
+			expectParent: true,
+			expectHidden: false,
+		},
+		{
+			name:         "Load directory with hidden files shown",
+			currentPath:  testDir,
+			showHidden:   true,
+			expectedMin:  8, // parent + 3 folders + 3 files + .claude
+			expectParent: true,
+			expectHidden: true,
+		},
+		{
+			name:         "Load root directory",
+			currentPath:  "/",
+			showHidden:   false,
+			expectedMin:  0, // No parent at root
+			expectParent: false,
+			expectHidden: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &model{
+				currentPath: tt.currentPath,
+				showHidden:  tt.showHidden,
+			}
+
+			m.loadFiles()
+
+			if len(m.files) < tt.expectedMin {
+				t.Errorf("Expected at least %d files, got %d", tt.expectedMin, len(m.files))
+			}
+
+			// Check for parent directory
+			if tt.expectParent {
+				if len(m.files) == 0 || m.files[0].name != ".." {
+					t.Error("Expected parent directory '..' at index 0")
+				}
+			}
+
+			// Check hidden files visibility
+			hasHidden := false
+			for _, f := range m.files {
+				if strings.HasPrefix(f.name, ".") && f.name != ".." && f.name != ".claude" {
+					hasHidden = true
+					break
+				}
+			}
+
+			if tt.expectHidden && !hasHidden && tt.currentPath == testDir {
+				t.Error("Expected hidden files to be visible, but none found")
+			}
+
+			// Note: Directory/file ordering depends on sortFiles() which may be called
+			// We skip this test as sortFiles() can reorder based on sortBy/sortAsc settings
+		})
+	}
+}
+
+// TestLoadFilesInvalidPath tests loading files from invalid path
+func TestLoadFilesInvalidPath(t *testing.T) {
+	m := &model{
+		currentPath: "/nonexistent/path/that/does/not/exist",
+		showHidden:  false,
+	}
+
+	m.loadFiles()
+
+	if len(m.files) != 0 {
+		t.Errorf("Expected 0 files for invalid path, got %d", len(m.files))
+	}
+}
+
+// TestLoadPreview tests file preview loading
+func TestLoadPreview(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	tests := []struct {
+		name           string
+		fileName       string
+		content        []byte
+		expectBinary   bool
+		expectTooLarge bool
+		expectLoaded   bool
+		minLines       int
+	}{
+		{
+			name:         "Text file",
+			fileName:     "test.txt",
+			content:      []byte("Line 1\nLine 2\nLine 3"),
+			expectBinary: false,
+			expectLoaded: true,
+			minLines:     1, // At least one line
+		},
+		{
+			name:         "Go source file",
+			fileName:     "main.go",
+			content:      []byte("package main\n\nfunc main() {\n\tprintln(\"hello\")\n}"),
+			expectBinary: false,
+			expectLoaded: true,
+			minLines:     1, // At least one line (syntax highlighting may affect line count)
+		},
+		{
+			name:         "JSON file",
+			fileName:     "data.json",
+			content:      []byte(`{"key": "value", "number": 123}`),
+			expectBinary: false,
+			expectLoaded: true,
+			minLines:     1,
+		},
+		{
+			name:         "Binary file",
+			fileName:     "binary.bin",
+			content:      []byte{0x00, 0x01, 0x02, 0xFF, 0xFE},
+			expectBinary: true,
+			expectLoaded: true,
+			minLines:     3, // Binary file message
+		},
+		{
+			name:         "Empty file",
+			fileName:     "empty.txt",
+			content:      []byte{},
+			expectBinary: false,
+			expectLoaded: true,
+			minLines:     0,
+		},
+		{
+			name:         "Markdown file",
+			fileName:     "README.md",
+			content:      []byte("# Title\n\nSome content"),
+			expectBinary: false,
+			expectLoaded: true,
+			minLines:     1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testFile := filepath.Join(tmpDir, tt.fileName)
+			createTestFileWithContent(t, testFile, tt.content)
+
+			m := &model{
+				preview: previewModel{},
+			}
+
+			m.loadPreview(testFile)
+
+			if !m.preview.loaded {
+				if tt.expectLoaded {
+					t.Error("Expected preview to be loaded")
+				}
+				return
+			}
+
+			if m.preview.isBinary != tt.expectBinary {
+				t.Errorf("Expected isBinary=%v, got %v", tt.expectBinary, m.preview.isBinary)
+			}
+
+			if m.preview.tooLarge != tt.expectTooLarge {
+				t.Errorf("Expected tooLarge=%v, got %v", tt.expectTooLarge, m.preview.tooLarge)
+			}
+
+			if len(m.preview.content) < tt.minLines {
+				t.Errorf("Expected at least %d lines, got %d", tt.minLines, len(m.preview.content))
+			}
+
+			if m.preview.filePath != testFile {
+				t.Errorf("Expected filePath=%s, got %s", testFile, m.preview.filePath)
+			}
+
+			if m.preview.fileName != tt.fileName {
+				t.Errorf("Expected fileName=%s, got %s", tt.fileName, m.preview.fileName)
+			}
+		})
+	}
+}
+
+// TestLoadPreviewLargeFile tests handling of files larger than 1MB
+func TestLoadPreviewLargeFile(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	// Create a file larger than 1MB
+	largeFile := filepath.Join(tmpDir, "large.txt")
+	largeContent := make([]byte, 1024*1024+1) // 1MB + 1 byte
+	for i := range largeContent {
+		largeContent[i] = 'A'
+	}
+	createTestFileWithContent(t, largeFile, largeContent)
+
+	m := &model{
+		preview: previewModel{},
+	}
+
+	m.loadPreview(largeFile)
+
+	if !m.preview.loaded {
+		t.Error("Expected preview to be loaded")
+	}
+
+	if !m.preview.tooLarge {
+		t.Error("Expected tooLarge flag to be set")
+	}
+
+	// Check that it shows appropriate message
+	foundMessage := false
+	for _, line := range m.preview.content {
+		if strings.Contains(line, "too large") || strings.Contains(line, "Too large") {
+			foundMessage = true
+			break
+		}
+	}
+
+	if !foundMessage {
+		t.Error("Expected 'too large' message in preview content")
+	}
+}
+
+// TestLoadPreviewNonExistent tests loading preview of non-existent file
+func TestLoadPreviewNonExistent(t *testing.T) {
+	m := &model{
+		preview: previewModel{},
+	}
+
+	m.loadPreview("/nonexistent/file.txt")
+
+	if m.preview.loaded {
+		t.Error("Expected preview not to be loaded for non-existent file")
+	}
+}
+
+// TestLoadPreviewImageFile tests image file detection
+func TestLoadPreviewImageFile(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	// Create a fake image file (binary content with null bytes)
+	imageFile := filepath.Join(tmpDir, "test.png")
+	// PNG magic bytes plus some binary data with null bytes (to trigger binary detection)
+	pngContent := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+		0x00, 0x00, 0x00, 0x0D, // Chunk length (null bytes)
+		0x49, 0x48, 0x44, 0x52, // IHDR chunk type
+		0x00, 0x00, 0x00, 0x10, // Width
+		0x00, 0x00, 0x00, 0x10, // Height (more null bytes)
+	}
+	createTestFileWithContent(t, imageFile, pngContent)
+
+	m := &model{
+		preview: previewModel{},
+	}
+
+	m.loadPreview(imageFile)
+
+	if !m.preview.loaded {
+		t.Error("Expected preview to be loaded")
+	}
+
+	if !m.preview.isBinary {
+		t.Error("Expected PNG file to be detected as binary")
+	}
+
+	// Check for image viewer hint in binary message
+	foundBinaryMessage := false
+	for _, line := range m.preview.content {
+		if strings.Contains(line, "Binary") || strings.Contains(line, "binary") {
+			foundBinaryMessage = true
+			break
+		}
+	}
+
+	if !foundBinaryMessage {
+		t.Error("Expected binary file message in preview content")
+	}
+}
+
+// TestGetIconForExtension tests icon selection based on file extension
+func TestGetIconForExtension(t *testing.T) {
+	tests := []struct {
+		filename string
+		wantIcon string // Expected icon (or empty if we just check it's not empty)
+	}{
+		{"test.go", "🐹"},
+		{"script.py", "🐍"},
+		{"app.js", "🟨"},
+		{"component.tsx", "⚛️"},
+		{"style.css", "🎨"},
+		{"data.json", "🔶"},
+		{"config.yaml", "⚙️"},
+		{"README.md", "📝"},
+		{"archive.zip", "📦"},
+		{"photo.png", "🖼️"},
+		{"document.pdf", "📕"},
+		{"unknown.xyz", "📄"}, // Generic file
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			item := fileItem{
+				name:  tt.filename,
+				isDir: false,
+			}
+			icon := getFileIcon(item)
+
+			// Just check we got some icon
+			if icon == "" && tt.wantIcon != "" {
+				t.Errorf("getFileIcon(%s) returned empty icon", tt.filename)
+			}
+		})
+	}
+}

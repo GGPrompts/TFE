@@ -1,0 +1,15 @@
+---
+name: Explain Code
+description: Understand what unfamiliar code does
+---
+Please explain what this code does in clear, simple terms:
+
+**File:** {{file}}
+
+Include:
+- High-level purpose
+- How it works (step-by-step)
+- Key functions or logic
+- Any gotchas or tricky parts
+
+Explain like I'm moderately familiar with {{project}} but seeing this file for the first time.

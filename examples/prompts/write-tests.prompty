@@ -1,0 +1,17 @@
+---
+name: Write Tests
+description: Generate test cases for code
+---
+Please write comprehensive tests for this code:
+
+**File:** {{file}}
+
+Include:
+- Unit tests for key functions
+- Edge cases and error conditions
+- Test data examples
+- Any setup/teardown needed
+
+**Project context:** {{project}}
+
+Use the testing framework common in this codebase.

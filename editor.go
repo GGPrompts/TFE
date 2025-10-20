@@ -199,9 +199,9 @@ func openInBrowser(path string) tea.Cmd {
 		}
 
 		if browser == "cmd.exe" {
-			// Windows via WSL - use cmd.exe /c start with empty title ""
-			// The empty title "" prevents cmd from treating first arg as window title
-			c = exec.Command("cmd.exe", "/c", "start", "", browserPath)
+			// Windows via WSL - use powershell.exe Start-Process (handles UNC paths)
+			// cmd.exe /c start doesn't support UNC paths (\\wsl.localhost\...)
+			c = exec.Command("powershell.exe", "-Command", "Start-Process", "'"+browserPath+"'")
 		} else {
 			// Linux/macOS/wslview
 			c = exec.Command(browser, browserPath)

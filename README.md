@@ -410,13 +410,48 @@ EOF
 
 Now when you press **F11** in TFE, you'll see `🌐 ~/.prompts/ (Global Prompts)` at the top of the file list, accessible from any directory.
 
+**Quick Start with Sample Prompts:**
+
+TFE includes 8 example prompts to get you started:
+
+```bash
+# Copy sample prompts to your home directory
+mkdir -p ~/.prompts
+cp examples/prompts/*.prompty ~/.prompts/
+```
+
+**Included prompts:**
+- 🔍 **Context Analyzer** - Analyze Claude Code `/context` output for optimization (Advanced)
+- 📝 **Code Review** - Review code for best practices and issues
+- 🔍 **Explain Code** - Understand unfamiliar code
+- 🧪 **Write Tests** - Generate test cases
+- 📚 **Document Code** - Create documentation
+- 🔧 **Refactor** - Get refactoring suggestions
+- 🐛 **Debug Help** - Get debugging assistance
+- 📝 **Git Commit** - Write better commit messages
+
+See `examples/prompts/README.md` for detailed usage and customization.
+
+**Featured: Context Analyzer** 🌟
+
+The Context Analyzer prompt helps you optimize your Claude Code setup:
+1. In Claude Code, run `/context` and copy the output
+2. In TFE, press F11 and select `context-analyzer.prompty`
+3. Paste context output into the `{{CONTEXT_PASTE}}` field
+4. Press F5 to copy the rendered prompt
+5. Paste into Claude to get a comprehensive markdown report on:
+   - File relevance and token usage
+   - CLAUDE.md optimization suggestions
+   - .claude folder structure review
+   - Recommended navigation paths
+
 **Tips:**
 - Organize prompts into subdirectories: `~/.prompts/coding/`, `~/.prompts/writing/`, etc.
 - Use `.prompty` format for the best metadata support
 - Prompts are accessible from **any directory** when F11 mode is active
 - The `~/.prompts/` folder auto-expands when you enable F11 mode
 
-**Quick Start:**
+**Quick Start (Manual Setup):**
 1. Press **F11** to enable Prompts Mode
 2. Navigate to `🌐 ~/.prompts/ (Global Prompts)` or `.claude/` folders
 3. Select a prompt file to preview it with auto-filled variables

@@ -1,263 +1,305 @@
-# Next Session: v1.0 Launch Preparation
+# Next Session: Record Demo with OBS
 
-## Status: ALL CODING COMPLETE! 🎉
+## ✅ Completed
+- Context-aware F1 help system (implemented and working!)
+- VHS demo system created (10 tape files - good for docs but no emojis)
+- Fixed browser opening for images/GIFs (PowerShell instead of cmd.exe)
+- Tried VHS: emojis show as boxes ❌
+- Tried asciinema: emojis show as boxes ❌
 
-**TFE v1.0 is feature-complete and ready for launch!** All critical file operations and core features are implemented, tested, and working.
+## 🐛 Bug to Fix: GIF Preview Mode
+**Problem:** When previewing a GIF file, it shows "file too big to display" with text "press V to open in image viewer", but terminal image viewers can't show animated GIFs.
 
----
+**Solution:** Add browser open option in preview mode for GIF files
+- Add "B" key binding in preview mode to open in browser (like context menu does)
+- Update help text to show: "V: view image • B: open in browser" for GIF files
+- Reuses existing `openInBrowser()` function (already fixed with PowerShell!)
 
-## ✅ Session Accomplishments (2025-10-19)
+**Files to modify:**
+- `update_keyboard.go` - Add "b" case in preview mode (around line 164-294)
+- `render_preview.go` - Update help text for GIF files (around line 751-755)
 
-This session completed the final v1.0 blockers plus bonus features:
+**Implementation:**
+```go
+// In update_keyboard.go, preview mode section:
+case "b", "B":
+    // Open GIF in browser (for animated playback)
+    if m.preview.loaded && m.preview.filePath != "" && isImageFile(m.preview.filePath) {
+        return m, openInBrowser(m.preview.filePath)
+    }
+```
 
-### Core File Operations ✅
-1. **Copy Files** - Context menu → "📋 Copy to..." with recursive directory support
-2. **Rename Files** - Context menu → "✏️ Rename..." with validation
+**Priority:** Medium (nice to have, works around limitation)
 
-### Preview Mode Enhancements ✅
-3. **Mouse Toggle** - Press 'm' in full preview to remove border for clean text selection
-4. **Preview Search** - Ctrl-F to search within files, 'n' for next match, Shift-N for previous
+## 🎬 Goal for This Session
+Record with **OBS** to capture TFE's **actual terminal appearance** with:
+- ✅ Proper emoji rendering (file icons, folders, AI context files)
+- ✅ CGA theme colors
+- ✅ FiraCode Nerd Font
+- ✅ Bright visible cursor
+- ✅ Mouse interaction visible
+- ✅ Real project files
 
-### Image Support ✅
-5. **Image Viewing** - viu/timg/chafa integration for viewing images in terminal
-6. **Image Editing** - textual-paint integration (MS Paint in terminal!)
-7. **Browser Fix** - Fixed WSL cmd.exe bug for opening images/HTML
-
-**Result:** v1.0 feature set is 100% complete! 🚀
-
----
-
-## 🎯 What's Next: Launch Preparation (8-12 hours)
-
-All that remains is documentation, testing, and release:
-
-### 1. Documentation Polish (2-3 hours)
-- [ ] **README.md** - Add all new features to feature list
-- [ ] **Create GIFs** - Screen recordings showing key features:
-  - Dual-pane mode + file preview
-  - Prompts mode with fillable fields
-  - Context menu operations (copy/rename/delete)
-  - Image viewing (viu demonstration)
-  - Tree view navigation
-  - Trash/restore operations
-- [ ] **Installation Guide** - Dependencies, installation steps
-- [ ] **Feature Comparison** - vs Ranger, Midnight Commander, Yazi
-- [ ] **Screenshots** - 5-6 high-quality terminal screenshots
-
-### 2. Platform Testing (2-3 hours)
-- [ ] Test on Linux (Ubuntu/Debian)
-- [ ] Test on WSL2 (Windows integration)
-- [ ] Test on macOS (if possible, or note untested)
-- [ ] Verify all F-keys work correctly
-- [ ] Test all context menu actions
-- [ ] Test trash operations (delete, restore, empty)
-- [ ] Test prompts mode with fillable fields
-- [ ] Test command execution (`:` key)
-- [ ] Test image viewing/editing
-- [ ] Test file operations (copy, rename, delete, new file/folder)
-
-### 3. GitHub Release (2-3 hours)
-- [ ] Clean up any TODOs or debug code
-- [ ] Create release branch (`release/v1.0.0`)
-- [ ] Build binaries:
-  - `go build -o tfe-linux-amd64` (Linux x64)
-  - `go build -o tfe-darwin-amd64` (macOS Intel)
-  - `go build -o tfe-darwin-arm64` (macOS Apple Silicon)
-- [ ] Write comprehensive release notes
-- [ ] Tag version: `git tag -a v1.0.0 -m "Release v1.0.0"`
-- [ ] Push and publish GitHub release with binaries
-
-### 4. Marketing & Outreach (1-2 hours)
-- [ ] **Reddit Posts:**
-  - r/linux - "TFE: A modern terminal file explorer with AI-powered prompts"
-  - r/commandline - "Show off your new TUI file manager"
-  - r/ClaudeAI - "Built TFE with Claude Code - prompts library integration"
-  - r/golang - "Built a file manager in Go with Bubbletea"
-- [ ] **Hacker News** - Submit with catchy title
-- [ ] **lobste.rs** - Submit to command-line/go tags
-- [ ] **Twitter/X** - Announcement with GIF
-- [ ] **Product Hunt** - Optional but good exposure
-
-**Total Launch Prep Time: 8-12 hours**
+## Why OBS?
+OBS captures your actual screen, so everything looks exactly like your terminal - emojis, colors, fonts, cursor - PERFECT! 🎥
 
 ---
 
-## 🎨 Marketing Angles
+## 🎥 Quick Start: Record with OBS
 
-### Unique Selling Points:
-1. **Prompts Library** - First file manager with built-in AI prompt management
-   - Fillable `{{VARIABLES}}` with file picker
-   - Auto-shows `~/.prompts/` and `~/.claude/` globally
-   - Perfect for AI-assisted development
+### Step 1: Prep Your Terminal
+```bash
+# Navigate to demo content
+cd ~/projects/TFE/demo-content
 
-2. **Image Support in Terminal** - View and edit images without leaving the CLI
-   - viu/timg/chafa for viewing
-   - textual-paint for editing (MS Paint in terminal!)
+# Open cheat sheet in second window (optional)
+cat DEMO_CHEATSHEET.txt
 
-3. **Educational Design** - Keyboard shortcuts taught through UI
-   - F1 help always available
-   - Context menu shows all actions
-   - Command prompt with history
+# Size your Windows Terminal to reasonable size
+# Not too small, not full screen
+# Recommended: ~1200x700 or similar
+```
 
-4. **Hybrid Approach** - Best of both worlds
-   - Fast native preview for text/markdown
-   - External editor integration (micro/nano/vim)
-   - TUI tool launcher (lazygit, lazydocker, etc.)
+### Step 2: Setup OBS
+1. Open OBS Studio
+2. **Add Source:** "Window Capture"
+   - Select: Windows Terminal
+   - Or: "Display Capture" for fullscreen
+3. **Crop:** Right-click source → Transform → Edit Transform
+   - Crop to just show terminal window (no taskbar/desktop)
+4. **Settings → Output:**
+   - Output Mode: Simple
+   - Recording Quality: High Quality
+   - Recording Format: MP4
+5. **Settings → Video:**
+   - Base Resolution: 1920x1080 (or your screen res)
+   - Output Resolution: 1280x720 (smaller = smaller file)
+   - FPS: 30
 
-### Taglines to Test:
-- "TFE: The file manager that teaches you Linux"
-- "Midnight Commander meets modern TUI design"
-- "File management + AI prompts in your terminal"
-- "Built for Claude Code users, perfect for everyone"
+### Step 3: Record Demo
+1. **Start Recording** in OBS (or hotkey)
+2. **Launch TFE:**
+   ```bash
+   tfe
+   ```
+3. **Follow the demo script** (see cheat sheet or below)
+4. **Stop Recording** when done
+5. **File saved to:** Videos folder (default)
 
----
+### Step 4: Convert MP4 to GIF (if needed)
+```bash
+# Install ffmpeg (if not already)
+sudo apt install ffmpeg
 
-## 📋 Launch Checklist
+# Convert (adjust path to your recording)
+ffmpeg -i ~/path/to/recording.mp4 \
+  -vf "fps=15,scale=1200:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+  -loop 0 assets/tfe-showcase.gif
 
-See `docs/LAUNCH_CHECKLIST.md` for comprehensive v1.0 requirements.
+# Or simpler (lower quality but smaller):
+ffmpeg -i recording.mp4 -vf "fps=15,scale=800:-1" assets/tfe-demo.gif
+```
 
-**Quick Status Check:**
-- ✅ All core features implemented
-- ✅ All critical bugs fixed
-- ✅ Error handling complete
-- ✅ User feedback system working
-- ⏳ Documentation needs polish
-- ⏳ Platform testing needed
-- ⏳ Release artifacts not built
-- ⏳ Marketing materials not ready
+### Step 5: View Result
+```bash
+# MP4
+explorer.exe ~/Videos  # or wherever OBS saved it
 
-**Blocker:** None - ready to start launch prep!
-
----
-
-## 🚀 Post-Launch Features (v1.1+)
-
-Save these for after v1.0 ships:
-
-### v1.1 - Educational Features (2-3 weeks)
-**Command Pre-filling** - Revolutionary educational feature
-- Instead of executing operations, pre-fill command line
-- Users learn Linux commands while using TFE
-- Press Enter to execute, Esc to cancel, or edit the command
-- Examples:
-  - Rename → Pre-fills `mv 'old.txt' '█'`
-  - Copy → Pre-fills `cp -r 'folder' '█'`
-  - Delete → Pre-fills `rm -rf 'file.txt'` (shows what F8 does!)
-- **Marketing:** "The File Manager That Teaches You Linux"
-- Platform-aware templates (GNU vs BSD, WSL differences)
-
-### v1.2 - Context Visualizer (2-3 weeks)
-**Claude Code Integration** - Unique differentiator
-- Press Ctrl+K to analyze Claude Code context
-- Show files with token estimates (4 chars = 1 token)
-- Visual indicators: ✅ Included, ❌ Excluded, ⚠️ Too large
-- Display total: "45K / 200K tokens (22%)"
-- Parse .gitignore and .claudeignore
-- Suggest files to exclude for optimization
-- **Marketing:** "See what Claude Code sees from your directory"
-
-### v1.3 - Productivity Boost (1-2 weeks)
-- Multi-select operations (Space to select, batch operations)
-- Archive operations (extract/create .zip, .tar.gz, .tar.bz2)
-- Permissions editor (visual chmod interface)
-- File comparison (side-by-side diff view)
+# GIF (if converted)
+cd ~/projects/TFE/assets
+explorer.exe .
+```
 
 ---
 
-## 📊 Success Metrics
+## 📋 Demo Script Ideas
 
-### Launch Week Goals:
-- 100+ GitHub stars
-- Front page of r/linux or r/commandline
-- 50+ upvotes on Hacker News
-- 10+ feature requests/bug reports (shows engagement!)
+### Demo 1: Complete Feature Tour (45 seconds)
+**Filename:** `tfe-complete-tour.cast`
 
-### First Month Goals:
-- 500+ GitHub stars
-- 50+ issues/PRs (community engagement)
-- Featured in a newsletter (e.g., Console, TLDR)
-- 5+ blog posts or videos from users
+**Script:**
+1. Launch TFE in demo-content
+2. Navigate down 3-4 files (shows icons)
+3. Toggle to tree view (press 3)
+4. Expand a folder (→)
+5. Enter dual-pane mode (Space)
+6. Navigate files (preview updates)
+7. Switch to preview pane (Tab)
+8. Scroll preview
+9. Exit (Esc, F10)
 
-### Long-term Goals:
-- 1000+ stars (established project)
-- Package in major distros (AUR, Homebrew, apt)
-- Corporate/team adoption (via prompts library)
-- Become the "standard" file manager for Claude Code users
+### Demo 2: AI Context Files (20 seconds)
+**Filename:** `tfe-ai-context.cast`
 
----
+**Script:**
+1. Launch TFE in project root (~/projects/TFE)
+2. Navigate to CLAUDE.md (orange icon 🤖)
+3. Preview it (Enter)
+4. Show beautiful markdown rendering
+5. Navigate to .claude/ folder
+6. Show prompt files
+7. Exit
 
-## 🎓 Lessons Learned This Session
+### Demo 3: Dual-Pane Workflow (30 seconds)
+**Filename:** `tfe-dual-pane.cast`
 
-**What Went Well:**
-- Modular architecture made adding features easy (context_menu.go, file_operations.go, etc.)
-- Dialog system reuse (input/confirm dialogs work perfectly)
-- User feedback drove mouse toggle improvement (border removal suggestion)
-- External tool integration was straightforward (viu, textual-paint)
-
-**Challenges Overcome:**
-- WSL cmd.exe browser opening quirk (needed empty "" title)
-- Mouse toggle in dual-pane mode (terminal selection limitations)
-- pipx/Pillow installation on laptop (missing JPEG dev headers)
-
-**Process Improvements:**
-- Always read file before Write tool (hit this error with NEXT_SESSION.md)
-- Todo list tracking works great for complex sessions
-- User testing immediately after implementation catches UX issues
-
----
-
-## 📝 Documentation Status
-
-**Updated This Session:**
-- ✅ CHANGELOG.md - Comprehensive 2025-10-19 section
-- ✅ PLAN.md - Marked Phase 4 complete, updated status to "v1.0 READY FOR LAUNCH"
-- ✅ HOTKEYS.md - Added mouse toggle, search, image operations
-- ✅ NEXT_SESSION.md - This file (launch preparation guide)
-- ⏳ README.md - Need to add new features to list
-
-**Core Docs Status:**
-- CLAUDE.md: 408 lines ✅ (under 500 limit)
-- PLAN.md: 377 lines ✅ (under 400 limit)
-- CHANGELOG.md: 302 lines ⚠️ (just over 300 - archive after v1.0 launch)
-- NEXT_SESSION.md: This file
-- README.md: 375 lines ✅ (under 400 limit)
+**Script:**
+1. Launch TFE
+2. Enter dual-pane immediately (Space)
+3. Navigate 4-5 files (preview updates automatically)
+4. Switch to preview pane (Tab)
+5. Scroll preview
+6. Switch back to file list (Tab)
+7. Navigate more files
+8. Exit dual-pane (Esc)
 
 ---
 
-## 🎯 Immediate Next Steps
+## 🎨 Tips for Great Recordings
 
-**Priority Order for Next Session:**
+### Before Recording:
+- ✅ Clear your terminal (Ctrl+L)
+- ✅ Make sure window is full size
+- ✅ Test the workflow first (practice run)
+- ✅ Know your ending point (plan last action)
 
-1. **Update README.md** (30 min)
-   - Add new features to feature list
-   - Update screenshots section
-   - Note image viewer/editor support
+### During Recording:
+- 🐢 Go SLOWER than normal (viewers need time to see)
+- ⏸️ Pause 1-2 seconds after each action
+- 🎯 Focus on one feature at a time
+- 📦 Show varied file types (icons!)
+- 🤖 Highlight AI context files (.claude/, CLAUDE.md)
 
-2. **Create Demo GIFs** (2-3 hours)
-   - Use asciinema or terminalizer
-   - Show 4-5 key features in action
-   - Keep each GIF under 30 seconds
-
-3. **Platform Testing** (2 hours)
-   - Systematic testing of all features
-   - Document any platform-specific quirks
-   - Create bug report template
-
-4. **Build & Release** (2-3 hours)
-   - Cross-compile binaries
-   - Write release notes
-   - Tag and publish v1.0.0
-
-5. **Marketing Blast** (1 hour)
-   - Schedule posts across platforms
-   - Prepare responses for common questions
-   - Monitor and engage with early feedback
-
-**After that: Ship it! 🚀**
+### After Recording:
+- 🎬 Review the .cast file (play it with `asciinema play file.cast`)
+- ✂️ If you mess up, just record again (quick!)
+- 🔧 Convert to GIF and check file size
 
 ---
 
-**Created:** 2025-10-19
-**Status:** ✅ ALL FEATURES COMPLETE - Launch preparation phase
-**Blocker:** None - ready for documentation and release!
-**Target Launch:** Within 1-2 weeks (8-12 hours of polishing work)
+## 🛠️ Advanced: Edit Recordings
+
+If you want to trim or speed up parts:
+
+```bash
+# Play recording to review
+asciinema play tfe-showcase.cast
+
+# Edit timing (if needed) - opens in editor
+# You can manually adjust timestamps
+nano tfe-showcase.cast
+
+# Or use asciinema tools to cut/trim
+# (see: https://docs.asciinema.org/manual/cli/editing/)
+```
+
+---
+
+## 📦 Final Output Goals
+
+### For README.md Hero Section:
+- **1 showcase GIF** (45-60 seconds) showing complete feature tour
+- Shows emoji icons, beautiful rendering, smooth navigation
+- Demonstrates why TFE is awesome
+- File: `assets/tfe-showcase.gif`
+- Target size: < 3 MB
+
+### For Features Section:
+- **1-2 feature-specific GIFs** (20-30 seconds each)
+- Dual-pane workflow
+- AI context file management
+- Files: `assets/demo-dual-pane-real.gif`, `assets/demo-ai-context.gif`
+- Target size: < 2 MB each
+
+---
+
+## 🔧 Troubleshooting
+
+### GIF is too large (> 5 MB)
+```bash
+# Option 1: Lower quality with agg
+agg input.cast output.gif --cols 100 --rows 30
+
+# Option 2: Optimize with gifsicle
+sudo apt install gifsicle
+gifsicle -O3 --lossy=80 --colors 128 -o output-opt.gif output.gif
+
+# Option 3: Record shorter demo (< 45 seconds)
+```
+
+### OBS not capturing terminal properly
+- Make sure "Window Capture" is selected (not Display Capture)
+- Select the correct window: "Windows Terminal"
+- Right-click source → Transform → Edit Transform to crop
+- Check Settings → Video → Output Resolution (1280x720 is good)
+
+### MP4 file is huge (> 50 MB)
+- Lower output resolution in OBS (Settings → Video → 1280x720)
+- Lower FPS (30 is fine, 24 is smaller)
+- Convert to GIF (much smaller): `ffmpeg -i video.mp4 -vf "scale=800:-1" out.gif`
+
+### Cursor not visible in recording
+- Your bright cursor should show! If not:
+- In OBS, make sure you're capturing the window (not display)
+- Check Windows Terminal cursor settings
+
+---
+
+## ✅ Session Checklist
+
+- [ ] Setup OBS (Window Capture → Windows Terminal)
+- [ ] Record complete feature tour with OBS (~45 seconds)
+- [ ] Check MP4 recording looks good (emojis visible!)
+- [ ] Convert MP4 to GIF with ffmpeg (optional)
+- [ ] Verify file size (< 5 MB for MP4, < 3 MB for GIF)
+- [ ] Optional: Record dual-pane demo
+- [ ] Optional: Record AI context files demo
+- [ ] Update README.md with new demos
+
+---
+
+## 📚 Quick Reference
+
+```bash
+# OBS Recording
+# 1. Open OBS
+# 2. Window Capture → Windows Terminal
+# 3. Start Recording
+# 4. Do demo
+# 5. Stop Recording
+
+# Convert MP4 to GIF
+ffmpeg -i recording.mp4 -vf "fps=15,scale=800:-1" output.gif
+
+# Optimize GIF (if needed)
+gifsicle -O3 --lossy=80 -o optimized.gif input.gif
+
+# Open folders
+explorer.exe ~/Videos        # OBS recordings
+explorer.exe assets          # GIF output
+```
+
+---
+
+## 🎯 Success Criteria
+
+✅ At least 1 beautiful GIF showing TFE's real appearance
+✅ Emojis render properly (not boxes!)
+✅ Shows key features: navigation, dual-pane, tree view
+✅ File size under 3 MB (loads fast on GitHub)
+✅ Looks professional and engaging
+
+---
+
+**Good luck! Sleep well! 😴**
+
+When you're ready tomorrow with ☕:
+1. Open OBS Studio
+2. Window Capture → Windows Terminal
+3. `cd ~/projects/TFE/demo-content`
+4. Start OBS Recording
+5. Launch `tfe` and show off features (follow DEMO_CHEATSHEET.txt)
+6. Stop OBS Recording
+7. Optional: Convert MP4 to GIF with ffmpeg
+
+You got this! OBS will capture everything perfectly! 🚀🎥

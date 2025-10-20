@@ -1,0 +1,19 @@
+---
+name: Debug Help
+description: Get help debugging errors or unexpected behavior
+---
+I'm debugging an issue in:
+
+**File:** {{file}}
+**Project:** {{project}}
+
+**Problem Description:**
+{{PROBLEM_DESCRIPTION}}
+
+**Error Message (if any):**
+{{ERROR_MESSAGE}}
+
+Please help me:
+1. Identify the likely cause
+2. Suggest debugging steps
+3. Propose potential fixes

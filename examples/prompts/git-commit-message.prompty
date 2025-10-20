@@ -1,0 +1,15 @@
+---
+name: Git Commit Message
+description: Write better commit messages from code changes
+---
+Please write a clear, concise git commit message for changes in:
+
+**File:** {{file}}
+**Project:** {{project}}
+
+**Changes made:**
+{{CHANGES_DESCRIPTION}}
+
+Follow conventional commits format (feat/fix/docs/refactor/test/chore) and explain both WHAT changed and WHY.
+
+Keep the first line under 72 characters.

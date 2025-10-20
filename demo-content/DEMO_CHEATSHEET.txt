@@ -1,0 +1,52 @@
+═══════════════════════════════════════════════════
+  TFE DEMO RECORDING CHEAT SHEET
+═══════════════════════════════════════════════════
+
+Keep this open in a second window while recording!
+
+START RECORDING:
+  cd ~/projects/TFE/demo-content
+  asciinema rec showcase.cast
+  tfe
+
+BASIC DEMO (30-45 seconds):
+  1. j j j j              → Navigate down (show icons)
+  2. Enter                → Enter folder
+  3. j j                  → Navigate inside
+  4. h or ←               → Go back to parent
+  5. 3                    → Toggle tree view
+  6. → (on folder)        → Expand folder
+  7. Space or Tab         → Dual-pane mode ⭐
+  8. j j j                → Navigate files (watch preview update!)
+  9. Tab                  → Switch to preview pane
+  10. j j j j             → Scroll preview
+  11. Tab                 → Back to file list
+  12. Esc                 → Exit dual-pane
+  13. F10                 → Quit
+  14. Ctrl+D              → Stop recording
+
+OPTIONAL EXTRAS:
+  F2                      → Context menu
+  F1                      → Help (context-aware!)
+  /                       → Search
+  Enter (on file)         → Full preview
+
+THINGS TO SHOW OFF:
+  ✨ Emojis/icons (📁 🤖 📄)
+  ✨ Orange AI files (CLAUDE.md, .claude/)
+  ✨ Markdown rendering
+  ✨ Dual-pane live preview
+  ✨ Tree view expand/collapse
+
+TIPS:
+  • GO SLOW! Pause 1-2 seconds between actions
+  • Don't rush - viewers need time to see
+  • If you mess up, just Ctrl+D and start over!
+
+AFTER RECORDING:
+  agg showcase.cast ../assets/tfe-showcase.gif
+  explorer.exe ../assets
+
+═══════════════════════════════════════════════════
+Coffee first! ☕ You got this! 🚀
+═══════════════════════════════════════════════════

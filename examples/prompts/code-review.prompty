@@ -1,0 +1,15 @@
+---
+name: Code Review
+description: Review code for best practices, bugs, and improvements
+---
+Please review the following code for:
+- Code quality and best practices
+- Potential bugs or edge cases
+- Performance considerations
+- Security vulnerabilities
+- Readability and maintainability
+
+**File:** {{file}}
+**Project:** {{project}}
+
+Provide specific, actionable feedback with examples where helpful.

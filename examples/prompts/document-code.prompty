@@ -1,0 +1,16 @@
+---
+name: Document Code
+description: Generate documentation from code
+---
+Please create documentation for:
+
+**File:** {{file}}
+
+Include:
+- Purpose and overview
+- Function/method descriptions
+- Parameters and return values
+- Usage examples
+- Any important notes or warnings
+
+Format as inline comments suitable for {{project}}.
