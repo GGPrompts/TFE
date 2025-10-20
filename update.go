@@ -119,8 +119,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Command has finished, we're back in TFE
 		// Refresh file list in case command modified files
 		m.loadFiles()
-		// Force a refresh and re-enable mouse support (shell commands may disable it)
+		// Force a refresh and restore terminal state (alt screen + mouse support)
 		return m, tea.Batch(
+			tea.EnterAltScreen,       // Re-enter alternate screen (required!)
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)

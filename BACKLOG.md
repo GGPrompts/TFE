@@ -8,6 +8,34 @@ This document contains ideas, feature requests, and brainstorming notes that are
 
 ## UI/UX Improvements
 
+### Icon Fallback System (3-Tier Support)
+**Status:** Post-launch v1.1+ feature
+**Complexity:** Medium
+**Priority:** Medium (for broader terminal compatibility)
+
+Add automatic emoji detection and fallback to ASCII icons when emojis don't render properly.
+
+**Three icon modes:**
+1. **Emoji Mode** (default, current) - `📁 folder/  🐹 main.go  📄 README.md`
+2. **ASCII Mode** (fallback) - `[D] folder/  [G] main.go  [T] README.md`
+3. **None Mode** (minimal) - `> folder/  - main.go  - README.md`
+
+**Implementation:**
+- Add `--icons=emoji|ascii|none` command-line flag
+- Auto-detect emoji support on startup (test render a known emoji)
+- Graceful fallback if test shows boxes
+- Store icon mode in model
+- Create parallel ASCII icon mapping in `file_operations.go`
+
+**Why:**
+- TFE works perfectly in Windows Terminal and Termux with emojis
+- Some users on older terminals or specific configurations might not see emojis
+- Provides universal compatibility without sacrificing beautiful defaults
+
+**Branch:** `feature/icon-fallback` (create when ready)
+
+---
+
 ### Menu Bar with Dropdowns
 **Status:** Needs careful planning
 **Complexity:** Medium-High (affects all mouse positioning)
@@ -94,4 +122,4 @@ Move implemented items to PLAN.md or delete. Archive old ideas to `docs/archive/
 
 ---
 
-**Last Updated:** 2025-10-16
+**Last Updated:** 2025-10-20

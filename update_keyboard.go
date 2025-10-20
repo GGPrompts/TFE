@@ -41,6 +41,14 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// This must come before preview mode and dialog handling
 	if m.inputFieldsActive && len(m.promptInputFields) > 0 {
 		switch msg.String() {
+		case "esc":
+			// Exit input fields mode and return to normal preview
+			m.inputFieldsActive = false
+			m.promptInputFields = nil
+			m.focusedInputField = 0
+			m.setStatusMessage("Input cancelled", false)
+			return m, nil
+
 		case "tab":
 			// Navigate to next field
 			m.focusedInputField++
@@ -94,24 +102,47 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		default:
-			// Handle regular character input
-			keyStr := msg.String()
+			// Handle regular character input and paste events
+			// Use msg.Runes to get raw text (avoids brackets from bracketed paste mode)
+			text := string(msg.Runes)
 
-			// Filter out function keys and special keys
-			if !isSpecialKey(keyStr) && len(keyStr) > 0 {
-				// Detect paste (multiple characters at once)
-				isPaste := len(keyStr) > 1
+			// Only process if not a special key and we have a valid focused field
+			if len(text) > 0 && !isSpecialKey(msg.String()) && m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
+				field := &m.promptInputFields[m.focusedInputField]
 
-				if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
-					field := &m.promptInputFields[m.focusedInputField]
+				// Check if all characters are printable (including Unicode)
+				isPrintable := true
+				for _, r := range msg.Runes {
+					// Block control characters (0-31) except:
+					// - \n (newline, 10)
+					// - \r (carriage return, 13) - Windows line endings
+					// - \t (tab, 9)
+					// Allow everything else including Unicode (32+)
+					if r < 32 && r != '\n' && r != '\r' && r != '\t' {
+						isPrintable = false
+						break
+					}
+				}
+
+				if isPrintable {
+					// Detect paste (multiple characters at once)
+					isPaste := len(msg.Runes) > 1
+
+					// Strip ANSI codes to prevent pasted styled text corruption
+					cleanText := stripANSI(text)
 
 					// Add the input to the field value
-					field.value += keyStr
+					field.value += cleanText
 
-					// If it's a paste, show status message
+					// If it's a paste, show status message with line count
 					if isPaste {
-						charCount := len(keyStr)
-						m.setStatusMessage(fmt.Sprintf("✓ Pasted %d characters", charCount), false)
+						charCount := len(cleanText)
+						lineCount := strings.Count(cleanText, "\n") + 1
+						if lineCount > 1 {
+							m.setStatusMessage(fmt.Sprintf("✓ Pasted %d chars (%d lines)", charCount, lineCount), false)
+						} else {
+							m.setStatusMessage(fmt.Sprintf("✓ Pasted %d characters", charCount), false)
+						}
 					}
 				}
 				return m, nil
@@ -1017,7 +1048,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if m.viewMode == viewSinglePane {
 			// Check if current display mode supports dual-pane
 			if !m.isDualPaneCompatible() {
-				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 4)", true)
+				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 3)", true)
 				return m, nil
 			}
 			// Enter dual-pane mode
@@ -1036,7 +1067,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.viewMode == viewSinglePane {
 			// Check if current display mode supports dual-pane
 			if !m.isDualPaneCompatible() {
-				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 4)", true)
+				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 3)", true)
 				return m, nil
 			}
 			m.viewMode = viewDualPane

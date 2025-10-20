@@ -1,8 +1,8 @@
 # TFE Development Plan
 
 **Project:** TFE - Terminal File Explorer
-**Status:** v0.4.0 - True file manager with F7/F8 operations
-**Updated:** 2025-10-16
+**Status:** v0.5.0 - Feature complete, ready for v1.0 public launch
+**Updated:** 2025-10-20
 
 ---
 
@@ -29,11 +29,12 @@
 - **New File Creation** - ✨ NEW! Context menu creates file and opens in editor
 - **Suspend/Resume** - ✨ NEW! Ctrl+Z to drop to shell, `fg` to resume
 - **Error Feedback** - All operations show success/error status messages
-- **Copy Files** - ✨ NEW! Context menu → "📋 Copy to..." with recursive directory support
-- **Rename Files** - ✨ NEW! Context menu → "✏️ Rename..." with validation
-- **Image Support** - ✨ NEW! View (viu/timg/chafa) and Edit (textual-paint) images in terminal
-- **Preview Search** - ✨ NEW! Ctrl-F to search within file previews
-- **Mouse Toggle** - ✨ NEW! Press 'm' in preview to toggle border/mouse for clean text selection
+- **Copy Files** - ✨ Context menu → "📋 Copy to..." with recursive directory support
+- **Rename Files** - ✨ Context menu → "✏️ Rename..." with validation
+- **Image Support** - ✨ View (viu/timg/chafa) and Edit (textual-paint) images in terminal
+- **Preview Search** - ✨ Ctrl-F to search within file previews
+- **Mouse Toggle** - ✨ Press 'm' in preview to toggle border/mouse for clean text selection
+- **Context-Aware F1 Help** - ✨ F1 jumps to relevant help section based on current mode
 
 ### 🚧 Known Limitations
 - **No multi-select** - Operations limited to single files (planned for v1.1+)
@@ -205,21 +206,23 @@ Fixed locations:
 
 ## Prioritized Next Steps
 
-### ✅ **CRITICAL FEATURES - ALL COMPLETE!** 🎉
-1. ~~**Copy Files**~~ - ✅ **COMPLETED 2025-10-19**
-2. ~~**Rename Files**~~ - ✅ **COMPLETED 2025-10-19**
-3. ~~**New File Creation**~~ - ✅ **COMPLETED**
+### ✅ **ALL v1.0 FEATURES COMPLETE!** 🎉
+All critical features are implemented and working. Ready to launch!
 
-**Status:** Ready for v1.0 launch! 🚀 All coding is DONE!
+**Status:** v0.5.0 released, v1.0 launch prep in progress 🚀
 
-### 📸 **Launch Preparation (8-12 hours total)**
-4. **Screenshots/GIFs** - Show off the UI (2 hours)
-5. **Documentation Polish** - Installation, features, comparison (1.5 hours)
-6. **GitHub Release** - Binaries for Linux/macOS (2-3 hours)
-7. **Testing** - Platform testing, edge cases (2 hours)
-8. **Marketing Posts** - Reddit, HN, lobste.rs (1 hour)
+### 📸 **Launch Preparation - IN PROGRESS**
+1. ⚠️ **VHS Demo System** - Created but emojis render as boxes (not usable)
+2. 🎬 **Record with OBS** - IN PROGRESS - Captures actual terminal perfectly (CURRENT)
+3. 📝 **Polish Documentation** - Installation, features, screenshots
+4. 📦 **GitHub Release** - Create v1.0.0 with binaries
+5. 🧪 **Platform Testing** - Test on Linux/macOS/WSL/Termux
+6. 📢 **Marketing Posts** - Reddit r/golang, HN, lobste.rs
 
-**See:** `docs/LAUNCH_CHECKLIST.md` for complete checklist
+**Current Focus:** Recording demos with OBS Studio (see `docs/NEXT_SESSION.md`)
+**Why OBS:** VHS/asciinema can't render emojis/icons properly. OBS captures real terminal appearance.
+
+**See:** `docs/LAUNCH_CHECKLIST.md` for complete v1.0 requirements
 
 ### ⭐ **Post-Launch (v1.1+)**
 9. **Command Pre-filling** - 🔥 **REVOLUTIONARY FEATURE**
@@ -244,23 +247,25 @@ Fixed locations:
 12. **Archive Operations** - Extract/create .zip, .tar.gz
 13. **Permissions Editor** - GUI for chmod
 
-### ✅ **Already Complete**
-- ~~F7/F8 operations~~ ✅
-- ~~Silent errors fixed~~ ✅
-- ~~Directory search (`/`)~~ ✅
-- ~~Refactor update.go~~ ✅
+### ✅ **Already Complete (v0.5.0 and earlier)**
+- ~~F7/F8 operations~~ ✅ (v0.4.0)
+- ~~Silent errors fixed~~ ✅ (v0.4.0)
+- ~~Directory search (`/`)~~ ✅ (v0.4.0)
+- ~~Refactor update.go~~ ✅ (v0.4.0)
 - ~~Grid view removed~~ ✅ (simplified to 3 view modes)
-- ~~Prompts library (F11)~~ ✅
-- ~~Fillable fields for prompts~~ ✅
-- ~~New file creation~~ ✅
-- ~~Trash/Recycle bin (F12)~~ ✅
-- ~~Suspend/Resume (Ctrl+Z)~~ ✅
-- ~~Command prompt helper text~~ ✅
-- ~~Copy files~~ ✅ **COMPLETED 2025-10-19**
-- ~~Rename files~~ ✅ **COMPLETED 2025-10-19**
-- ~~Image support (view/edit)~~ ✅ **COMPLETED 2025-10-19**
-- ~~Preview search (Ctrl-F)~~ ✅ **COMPLETED 2025-10-19**
-- ~~Mouse toggle~~ ✅ **COMPLETED 2025-10-19**
+- ~~Prompts library (F11)~~ ✅ (v0.5.0)
+- ~~Fillable fields for prompts~~ ✅ (v0.5.0)
+- ~~New file creation~~ ✅ (v0.4.0)
+- ~~Trash/Recycle bin (F12)~~ ✅ (v0.4.0)
+- ~~Suspend/Resume (Ctrl+Z)~~ ✅ (v0.4.0)
+- ~~Command prompt helper text~~ ✅ (v0.3.0)
+- ~~Copy files~~ ✅ (v0.5.0)
+- ~~Rename files~~ ✅ (v0.5.0)
+- ~~Image support (view/edit)~~ ✅ (v0.5.0)
+- ~~Preview search (Ctrl-F)~~ ✅ (v0.5.0)
+- ~~Mouse toggle~~ ✅ (v0.5.0)
+- ~~Context-aware F1 help~~ ✅ (v0.5.0+)
+- ~~Browser opening fixes (WSL)~~ ✅ (v0.5.0+)
 
 ---
 
@@ -358,19 +363,22 @@ Right now: **Ship features first, refactor later**
 
 ## Notes
 
-- **Current Focus:** ✅ Phase 4 COMPLETE - **v1.0 READY FOR LAUNCH!** 🚀
+- **Current Version:** v0.5.0 (2025-10-19)
+- **Current Focus:** 🎬 Launch preparation - Recording OBS demos
 - **Primary Differentiator:** Prompts library with fillable fields ✨ (unique feature!)
 - **Secondary Differentiator:** Image support in terminal (view/edit)
-- **Future Differentiator:** Command pre-filling (v1.1) - Educational file manager
-- **Tertiary Differentiator:** Context Visualizer (v1.2+) - Claude Code integration
+- **Future Differentiators:**
+  - Command pre-filling (v1.1) - Educational file manager
+  - Context Visualizer (v1.2+) - Claude Code integration
 - **Philosophy:** Hybrid approach (native preview + external editor)
 - **Target:** AI-assisted developers, Claude Code users, Windows→Linux learners
-- **Keep:** Fast, simple, modular, educational
-- **Launch Status:** All critical coding DONE! Ready for documentation & release (8-12 hours)
+- **Design:** Fast, simple, modular, educational
+
+**Launch Status:** All coding complete! Now creating demos and polishing docs.
 
 ---
 
-**Last Updated:** 2025-10-19
-**Status:** ✅ ALL v1.0 FEATURES COMPLETE
-**Next Session:** Launch preparation (screenshots, docs, binaries, marketing)
+**Last Updated:** 2025-10-20
+**Status:** ✅ v0.5.0 released, v1.0 launch prep in progress
+**Next Session:** Record OBS demos, update README with GIFs
 **Launch Checklist:** See `docs/LAUNCH_CHECKLIST.md` for complete v1.0 requirements

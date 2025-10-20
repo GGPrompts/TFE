@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -142,12 +144,34 @@ func (f *promptInputField) getDisplayValue() string {
 		maxDisplay = 20
 	}
 
-	// If content fits, show it all
+	// Check if content is multi-line
+	isMultiLine := strings.Contains(content, "\n")
+
+	if isMultiLine {
+		// Multi-line content - just show summary indicator
+		lines := strings.Split(content, "\n")
+		lineCount := len(lines)
+		charCount := len(content)
+
+		// Format character count
+		charDisplay := ""
+		if charCount < 1000 {
+			charDisplay = fmt.Sprintf("%d chars", charCount)
+		} else if charCount < 10000 {
+			charDisplay = fmt.Sprintf("%.1fk chars", float64(charCount)/1000)
+		} else {
+			charDisplay = fmt.Sprintf("%dk chars", charCount/1000)
+		}
+
+		return fmt.Sprintf("[Pasted: %d lines, %s]", lineCount, charDisplay)
+	}
+
+	// Single-line content
 	if len(content) <= maxDisplay {
 		return content
 	}
 
-	// Long content - show trailing end with ellipsis and char count
+	// Long single-line content - show trailing end with ellipsis
 	suffix := content[len(content)-maxDisplay:]
 	return suffix // We'll add [...] and (X chars) in the rendering code
 }

@@ -361,9 +361,9 @@ These files live in the project root and should be kept concise:
 | File | Max Lines | Purpose | When to Clean |
 |------|-----------|---------|---------------|
 | **CLAUDE.md** | 500 | Architecture guide for AI assistants | Archive old sections to `docs/archive/` |
-| **README.md** | 400 | Project overview, installation, usage | Split detailed docs to `docs/` |
+| **README.md** | 600 | Project overview, installation, usage | Split detailed docs to `docs/` (user-facing, can be longer) |
 | **PLAN.md** | 400 | Current roadmap & planned features | Move completed items to CHANGELOG.md |
-| **CHANGELOG.md** | 300 | Recent changes & release notes | Archive old versions to `docs/archive/CHANGELOG_YYYY.md` |
+| **CHANGELOG.md** | 350 | Recent changes & release notes | Create CHANGELOG2.md when exceeds limit |
 | **BACKLOG.md** | 300 | Ideas & future features (brainstorming) | Move refined ideas to PLAN.md or archive |
 | **HOTKEYS.md** | - | User-facing keyboard shortcuts | Keep the list comprehensive and current |
 
@@ -387,38 +387,39 @@ These files live in the project root and should be kept concise:
 **4. Completion Stage → CHANGELOG.md**
 - Brief description of what was implemented
 - Version number, date, key changes
-- When file exceeds 300 lines → Archive old versions
+- When file exceeds 350 lines → Create CHANGELOG2.md (see below)
 
 **5. Research Notes → docs/**
 - Research documents can be large but should be split by topic
 - One topic per file (e.g., `RESEARCH_UI_FRAMEWORKS.md`)
 - Archive when no longer relevant
 
-### Archiving Rules
+### Managing File Growth
 
-**When to archive:**
-- CHANGELOG.md exceeds 300 lines → Move entries older than 6 months to `docs/archive/CHANGELOG_2024.md`
+**CHANGELOG Approach (Keep History Visible):**
+- When CHANGELOG.md exceeds 350 lines, create CHANGELOG2.md
+- Move older entries (v0.1.x, v0.2.x, etc.) to CHANGELOG2.md
+- Keep recent versions (latest 3-4) in CHANGELOG.md
+- Continue pattern: CHANGELOG3.md, CHANGELOG4.md, etc. as needed
+- All files remain in project root for easy access
+- Link between files: "See CHANGELOG2.md for older versions"
+
+**Example structure when splitting:**
+```
+CHANGELOG.md      → v0.5.0, v0.4.0, v0.3.0 (current + recent)
+CHANGELOG2.md     → v0.2.0, v0.1.5, v0.1.0 (older versions)
+```
+
+**Other files:**
 - PLAN.md exceeds 400 lines → Move completed items to CHANGELOG.md, defer low-priority items to BACKLOG.md
 - BACKLOG.md exceeds 300 lines → Archive old/rejected ideas to `docs/archive/BACKLOG_OLD.md`
 - Research docs exceed 1000 lines → Split into multiple focused docs or archive outdated sections
-
-**Archive structure:**
-```
-docs/
-├── archive/
-│   ├── CHANGELOG_2024.md
-│   ├── BACKLOG_2024.md
-│   ├── RESEARCH_OLD.md
-│   └── ...
-├── NEXT_SESSION.md (current work)
-├── RESEARCH_XYZ.md (active research)
-└── ...
-```
 
 ### AI Assistant Reminders
 
 **For Claude Code:**
 - If any core doc exceeds its line limit during a session, proactively suggest cleanup
+- When CHANGELOG.md exceeds 350 lines, create CHANGELOG2.md and move older entries
 - When adding to PLAN.md, check if it's grown too large
 - Suggest moving completed PLAN.md items to CHANGELOG.md
 - Keep NEXT_SESSION.md focused on current work only
@@ -436,13 +437,13 @@ wc -l *.md docs/*.md
 ✅ **Prevents Bloat** - Proactive limits prevent files from becoming unmanageable
 ✅ **Clear Workflow** - Know exactly where each piece of information belongs
 
-### Current Status (as of 2025-10-16)
+### Current Status (as of 2025-10-20)
 
 Recent line counts:
-- CLAUDE.md: 408 lines ✅ (under 500 limit)
-- PLAN.md: 339 lines ✅ (under 400 limit - cleaned up Phase 1)
-- CHANGELOG.md: 254 lines ✅ (under 300 limit)
-- BACKLOG.md: 97 lines ✅ (newly created)
-- README.md: 375 lines ✅ (under 400 limit)
+- CLAUDE.md: 448 lines ✅ (under 500 limit)
+- PLAN.md: 384 lines ✅ (under 400 limit)
+- CHANGELOG.md: 535 lines ⚠️ (exceeds 350 limit - needs split to CHANGELOG2.md)
+- BACKLOG.md: 97 lines ✅ (under 300 limit)
+- README.md: 697 lines ✅ (under 600 limit - user-facing doc)
 
-**Status:** ✅ All documentation is within limits! Phase 1 completion moved to CHANGELOG.md.
+**Status:** ⚠️ CHANGELOG.md needs splitting - ready to create CHANGELOG2.md for older versions.

@@ -393,21 +393,27 @@ func (m model) renderContextMenu() string {
 		return ""
 	}
 
-	// Calculate menu dimensions - make it wider to ensure full coverage
+	// Calculate menu dimensions - find the longest item
 	maxWidth := 0
 	for _, item := range items {
-		// Use visual width (accounting for emoji)
-		width := visualWidth(item.label)
+		// Count runes, not bytes (better emoji support)
+		width := len([]rune(item.label))
 		if width > maxWidth {
 			maxWidth = width
 		}
 	}
-	// Content width (without borders/padding)
-	contentWidth := maxWidth + 4 // Add internal spacing
+
+	// Fixed menu width (wider for better appearance)
+	menuWidth := maxWidth + 4 // 2 spaces padding on each side
 
 	// Build menu content with consistent width
 	var menuLines []string
 	for i, item := range items {
+		// Pad all labels to the same width with spaces (ensures even borders)
+		labelWidth := len([]rune(item.label))
+		padding := maxWidth - labelWidth
+		paddedLabel := item.label + strings.Repeat(" ", padding)
+
 		var line string
 
 		// Style separators differently
@@ -416,36 +422,36 @@ func (m model) renderContextMenu() string {
 			separatorStyle := lipgloss.NewStyle().
 				Background(lipgloss.Color("236")).
 				Foreground(lipgloss.Color("240")).
-				Width(contentWidth)
-			line = separatorStyle.Render(fmt.Sprintf("  %s  ", item.label))
+				Width(menuWidth) // Force exact width
+			line = separatorStyle.Render(fmt.Sprintf("  %s  ", paddedLabel))
 		} else if i == m.contextMenuCursor {
 			// Highlighted selected item
 			selectedStyle := lipgloss.NewStyle().
 				Background(lipgloss.Color("39")).
 				Foreground(lipgloss.Color("0")).
 				Bold(true).
-				Width(contentWidth)
-			line = selectedStyle.Render(fmt.Sprintf("  %s  ", item.label))
+				Width(menuWidth) // Force exact width
+			line = selectedStyle.Render(fmt.Sprintf("  %s  ", paddedLabel))
 		} else {
 			// Normal items also need a background to cover underlying text
 			normalStyle := lipgloss.NewStyle().
 				Background(lipgloss.Color("236")).
 				Foreground(lipgloss.Color("252")).
-				Width(contentWidth)
-			line = normalStyle.Render(fmt.Sprintf("  %s  ", item.label))
+				Width(menuWidth) // Force exact width
+			line = normalStyle.Render(fmt.Sprintf("  %s  ", paddedLabel))
 		}
 		menuLines = append(menuLines, line)
 	}
 
-	// Create menu box - don't set width here, let it fit the content
+	// Create menu box with consistent-width content
 	menuContent := strings.Join(menuLines, "\n")
 
-	// Apply border and background
+	// Apply border (content width is already fixed)
 	menuStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("39")).
-		BorderBackground(lipgloss.Color("236")).  // Background for border area
-		Background(lipgloss.Color("236"))         // Background for content area
+		BorderBackground(lipgloss.Color("236")).
+		Background(lipgloss.Color("236"))
 
 	return menuStyle.Render(menuContent)
 }

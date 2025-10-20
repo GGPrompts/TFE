@@ -1,13 +1,11 @@
----
-name: Context Analyzer
-description: Analyze Claude Code context for relevance and optimization
----
-# Claude Code Context Analysis
+# Claude Code Context Analysis Prompt v2.0
 
 Please analyze this Claude Code context output and provide a comprehensive report.
 
 ## Context Output:
-{{CONTEXT_PASTE}}
+```
+[Paste /context output here]
+```
 
 ---
 
@@ -235,6 +233,6 @@ Generate a markdown report with:
 /context
 
 # Copy output and run:
-# "Please analyze this context using the context-analyzer prompt"
+# "Please analyze this context using the v2.0 prompt"
 # [Paste /context output]
 ```
