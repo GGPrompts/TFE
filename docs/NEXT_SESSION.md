@@ -1,4 +1,106 @@
-# Next Session: Record Demo with OBS
+# Next Session Tasks
+
+## 🚨 PRIORITY: Fix Dropdown Menu Performance Lag
+
+### Problem
+The dropdown menus are causing noticeable lag in TFE, likely due to overlay rendering issues. The current implementation may have ASCII bleed-through or inefficient overlay compositing causing performance degradation.
+
+### Investigation Required
+
+**Reference implementation**: `~/projects/TUITemplate/examples/tui-showcase/`
+
+Compare the dropdown overlay logic between:
+- **TFE**: `menu.go` and `view.go` (overlayDropdown function)
+- **TUITemplate**: Check how dropdowns are rendered without causing lag
+
+**Key files to review:**
+```bash
+# TFE (current - laggy)
+/home/matt/projects/TFE/menu.go - renderActiveDropdown()
+/home/matt/projects/TFE/view.go - overlayDropdown() (around line 481-517)
+
+# TUITemplate (reference - should be performant)
+~/projects/TUITemplate/examples/tui-showcase/menu.go
+~/projects/TUITemplate/examples/tui-showcase/view.go
+```
+
+### Specific Issues to Check
+
+1. **ASCII Bleed-Through:**
+   - Are ANSI codes being properly stripped/handled?
+   - Is the overlay clearing the background properly?
+   - Are there remnants of previous frames showing through?
+
+2. **Overlay Rendering:**
+   - How does TUITemplate composite the dropdown over base content?
+   - Should we use Lipgloss `Place()` instead of manual line replacement?
+   - Are we reconstructing the entire view on every render?
+
+3. **Performance:**
+   - Is the overlay being rendered every frame even when not visible?
+   - Are we caching the dropdown content or regenerating it constantly?
+
+### Current TFE Implementation (Potentially Problematic)
+
+```go
+// view.go:481-517
+func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
+    // Simple approach: splits base view into lines, replaces lines with dropdown
+    // This might be inefficient or causing ASCII issues
+    baseLines := strings.Split(baseView, "\n")
+    dropdownLines := strings.Split(dropdown, "\n")
+
+    // ... creates new lines with padding + dropdown
+    newLine := strings.Repeat(" ", x) + dropdownLine
+}
+```
+
+### Potential Fixes
+
+Based on TUITemplate comparison, likely need to:
+
+1. **Use Lipgloss Place() instead of manual overlay**
+2. **Strip ANSI codes from base view before overlaying**
+3. **Only render dropdown when menu is open**
+4. **Cache dropdown content**
+
+### Testing
+
+**Before fixing:**
+```bash
+cd /home/matt/projects/TFE
+./tfe
+# Wait 5+ seconds for menu to appear
+# Click "File" menu - notice lag
+# Navigate with arrow keys - check responsiveness
+```
+
+**After fixing:**
+- [ ] No lag when opening dropdown menus
+- [ ] Arrow key navigation is instant
+- [ ] No visual artifacts or ASCII bleed-through
+- [ ] Works in both single-pane and dual-pane modes
+
+### Commands for Investigation
+
+```bash
+# Compare implementations
+cd ~/projects/TUITemplate/examples/tui-showcase
+grep -A 50 "overlay\|renderMenu" *.go
+
+cd /home/matt/projects/TFE
+grep -A 50 "overlayDropdown\|renderActiveDropdown" view.go menu.go
+
+# Check for ANSI stripping utilities
+grep -r "stripANSI\|cleanANSI" ~/projects/TUITemplate/
+grep -r "stripANSI\|cleanANSI" /home/matt/projects/TFE/
+```
+
+**Branch**: headerdropdowns
+**Priority**: 🔥 High (UX blocker)
+**Expected Time**: 1-2 hours
+
+---
 
 ## ✅ Completed
 - Context-aware F1 help system (implemented and working!)
