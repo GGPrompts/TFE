@@ -1,5 +1,113 @@
 # Next Session Tasks
 
+## 🐛 TODO: Bug Fixes for Preview & Layout
+
+### 1. Prompty File Preview Causing Height Mismatch
+
+**Problem:**
+When viewing prompty files (prompt templates with fillable fields) in a narrow window, the file tree/preview pane heights become mismatched and sometimes the app headers get hidden. This suggests incorrect width calculations or text wrapping issues when rendering fillable input fields.
+
+**Where to Look:**
+- `render_preview.go` - Prompty rendering with fillable fields
+- `prompt_parser.go` - Template parsing and field rendering
+- Width calculations for input fields in narrow windows
+- Height calculations that might be getting thrown off by wrapped text
+
+**Expected Behavior:**
+- File tree and preview pane should always have matching heights
+- App headers should never be hidden
+- Input fields should wrap properly in narrow windows
+- Layout should remain stable regardless of window width
+
+**Test Case:**
+1. Open a `.prompty` file with multiple `{{VARIABLES}}`
+2. Resize terminal to narrow width (e.g., 80 columns)
+3. Observe if heights mismatch or headers disappear
+4. Check if input fields are causing extra height/wrapping issues
+
+---
+
+### 2. Preview Banner Not Hidden in Text Selection Mode (M key)
+
+**Problem:**
+When previewing a file in full-screen mode and pressing **M** to enable text selection (which removes the border), the bright blue banner at the top that displays "Preview: FILENAME [Filetype]" does NOT get hidden. This means when selecting/copying multiple pages of text, the banner appears in the middle of the copied content.
+
+**Current Behavior:**
+- Press **Enter** or **F3** to preview a file (full-screen)
+- Press **M** to toggle mouse/border for text selection
+- Border disappears (correct) ✅
+- Banner stays visible (incorrect) ❌
+
+**Expected Behavior:**
+- Pressing **M** should hide BOTH:
+  1. The decorative border ✅ (already works)
+  2. The blue "Preview: FILENAME [Filetype]" banner ❌ (needs fix)
+- This allows clean text selection without the banner interrupting
+
+**Where to Look:**
+- `render_preview.go` - Full-screen preview rendering
+- `renderFullPreview()` function
+- The banner is rendered separately from the border
+- Need to check the same toggle that hides border (`m.preview.mouseEnabled`?) and also hide the banner
+
+**Test Case:**
+1. Open a multi-page text file (e.g., CLAUDE.md)
+2. Press **Enter** to view in full-screen
+3. Press **M** to enable text selection mode
+4. Verify banner at top is hidden
+5. Try selecting text from top of file - banner should not be included
+
+**Implementation Hint:**
+The banner rendering likely looks something like:
+```go
+if m.viewMode == viewFullPreview {
+    // Render banner with filename and filetype
+    bannerStyle := lipgloss.NewStyle().Background(lipgloss.Color("39"))...
+    s.WriteString(bannerStyle.Render("Preview: " + filename + " [" + filetype + "]"))
+}
+```
+
+Need to add a condition:
+```go
+if m.viewMode == viewFullPreview && m.preview.mouseEnabled {
+    // Only show banner when mouse/border is enabled
+    // Hide it in text selection mode (M pressed)
+}
+```
+
+---
+
+**Files to Check:**
+
+**For Issue #1 (Prompty Height Mismatch):**
+- `render_preview.go` - Preview pane rendering
+- `prompt_parser.go` - Prompty template parsing
+- `model.go` - Layout calculations (`calculateLayout()`)
+- `view.go` - Height calculations
+
+**For Issue #2 (Banner Visibility):**
+- `render_preview.go` - `renderFullPreview()` function
+- Look for banner rendering code (bright blue background)
+- Check where `m.preview.mouseEnabled` is used
+
+**Success Criteria:**
+
+✅ **Issue #1 Fixed:**
+- Prompty files render correctly in narrow windows
+- File tree and preview pane heights always match
+- App headers never get hidden
+- Input fields wrap properly without breaking layout
+
+✅ **Issue #2 Fixed:**
+- Pressing **M** in full-screen preview hides both border AND banner
+- Clean text selection without banner interrupting
+- Banner returns when **M** is pressed again (toggle)
+
+**Priority:** High - Both are UX issues that affect core functionality
+**Expected Time:** 30-45 minutes
+
+---
+
 ## ✅ COMPLETED (Session 2025-10-21): Persistent Command History
 
 ### Feature Summary
