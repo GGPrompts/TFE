@@ -4,6 +4,41 @@ This file contains changelog entries for TFE versions 0.2.0 and earlier.
 **See [CHANGELOG.md](CHANGELOG.md) for current versions (v0.3.0+)**
 
 ---
+## [0.3.0] - 2025-10-16
+
+### Added - Context Menu & Favorites
+- **Context Menu System** (right-click or F2)
+  - Quick access to common file operations
+  - Different menus for files vs directories
+  - Keyboard navigation (up/down/enter/esc)
+  - Mouse wheel scrolling support
+- **Favorites/Bookmarks System**
+  - Toggle favorite with 's' key
+  - F6 to filter by favorites only
+  - Persistent storage in ~/.config/tfe/favorites.json
+  - Visual indicators (star emoji) for favorited items
+- **TUI Tool Launcher**
+  - Launch lazygit, lazydocker, lnav, htop from context menu
+  - Auto-detection of installed tools
+  - Smart directory-specific options
+- **Quick CD Feature**
+  - Exit TFE and change shell to selected directory
+  - Requires bash wrapper (tfe-wrapper.sh)
+  - Accessible via context menu for directories
+
+### Enhanced
+- Text selection enabled in preview mode
+- Markdown rendering improvements with Glamour
+- Command history now stores last 100 commands
+- Bracketed paste support for proper terminal paste handling
+- Special key filtering (prevents literal "end", "home" text)
+
+### Fixed
+- Mouse coordinate calculations in dual-pane mode
+- Context menu positioning and overflow handling
+- Command prompt input handling edge cases
+
+
 
 ## [0.2.0] - 2025-10-15
 

@@ -10,6 +10,12 @@ import (
 )
 
 func main() {
+	// Handle version flag
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("TFE (Terminal File Explorer) v%s\n", Version)
+		os.Exit(0)
+	}
+
 	// Ensure terminal cleanup on exit (defer runs even if panic/interrupt)
 	defer cleanupTerminal()
 

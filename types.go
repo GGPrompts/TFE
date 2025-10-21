@@ -9,6 +9,9 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 )
 
+// Version is the current version of TFE
+const Version = "1.0.0"
+
 // displayMode represents different view modes for displaying files
 type displayMode int
 
