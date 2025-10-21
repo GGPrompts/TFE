@@ -540,30 +540,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
-				} else if m.dialog.title == "Create Image" {
-					// Handle image creation (always opens in textual-paint)
-					filepath := filepath.Join(m.currentPath, m.dialog.input)
-
-					// Create empty file
-					file, err := os.Create(filepath)
-					if err != nil {
-						m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
-					} else {
-						// Close the file handle immediately
-						file.Close()
-
-						m.setStatusMessage(fmt.Sprintf("Created image: %s", m.dialog.input), false)
-						m.loadFiles()
-
-						// Open in textual-paint (cached check)
-						if m.toolsAvailable["textual-paint"] {
-							m.showDialog = false
-							m.dialog = dialogModel{}
-							return m, openImageEditor(filepath)
-						} else {
-							m.setStatusMessage("Image created, but textual-paint not available", true)
-						}
-					}
 				} else if m.dialog.title == "Copy File" {
 					// Handle copy
 					destPath := m.dialog.input

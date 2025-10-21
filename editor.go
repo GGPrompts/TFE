@@ -311,6 +311,27 @@ func openImageEditor(path string) tea.Cmd {
 	)
 }
 
+// openImageEditorNew launches an image editor with a blank canvas (no file required)
+func openImageEditorNew(currentDir string) tea.Cmd {
+	editor := getAvailableImageEditor()
+	if editor == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{fmt.Errorf("no image editor found (install textual-paint)")}
+		}
+	}
+
+	// Launch textual-paint without a file argument - it will start with a blank canvas
+	// Set the working directory so when user saves, it defaults to current directory
+	c := exec.Command(editor)
+	c.Dir = currentDir
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
 // fileExplorerOpenedMsg is returned when a folder is opened in file explorer
 type fileExplorerOpenedMsg struct {
 	success bool

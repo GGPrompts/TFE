@@ -26,9 +26,9 @@ func (m model) getMenus() map[string]Menu {
 		{Label: "📄 New File...", Action: "new-file"},
 	}
 
-	// Add "New Image..." if textual-paint is available
+	// Add "New Image" if textual-paint is available
 	if m.toolsAvailable["textual-paint"] {
-		fileMenuItems = append(fileMenuItems, MenuItem{Label: "🎨 New Image...", Action: "new-image"})
+		fileMenuItems = append(fileMenuItems, MenuItem{Label: "🎨 New Image", Action: "new-image"})
 	}
 
 	fileMenuItems = append(fileMenuItems,
@@ -533,14 +533,12 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		m.showDialog = true
 
 	case "new-image":
-		// Create new image and open in textual-paint
-		m.dialog = dialogModel{
-			dialogType: dialogInput,
-			title:      "Create Image",
-			message:    "Enter image filename (e.g., drawing.png):",
-			input:      "",
-		}
-		m.showDialog = true
+		// Launch textual-paint with blank canvas (it will handle save dialog)
+		// Close menu before launching
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openImageEditorNew(m.currentPath)
 
 	case "open":
 		// Open selected file/folder (same as Enter key)
