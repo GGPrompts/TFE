@@ -47,19 +47,43 @@ func initialModel() model {
 }
 
 // calculateLayout calculates left and right pane widths for dual-pane mode
+// Uses accordion-style layout: focused pane gets 2/3, unfocused gets 1/3
+// Exception: Detail view uses vertical split (full width), so width calculations don't apply
 func (m *model) calculateLayout() {
 	if m.viewMode == viewSinglePane || m.viewMode == viewFullPreview {
 		m.leftWidth = m.width
 		m.rightWidth = 0
 	} else {
-		// 40/60 split for dual-pane
-		m.leftWidth = m.width * 40 / 100
-		m.rightWidth = m.width - m.leftWidth - 1 // -1 for separator
-		if m.leftWidth < 20 {
-			m.leftWidth = 20
-		}
-		if m.rightWidth < 30 {
-			m.rightWidth = 30
+		// Detail view: uses vertical split (stacked layout) - set full width for both
+		// (actual rendering uses full width for top and bottom panes)
+		if m.displayMode == modeDetail {
+			m.leftWidth = m.width   // Full width for detail view (top pane)
+			m.rightWidth = m.width  // Full width for preview (bottom pane)
+		} else {
+			// List/Tree view: accordion-style horizontal split
+			// Focused pane gets 2/3, unfocused gets 1/3
+			if m.focusedPane == leftPane {
+				m.leftWidth = (m.width * 2) / 3  // 66%
+				m.rightWidth = m.width / 3       // 33%
+			} else {
+				m.leftWidth = m.width / 3        // 33%
+				m.rightWidth = (m.width * 2) / 3 // 66%
+			}
+
+			// Ensure minimum widths for usability
+			if m.leftWidth < 30 {
+				m.leftWidth = 30
+			}
+			if m.rightWidth < 30 {
+				m.rightWidth = 30
+			}
+
+			// Adjust for separator (1 char between horizontal panes)
+			if m.focusedPane == leftPane {
+				m.rightWidth = m.width - m.leftWidth - 1
+			} else {
+				m.leftWidth = m.width - m.rightWidth - 1
+			}
 		}
 	}
 }

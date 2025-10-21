@@ -157,6 +157,46 @@ func (m model) renderDetailView(maxVisible int) string {
 	// Get filtered files (respects favorites filter)
 	files := m.getFilteredFiles()
 
+	// Calculate available width for columns based on view mode
+	availableWidth := m.width
+	if m.viewMode == viewDualPane {
+		availableWidth = m.leftWidth - 6 // Account for borders and padding
+	}
+	if availableWidth < 60 {
+		availableWidth = 60 // Minimum width
+	}
+
+	// Distribute column widths dynamically (total must fit in availableWidth)
+	// Leave space for icons (4), star (3), spacing (6), and padding (4) = 17 chars
+	usableWidth := availableWidth - 17
+
+	var nameWidth, sizeWidth, modifiedWidth, extraWidth int
+	if m.showTrashOnly || m.showFavoritesOnly {
+		// 4 columns: Name, Size, Modified/Deleted, Location
+		nameWidth = usableWidth * 35 / 100    // 35%
+		sizeWidth = 10                         // Fixed
+		modifiedWidth = 12                     // Fixed
+		extraWidth = usableWidth - nameWidth - sizeWidth - modifiedWidth
+		if extraWidth < 15 {
+			extraWidth = 15
+		}
+	} else {
+		// 4 columns: Name, Size, Modified, Type
+		nameWidth = usableWidth * 40 / 100    // 40%
+		sizeWidth = 10                         // Fixed
+		modifiedWidth = 12                     // Fixed
+		extraWidth = 15                        // Type is usually short
+	}
+
+	// Ensure minimum widths
+	if nameWidth < 15 {
+		nameWidth = 15
+	}
+
+	// Account for icon (2) + potential star (3) in display name
+	// The name field includes these, so effective text width is smaller
+	maxNameTextLen := nameWidth - 5
+
 	// Header with sort indicators
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -171,7 +211,7 @@ func (m model) renderDetailView(maxVisible int) string {
 		sortIndicator = " ↓" // Descending
 	}
 
-	// Build header with sort indicators
+	// Build header with sort indicators using dynamic widths
 	var header string
 	if m.showTrashOnly {
 		// Trash mode: Name, Size, Deleted, Original Location
@@ -190,7 +230,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			deletedHeader += sortIndicator
 		}
 
-		header = fmt.Sprintf("%-25s  %-10s  %-12s  %-30s", nameHeader, sizeHeader, deletedHeader, locationHeader)
+		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, deletedHeader, extraWidth, locationHeader)
 	} else if m.showFavoritesOnly {
 		// Favorites mode: Name, Size, Modified, Location
 		nameHeader := "Name"
@@ -208,7 +248,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			modifiedHeader += sortIndicator
 		}
 
-		header = fmt.Sprintf("%-25s  %-10s  %-12s  %-25s", nameHeader, sizeHeader, modifiedHeader, locationHeader)
+		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
 	} else {
 		// Regular mode: Name, Size, Modified, Type
 		nameHeader := "Name"
@@ -228,7 +268,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			typeHeader += sortIndicator
 		}
 
-		header = fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", nameHeader, sizeHeader, modifiedHeader, typeHeader)
+		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, typeHeader)
 	}
 
 	// Render header with sort indicators
@@ -266,11 +306,14 @@ func (m model) renderDetailView(maxVisible int) string {
 			favIndicator = "⭐"
 		}
 
-		// Truncate long names
+		// Truncate long names based on dynamic width
 		displayName := file.name
-		maxNameLen := 25
-		if len(displayName) > maxNameLen {
-			displayName = displayName[:maxNameLen-2] + ".."
+		// Use the pre-calculated maxNameTextLen which accounts for icon + star
+		if maxNameTextLen < 10 {
+			maxNameTextLen = 10
+		}
+		if len(displayName) > maxNameTextLen {
+			displayName = displayName[:maxNameTextLen-2] + ".."
 		}
 
 		// Extract leading emoji for global virtual folders to preserve color
@@ -322,13 +365,13 @@ func (m model) renderDetailView(maxVisible int) string {
 				if homeDir != "" && strings.HasPrefix(location, homeDir) {
 					location = "~" + strings.TrimPrefix(location, homeDir)
 				}
-				// Truncate long paths
-				if len(location) > 28 {
-					location = "..." + location[len(location)-25:]
+				// Truncate long paths based on dynamic width
+				if len(location) > extraWidth {
+					location = "..." + location[len(location)-(extraWidth-3):]
 				}
 			}
 
-			line = fmt.Sprintf("%-25s  %-10s  %-12s  %-30s", name, size, deleted, location)
+			line = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, name, sizeWidth, size, modifiedWidth, deleted, extraWidth, location)
 		} else if m.showFavoritesOnly {
 			// Favorites mode: Name, Size, Modified, Location
 			// Get parent directory path for location
@@ -338,15 +381,19 @@ func (m model) renderDetailView(maxVisible int) string {
 			if homeDir != "" && strings.HasPrefix(location, homeDir) {
 				location = "~" + strings.TrimPrefix(location, homeDir)
 			}
-			// Truncate long paths
-			if len(location) > 23 {
-				location = "..." + location[len(location)-20:]
+			// Truncate long paths based on dynamic width
+			if len(location) > extraWidth {
+				location = "..." + location[len(location)-(extraWidth-3):]
 			}
-			line = fmt.Sprintf("%-25s  %-10s  %-12s  %-25s", name, size, modified, location)
+			line = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, name, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
 		} else {
 			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)
-			line = fmt.Sprintf("%-30s  %-10s  %-12s  %-15s", name, size, modified, fileType)
+			// Truncate file type if needed
+			if len(fileType) > extraWidth {
+				fileType = fileType[:extraWidth-2] + ".."
+			}
+			line = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, name, sizeWidth, size, modifiedWidth, modified, extraWidth, fileType)
 		}
 
 		style := fileStyle
@@ -375,7 +422,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
 			} else {
 				if i%2 == 0 {
-					alternateStyle := style.Copy().Background(lipgloss.Color("235"))
+					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#262626"})
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
 				} else {
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, style.Render(nameWithoutEmoji)), 1)
@@ -387,9 +434,9 @@ func (m model) renderDetailView(maxVisible int) string {
 				line = selectedStyle.Render(line)
 			} else {
 				// Add alternating row background for easier reading
-				// Even rows (0, 2, 4...) get a subtle dark background
+				// Even rows (0, 2, 4...) get a subtle background
 				if i%2 == 0 {
-					alternateStyle := style.Copy().Background(lipgloss.Color("235")) // Very dark gray
+					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#262626"})
 					line = alternateStyle.Render(line)
 				} else {
 					line = style.Render(line)

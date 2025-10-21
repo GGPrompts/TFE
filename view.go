@@ -152,6 +152,10 @@ func (m model) renderSinglePane() string {
 	}
 	s.WriteString(" ")
 
+	// Games launcher button
+	s.WriteString(homeButtonStyle.Render("[🎮]"))
+	s.WriteString(" ")
+
 	// Trash/Recycle bin button
 	trashIcon := "🗑️"
 	if m.showTrashOnly {
@@ -334,8 +338,11 @@ func (m model) renderSinglePane() string {
 		// View mode indicator
 		viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
 
-		// Help hint
+		// Help hint - show "/" search hint only when not already searching
 		helpHint := " • F1: help"
+		if !m.searchMode && m.searchQuery == "" {
+			helpHint += " • /: search"
+		}
 
 		// Split status into two lines to prevent truncation
 		// Line 1: Counts, indicators, view mode, help

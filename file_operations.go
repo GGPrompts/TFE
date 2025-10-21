@@ -1120,25 +1120,26 @@ func (m *model) populatePreviewCache() {
 		return
 	}
 
-	// Calculate available width
+	// Calculate available width - must match renderPreview() logic exactly
 	var availableWidth int
-	if m.preview.isMarkdown {
-		// Markdown never shows line numbers/scrollbar, so use wider width
-		if m.viewMode == viewFullPreview {
-			availableWidth = m.width - 4 // Just padding
-		} else {
-			availableWidth = m.rightWidth - 4 // Just padding in dual-pane
-		}
+	var boxContentWidth int
+
+	if m.viewMode == viewFullPreview {
+		boxContentWidth = m.width - 6 // Box content width in full preview
 	} else {
-		// Regular text files show line numbers and scrollbar
-		if m.viewMode == viewFullPreview {
-			availableWidth = m.width - 10 // line nums (6) + scrollbar (2) + padding (2)
-		} else {
-			availableWidth = m.rightWidth - 17 // line nums (8) + scrollbar (2) + borders (4) + padding (3)
-		}
+		boxContentWidth = m.rightWidth - 2 // Box content width in dual-pane (accounting for borders)
 	}
+
+	if m.preview.isMarkdown {
+		// Markdown: no line numbers or scrollbar, content uses full box width
+		availableWidth = boxContentWidth
+	} else {
+		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
+		availableWidth = boxContentWidth - 8
+	}
+
 	if availableWidth < 20 {
-		availableWidth = 20
+		availableWidth = 20 // Minimum width
 	}
 
 	// Cache markdown rendering
@@ -1146,8 +1147,17 @@ func (m *model) populatePreviewCache() {
 		// Safety: skip Glamour for very large markdown files (can cause hangs with complex content)
 		// For files > 2000 lines, treat as plain text to avoid performance issues
 		const maxMarkdownLines = 2000
+
+		// Also skip Glamour when preview pane is too narrow (< 45 chars)
+		// Glamour's word wrapping in narrow panes creates awkward line breaks in code blocks
+		const minGlamourWidth = 45
+
 		if len(m.preview.content) > maxMarkdownLines {
 			// Too large for Glamour - treat as plain text
+			m.preview.isMarkdown = false
+			// Fall through to regular text wrapping below
+		} else if availableWidth < minGlamourWidth {
+			// Too narrow for Glamour - show plain markdown instead
 			m.preview.isMarkdown = false
 			// Fall through to regular text wrapping below
 		} else {
@@ -1225,9 +1235,9 @@ func renderMarkdownWithTimeout(content string, width int, timeout time.Duration)
 				glamour.WithWordWrap(width),
 			)
 		} else {
-			// Fall back to dark style if custom style not found
+			// Fall back to auto style (detects light/dark terminal theme)
 			renderer, err = glamour.NewTermRenderer(
-				glamour.WithStandardStyle("dark"),
+				glamour.WithAutoStyle(),
 				glamour.WithWordWrap(width),
 			)
 		}

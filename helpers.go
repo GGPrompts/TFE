@@ -71,9 +71,9 @@ func getDisplayPath(path string) string {
 }
 
 // isDualPaneCompatible checks if the current display mode supports dual-pane view
-// Grid and Detail views need full width for their column layouts
+// All display modes now support dual-pane with accordion layout
 func (m model) isDualPaneCompatible() bool {
-	return m.displayMode == modeList || m.displayMode == modeTree
+	return m.displayMode == modeList || m.displayMode == modeTree || m.displayMode == modeDetail
 }
 
 // isPromptFile checks if a file is a prompt file (.prompty, .yaml, .md, .txt)

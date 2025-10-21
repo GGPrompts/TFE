@@ -812,12 +812,17 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle typing/pasting while command prompt is focused
 	// Only capture input when commandFocused is true
 	if m.commandFocused {
-		// Use msg.Runes to get raw text (Bubble Tea handles escape sequences for us)
-		// This avoids the brackets that msg.String() adds around paste events
-		text := string(msg.Runes)
+		// Special case: if command input is empty and space is pressed, allow it to fall through
+		// to the main switch to toggle dual-pane mode (user might have command mode focused accidentally)
+		if msg.String() == " " && m.commandInput == "" {
+			// Fall through to main switch - don't capture this space
+		} else {
+			// Use msg.Runes to get raw text (Bubble Tea handles escape sequences for us)
+			// This avoids the brackets that msg.String() adds around paste events
+			text := string(msg.Runes)
 
-		// Only process if not a special key
-		if len(text) > 0 && !isSpecialKey(msg.String()) {
+			// Only process if not a special key
+			if len(text) > 0 && !isSpecialKey(msg.String()) {
 			// Check if it's printable text
 			isPrintable := true
 			for _, r := range msg.Runes {
@@ -826,11 +831,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			if isPrintable {
-				// Strip ANSI codes to prevent pasted styled text from corrupting command line
-				m.commandInput += stripANSI(text)
-				m.historyPos = len(m.commandHistory)
-				return m, nil
+				if isPrintable {
+					// Strip ANSI codes to prevent pasted styled text from corrupting command line
+					m.commandInput += stripANSI(text)
+					m.historyPos = len(m.commandHistory)
+					return m, nil
+				}
 			}
 		}
 	}
@@ -1045,6 +1051,9 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.focusedPane = leftPane
 			}
+			// Recalculate accordion layout and refresh cache when switching focus
+			m.calculateLayout()
+			m.populatePreviewCache()
 		} else if m.viewMode == viewSinglePane {
 			// Check if current display mode supports dual-pane
 			if !m.isDualPaneCompatible() {
@@ -1229,9 +1238,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "2":
 		// Switch to detail view
 		m.displayMode = modeDetail
-		// Auto-exit dual-pane (detail view needs full width)
+		// Recalculate layout in case we're in dual-pane (accordion mode supports detail view)
 		if m.viewMode == viewDualPane {
-			m.viewMode = viewSinglePane
 			m.calculateLayout()
 			m.populatePreviewCache()
 		}

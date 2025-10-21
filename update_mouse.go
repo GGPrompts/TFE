@@ -19,6 +19,40 @@ import (
 // - Mouse wheel scrolling
 // - Clickable UI elements
 
+// isClickInFileListArea checks if a mouse click is in the file list area (vs preview area)
+// Handles both horizontal split (List/Tree) and vertical split (Detail) layouts
+func (m model) isClickInFileListArea(mouseX, mouseY int) bool {
+	if m.viewMode != viewDualPane {
+		return true // Single-pane mode - all clicks are in file list
+	}
+
+	headerLines := 4
+	footerLines := 4
+
+	// Check if click is within pane area vertically
+	if mouseY < headerLines || mouseY >= m.height-footerLines {
+		return false // Click in header or footer
+	}
+
+	if m.displayMode == modeDetail {
+		// VERTICAL split: top pane is file list, bottom pane is preview
+		// ACCORDION: Calculate based on current focus (matches render_preview.go)
+		maxVisible := m.height - headerLines - footerLines
+		var topHeight int
+		if m.focusedPane == leftPane {
+			topHeight = (maxVisible * 2) / 3  // Top pane focused = 2/3
+		} else {
+			topHeight = maxVisible - ((maxVisible * 2) / 3)  // Top pane unfocused = 1/3
+		}
+		paneY := mouseY - headerLines
+
+		return paneY < topHeight // Top pane is file list
+	} else {
+		// HORIZONTAL split: left pane is file list, right pane is preview
+		return mouseX < m.leftWidth // Left pane is file list
+	}
+}
+
 // handleMouseEvent processes all mouse input
 func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// If fuzzy search is active, don't process any mouse events
@@ -53,13 +87,46 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	// In dual-pane mode, detect which pane was clicked to switch focus
 	if m.viewMode == viewDualPane && msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
-		// Check if click is in left or right pane (not in header or status bar)
-		// Header is 4 lines total (title, path, command, separator)
-		if msg.Y >= 4 && msg.Y < m.height-1 { // Skip header (4 lines) and status bar (1 line)
-			if msg.X < m.leftWidth {
-				m.focusedPane = leftPane
-			} else if msg.X > m.leftWidth { // Account for separator
-				m.focusedPane = rightPane
+		// Check if click is in panes (not in header or status bar)
+		// Header is 4 lines total (title, toolbar, command, separator)
+		headerLines := 4
+		footerLines := 4  // blank + 2 status lines + optional message/search
+
+		if msg.Y >= headerLines && msg.Y < m.height-footerLines {
+			oldFocus := m.focusedPane
+
+			if m.displayMode == modeDetail {
+				// Calculate pane heights for vertical split based on CURRENT focus
+				// (matches render_preview.go accordion behavior)
+				maxVisible := m.height - headerLines - footerLines
+				var topHeight int
+				if m.focusedPane == leftPane {
+					topHeight = (maxVisible * 2) / 3  // Top pane currently focused = 2/3
+				} else {
+					topHeight = maxVisible - ((maxVisible * 2) / 3)  // Top pane unfocused = 1/3
+				}
+
+				// Calculate Y position relative to pane area start
+				paneY := msg.Y - headerLines
+
+				if paneY < topHeight {
+					m.focusedPane = leftPane  // Top pane (detail view)
+				} else {
+					m.focusedPane = rightPane // Bottom pane (preview)
+				}
+			} else {
+				// List/Tree view uses HORIZONTAL split (accordion layout)
+				if msg.X < m.leftWidth {
+					m.focusedPane = leftPane
+				} else if msg.X > m.leftWidth { // Account for separator
+					m.focusedPane = rightPane
+				}
+			}
+
+			// If focus changed, recalculate layout and refresh preview cache
+			if oldFocus != m.focusedPane {
+				m.calculateLayout()
+				m.populatePreviewCache()
 			}
 		}
 	}
@@ -68,8 +135,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [👁️] [⬜/⬌] [>_] [🔍] [📝] [🗑️]
-			// Layout:  0-4   5-9    10-14 15-19 20-24 25-29 30-34 35-39
+			// Toolbar: [🏠] [⭐/✨] [👁️] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑️]
+			// Layout:  0-4   5-9    10-14 15-19 20-24 25-29 30-34 35-39 40-44
 			// Note: Each button is 5 chars: [ + emoji(2) + ] + space
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
@@ -155,8 +222,44 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Trash button [🗑️] or [♻️] (X=35-39: [ + emoji(2) + ] + space)
+				// Game controller button [🎮] (X=35-39: [ + emoji(2) + ] + space)
 				if msg.X >= 35 && msg.X <= 39 {
+					// Launch TUIClassics game launcher
+					homeDir, err := os.UserHomeDir()
+					if err != nil {
+						m.setStatusMessage("Error: Could not find home directory", true)
+						return m, nil
+					}
+
+					classicsPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
+
+					// Check if classics launcher exists
+					if _, err := os.Stat(classicsPath); err == nil {
+						// Launch the classics menu
+						return m, openTUITool(classicsPath, filepath.Dir(classicsPath))
+					}
+
+					// If classics doesn't exist, check for individual games
+					binDir := filepath.Join(homeDir, "projects", "TUIClassics", "bin")
+					if entries, err := os.ReadDir(binDir); err == nil && len(entries) > 0 {
+						// Find first executable game
+						for _, entry := range entries {
+							if !entry.IsDir() {
+								gamePath := filepath.Join(binDir, entry.Name())
+								if info, err := os.Stat(gamePath); err == nil && info.Mode()&0111 != 0 {
+									// Found an executable - launch it
+									return m, openTUITool(gamePath, binDir)
+								}
+							}
+						}
+					}
+
+					// No games found
+					m.setStatusMessage("Games: Install from github.com/GGPrompts/TUIClassics (run: git clone ... && make build)", false)
+					return m, nil
+				}
+				// Trash button [🗑️] or [♻️] (X=40-44: [ + emoji(2) + ] + space)
+				if msg.X >= 40 && msg.X <= 44 {
 					// Toggle trash view
 					m.showTrashOnly = !m.showTrashOnly
 					m.showFavoritesOnly = false // Disable favorites filter
@@ -208,9 +311,9 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			// In dual-pane mode, only process file clicks if within left pane
-			if m.viewMode == viewDualPane && msg.X >= m.leftWidth {
-				// Click is in right pane or beyond - don't select files
+			// In dual-pane mode, only process file clicks if within file list area
+			if !m.isClickInFileListArea(msg.X, msg.Y) {
+				// Click is in preview pane - don't select files
 				break
 			}
 
@@ -292,27 +395,41 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				headerOffset += 1 // Add 1 for detail view's header only (separator removed)
 			}
 
-			// Calculate visible range to account for scrolling
-			// Must match view.go and render_preview.go calculations
-			var maxVisible int
-			var contentHeight int
+		// Calculate visible range to account for scrolling
+		// Must match view.go and render_preview.go calculations
+		var maxVisible int
+		var contentHeight int
 
-			if m.viewMode == viewDualPane {
-				// Dual-pane: maxVisible = m.height - 7 (total pane height INCLUDING borders)
-				// See render_preview.go:845
-				maxVisible = m.height - 7
-				contentHeight = maxVisible - 2 // Content area inside borders
-			} else {
-				// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
-				// See view.go:154
-				maxVisible = m.height - 9
-				contentHeight = maxVisible - 2 // Content area inside borders
-			}
+		if m.viewMode == viewDualPane {
+			// Dual-pane: calculate based on current accordion state
+			headerLines := 4
+			footerLines := 4
+			totalAvailable := m.height - headerLines - footerLines
 
-			maxVisible = contentHeight // Use contentHeight for consistency with rendering
 			if m.displayMode == modeDetail {
-				maxVisible -= 1 // Account for detail header only
+				// VERTICAL split with accordion - top pane height varies by focus
+				var topHeight int
+				if m.focusedPane == leftPane {
+					topHeight = (totalAvailable * 2) / 3  // Top focused = 2/3
+				} else {
+					topHeight = totalAvailable - ((totalAvailable * 2) / 3)  // Top unfocused = 1/3
+				}
+				maxVisible = topHeight - 2  // Content height inside borders
+			} else {
+				// HORIZONTAL split (List/Tree) - height is fixed
+				maxVisible = totalAvailable - 2  // Content area inside borders
 			}
+			contentHeight = maxVisible
+		} else {
+			// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
+			maxVisible = m.height - 9
+			contentHeight = maxVisible - 2 // Content area inside borders
+			maxVisible = contentHeight
+		}
+
+		if m.displayMode == modeDetail {
+			maxVisible -= 1 // Account for detail header line
+		}
 
 			// Get filtered files for click detection (respects favorites filter)
 			// This must match what's actually rendered on screen
@@ -464,11 +581,11 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				m.contextMenuOpen = false
 			}
 
-			// Don't open menu in preview mode or if in right pane
+			// Don't open menu in preview mode or if in preview pane
 			if m.viewMode == viewFullPreview {
 				break
 			}
-			if m.viewMode == viewDualPane && msg.X >= m.leftWidth {
+			if !m.isClickInFileListArea(msg.X, msg.Y) {
 				break
 			}
 
@@ -480,23 +597,41 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Must match view.go and render_preview.go calculations (same as left-click handler)
-			var maxVisible int
-			var contentHeight int
+		// Calculate visible range to account for scrolling
+		// Must match view.go and render_preview.go calculations
+		var maxVisible int
+		var contentHeight int
 
-			if m.viewMode == viewDualPane {
-				// Dual-pane: maxVisible = m.height - 7 (total pane height INCLUDING borders)
-				maxVisible = m.height - 7
-				contentHeight = maxVisible - 2
-			} else {
-				// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
-				maxVisible = m.height - 9
-				contentHeight = maxVisible - 2
-			}
+		if m.viewMode == viewDualPane {
+			// Dual-pane: calculate based on current accordion state
+			headerLines := 4
+			footerLines := 4
+			totalAvailable := m.height - headerLines - footerLines
 
-			maxVisible = contentHeight
 			if m.displayMode == modeDetail {
-				maxVisible -= 1 // Account for detail header only
+				// VERTICAL split with accordion - top pane height varies by focus
+				var topHeight int
+				if m.focusedPane == leftPane {
+					topHeight = (totalAvailable * 2) / 3  // Top focused = 2/3
+				} else {
+					topHeight = totalAvailable - ((totalAvailable * 2) / 3)  // Top unfocused = 1/3
+				}
+				maxVisible = topHeight - 2  // Content height inside borders
+			} else {
+				// HORIZONTAL split (List/Tree) - height is fixed
+				maxVisible = totalAvailable - 2  // Content area inside borders
 			}
+			contentHeight = maxVisible
+		} else {
+			// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
+			maxVisible = m.height - 9
+			contentHeight = maxVisible - 2 // Content area inside borders
+			maxVisible = contentHeight
+		}
+
+		if m.displayMode == modeDetail {
+			maxVisible -= 1 // Account for detail header line
+		}
 
 			// Get filtered files for right-click detection (respects favorites filter)
 			var displayedFiles []fileItem
