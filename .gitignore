@@ -33,3 +33,7 @@ test_*.md
 Thumbs.db
 # Session summaries (optional - can also commit for history)
 #docs/NEXT_SESSION.md
+
+# Test coverage
+coverage.out
+coverage.html
