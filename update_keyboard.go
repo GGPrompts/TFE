@@ -65,6 +65,22 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case "up", "k":
+			// Navigate to previous field (same as Shift+Tab)
+			m.focusedInputField--
+			if m.focusedInputField < 0 {
+				m.focusedInputField = len(m.promptInputFields) - 1 // Wrap around
+			}
+			return m, nil
+
+		case "down", "j":
+			// Navigate to next field (same as Tab)
+			m.focusedInputField++
+			if m.focusedInputField >= len(m.promptInputFields) {
+				m.focusedInputField = 0 // Wrap around
+			}
+			return m, nil
+
 		case "backspace":
 			// Delete last character from focused field
 			if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {

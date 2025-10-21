@@ -322,6 +322,17 @@ func (m model) renderInputFields(availableWidth, availableHeight int) string {
 		return ""
 	}
 
+	// Update displayWidth for all fields based on actual available width
+	// Reserve space for focus indicator (2 chars) and label indent (2 chars)
+	// This prevents overflow in narrow windows
+	fieldDisplayWidth := availableWidth - 4 // Focus indicator + indent
+	if fieldDisplayWidth < 20 {
+		fieldDisplayWidth = 20 // Minimum readable width
+	}
+	for i := range m.promptInputFields {
+		m.promptInputFields[i].displayWidth = fieldDisplayWidth
+	}
+
 	var s strings.Builder
 
 	// Title for input fields section
@@ -616,27 +627,61 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		end = totalLines
 	}
 
+	// Track total lines rendered to ensure we don't exceed maxVisible
+	linesRendered := 0
+
 	// Render header
 	for _, line := range headerLines {
+		if linesRendered >= maxVisible {
+			break
+		}
 		s.WriteString(line)
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
+		linesRendered++
 	}
 
 	// Render content (no line numbers for prompts)
-	for i := start; i < end; i++ {
+	for i := start; i < end && linesRendered < maxVisible; i++ {
+		if linesRendered >= maxVisible {
+			break
+		}
 		s.WriteString(wrappedLines[i])
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
+		linesRendered++
 	}
 
 	// Render input fields section if active
 	if m.inputFieldsActive && inputFieldsSection != "" {
+		// Reserve 2 lines for separator
+		if linesRendered+2 < maxVisible {
+			s.WriteString("\n")
+			linesRendered++
+			separatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+			s.WriteString(separatorStyle.Render("─────────────────────────────────────"))
+			s.WriteString("\n")
+			linesRendered++
+
+			// Render input fields, but only as many lines as fit
+			inputLines := strings.Split(inputFieldsSection, "\n")
+			for i, line := range inputLines {
+				if linesRendered >= maxVisible {
+					break
+				}
+				if i > 0 {
+					s.WriteString("\n")
+				}
+				s.WriteString(line)
+				linesRendered++
+			}
+		}
+	}
+
+	// Pad with empty lines to reach exactly maxVisible lines
+	for linesRendered < maxVisible {
 		s.WriteString("\n")
-		separatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-		s.WriteString(separatorStyle.Render("─────────────────────────────────────"))
-		s.WriteString("\n")
-		s.WriteString(inputFieldsSection)
+		linesRendered++
 	}
 
 	return strings.TrimRight(s.String(), "\n")
@@ -676,44 +721,51 @@ func max(a, b int) int {
 func (m model) renderFullPreview() string {
 	var s strings.Builder
 
-	// Title bar with file name
-	previewTitleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
-		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
-		Width(m.width).
-		Padding(0, 1)
+	// Only show title bar and info line when mouse is enabled (not in text selection mode)
+	headerLines := 0
+	if m.previewMouseEnabled {
+		// Title bar with file name
+		previewTitleStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
+			Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+			Width(m.width).
+			Padding(0, 1)
 
-	titleText := fmt.Sprintf("Preview: %s", m.preview.fileName)
-	if m.preview.tooLarge || m.preview.isBinary {
-		titleText += " [Cannot Preview]"
-	}
-	if m.preview.isPrompt {
-		titleText += " [Prompt Template]"
-	} else if m.preview.isMarkdown {
-		titleText += " [Markdown]"
-	}
-	s.WriteString(previewTitleStyle.Render(titleText))
-	s.WriteString("\033[0m") // Reset ANSI codes
-	s.WriteString("\n")
+		titleText := fmt.Sprintf("Preview: %s", m.preview.fileName)
+		if m.preview.tooLarge || m.preview.isBinary {
+			titleText += " [Cannot Preview]"
+		}
+		if m.preview.isPrompt {
+			titleText += " [Prompt Template]"
+		} else if m.preview.isMarkdown {
+			titleText += " [Markdown]"
+		}
+		s.WriteString(previewTitleStyle.Render(titleText))
+		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n")
 
-	// File info line - update based on whether we're showing markdown or wrapped text
-	var infoText string
-	if m.preview.isMarkdown {
-		infoText = fmt.Sprintf("Size: %s | Markdown Rendered",
-			formatFileSize(m.preview.fileSize))
-	} else {
-		infoText = fmt.Sprintf("Size: %s | Lines: %d (wrapped) | Scroll: %d",
-			formatFileSize(m.preview.fileSize),
-			len(m.preview.content),
-			m.preview.scrollPos+1)
+		// File info line - update based on whether we're showing markdown or wrapped text
+		var infoText string
+		if m.preview.isMarkdown {
+			infoText = fmt.Sprintf("Size: %s | Markdown Rendered",
+				formatFileSize(m.preview.fileSize))
+		} else {
+			infoText = fmt.Sprintf("Size: %s | Lines: %d (wrapped) | Scroll: %d",
+				formatFileSize(m.preview.fileSize),
+				len(m.preview.content),
+				m.preview.scrollPos+1)
+		}
+		s.WriteString(pathStyle.Render(infoText))
+		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n")
+
+		headerLines = 2 // title + info line
 	}
-	s.WriteString(pathStyle.Render(infoText))
-	s.WriteString("\033[0m") // Reset ANSI codes
-	s.WriteString("\n")
 
 	// Content with border
-	maxVisible := m.height - 6 // Reserve space for title, info, help (total box height INCLUDING borders)
+	// Reserve space based on whether header is shown
+	maxVisible := m.height - 4 - headerLines // Reserve space for header (if shown), help, and borders
 	contentHeight := maxVisible - 2 // Content area accounting for borders
 	previewContent := m.renderPreview(contentHeight)
 
