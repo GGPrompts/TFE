@@ -1,8 +1,41 @@
 # Next Session Tasks
 
+## ✅ COMPLETED (Session 2025-10-21): Prompty Preview Layout Fixes
+
+### Issue Summary
+Fixed multiple critical bugs in prompty file preview rendering that caused height mismatches, overflow in narrow windows, and navigation issues with input fields.
+
+### What Was Fixed
+
+**1. Pane Height Mismatches**
+- **Problem:** `renderPromptPreview()` returned variable-length content that often exceeded `maxVisible`, causing panes to have different heights and headers to be pushed off-screen
+- **Fix:** Implemented line tracking to enforce exact `maxVisible` output with padding/truncation (render_preview.go:630-687)
+- **Result:** Panes always have matching heights, headers never disappear
+
+**2. Input Field Overflow in Narrow Windows**
+- **Problem:** Input fields used hardcoded `displayWidth=60`, causing overflow and wrapping issues
+- **Fix:** Calculate `displayWidth` dynamically based on actual available width (render_preview.go:325-334)
+- **Result:** Input fields wrap properly regardless of window size
+
+**3. Input Fields Not Scrollable**
+- **Problem:** When fields showed "X fields below ↓", users couldn't navigate to them with arrow keys
+- **Fix:** Added up/down/j/k arrow key navigation for input fields (update_keyboard.go:68-82)
+- **Result:** Natural navigation with arrows, auto-scrolling keeps focused field visible
+
+**4. Banner Visibility in Text Selection Mode**
+- **Problem:** Pressing M to enable text selection hid border but not the banner
+- **Fix:** Wrap banner rendering in `if m.previewMouseEnabled` check (render_preview.go:679-724)
+- **Result:** Clean text copying without banner interruption
+
+**Commit:** `bed2535` - fix: Resolve prompty preview layout issues and improve navigation
+**Branch:** main
+**Status:** ✅ COMPLETE - All prompty layout issues resolved
+
+---
+
 ## 🐛 TODO: Bug Fixes for Preview & Layout
 
-### 1. Prompty File Preview Causing Height Mismatch
+### 1. ~~Prompty File Preview Causing Height Mismatch~~ ✅ FIXED
 
 **Problem:**
 When viewing prompty files (prompt templates with fillable fields) in a narrow window, the file tree/preview pane heights become mismatched and sometimes the app headers get hidden. This suggests incorrect width calculations or text wrapping issues when rendering fillable input fields.
@@ -27,7 +60,7 @@ When viewing prompty files (prompt templates with fillable fields) in a narrow w
 
 ---
 
-### 2. Preview Banner Not Hidden in Text Selection Mode (M key)
+### 2. ~~Preview Banner Not Hidden in Text Selection Mode (M key)~~ ✅ FIXED
 
 **Problem:**
 When previewing a file in full-screen mode and pressing **M** to enable text selection (which removes the border), the bright blue banner at the top that displays "Preview: FILENAME [Filetype]" does NOT get hidden. This means when selecting/copying multiple pages of text, the banner appears in the middle of the copied content.
