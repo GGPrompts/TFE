@@ -253,6 +253,40 @@ When adding tests (future):
 
 ## Common Patterns
 
+### Modifying the Header/Title Bar
+
+**⚠️ IMPORTANT: Headers exist in TWO locations!**
+
+When modifying the header/title bar (GitHub link, menu bar, mode indicators), you must update BOTH:
+
+1. **Single-Pane Mode**: `view.go` → `renderSinglePane()` (around line 64)
+2. **Dual-Pane Mode**: `render_preview.go` → `renderDualPane()` (around line 816)
+
+**Note**: `renderFullPreview()` has a different header intentionally (shows filename, not menu bar).
+
+**Example - Adding menu bar:**
+```go
+// view.go - renderSinglePane()
+showGitHub := time.Since(m.startupTime) < 5*time.Second
+if showGitHub {
+    // GitHub link
+} else {
+    // Menu bar
+    menuBar := m.renderMenuBar()
+}
+
+// render_preview.go - renderDualPane()
+showGitHub := time.Since(m.startupTime) < 5*time.Second  // ← Same logic!
+if showGitHub {
+    // GitHub link
+} else {
+    // Menu bar
+    menuBar := m.renderMenuBar()
+}
+```
+
+**Why this matters**: Forgetting to update both locations leads to inconsistent UI between view modes.
+
 ### Adding a New Keyboard Shortcut
 
 1. Go to `update_keyboard.go`
