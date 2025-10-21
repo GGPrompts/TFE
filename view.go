@@ -214,17 +214,42 @@ func (m model) renderSinglePane() string {
 		// Not focused - show how to enter command mode
 		s.WriteString(helperStyle.Render(": to focus"))
 	} else if m.commandFocused && m.commandInput == "" {
-		// Focused but no input - show ! prefix hint
+		// Focused but no input - show ! prefix hint and cursor
 		s.WriteString(helperStyle.Render("! prefix to run & exit"))
-	} else {
-		// Has input - show the command
-		s.WriteString(inputStyle.Render(m.commandInput))
-	}
-
-	// Show cursor only when command mode is active
-	if m.commandFocused {
 		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 		s.WriteString(cursorStyle.Render("█"))
+	} else {
+		// Has input - show the command with cursor at correct position
+		if m.commandFocused {
+			// Render text before cursor, cursor, text after cursor
+			beforeCursor := m.commandInput[:m.commandCursorPos]
+			afterCursor := m.commandInput[m.commandCursorPos:]
+
+			// Handle ! prefix coloring
+			if strings.HasPrefix(beforeCursor, "!") {
+				prefixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+				s.WriteString(prefixStyle.Render("!"))
+				s.WriteString(inputStyle.Render(beforeCursor[1:]))
+			} else {
+				s.WriteString(inputStyle.Render(beforeCursor))
+			}
+
+			// Render cursor
+			cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+			s.WriteString(cursorStyle.Render("█"))
+
+			// Render text after cursor
+			s.WriteString(inputStyle.Render(afterCursor))
+		} else {
+			// Not focused - just show the text
+			if strings.HasPrefix(m.commandInput, "!") {
+				prefixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+				s.WriteString(prefixStyle.Render("!"))
+				s.WriteString(inputStyle.Render(m.commandInput[1:]))
+			} else {
+				s.WriteString(inputStyle.Render(m.commandInput))
+			}
+		}
 	}
 	// Explicitly reset styling after cursor to prevent ANSI code leakage
 	s.WriteString("\033[0m")

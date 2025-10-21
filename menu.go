@@ -47,8 +47,6 @@ func (m model) getMenus() map[string]Menu {
 		"edit": {
 			Label: "Edit",
 			Items: []MenuItem{
-				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
-				{IsSeparator: true},
 				{Label: "🗑️  Delete", Action: "delete", Shortcut: "F8"},
 			},
 		},
@@ -61,6 +59,10 @@ func (m model) getMenus() map[string]Menu {
 				{IsSeparator: true},
 				{Label: "⬌ Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
 				{Label: "👁️  Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
+				{IsSeparator: true},
+				{Label: "📝 Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly},
+				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
+				{Label: "🗑️  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
 				{IsSeparator: true},
 				{Label: "🔄 Refresh", Action: "refresh", Shortcut: "F5"},
 			},
@@ -125,11 +127,12 @@ func (m model) getMenus() map[string]Menu {
 		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📊 Monitor (bottom)", Action: "bottom"})
 	}
 
-	// Add Prompts Library and Games
-	toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
-	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📝 Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly})
+	// Add Games Launcher
+	if hasTools {
+		// Only add separator if we added TUI tools above
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+	}
 	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🎮 Games Launcher", Action: "launch-games"})
-	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🗑️  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly})
 
 	menus["tools"] = toolsMenu
 
@@ -727,7 +730,39 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 
 	// Help menu
 	case "show-hotkeys":
-		m.setStatusMessage("Press F1 to view keyboard shortcuts (feature to be implemented)", false)
+		// F1 functionality: Show hotkeys reference with context-aware navigation
+		hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")
+		// Try to find HOTKEYS.md in the TFE directory
+		// First check if it exists in current directory
+		if _, err := os.Stat(hotkeysPath); os.IsNotExist(err) {
+			// Try executable directory
+			if exePath, err := os.Executable(); err == nil {
+				hotkeysPath = filepath.Join(filepath.Dir(exePath), "HOTKEYS.md")
+			}
+		}
+		// Load and show the hotkeys file if it exists
+		if _, err := os.Stat(hotkeysPath); err == nil {
+			m.loadPreview(hotkeysPath)
+
+			// Context-aware help: Jump to relevant section based on current mode
+			sectionName := m.getHelpSectionName()
+			if sectionLine := findSectionLine(m.preview.content, sectionName); sectionLine >= 0 {
+				m.preview.scrollPos = sectionLine
+			}
+
+			m.viewMode = viewFullPreview
+			m.searchMode = false // Disable search mode in preview
+			m.calculateLayout() // Update widths for full-screen
+			m.populatePreviewCache() // Repopulate cache with correct width
+			// Close menu before showing help
+			m.menuOpen = false
+			m.activeMenu = ""
+			m.selectedMenuItem = -1
+			// Return early with ClearScreen command
+			return m, tea.ClearScreen
+		} else {
+			m.setStatusMessage("HOTKEYS.md not found", true)
+		}
 
 	case "show-about":
 		m.setStatusMessage("TFE v"+Version+" - Terminal File Explorer | github.com/GGPrompts/TFE", false)

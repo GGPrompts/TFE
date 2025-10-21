@@ -912,6 +912,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Check for exit/quit commands
 			cmdLower := strings.ToLower(strings.TrimSpace(cmd))
 			if cmdLower == "exit" || cmdLower == "quit" {
+				m.saveCommandHistory() // Save before quitting
 				return m, tea.Quit
 			}
 
@@ -931,23 +932,101 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If not in command mode or no input, handle Enter for file navigation (below)
 
 	case "backspace":
-		// Delete last character from command if focused and has input
-		if m.commandFocused && len(m.commandInput) > 0 {
-			m.commandInput = m.commandInput[:len(m.commandInput)-1]
+		// Delete character at cursor position from command if focused and has input
+		if m.commandFocused && len(m.commandInput) > 0 && m.commandCursorPos > 0 {
+			// Delete character before cursor
+			m.commandInput = m.commandInput[:m.commandCursorPos-1] + m.commandInput[m.commandCursorPos:]
+			m.commandCursorPos--
 			return m, nil
 		}
 		// If no command input, backspace does nothing
+
+	case "delete":
+		// Delete character at cursor position (forward delete)
+		if m.commandFocused && m.commandCursorPos < len(m.commandInput) {
+			m.commandInput = m.commandInput[:m.commandCursorPos] + m.commandInput[m.commandCursorPos+1:]
+			return m, nil
+		}
+
+	case "home", "ctrl+a":
+		// Move cursor to beginning of command input
+		if m.commandFocused {
+			m.commandCursorPos = 0
+			return m, nil
+		}
+
+	case "end", "ctrl+e":
+		// Move cursor to end of command input
+		if m.commandFocused {
+			m.commandCursorPos = len(m.commandInput)
+			return m, nil
+		}
+
+	case "ctrl+k":
+		// Delete from cursor to end of line
+		if m.commandFocused {
+			m.commandInput = m.commandInput[:m.commandCursorPos]
+			return m, nil
+		}
+
+	case "ctrl+u":
+		// Delete from cursor to beginning of line
+		if m.commandFocused {
+			m.commandInput = m.commandInput[m.commandCursorPos:]
+			m.commandCursorPos = 0
+			return m, nil
+		}
+
+	case "ctrl+left", "alt+left", "alt+b":
+		// Move cursor one word left
+		if m.commandFocused && m.commandCursorPos > 0 {
+			// Find previous word boundary (skip current word, then find start of previous word)
+			pos := m.commandCursorPos - 1
+			// Skip whitespace
+			for pos > 0 && m.commandInput[pos] == ' ' {
+				pos--
+			}
+			// Skip word characters
+			for pos > 0 && m.commandInput[pos] != ' ' {
+				pos--
+			}
+			// If we stopped at a space, move one forward (unless at start)
+			if pos > 0 {
+				pos++
+			}
+			m.commandCursorPos = pos
+			return m, nil
+		}
+
+	case "ctrl+right", "alt+right", "alt+f":
+		// Move cursor one word right
+		if m.commandFocused && m.commandCursorPos < len(m.commandInput) {
+			// Find next word boundary
+			pos := m.commandCursorPos
+			// Skip current word characters
+			for pos < len(m.commandInput) && m.commandInput[pos] != ' ' {
+				pos++
+			}
+			// Skip whitespace
+			for pos < len(m.commandInput) && m.commandInput[pos] == ' ' {
+				pos++
+			}
+			m.commandCursorPos = pos
+			return m, nil
+		}
 
 	case "esc":
 		// Exit command mode if focused
 		if m.commandFocused {
 			m.commandInput = ""
+			m.commandCursorPos = 0
 			m.commandFocused = false
 			return m, nil
 		}
 		// If there's leftover command input (but not focused), clear it
 		if m.commandInput != "" {
 			m.commandInput = ""
+			m.commandCursorPos = 0
 			return m, nil
 		}
 		// If no command input, handle Esc for dual-pane exit (below)
@@ -957,6 +1036,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.commandFocused {
 			m.commandFocused = true
 			m.commandInput = ""
+			m.commandCursorPos = 0
 			return m, nil
 		}
 		// If already in command mode, add the colon to input
@@ -986,7 +1066,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 				if isPrintable {
 					// Strip ANSI codes to prevent pasted styled text from corrupting command line
-					m.commandInput += stripANSI(text)
+					cleanText := stripANSI(text)
+					// Insert at cursor position
+					m.commandInput = m.commandInput[:m.commandCursorPos] + cleanText + m.commandInput[m.commandCursorPos:]
+					m.commandCursorPos += len(cleanText)
 					m.historyPos = len(m.commandHistory)
 					return m, nil
 				}
@@ -1017,6 +1100,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "f10", "ctrl+c":
 		// F10: Quit (replaces q)
+		m.saveCommandHistory() // Save before quitting
 		return m, tea.Quit
 
 	case "ctrl+z":
@@ -1048,14 +1132,21 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "up":
-		// If in command mode, navigate command history
-		if m.commandFocused && len(m.commandHistory) > 0 {
-			m.commandInput = m.getPreviousCommand()
+		// If in command mode, navigate command history (or just block navigation if no history)
+		if m.commandFocused {
+			if len(m.commandHistory) > 0 {
+				m.commandInput = m.getPreviousCommand()
+				m.commandCursorPos = len(m.commandInput) // Move cursor to end
+			}
 			return m, nil
 		}
 		// Otherwise fall through to file navigation
 		fallthrough
 	case "k":
+		// Block vim navigation when command is focused
+		if m.commandFocused {
+			return m, nil
+		}
 		if m.viewMode == viewDualPane {
 			// In dual-pane mode, check which pane is focused
 			if m.focusedPane == leftPane {
@@ -1082,14 +1173,21 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "down":
-		// If in command mode, navigate command history
-		if m.commandFocused && len(m.commandHistory) > 0 {
-			m.commandInput = m.getNextCommand()
+		// If in command mode, navigate command history (or just block navigation if no history)
+		if m.commandFocused {
+			if len(m.commandHistory) > 0 {
+				m.commandInput = m.getNextCommand()
+				m.commandCursorPos = len(m.commandInput) // Move cursor to end
+			}
 			return m, nil
 		}
 		// Otherwise fall through to file navigation
 		fallthrough
 	case "j":
+		// Block vim navigation when command is focused
+		if m.commandFocused {
+			return m, nil
+		}
 		if m.viewMode == viewDualPane {
 			// In dual-pane mode, check which pane is focused
 			if m.focusedPane == leftPane {
@@ -1276,6 +1374,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "pageup", "pgup":
+		// If command prompt is focused, don't navigate
+		if m.commandFocused {
+			return m, nil
+		}
 		// Page up in dual-pane mode (only works when right pane focused)
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 			visibleLines := m.height - 7
@@ -1287,6 +1389,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "pagedown", "pgdn", "pgdown":
+		// If command prompt is focused, don't navigate
+		if m.commandFocused {
+			return m, nil
+		}
 		// Page down in dual-pane mode (only works when right pane focused)
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 			// Calculate visible lines: m.height - 5 (header) - 2 (preview title) = m.height - 7
@@ -1304,6 +1410,13 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "left":
+		// If command prompt is focused, move cursor left in command input
+		if m.commandFocused {
+			if m.commandCursorPos > 0 {
+				m.commandCursorPos--
+			}
+			return m, nil
+		}
 		// In tree mode: collapse folder or go to parent
 		// In other modes: go to parent directory
 		if m.displayMode == modeTree {
@@ -1347,6 +1460,13 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "right":
+		// If command prompt is focused, move cursor right in command input
+		if m.commandFocused {
+			if m.commandCursorPos < len(m.commandInput) {
+				m.commandCursorPos++
+			}
+			return m, nil
+		}
 		// In tree mode: expand folder or navigate into it
 		// In other modes: navigate into selected directory
 		if currentFile := m.getCurrentFile(); currentFile != nil && currentFile.isDir && currentFile.name != ".." {

@@ -176,7 +176,21 @@ tfe/
 
 **When to extend**: Add new editor/browser support, clipboard features, or TUI tool integrations.
 
-### 11. `favorites.go` - Favorites System
+### 11. `command.go` - Command Execution & History
+**Purpose**: Command prompt system with persistent history
+**Contents**:
+- `executeCommand()` - runs shell commands in current directory
+- `addToHistory()` - adds commands to history (max 100)
+- `getPreviousCommand()` / `getNextCommand()` - history navigation
+- `loadCommandHistory()` - loads history from ~/.config/tfe/command_history.json
+- `saveCommandHistory()` - persists history to disk (JSON format)
+- Command cursor editing (position tracking, insertion, deletion)
+
+**When to extend**: Add command completion, aliases, or advanced command features.
+
+**Recent additions**: Full cursor editing with word jumping, persistent history across restarts.
+
+### 12. `favorites.go` - Favorites System
 **Purpose**: Bookmarking files and directories
 **Contents**:
 - `loadFavorites()` / `saveFavorites()` - persistence to ~/.config/tfe/favorites.json
@@ -185,7 +199,7 @@ tfe/
 
 **When to extend**: Add favorite management features (import/export, categories, etc.).
 
-### 12. `helpers.go` - Helper Functions
+### 13. `helpers.go` - Helper Functions
 **Purpose**: Utility functions for model operations
 **Contents**:
 - `getCurrentFile()` - gets selected file (handles tree view expansion)

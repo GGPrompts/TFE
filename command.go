@@ -8,9 +8,11 @@ package main
 // - Manage command history (optional)
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -112,6 +114,9 @@ func (m *model) addToHistory(command string) {
 
 	// Reset history position
 	m.historyPos = len(m.commandHistory)
+
+	// Save to disk after adding
+	m.saveCommandHistory()
 }
 
 // getPreviousCommand navigates backward in command history
@@ -188,4 +193,58 @@ func shellQuote(s string) string {
 	// Replace single quotes with '\'' (end quote, escaped quote, start quote)
 	s = strings.ReplaceAll(s, "'", "'\\''")
 	return "'" + s + "'"
+}
+
+// loadCommandHistory reads command history from disk
+// Returns empty slice if file doesn't exist or on error
+func loadCommandHistory() []string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return []string{}
+	}
+
+	historyPath := filepath.Join(homeDir, ".config", "tfe", "command_history.json")
+	data, err := os.ReadFile(historyPath)
+	if err != nil {
+		return []string{} // File doesn't exist yet, start fresh
+	}
+
+	var history struct {
+		Commands []string `json:"commands"`
+	}
+
+	if err := json.Unmarshal(data, &history); err != nil {
+		return []string{}
+	}
+
+	return history.Commands
+}
+
+// saveCommandHistory writes command history to disk
+// Creates the config directory if it doesn't exist
+func (m *model) saveCommandHistory() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	configDir := filepath.Join(homeDir, ".config", "tfe")
+	os.MkdirAll(configDir, 0755) // Create directory if it doesn't exist
+
+	historyPath := filepath.Join(configDir, "command_history.json")
+
+	history := struct {
+		Commands []string `json:"commands"`
+		MaxSize  int      `json:"maxSize"`
+	}{
+		Commands: m.commandHistory,
+		MaxSize:  100,
+	}
+
+	data, err := json.MarshalIndent(history, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(historyPath, data, 0644)
 }

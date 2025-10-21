@@ -61,6 +61,27 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Handle mouse wheel scrolling for command history when command prompt is focused
+	// Block file tree navigation even if no history exists
+	if m.commandFocused {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			// Scroll up in history (previous command) if history exists
+			if len(m.commandHistory) > 0 {
+				m.commandInput = m.getPreviousCommand()
+				m.commandCursorPos = len(m.commandInput) // Move cursor to end
+			}
+			return m, nil
+		case tea.MouseButtonWheelDown:
+			// Scroll down in history (next command) if history exists
+			if len(m.commandHistory) > 0 {
+				m.commandInput = m.getNextCommand()
+				m.commandCursorPos = len(m.commandInput) // Move cursor to end
+			}
+			return m, nil
+		}
+	}
+
 	// Handle mouse wheel scrolling in full-screen preview mode
 	if m.viewMode == viewFullPreview {
 		switch msg.Button {

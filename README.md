@@ -620,14 +620,18 @@ The command prompt is always visible at the top of the screen (3rd row, below th
 ```
 
 **Command Prompt Features:**
-- Always visible at the top (3rd row) - no need to enter a special mode
-- Start typing any character to automatically focus the prompt
-- Execute any shell command in the current directory
-- TFE suspends while the command runs, then resumes automatically
-- File list refreshes automatically after command completes
-- Command history with up/down arrows (stores last 100 commands)
+- **Always visible** at the top (3rd row) - no need to enter a special mode
+- **Full cursor editing** - Left/Right arrows, Home/End, Ctrl+Left/Right for word jumping
+- **Smart editing** - Backspace, Delete, Ctrl+K (kill to end), Ctrl+U (kill to start)
+- **Persistent history** - Saved to `~/.config/tfe/command_history.json`, survives restarts
+- **History navigation** - Up/Down arrows or mouse wheel to browse previous commands
+- **Visual feedback** - Cursor `█` shows position, `!` prefix appears in red
+- **Auto-focus** - Start typing any character to automatically focus the prompt
+- **Execute commands** - Any shell command runs in the current directory
+- **TFE suspends** while the command runs, then resumes automatically
+- **Auto-refresh** - File list updates after command completes
 - Press `Esc` to unfocus and clear the prompt
-- Press `Backspace` to edit command text
+- Press `:!command` to run command and exit TFE (perfect for launching Claude Code!)
 
 **Example Commands:**
 - `ls -la` - List files with details
@@ -635,6 +639,7 @@ The command prompt is always visible at the top of the screen (3rd row, below th
 - `mkdir testdir` - Create a new directory
 - `git status` - Check git repository status
 - `vim file.txt` - Open file in vim and return to TFE
+- `:!claude --dangerously-skip-permissions` - Launch Claude Code and exit TFE
 
 #### Key Interface Elements
 

@@ -38,6 +38,9 @@ func initialModel() model {
 		favorites:           loadFavorites(),
 		showFavoritesOnly:   false,
 		expandedDirs:        make(map[string]bool),
+		commandHistory:      loadCommandHistory(), // Load from disk on startup
+		commandCursorPos:    0,
+		historyPos:          0,
 		commandFocused:      false, // Start in file browser mode, not command mode
 		previewMouseEnabled: true,  // Mouse enabled by default
 		// Menu system

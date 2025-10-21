@@ -130,7 +130,8 @@ func (m model) renderListView(maxVisible int) string {
 			}
 
 			// Render the emoji without styling, then the rest with styling
-			if i == m.cursor {
+			// Don't highlight if command prompt is focused
+			if i == m.cursor && !m.commandFocused {
 				line = fmt.Sprintf("  %s%s %s%s", icon, favIndicator, leadingEmoji, selectedStyle.Render(restOfName))
 			} else {
 				line = fmt.Sprintf("  %s%s %s%s", icon, favIndicator, leadingEmoji, style.Render(restOfName))
@@ -140,7 +141,8 @@ func (m model) renderListView(maxVisible int) string {
 			line = fmt.Sprintf("  %s%s %s", icon, favIndicator, displayName)
 
 			// Apply selection style
-			if i == m.cursor {
+			// Don't highlight if command prompt is focused
+			if i == m.cursor && !m.commandFocused {
 				line = selectedStyle.Render(line)
 			} else {
 				line = style.Render(line)
@@ -432,7 +434,8 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Replace the styled portion, preserving the emoji color
 			plainNameWithEmoji := fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, nameWithoutEmoji)
 
-			if i == m.cursor {
+			// Don't highlight if command prompt is focused
+			if i == m.cursor && !m.commandFocused {
 				line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
 			} else {
 				if i%2 == 0 {
@@ -444,7 +447,8 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 		} else {
 			// Normal rendering
-			if i == m.cursor {
+			// Don't highlight if command prompt is focused
+			if i == m.cursor && !m.commandFocused {
 				line = selectedStyle.Render(line)
 			} else {
 				// Add alternating row background for easier reading
@@ -697,7 +701,8 @@ func (m model) renderTreeView(maxVisible int) string {
 			baseString := fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, leadingEmoji)
 
 			// Render the emoji without styling, then the rest with styling
-			if i == m.cursor {
+			// Don't highlight if command prompt is focused
+			if i == m.cursor && !m.commandFocused {
 				line = baseString + selectedStyle.Render(restOfName)
 			} else {
 				line = baseString + style.Render(restOfName)
@@ -706,7 +711,8 @@ func (m model) renderTreeView(maxVisible int) string {
 			// Normal rendering for all other files
 			line = fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, displayName)
 
-			if i == m.cursor {
+			// Don't highlight if command prompt is focused
+			if i == m.cursor && !m.commandFocused {
 				line = selectedStyle.Render(line)
 			} else {
 				line = style.Render(line)

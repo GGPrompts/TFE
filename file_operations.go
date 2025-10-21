@@ -101,6 +101,12 @@ func getFileIcon(item fileItem) string {
 		if item.name == ".." {
 			return "⬆️" // Up arrow for parent dir
 		}
+		// Check if this is the user's home directory
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			if item.path == homeDir {
+				return "🏠" // Home emoji for home directory
+			}
+		}
 		// Virtual global prompts folder - no icon since name already has 🌐
 		if isGlobalPromptsVirtualFolder(item.name) {
 			return "" // Name already contains 🌐 emoji

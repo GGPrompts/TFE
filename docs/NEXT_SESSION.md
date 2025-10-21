@@ -1,214 +1,307 @@
 # Next Session Tasks
 
-## 🎯 PRIORITY: Add Keyboard Navigation for Header Dropdowns
+## ✅ COMPLETED (Session 2025-10-21): Persistent Command History
 
-### Feature Request
-Add keyboard shortcuts to navigate and interact with the header dropdown menus (File, Edit, View, Tools, Help) without using the mouse.
+### Feature Summary
+Implemented persistent command history that saves to disk and survives TFE restarts, making it easy to recall and reuse complex commands across sessions.
 
-### Why This is Important
-✅ **Accessibility** - Full keyboard navigation for users who prefer/need keyboard-only interaction
-✅ **Power User Efficiency** - Faster navigation than mouse (Alt → Arrow → Enter is quicker than mouse)
-✅ **Professional UX** - Matches traditional desktop application behavior (Windows, Linux, macOS apps)
-✅ **Consistency** - TFE already has excellent keyboard shortcuts (F1-F12, Vim bindings) - this completes the picture
-✅ **Discoverability** - Users who press Alt or F9 will discover the menu system
-
-### Proposed Implementation
-
-#### **Hotkey to Enter Menu Mode:**
-- **Alt** or **F9** - Enter "menu mode" and highlight the first menu (File)
-  - Alt is traditional (Windows/Linux) but may not work in all terminals
-  - F9 is the safe fallback (F10 is already "Exit", so F9 makes sense)
-  - Either key should work
-
-#### **Navigation Keys:**
-When in menu mode (menu bar is focused):
-- **Left/Right arrows** - Move between menus (File ↔ Edit ↔ View ↔ Tools ↔ Help)
-- **Down arrow / Enter** - Open the currently highlighted menu dropdown
-- **Escape** - Exit menu mode, return to file browser
-- **Tab** - Alternative to Right arrow (some users prefer Tab for menu navigation)
-
-When dropdown is open (already implemented ✓):
-- **Up/Down arrows** - Navigate menu items (already works!)
-- **Enter** - Execute selected menu item (already works!)
-- **Escape** - Close dropdown and return to menu bar focus
-- **Left/Right arrows** - Close current menu and open adjacent menu (smooth horizontal navigation)
-
-#### **Visual Feedback:**
-- Menu bar item should show highlight when in menu mode:
-  ```
-  Normal:    File  Edit  View  Tools  Help
-  Focused:  [File] Edit  View  Tools  Help
-  Active:   [File] Edit  View  Tools  Help (with dropdown open below)
-  ```
-- Use existing `selectedStyle` or similar styling for consistency
+### What Was Implemented
+✅ **Persistent Storage** - History saved to `~/.config/tfe/command_history.json`
+✅ **Load on Startup** - History automatically loaded from disk when TFE starts
+✅ **Auto-Save** - History saved when adding commands and when quitting TFE
+✅ **Keyboard Navigation** - Up/Down arrows navigate history (already worked, improved)
+✅ **Mouse Wheel Support** - Scroll wheel navigates command history when prompt is focused
+✅ **Navigation Lock** - Arrow keys, left/right, pageup/pagedown don't navigate file tree when command prompt is focused
+✅ **Visual Feedback** - Red `!` prefix for run-and-exit commands (both single-pane and dual-pane modes)
 
 ### Implementation Details
 
-#### **New State Variables (types.go):**
-```go
-menuBarFocused   bool   // True when user is navigating the menu bar
-highlightedMenu  string // Which menu is highlighted ("file", "edit", etc.)
-```
+**Files Modified:**
+1. **command.go** - Added `loadCommandHistory()` and `saveCommandHistory()` functions with JSON persistence
+2. **model.go** - Load history from disk in `initialModel()`
+3. **update_keyboard.go** - Save history on quit (F10, Ctrl+C, exit/quit commands), added commandFocused checks for navigation keys
+4. **update_mouse.go** - Added mouse wheel scrolling for command history navigation
+5. **view.go** - Added red color-coding for `!` prefix in single-pane mode
+6. **render_preview.go** - Added red color-coding for `!` prefix in dual-pane mode
 
-#### **Keyboard Handler (update_keyboard.go):**
+**Storage Location:**
+- `~/.config/tfe/command_history.json`
 
-**Entry:**
-```go
-case "alt", tea.KeyF9:
-    if !m.menuBarFocused {
-        m.menuBarFocused = true
-        m.highlightedMenu = "file" // Start with first menu
-        m.menuOpen = false
-    }
-```
-
-**Menu bar navigation:**
-```go
-if m.menuBarFocused && !m.menuOpen {
-    switch msg.String() {
-    case "left", "shift+tab":
-        // Move to previous menu
-        m.highlightedMenu = getPreviousMenu(m.highlightedMenu)
-
-    case "right", "tab":
-        // Move to next menu
-        m.highlightedMenu = getNextMenu(m.highlightedMenu)
-
-    case "down", "enter":
-        // Open the highlighted menu
-        m.menuOpen = true
-        m.activeMenu = m.highlightedMenu
-        m.selectedMenuItem = getFirstSelectableMenuItem(m.activeMenu)
-
-    case "esc":
-        // Exit menu mode
-        m.menuBarFocused = false
-        m.highlightedMenu = ""
-    }
+**Format:**
+```json
+{
+  "commands": ["ls -la", "!claude --yolo", "htop"],
+  "maxSize": 100
 }
 ```
 
-**Dropdown navigation (enhance existing):**
-```go
-if m.menuOpen && m.activeMenu != "" {
-    switch msg.String() {
-    case "left":
-        // Close current menu, open previous menu
-        m.activeMenu = getPreviousMenu(m.activeMenu)
-        m.selectedMenuItem = getFirstSelectableMenuItem(m.activeMenu)
+### Bug Fixes Applied
 
-    case "right":
-        // Close current menu, open next menu
-        m.activeMenu = getNextMenu(m.activeMenu)
-        m.selectedMenuItem = getFirstSelectableMenuItem(m.activeMenu)
+**Issue 1: File tree selection visible when command focused**
+- Problem: File tree showed selection highlight even when command prompt was focused
+- Fix: Added `!m.commandFocused` check to all selection rendering in `render_file_list.go`
+- Result: File tree loses highlight completely when `:` is pressed
 
-    // Existing up/down/enter/esc logic stays the same
-    }
+**Issue 2: Arrow keys still navigated file tree when command focused**
+- Problem: Up/Down/k/j keys moved cursor in file tree even with command prompt focused
+- Fix: Changed condition from checking `commandFocused && len(history) > 0` to just `commandFocused`
+- Result: All navigation keys blocked when command mode active, even with empty history
+
+**Issue 3: Mouse wheel still scrolled file tree when command focused**
+- Problem: Mouse wheel scrolling navigated file tree instead of command history
+- Fix: Updated mouse wheel handler to block file navigation when `commandFocused`, regardless of history length
+- Result: Mouse wheel only works for history navigation (or does nothing if no history)
+
+### Command Line Editing Features Added
+
+**New Navigation:**
+- **Left/Right arrows** - Move cursor within command text
+- **Home/Ctrl+A** - Jump to beginning of line
+- **End/Ctrl+E** - Jump to end of line
+- **Ctrl+Left/Alt+Left/Alt+B** - Jump one word left
+- **Ctrl+Right/Alt+Right/Alt+F** - Jump one word right
+
+**New Editing:**
+- **Delete** - Forward delete at cursor position
+- **Ctrl+K** - Delete from cursor to end of line
+- **Ctrl+U** - Delete from cursor to beginning of line
+- **Backspace** - Now deletes at cursor (not just end)
+- **Text insertion** - Inserts at cursor position (not just end)
+
+**Visual:**
+- Cursor `█` now renders at actual cursor position in text
+- History navigation (↑/↓/mouse wheel) moves cursor to end
+
+**Commit:** (pending)
+**Branch:** headerdropdowns
+**Status:** ✅ COMPLETE - All features tested and confirmed working
+
+---
+
+## 📋 Original Implementation Plan (Completed)
+
+#### **1. Persistent Storage**
+Save command history to: `~/.config/tfe/command_history.json`
+
+**File format:**
+```json
+{
+  "commands": [
+    "ls -la",
+    "!claude --dangerously-skip-permissions",
+    "htop",
+    "!vim myfile.txt"
+  ],
+  "maxSize": 100
 }
 ```
 
-#### **Helper Functions (menu.go):**
+#### **2. Load/Save Functions**
+
+**In `command.go`:**
 ```go
-// getPreviousMenu returns the menu key to the left of the current menu
-func getPreviousMenu(current string) string {
-    order := getMenuOrder()
-    for i, key := range order {
-        if key == current {
-            if i == 0 {
-                return order[len(order)-1] // Wrap to last menu
-            }
-            return order[i-1]
-        }
+// loadCommandHistory reads command history from disk
+func loadCommandHistory() []string {
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return []string{}
     }
-    return order[0]
+
+    historyPath := filepath.Join(homeDir, ".config", "tfe", "command_history.json")
+    data, err := os.ReadFile(historyPath)
+    if err != nil {
+        return []string{} // File doesn't exist yet, start fresh
+    }
+
+    var history struct {
+        Commands []string `json:"commands"`
+    }
+
+    if err := json.Unmarshal(data, &history); err != nil {
+        return []string{}
+    }
+
+    return history.Commands
 }
 
-// getNextMenu returns the menu key to the right of the current menu
-func getNextMenu(current string) string {
-    order := getMenuOrder()
-    for i, key := range order {
-        if key == current {
-            if i == len(order)-1 {
-                return order[0] // Wrap to first menu
-            }
-            return order[i+1]
-        }
+// saveCommandHistory writes command history to disk
+func (m *model) saveCommandHistory() error {
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return err
     }
-    return order[0]
+
+    configDir := filepath.Join(homeDir, ".config", "tfe")
+    os.MkdirAll(configDir, 0755) // Create directory if it doesn't exist
+
+    historyPath := filepath.Join(configDir, "command_history.json")
+
+    history := struct {
+        Commands []string `json:"commands"`
+        MaxSize  int      `json:"maxSize"`
+    }{
+        Commands: m.commandHistory,
+        MaxSize:  100,
+    }
+
+    data, err := json.MarshalIndent(history, "", "  ")
+    if err != nil {
+        return err
+    }
+
+    return os.WriteFile(historyPath, data, 0644)
 }
 ```
 
-#### **Rendering (menu.go - renderMenuBar):**
-```go
-// When rendering each menu label, check if it's highlighted
-for _, menuKey := range menuOrder {
-    menu := menus[menuKey]
+#### **3. Integration Points**
 
-    var style lipgloss.Style
-    if m.activeMenu == menuKey && m.menuOpen {
-        style = menuActiveStyle // Already exists
-    } else if m.highlightedMenu == menuKey && m.menuBarFocused {
-        style = menuHighlightedStyle // New: show focus without opening
+**In `model.go` - initialModel():**
+```go
+m := model{
+    // ... existing fields ...
+    commandHistory: loadCommandHistory(), // Load from disk on startup
+    historyPos:     0,
+}
+```
+
+**In `update.go` - when quitting TFE:**
+```go
+case tea.KeyMsg:
+    if msg.String() == "f10" || msg.String() == "ctrl+c" {
+        m.saveCommandHistory() // Save before quitting
+        return m, tea.Quit
+    }
+```
+
+**In `command.go` - addToHistory():**
+```go
+func (m *model) addToHistory(command string) {
+    // ... existing logic ...
+
+    // Save to disk after adding
+    m.saveCommandHistory()
+}
+```
+
+#### **4. Visual Enhancement: Color-Code ! Prefix**
+
+When displaying command history with ↑/↓ arrows, highlight the `!` prefix in red.
+
+**In `view.go` and `render_preview.go` - command prompt rendering:**
+```go
+// Show the command with colored ! prefix
+if m.commandFocused && m.commandInput != "" {
+    // Check if command starts with !
+    if strings.HasPrefix(m.commandInput, "!") {
+        // Red ! prefix
+        prefixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+        s.WriteString(prefixStyle.Render("!"))
+        // Normal text for rest of command
+        s.WriteString(inputStyle.Render(m.commandInput[1:]))
     } else {
-        style = menuInactiveStyle
+        s.WriteString(inputStyle.Render(m.commandInput))
     }
-
-    renderedMenu := style.Render(menu.Label)
-    renderedMenus = append(renderedMenus, renderedMenu)
+} else if m.commandFocused && m.commandInput == "" {
+    // ... existing helper text ...
 }
 ```
 
-**New style for highlighted (but not open) menu:**
+#### **5. Fix: Disable Arrow Key Navigation When Command Prompt is Focused**
+
+**Problem:** Currently, when command prompt is focused (`:` pressed), arrow keys still navigate the file tree/preview pane. This conflicts with command history navigation (↑/↓).
+
+**Solution:** In `update_keyboard.go`, check `m.commandFocused` before handling arrow key navigation.
+
+**Current behavior:**
 ```go
-menuHighlightedStyle := lipgloss.NewStyle().
-    Foreground(lipgloss.Color("0")).
-    Background(lipgloss.Color("240")).  // Different from active (39)
-    Bold(true).
-    Padding(0, 1)
+case "up", "k":
+    // Navigate file list up
+    if m.cursor > 0 {
+        m.cursor--
+    }
 ```
+
+**Fixed behavior:**
+```go
+case "up", "k":
+    // If command prompt is focused, arrow keys are for history (already handled above)
+    if m.commandFocused {
+        return m, nil // Don't navigate file list
+    }
+
+    // Navigate file list up
+    if m.cursor > 0 {
+        m.cursor--
+    }
+```
+
+**Apply same fix for:**
+- `"down"`, `"j"` - Down navigation
+- `"left"`, `"h"` - Left navigation (if used in file browser)
+- `"right"`, `"l"` - Right navigation (if used in file browser)
+- `"pageup"`, `"pagedown"` - Page navigation
+- `"home"`, `"end"` - Jump to start/end
+
+**Note:** Make sure this check is added EARLY in the switch statement, before arrow key handling for file navigation.
 
 ### Files to Modify
 
-1. **types.go** - Add `menuBarFocused` and `highlightedMenu` fields to model
-2. **model.go** - Initialize new fields to `false` and `""`
-3. **update_keyboard.go** - Add Alt/F9 handler and menu navigation logic
-4. **menu.go** - Add `getPreviousMenu()`, `getNextMenu()`, update `renderMenuBar()` with highlight style
-5. **HOTKEYS.md** - Document the new keyboard shortcuts
+1. **command.go** - Add `loadCommandHistory()` and `saveCommandHistory()` functions
+2. **model.go** - Load history from disk in `initialModel()`
+3. **update.go** - Save history when quitting TFE
+4. **update_keyboard.go** - Add `if m.commandFocused { return m, nil }` check before arrow key file navigation
+5. **view.go** - Color-code `!` prefix in red when rendering command input
+6. **render_preview.go** - Same `!` prefix coloring for dual-pane mode
 
 ### Testing Checklist
 
 After implementation:
-- [ ] Press Alt or F9 → First menu (File) is highlighted
-- [ ] Left/Right arrows → Navigate between menus
-- [ ] Down arrow or Enter → Open highlighted menu
-- [ ] Up/Down arrows → Navigate within dropdown (already works)
-- [ ] Left/Right arrows in dropdown → Switch to adjacent menu smoothly
-- [ ] Enter in dropdown → Execute action, close menu
-- [ ] Escape in dropdown → Return to menu bar focus (stay in menu mode)
-- [ ] Escape in menu bar → Exit menu mode, return to file browser
-- [ ] Tab key → Works as alternative to Right arrow
-- [ ] Shift+Tab → Works as alternative to Left arrow
-- [ ] Menu wrapping → Right on Help goes to File, Left on File goes to Help
-
-### Benefits
-
-✅ **Complete keyboard workflow** - Every menu item accessible without mouse
-✅ **Discoverability** - Users explore menus with keyboard (press Alt to discover)
-✅ **Power user efficiency** - `Alt → Right → Right → Enter` faster than mouse
-✅ **Accessibility compliance** - Keyboard-only users can access all features
-✅ **Professional polish** - Matches expectations from desktop apps
+- [ ] Run TFE, execute a few commands (`:ls`, `:htop`, `:!vim test.txt`)
+- [ ] Press `:` and use ↑/↓ to verify history works
+- [ ] Quit TFE (F10)
+- [ ] Check `~/.config/tfe/command_history.json` exists and contains commands
+- [ ] Restart TFE
+- [ ] Press `:` and ↑ - verify previous commands are loaded
+- [ ] Verify `!` prefix appears in **red** when scrolling through history
+- [ ] Press `:` to focus command prompt, then press arrow keys
+- [ ] Verify arrow keys navigate history, NOT the file tree (file tree should not move)
+- [ ] Press Esc to unfocus command prompt
+- [ ] Verify arrow keys now navigate file tree normally
 
 ### Priority
-**High** - This is a quality-of-life improvement that elevates TFE's UX significantly
+**High** - Persistent history is a fundamental usability improvement that makes the command prompt much more practical for complex commands.
 
 ### Expected Time
-**45-60 minutes** - Straightforward implementation, mostly keyboard handling logic
+**30-45 minutes** - Straightforward file I/O + small rendering changes + arrow key fix
+
+---
+
+## ✅ COMPLETED (Session 2025-10-21): Keyboard Navigation & Command Improvements
+
+### Keyboard Navigation for Menus ✅
+- Alt/F9 enters menu bar navigation mode
+- Left/Right or Tab/Shift+Tab to navigate between menus
+- Down/Enter to open dropdown, Up/Down to navigate items
+- Left/Right in dropdown smoothly switches to adjacent menus
+- Esc to close dropdown or exit menu mode
+- Visual feedback with gray highlight for focused menu
+- View menu reordered to match 1-2-3 hotkeys
+
+### Command Execution Enhancement ✅
+- `!` prefix support: `:!command` exits TFE after running command
+- `:command` suspends TFE and returns after execution
+- Smart helper text shows "! prefix to run & exit" when focused
+- Works in both single-pane and dual-pane modes
+- Perfect for launching Claude Code: `:!claude --dangerously-skip-permissions`
+
+**Commit:** `28eced1` - feat: Add keyboard navigation for menu bar and ! prefix for command execution
+**Branch:** headerdropdowns
+**Status:** ✅ COMPLETE
 
 ---
 
 ## ✅ FIXED: Dropdown and Context Menu Alignment Issues
 
-### Issues Resolved (Session 2025-10-21)
 All dropdown and context menu alignment issues have been fixed:
 
 ✅ **Dropdown menus** - Simplified overlay with empty space padding (no ANSI bleeding)
@@ -253,16 +346,8 @@ Both the **dropdown menus** and **context menus** (right-click/F2) had **repeate
 
 ---
 
-## ✅ Completed
-- Context-aware F1 help system (implemented and working!)
-- VHS demo system created (10 tape files - good for docs but no emojis)
-- Fixed browser opening for images/GIFs (PowerShell instead of cmd.exe)
-- Tried VHS: emojis show as boxes ❌
-- Tried asciinema: emojis show as boxes ❌
-- Dropdown menu alignment issues (emoji width, ANSI bleeding)
-- Context menu alignment issues (favorited files, empty space)
-
 ## 🐛 Bug to Fix: GIF Preview Mode
+
 **Problem:** When previewing a GIF file, it shows "file too big to display" with text "press V to open in image viewer", but terminal image viewers can't show animated GIFs.
 
 **Solution:** Add browser open option in preview mode for GIF files
@@ -286,265 +371,7 @@ case "b", "B":
 
 **Priority:** Medium (nice to have, works around limitation)
 
-## 🎬 Goal for This Session
-Record with **OBS** to capture TFE's **actual terminal appearance** with:
-- ✅ Proper emoji rendering (file icons, folders, AI context files)
-- ✅ CGA theme colors
-- ✅ FiraCode Nerd Font
-- ✅ Bright visible cursor
-- ✅ Mouse interaction visible
-- ✅ Real project files
-
-## Why OBS?
-OBS captures your actual screen, so everything looks exactly like your terminal - emojis, colors, fonts, cursor - PERFECT! 🎥
-
----
-
-## 🎥 Quick Start: Record with OBS
-
-### Step 1: Prep Your Terminal
-```bash
-# Navigate to demo content
-cd ~/projects/TFE/demo-content
-
-# Open cheat sheet in second window (optional)
-cat DEMO_CHEATSHEET.txt
-
-# Size your Windows Terminal to reasonable size
-# Not too small, not full screen
-# Recommended: ~1200x700 or similar
-```
-
-### Step 2: Setup OBS
-1. Open OBS Studio
-2. **Add Source:** "Window Capture"
-   - Select: Windows Terminal
-   - Or: "Display Capture" for fullscreen
-3. **Crop:** Right-click source → Transform → Edit Transform
-   - Crop to just show terminal window (no taskbar/desktop)
-4. **Settings → Output:**
-   - Output Mode: Simple
-   - Recording Quality: High Quality
-   - Recording Format: MP4
-5. **Settings → Video:**
-   - Base Resolution: 1920x1080 (or your screen res)
-   - Output Resolution: 1280x720 (smaller = smaller file)
-   - FPS: 30
-
-### Step 3: Record Demo
-1. **Start Recording** in OBS (or hotkey)
-2. **Launch TFE:**
-   ```bash
-   tfe
-   ```
-3. **Follow the demo script** (see cheat sheet or below)
-4. **Stop Recording** when done
-5. **File saved to:** Videos folder (default)
-
-### Step 4: Convert MP4 to GIF (if needed)
-```bash
-# Install ffmpeg (if not already)
-sudo apt install ffmpeg
-
-# Convert (adjust path to your recording)
-ffmpeg -i ~/path/to/recording.mp4 \
-  -vf "fps=15,scale=1200:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
-  -loop 0 assets/tfe-showcase.gif
-
-# Or simpler (lower quality but smaller):
-ffmpeg -i recording.mp4 -vf "fps=15,scale=800:-1" assets/tfe-demo.gif
-```
-
-### Step 5: View Result
-```bash
-# MP4
-explorer.exe ~/Videos  # or wherever OBS saved it
-
-# GIF (if converted)
-cd ~/projects/TFE/assets
-explorer.exe .
-```
-
----
-
-## 📋 Demo Script Ideas
-
-### Demo 1: Complete Feature Tour (45 seconds)
-**Filename:** `tfe-complete-tour.cast`
-
-**Script:**
-1. Launch TFE in demo-content
-2. Navigate down 3-4 files (shows icons)
-3. Toggle to tree view (press 3)
-4. Expand a folder (→)
-5. Enter dual-pane mode (Space)
-6. Navigate files (preview updates)
-7. Switch to preview pane (Tab)
-8. Scroll preview
-9. Exit (Esc, F10)
-
-### Demo 2: AI Context Files (20 seconds)
-**Filename:** `tfe-ai-context.cast`
-
-**Script:**
-1. Launch TFE in project root (~/projects/TFE)
-2. Navigate to CLAUDE.md (orange icon 🤖)
-3. Preview it (Enter)
-4. Show beautiful markdown rendering
-5. Navigate to .claude/ folder
-6. Show prompt files
-7. Exit
-
-### Demo 3: Dual-Pane Workflow (30 seconds)
-**Filename:** `tfe-dual-pane.cast`
-
-**Script:**
-1. Launch TFE
-2. Enter dual-pane immediately (Space)
-3. Navigate 4-5 files (preview updates automatically)
-4. Switch to preview pane (Tab)
-5. Scroll preview
-6. Switch back to file list (Tab)
-7. Navigate more files
-8. Exit dual-pane (Esc)
-
----
-
-## 🎨 Tips for Great Recordings
-
-### Before Recording:
-- ✅ Clear your terminal (Ctrl+L)
-- ✅ Make sure window is full size
-- ✅ Test the workflow first (practice run)
-- ✅ Know your ending point (plan last action)
-
-### During Recording:
-- 🐢 Go SLOWER than normal (viewers need time to see)
-- ⏸️ Pause 1-2 seconds after each action
-- 🎯 Focus on one feature at a time
-- 📦 Show varied file types (icons!)
-- 🤖 Highlight AI context files (.claude/, CLAUDE.md)
-
-### After Recording:
-- 🎬 Review the .cast file (play it with `asciinema play file.cast`)
-- ✂️ If you mess up, just record again (quick!)
-- 🔧 Convert to GIF and check file size
-
----
-
-## 🛠️ Advanced: Edit Recordings
-
-If you want to trim or speed up parts:
-
-```bash
-# Play recording to review
-asciinema play tfe-showcase.cast
-
-# Edit timing (if needed) - opens in editor
-# You can manually adjust timestamps
-nano tfe-showcase.cast
-
-# Or use asciinema tools to cut/trim
-# (see: https://docs.asciinema.org/manual/cli/editing/)
-```
-
----
-
-## 📦 Final Output Goals
-
-### For README.md Hero Section:
-- **1 showcase GIF** (45-60 seconds) showing complete feature tour
-- Shows emoji icons, beautiful rendering, smooth navigation
-- Demonstrates why TFE is awesome
-- File: `assets/tfe-showcase.gif`
-- Target size: < 3 MB
-
-### For Features Section:
-- **1-2 feature-specific GIFs** (20-30 seconds each)
-- Dual-pane workflow
-- AI context file management
-- Files: `assets/demo-dual-pane-real.gif`, `assets/demo-ai-context.gif`
-- Target size: < 2 MB each
-
----
-
-## 🔧 Troubleshooting
-
-### GIF is too large (> 5 MB)
-```bash
-# Option 1: Lower quality with agg
-agg input.cast output.gif --cols 100 --rows 30
-
-# Option 2: Optimize with gifsicle
-sudo apt install gifsicle
-gifsicle -O3 --lossy=80 --colors 128 -o output-opt.gif output.gif
-
-# Option 3: Record shorter demo (< 45 seconds)
-```
-
-### OBS not capturing terminal properly
-- Make sure "Window Capture" is selected (not Display Capture)
-- Select the correct window: "Windows Terminal"
-- Right-click source → Transform → Edit Transform to crop
-- Check Settings → Video → Output Resolution (1280x720 is good)
-
-### MP4 file is huge (> 50 MB)
-- Lower output resolution in OBS (Settings → Video → 1280x720)
-- Lower FPS (30 is fine, 24 is smaller)
-- Convert to GIF (much smaller): `ffmpeg -i video.mp4 -vf "scale=800:-1" out.gif`
-
-### Cursor not visible in recording
-- Your bright cursor should show! If not:
-- In OBS, make sure you're capturing the window (not display)
-- Check Windows Terminal cursor settings
-
----
-
-## ✅ Session Checklist
-
-- [ ] Setup OBS (Window Capture → Windows Terminal)
-- [ ] Record complete feature tour with OBS (~45 seconds)
-- [ ] Check MP4 recording looks good (emojis visible!)
-- [ ] Convert MP4 to GIF with ffmpeg (optional)
-- [ ] Verify file size (< 5 MB for MP4, < 3 MB for GIF)
-- [ ] Optional: Record dual-pane demo
-- [ ] Optional: Record AI context files demo
-- [ ] Update README.md with new demos
-
----
-
-## 📚 Quick Reference
-
-```bash
-# OBS Recording
-# 1. Open OBS
-# 2. Window Capture → Windows Terminal
-# 3. Start Recording
-# 4. Do demo
-# 5. Stop Recording
-
-# Convert MP4 to GIF
-ffmpeg -i recording.mp4 -vf "fps=15,scale=800:-1" output.gif
-
-# Optimize GIF (if needed)
-gifsicle -O3 --lossy=80 -o optimized.gif input.gif
-
-# Open folders
-explorer.exe ~/Videos        # OBS recordings
-explorer.exe assets          # GIF output
-```
-
----
-
-## 🎯 Success Criteria
-
-✅ At least 1 beautiful GIF showing TFE's real appearance
-✅ Emojis render properly (not boxes!)
-✅ Shows key features: navigation, dual-pane, tree view
-✅ File size under 3 MB (loads fast on GitHub)
-✅ Looks professional and engaging
-
 ---
 
 **Branch:** headerdropdowns
-**Status:** Ready for keyboard navigation implementation
+**Status:** Ready for persistent command history implementation

@@ -223,18 +223,53 @@ When in trash view:
 
 ## Command Prompt (Vim-Style)
 
+### Basic Commands
+
 | Key | Action |
 |-----|--------|
 | **:** | Enter command mode (focus command prompt) |
-| **Type** | Type command while in command mode |
-| **Backspace** | Delete last character from command |
-| **Enter** | Execute command (or navigate if empty) |
 | **Esc** | Exit command mode and clear prompt |
-| **↑** (in command mode) | Previous command in history |
-| **↓** (in command mode) | Next command in history |
+| **Enter** | Execute command (or navigate if empty) |
+| **!** prefix | Run command and exit TFE (e.g., `:!claude --yolo`) |
 | **exit** / **quit** | Exit TFE (type and press Enter) |
 
-> **Note:** Press **:** (colon) to enter command mode - your input appears at the top of the screen. Press **Esc** to exit command mode. Command history navigation works while in command mode.
+### Cursor Movement
+
+| Key | Action |
+|-----|--------|
+| **←** / **→** | Move cursor left/right in command text |
+| **Home** / **Ctrl+A** | Jump to beginning of line |
+| **End** / **Ctrl+E** | Jump to end of line |
+| **Ctrl+Left** / **Alt+Left** / **Alt+B** | Jump one word left |
+| **Ctrl+Right** / **Alt+Right** / **Alt+F** | Jump one word right |
+
+### Editing
+
+| Key | Action |
+|-----|--------|
+| **Backspace** | Delete character before cursor |
+| **Delete** | Delete character at cursor (forward delete) |
+| **Ctrl+K** | Delete from cursor to end of line |
+| **Ctrl+U** | Delete from cursor to beginning of line |
+| **Type** | Insert text at cursor position |
+
+### History Navigation
+
+| Key | Action |
+|-----|--------|
+| **↑** (in command mode) | Previous command in history |
+| **↓** (in command mode) | Next command in history |
+| **Mouse Wheel** | Scroll through command history (when command focused) |
+
+### Features
+
+- **Persistent History**: Command history saved to `~/.config/tfe/command_history.json` and survives restarts
+- **Cursor Editing**: Full cursor control - edit anywhere in the command line
+- **Word Jumping**: Fast navigation with Ctrl/Alt + arrows
+- **Visual Feedback**: Cursor `█` shows current position, `!` prefix appears in red
+- **Smart Navigation**: Arrow keys and mouse wheel navigate history when command is focused, don't affect file tree
+
+> **Note:** Press **:** (colon) to enter command mode - your input appears at the top of the screen with a cursor. Use arrow keys to move the cursor and edit anywhere in the text. Press **Esc** to exit command mode. Command history persists across TFE restarts.
 
 ## Dual-Pane Mode
 
