@@ -1,0 +1,76 @@
+{
+  // Add this profile to your Windows Terminal settings.json
+  // File location: %LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalSettings\settings.json
+
+  "profiles": {
+    "list": [
+      {
+        "name": "TFE Recording",
+        "guid": "{12345678-1234-5678-1234-567812345678}",  // Change this GUID to be unique
+        "commandline": "wsl.exe ~ -e bash -c 'cd ~/projects/TFE && exec bash'",
+        "startingDirectory": "//wsl$/Ubuntu/home/matt/projects/TFE",
+
+        // Optimal recording dimensions
+        "initialCols": 120,
+        "initialRows": 30,
+        // Or use pixel dimensions:
+        // "initialPosition": ",",
+        // "useAcrylic": false,
+
+        // Font settings (match your current setup)
+        "font": {
+          "face": "FiraCode Nerd Font Mono",
+          "size": 11,
+          "weight": "normal"
+        },
+
+        // Color scheme
+        "colorScheme": "CGA",  // Or your current theme
+
+        // Cursor settings (bright and visible)
+        "cursorShape": "bar",  // or "block", "underscore", "vintage"
+        "cursorColor": "#FFFFFF",
+        "cursorHeight": 25,
+
+        // Disable distractions for clean recording
+        "opacity": 100,
+        "useAcrylic": false,
+        "backgroundImage": null,
+        "backgroundImageOpacity": 0,
+
+        // Clean appearance
+        "padding": "8, 8, 8, 8",
+        "scrollbarState": "hidden",  // Hide scrollbar for cleaner look
+        "snapOnInput": true,
+
+        // Tab title
+        "tabTitle": "TFE Demo Recording"
+      }
+    ]
+  },
+
+  // Make sure you have the CGA color scheme defined:
+  "schemes": [
+    {
+      "name": "CGA",
+      "background": "#000000",
+      "foreground": "#AAAAAA",
+      "black": "#000000",
+      "blue": "#0000AA",
+      "cyan": "#00AAAA",
+      "green": "#00AA00",
+      "purple": "#AA00AA",
+      "red": "#AA0000",
+      "white": "#AAAAAA",
+      "yellow": "#AA5500",
+      "brightBlack": "#555555",
+      "brightBlue": "#5555FF",
+      "brightCyan": "#55FFFF",
+      "brightGreen": "#55FF55",
+      "brightPurple": "#FF55FF",
+      "brightRed": "#FF5555",
+      "brightWhite": "#FFFFFF",
+      "brightYellow": "#FFFF55"
+    }
+  ]
+}
