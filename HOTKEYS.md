@@ -357,7 +357,7 @@ TFE uses emoji icons to indicate file types:
 18. **Copying Text from Files:** Press **F4** to open in Micro editor - this is the easiest way to select and copy text. In full-screen preview (F3/Enter), you can also press **m** to remove the border and disable mouse, enabling clean terminal text selection. The border disappears as visual feedback
 19. **Search in Preview:** Press **Ctrl+F** while viewing a file to search, type your query, press **n** for next match, **Shift+N** for previous, **Esc** to exit search
 20. **Viewing Images:** Right-click on image files (.png, .jpg, .gif, etc.) and select "🖼️ View Image" to see them in your terminal! Requires viu, timg, or chafa. For editing, select "🎨 Edit Image" to use textual-paint (MS Paint in terminal!)
-21. **Hidden Files:** Press **.** (period) or **Ctrl+H** to toggle hidden files. Note: Important folders (.claude, .git, .vscode, .github, .config, .docker, .prompts) and all symlinks are always shown
+21. **Hidden Files:** Press **.** (period) or **Ctrl+H** to toggle hidden files. Note: Important folders (.claude, .git, .vscode, .github, .config, .docker, .prompts), secrets files (.env, credentials, etc.), ignore files (.gitignore, .dockerignore, etc.), and all symlinks are always shown for security and project awareness
 22. **Open in File Explorer:** Press **Ctrl+O** to open the current directory in your system file explorer (Windows Explorer in WSL, Finder on macOS, or default file manager on Linux)
 
 ---

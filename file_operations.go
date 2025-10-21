@@ -62,6 +62,52 @@ func isClaudePromptsSubfolder(name string) bool {
 	return name == "commands" || name == "agents" || name == "skills"
 }
 
+// isSecretsFile checks if a file contains secrets/credentials (always show for security awareness)
+func isSecretsFile(name string) bool {
+	// .env files and variants
+	if name == ".env" || strings.HasPrefix(name, ".env.") {
+		return true
+	}
+	// Common secrets file patterns
+	secretPatterns := []string{
+		"secrets",
+		"credentials",
+		"secret",
+		"credential",
+		".key",
+		".pem",
+		".p12",
+		".pfx",
+		"private",
+	}
+	lowerName := strings.ToLower(name)
+	for _, pattern := range secretPatterns {
+		if strings.Contains(lowerName, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// isIgnoreFile checks if a file is a .gitignore or similar ignore file (always show for awareness)
+func isIgnoreFile(name string) bool {
+	ignoreFiles := []string{
+		".gitignore",
+		".dockerignore",
+		".npmignore",
+		".eslintignore",
+		".prettierignore",
+		".claudeignore",
+		".gitattributes",
+	}
+	for _, ignoreFile := range ignoreFiles {
+		if name == ignoreFile {
+			return true
+		}
+	}
+	return false
+}
+
 // isObsidianVault checks if a directory is an Obsidian vault (contains .obsidian folder)
 func isObsidianVault(path string) bool {
 	obsidianPath := filepath.Join(path, ".obsidian")
@@ -156,6 +202,16 @@ func getFileIcon(item fileItem) string {
 			}
 			return "📁" // Regular closed folder (has content)
 		}
+	}
+
+	// Check for secrets/credentials files (security awareness for AI usage)
+	if isSecretsFile(item.name) {
+		return "🔒" // Lock for secrets/credentials files
+	}
+
+	// Check for ignore files (.gitignore, etc. - know what's excluded)
+	if isIgnoreFile(item.name) {
+		return "🚫" // Prohibited sign for ignore files
 	}
 
 	// Get file extension
@@ -733,6 +789,12 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 				}
 			}
 
+			// Exception: Always show secrets/credentials files (security awareness for AI usage)
+			isSecretsFileFlag := isSecretsFile(entry.Name())
+
+			// Exception: Always show ignore files (.gitignore, etc. - know what's excluded)
+			isIgnoreFileFlag := isIgnoreFile(entry.Name())
+
 			// Exception: If we're inside these folders, show all files
 			inImportantFolder := strings.Contains(dirPath, "/.claude") ||
 				strings.Contains(dirPath, "/.git") ||
@@ -742,7 +804,7 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 				strings.Contains(dirPath, "/.docker") ||
 				strings.Contains(dirPath, "/.prompts")
 
-			if !isImportantFolder && !inImportantFolder {
+			if !isImportantFolder && !inImportantFolder && !isSecretsFileFlag && !isIgnoreFileFlag {
 				continue
 			}
 		}
@@ -865,6 +927,12 @@ func (m *model) loadFiles() {
 				}
 			}
 
+			// Exception: Always show secrets/credentials files (security awareness for AI usage)
+			isSecretsFileFlag := isSecretsFile(entry.Name())
+
+			// Exception: Always show ignore files (.gitignore, etc. - know what's excluded)
+			isIgnoreFileFlag := isIgnoreFile(entry.Name())
+
 			// Exception: If we're inside these folders, show all files
 			inImportantFolder := strings.Contains(m.currentPath, "/.claude") ||
 				strings.Contains(m.currentPath, "/.git") ||
@@ -874,7 +942,7 @@ func (m *model) loadFiles() {
 				strings.Contains(m.currentPath, "/.docker") ||
 				strings.Contains(m.currentPath, "/.prompts")
 
-			if !isImportantFolder && !inImportantFolder {
+			if !isImportantFolder && !inImportantFolder && !isSecretsFileFlag && !isIgnoreFileFlag {
 				continue
 			}
 		}
