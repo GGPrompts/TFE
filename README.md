@@ -691,6 +691,33 @@ TFE is designed to be simpler than full-featured file managers like Midnight Com
 - **Modern UX**: Mouse support and smooth scrolling for contemporary terminals
 - **Modularity**: Well-organized codebase split across focused modules (see CLAUDE.md)
 
+## Customization
+
+**TFE uses its own prompts library for customization documentation!** Instead of complex YAML config files, we provide step-by-step guides as `.prompty` files that you can view in TFE itself.
+
+### Available Customization Guides
+
+Open TFE in the project directory and press **F11** to access:
+
+- 📁 **TFE-Customization** folder (in `examples/.prompts/`)
+  - `add-tui-tool.prompty` - Add tools like ncdu, ranger to context menu
+  - `customize-toolbar.prompty` - Change emoji buttons and colors
+  - `add-file-icons.prompty` - Add icons for file types
+  - `change-colors.prompty` - Apply color schemes (Gruvbox, Dracula, Nord, etc.)
+  - `add-keyboard-shortcut.prompty` - Add or modify shortcuts
+
+Each guide provides:
+- ✅ Exact file locations and line numbers
+- ✅ Copy-paste ready code examples
+- ✅ Multiple theme/option variations
+- ✅ Tips and best practices
+
+### Philosophy
+
+No config files = Simple codebase. Direct code edits = Full control. TFE's prompts library = Your customization docs! 🎯
+
+See [`examples/.prompts/TFE-Customization/`](examples/.prompts/TFE-Customization/) for all guides.
+
 ## Development
 
 ### Running in Development Mode

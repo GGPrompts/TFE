@@ -1,0 +1,83 @@
+---
+name: TFE - Add TUI Tool to Context Menu
+description: Guide for adding a new TUI tool (like lazygit, htop) to TFE's context menu
+authors:
+  - TFE Team
+---
+
+# Add TUI Tool to TFE Context Menu
+
+This guide shows how to add a new TUI tool to TFE's right-click context menu.
+
+## Example: Adding 'ncdu' (Disk Usage Analyzer)
+
+### Step 1: Edit context_menu.go
+
+Find the section in `getContextMenuItems()` where TUI tools are added (around line 64-98):
+
+```go
+// Add separator and TUI tools if available
+hasTools := false
+if editorAvailable("lazygit") {
+    if !hasTools {
+        items = append(items, contextMenuItem{"─────────", "separator"})
+        hasTools = true
+    }
+    items = append(items, contextMenuItem{"🌿 Git (lazygit)", "lazygit"})
+}
+```
+
+### Step 2: Add your tool check
+
+Add this block after the existing tools:
+
+```go
+if editorAvailable("ncdu") {
+    if !hasTools {
+        items = append(items, contextMenuItem{"─────────", "separator"})
+        hasTools = true
+    }
+    items = append(items, contextMenuItem{"💾 Disk Usage (ncdu)", "ncdu"})
+}
+```
+
+### Step 3: Add the action handler
+
+Find `executeContextMenuAction()` (around line 260-292) and add your case:
+
+```go
+case "ncdu":
+    // Launch ncdu in the selected directory
+    if m.contextMenuFile.isDir {
+        return m, openTUITool("ncdu", m.contextMenuFile.path)
+    }
+    return m, tea.ClearScreen
+```
+
+### Step 4: Test it
+
+1. Rebuild TFE: `go build -o tfe`
+2. Run TFE and right-click on a directory
+3. You should see "💾 Disk Usage (ncdu)" in the menu
+
+## Customization Tips
+
+- **Emoji Choice**: Pick an emoji that represents the tool's function
+- **Tool Detection**: `editorAvailable()` checks if the command is in PATH
+- **Directory Context**: Most TUI tools work best when launched in a specific directory
+- **Ordering**: Tools appear in the order they're added in the code
+
+## Common TUI Tools to Add
+
+- `ncdu` - Disk usage analyzer (💾)
+- `ranger` - Another file manager (🗂️)
+- `tig` - Git repository browser (🔍)
+- `glances` - System monitor (📊)
+- `bmon` - Network monitor (🌐)
+- `nmap` - Network scanner (🔎)
+
+## Files Modified
+
+- `context_menu.go` (2 locations: menu items and action handler)
+
+Rebuild after changes: `go build -o tfe`

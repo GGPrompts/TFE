@@ -1,0 +1,218 @@
+---
+name: TFE - Change Color Scheme
+description: Guide for customizing TFE's colors and visual styles
+authors:
+  - TFE Team
+---
+
+# Change TFE Color Scheme
+
+This guide shows how to customize colors in TFE.
+
+## Location: styles.go
+
+All color definitions are in `styles.go`. Here's the default color scheme:
+
+```go
+var (
+    titleStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color("39")).  // Cyan title
+        Bold(true)
+
+    pathStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color("245"))  // Gray path
+
+    selectedStyle = lipgloss.NewStyle().
+        Background(lipgloss.Color("39")).  // Cyan highlight
+        Foreground(lipgloss.Color("0")).   // Black text
+        Bold(true)
+
+    folderStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color("39"))   // Cyan folders
+
+    fileStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color("252"))  // Light gray files
+)
+```
+
+## Color Codes Reference
+
+Common Lipgloss colors (256-color palette):
+
+```
+Grays:    232 (black) → 255 (white)
+Blues:    17, 18, 19, 20, 21 (dark → bright)
+Cyans:    23, 24, 25, 26, 27, 37, 38, 39
+Greens:   22, 28, 34, 40, 46, 76, 82, 118
+Yellows:  58, 100, 142, 184, 220, 226
+Oranges:  166, 172, 178, 208, 214, 220
+Reds:     52, 88, 124, 160, 196
+Purples:  53, 54, 55, 56, 57, 91, 92, 93
+```
+
+Full palette: https://www.ditig.com/256-colors-cheat-sheet
+
+## Example Color Schemes
+
+### 1. Gruvbox Dark Theme
+
+```go
+titleStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("214")).  // Gruvbox orange
+    Bold(true)
+
+selectedStyle = lipgloss.NewStyle().
+    Background(lipgloss.Color("214")).  // Orange highlight
+    Foreground(lipgloss.Color("234")).  // Dark bg
+    Bold(true)
+
+folderStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("109"))   // Gruvbox blue
+
+fileStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("223"))   // Gruvbox light fg
+```
+
+### 2. Dracula Theme
+
+```go
+titleStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("141")).  // Dracula purple
+    Bold(true)
+
+selectedStyle = lipgloss.NewStyle().
+    Background(lipgloss.Color("141")).  // Purple highlight
+    Foreground(lipgloss.Color("0"))
+
+folderStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("117"))   // Dracula cyan
+
+fileStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("253"))   // Dracula foreground
+```
+
+### 3. Nord Theme
+
+```go
+titleStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("110")).  // Nord frost blue
+    Bold(true)
+
+selectedStyle = lipgloss.NewStyle().
+    Background(lipgloss.Color("110")).
+    Foreground(lipgloss.Color("233"))
+
+folderStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("110"))   // Nord blue
+
+fileStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("254"))   // Nord light
+```
+
+### 4. Solarized Dark
+
+```go
+titleStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("33")).   // Solarized blue
+    Bold(true)
+
+selectedStyle = lipgloss.NewStyle().
+    Background(lipgloss.Color("33")).
+    Foreground(lipgloss.Color("234"))
+
+folderStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("37"))    // Solarized cyan
+
+fileStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("246"))   // Solarized base0
+```
+
+### 5. Monochrome (Green Terminal)
+
+```go
+titleStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("40")).   // Bright green
+    Bold(true)
+
+selectedStyle = lipgloss.NewStyle().
+    Background(lipgloss.Color("22")).   // Dark green
+    Foreground(lipgloss.Color("40")).   // Bright green
+    Bold(true)
+
+folderStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("34"))    // Medium green
+
+fileStyle = lipgloss.NewStyle().
+    Foreground(lipgloss.Color("28"))    // Dim green
+```
+
+## Additional Color Customizations
+
+### Status Bar Colors
+
+In `view.go` (around line 180):
+
+```go
+// Default
+statusBar := lipgloss.NewStyle().
+    Foreground(lipgloss.Color("252")).
+    Background(lipgloss.Color("236"))
+
+// Gruvbox
+statusBar := lipgloss.NewStyle().
+    Foreground(lipgloss.Color("223")).
+    Background(lipgloss.Color("237"))
+```
+
+### Border Colors
+
+In `render_preview.go` (around line 100):
+
+```go
+// Default
+BorderForeground(lipgloss.Color("39"))  // Cyan
+
+// Custom
+BorderForeground(lipgloss.Color("141"))  // Purple
+BorderForeground(lipgloss.Color("76"))   // Green
+BorderForeground(lipgloss.Color("214"))  // Orange
+```
+
+### Context Menu Colors
+
+In `context_menu.go` (around line 440):
+
+```go
+// Selected item
+selectedStyle := lipgloss.NewStyle().
+    Background(lipgloss.Color("39")).   // Change this
+    Foreground(lipgloss.Color("0"))
+
+// Menu background
+normalStyle := lipgloss.NewStyle().
+    Background(lipgloss.Color("236"))   // Change this
+```
+
+## Testing Your Colors
+
+1. Edit `styles.go`
+2. Rebuild: `go build -o tfe`
+3. Run TFE in your terminal
+4. Check readability in different lighting conditions
+
+## Tips
+
+- Use high contrast for readability
+- Test with your terminal's color scheme
+- Consider both dark and light terminal backgrounds
+- Avoid similar colors for folders/files (hard to distinguish)
+- Keep selected items clearly visible
+
+## Files Modified
+
+- `styles.go` (main color definitions)
+- `view.go` (status bar, toolbar)
+- `render_preview.go` (borders)
+- `context_menu.go` (menu colors)
+
+Rebuild after changes: `go build -o tfe`

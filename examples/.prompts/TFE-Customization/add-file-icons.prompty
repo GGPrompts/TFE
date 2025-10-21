@@ -1,0 +1,178 @@
+---
+name: TFE - Add Custom File Icons
+description: Guide for adding file type icons to TFE's file browser
+authors:
+  - TFE Team
+---
+
+# Add Custom File Icons to TFE
+
+This guide shows how to add icons for specific file types in TFE.
+
+## Current Icon System
+
+TFE uses icons from `file_operations.go`:
+- 📁 Directories
+- 📄 Default files
+- 🐍 Python files
+- 🦀 Rust files
+- 🔧 Config files
+- etc.
+
+## Location: file_operations.go
+
+Find `getIconForExtension()` function (around line 950-1050):
+
+```go
+func getIconForExtension(ext string, isDir bool) string {
+    if isDir {
+        return "📁"
+    }
+
+    switch ext {
+    case ".py":
+        return "🐍"
+    case ".go":
+        return "🐹"
+    // ... more extensions
+    default:
+        return "📄"
+    }
+}
+```
+
+## Example: Adding New File Types
+
+### 1. Add Programming Languages
+
+```go
+// Add between existing cases
+case ".zig":
+    return "⚡"  // Zig files
+case ".nim":
+    return "👑"  // Nim files
+case ".crystal":
+    return "💎"  // Crystal files
+case ".elixir", ".ex", ".exs":
+    return "💧"  // Elixir files
+case ".haskell", ".hs":
+    return "λ"   // Haskell files (lambda symbol)
+```
+
+### 2. Add Document Types
+
+```go
+case ".pdf":
+    return "📕"  // PDF documents
+case ".docx", ".doc":
+    return "📘"  // Word documents
+case ".xlsx", ".xls":
+    return "📊"  // Excel spreadsheets
+case ".pptx", ".ppt":
+    return "📽️"   // PowerPoint presentations
+```
+
+### 3. Add Media Files
+
+```go
+case ".mp3", ".wav", ".flac":
+    return "🎵"  // Audio files
+case ".mp4", ".mkv", ".avi":
+    return "🎬"  // Video files
+case ".svg":
+    return "🎨"  // Vector graphics
+```
+
+### 4. Add Archive Files
+
+```go
+case ".zip":
+    return "📦"  // ZIP archives
+case ".tar", ".tar.gz", ".tgz":
+    return "📚"  // TAR archives
+case ".7z":
+    return "🗜️"   // 7-Zip archives
+case ".rar":
+    return "📦"  // RAR archives
+```
+
+### 5. Add Special File Types
+
+```go
+case ".dockerfile", ".dockerignore":
+    return "🐋"  // Docker files
+case ".env":
+    return "🔐"  // Environment files
+case ".lock":
+    return "🔒"  // Lock files
+case ".log":
+    return "📋"  // Log files
+case ".db", ".sqlite", ".sql":
+    return "🗄️"   // Database files
+```
+
+## Using Nerd Font Icons
+
+If you prefer Nerd Font icons over emoji:
+
+```go
+case ".py":
+    return ""  // Python Nerd Font icon
+case ".go":
+    return ""  // Go Nerd Font icon
+case ".js":
+    return ""  // JavaScript Nerd Font icon
+case ".rs":
+    return ""  // Rust Nerd Font icon
+```
+
+See [Nerd Fonts Cheat Sheet](https://www.nerdfonts.com/cheat-sheet) for icon codes.
+
+## Grouping File Types
+
+You can add multiple extensions to one case:
+
+```go
+// All JavaScript-related files
+case ".js", ".jsx", ".mjs", ".cjs":
+    return "📜"
+
+// All TypeScript-related files
+case ".ts", ".tsx", ".d.ts":
+    return "📘"
+
+// All shell scripts
+case ".sh", ".bash", ".zsh", ".fish":
+    return "🐚"
+```
+
+## Special File Names
+
+For files without extensions (like Dockerfile), check filename:
+
+```go
+// Add this check before the extension switch
+filename := filepath.Base(path)
+switch filename {
+case "Dockerfile", "Containerfile":
+    return "🐋"
+case "Makefile":
+    return "🔨"
+case "README.md", "README":
+    return "📖"
+}
+```
+
+## Files Modified
+
+- `file_operations.go` (`getIconForExtension()` function)
+
+Rebuild after changes: `go build -o tfe`
+
+## Tips
+
+- Use emoji that visually represent the file type
+- Test in your terminal - some emoji may not render
+- Keep it simple - too many icons can be cluttered
+- Consider using Nerd Font icons for more variety
+- Add most common file types first

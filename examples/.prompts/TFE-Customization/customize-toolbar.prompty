@@ -1,0 +1,131 @@
+---
+name: TFE - Customize Toolbar Emojis
+description: Guide for customizing the emoji toolbar at the top of TFE
+authors:
+  - TFE Team
+---
+
+# Customize TFE Toolbar Emojis
+
+This guide shows how to change the toolbar buttons that appear at the top of TFE.
+
+## Current Toolbar (as of v1.0.0)
+
+```
+[🏠] home  [⭐] favorites  [>_] command  [🔍] fuzzy search
+```
+
+## Location: view.go
+
+Find the toolbar rendering code in `view.go` (around line 80-100):
+
+```go
+// Toolbar buttons
+toolbar := lipgloss.JoinHorizontal(
+    lipgloss.Top,
+    buttonStyle.Render("[🏠] home"),
+    " ",
+    favoriteButton,
+    " ",
+    buttonStyle.Render("[>_] command"),
+    " ",
+    buttonStyle.Render("[🔍] fuzzy search"),
+)
+```
+
+## Example Customizations
+
+### 1. Change Button Emojis
+
+```go
+// More modern icons
+buttonStyle.Render("[🏡] home"),      // house emoji
+buttonStyle.Render("[⭐] favs"),       // shorter label
+buttonStyle.Render("[$] shell"),      // dollar sign for command
+buttonStyle.Render("[🔎] find"),       // magnifying glass
+```
+
+### 2. Add New Buttons
+
+```go
+// Add a help button
+toolbar := lipgloss.JoinHorizontal(
+    lipgloss.Top,
+    buttonStyle.Render("[🏠] home"),
+    " ",
+    favoriteButton,
+    " ",
+    buttonStyle.Render("[>_] command"),
+    " ",
+    buttonStyle.Render("[🔍] search"),
+    " ",
+    buttonStyle.Render("[❓] help"),    // NEW!
+)
+```
+
+Note: You'll also need to add mouse click handling in `update_mouse.go` for new buttons.
+
+### 3. Minimalist Style
+
+```go
+// Text-only, no boxes
+lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Render("🏠 home"),
+" | ",
+favoriteButton,
+" | ",
+lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Render(">_ cmd"),
+```
+
+### 4. Nerd Font Icons (if available)
+
+```go
+// Use Nerd Font icons instead of emoji
+buttonStyle.Render("[ ] home"),      //
+buttonStyle.Render("[ ] favs"),      //
+buttonStyle.Render("[ ] term"),      //
+buttonStyle.Render("[ ] find"),      //
+```
+
+## Color Customization
+
+Change button colors by modifying `buttonStyle` (around line 70):
+
+```go
+// Default (cyan)
+buttonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+
+// Green theme
+buttonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("76"))
+
+// Orange theme
+buttonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
+
+// Purple theme
+buttonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
+```
+
+## Adding Click Handlers
+
+If you add new buttons, update `update_mouse.go` (around line 160):
+
+```go
+// Example: Add click handler for help button at position X
+if mouseX >= helpButtonStart && mouseX <= helpButtonEnd {
+    // Open help
+    return m, tea.Batch(tea.ClearScreen, openHelp())
+}
+```
+
+## Files Modified
+
+- `view.go` (toolbar rendering)
+- `update_mouse.go` (click handlers, if adding new buttons)
+
+Rebuild after changes: `go build -o tfe`
+
+## Tips
+
+- Keep labels short (5-10 chars) to fit narrow terminals
+- Test on 80-column terminal to ensure everything fits
+- Emoji can render differently across terminals/fonts
+- Consistent spacing: use " " between buttons

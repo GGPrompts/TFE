@@ -1,0 +1,206 @@
+---
+name: TFE - Add Custom Keyboard Shortcut
+description: Guide for adding new keyboard shortcuts to TFE
+authors:
+  - TFE Team
+---
+
+# Add Custom Keyboard Shortcuts to TFE
+
+This guide shows how to add new keyboard shortcuts or modify existing ones in TFE.
+
+## Location: update_keyboard.go
+
+All keyboard handling is in `update_keyboard.go`. The main function is `handleKeyEvent()`.
+
+## Example 1: Add a New Shortcut
+
+Let's add `Ctrl+T` to toggle tree view:
+
+### Step 1: Find the keyboard handler
+
+In `update_keyboard.go`, find the main switch statement (around line 200+):
+
+```go
+func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+    // ... existing code ...
+
+    switch msg.String() {
+    case "ctrl+c", "q":
+        return m, tea.Quit
+
+    // ADD YOUR NEW SHORTCUT HERE
+    case "ctrl+t":
+        // Toggle tree view
+        if m.displayMode == modeTree {
+            m.displayMode = modeDetail  // Switch to detail
+        } else {
+            m.displayMode = modeTree    // Switch to tree
+        }
+        return m, nil
+
+    case "F1":
+        // ... existing code ...
+    }
+}
+```
+
+### Step 2: Test it
+
+1. Rebuild: `go build -o tfe`
+2. Run TFE
+3. Press `Ctrl+T` to toggle tree view
+
+## Example 2: Modify Existing Shortcut
+
+Change F9 (cycle display modes) to use 'v' key instead:
+
+```go
+// Find this line (around line 650):
+case "F9":
+    // Cycle display modes
+    m.displayMode = (m.displayMode + 1) % 4
+    m.cursor = 0
+    return m, nil
+
+// Change to:
+case "v", "V":  // Now 'v' or 'V' will work
+    // Cycle display modes
+    m.displayMode = (m.displayMode + 1) % 4
+    m.cursor = 0
+    return m, nil
+```
+
+## Example 3: Add Multi-Key Shortcut
+
+Add `g` twice (like vim) to jump to top:
+
+```go
+// In types.go, add a field to model:
+type model struct {
+    // ... existing fields ...
+    lastKey string  // Track last key pressed
+}
+
+// In update_keyboard.go:
+case "g":
+    if m.lastKey == "g" {
+        // 'gg' pressed - jump to top
+        m.cursor = 0
+        m.lastKey = ""
+        return m, nil
+    }
+    m.lastKey = "g"
+    return m, nil
+
+case "G":  // Capital G to jump to bottom
+    m.cursor = len(m.files) - 1
+    m.lastKey = ""
+    return m, nil
+```
+
+## Example 4: Mode-Specific Shortcuts
+
+Add different behavior for 'e' depending on mode:
+
+```go
+case "e", "E":
+    if m.viewMode == viewFullPreview {
+        // In preview mode: exit preview
+        m.viewMode = viewSinglePane
+        return m, tea.ClearScreen
+    } else {
+        // In browse mode: edit file
+        file := m.getCurrentFile()
+        if !file.isDir {
+            editor := getAvailableEditor()
+            return m, openEditor(editor, file.path)
+        }
+    }
+    return m, nil
+```
+
+## Common Keyboard Patterns
+
+### Navigation Keys
+
+```go
+case "h", "left":       // Go to parent directory
+case "j", "down":       // Move down
+case "k", "up":         // Move up
+case "l", "right", "enter":  // Enter directory or preview
+case "gg":              // Jump to top
+case "G":               // Jump to bottom
+case "ctrl+d":          // Half page down
+case "ctrl+u":          // Half page up
+```
+
+### Mode Toggles
+
+```go
+case " ":               // Toggle dual-pane
+case "tab":             // Switch panes
+case "1":               // List view
+case "2":               // Detail view
+case "3":               // Tree view
+case "4":               // Grid view
+```
+
+### File Operations
+
+```go
+case "y", "Y":          // Yank (copy) path
+case "d", "D":          // Delete
+case "r", "R":          // Rename
+case "c", "C":          // Copy
+case "n", "N":          // New file
+```
+
+### Search & Filter
+
+```go
+case "/":               // Start search
+case "ctrl+p":          // Fuzzy search
+case "ctrl+f":          // Search in preview
+case "n":               // Next match
+case "N":               // Previous match
+```
+
+## Modifier Keys
+
+```go
+case "ctrl+c":          // Ctrl + C
+case "alt+enter":       // Alt + Enter
+case "shift+tab":       // Shift + Tab
+case "ctrl+shift+p":    // Ctrl + Shift + P
+```
+
+## Updating HOTKEYS.md
+
+Don't forget to document your new shortcuts in `HOTKEYS.md`!
+
+```markdown
+### Custom Shortcuts
+| Key | Action |
+|-----|--------|
+| `Ctrl+T` | Toggle tree view |
+| `v` | Cycle display modes |
+| `gg` | Jump to top of list |
+| `G` | Jump to bottom of list |
+```
+
+## Files Modified
+
+- `update_keyboard.go` (main shortcut handling)
+- `types.go` (if adding state fields)
+- `HOTKEYS.md` (documentation)
+
+Rebuild after changes: `go build -o tfe`
+
+## Tips
+
+- Keep shortcuts intuitive (e.g., 't' for tree, 'v' for view)
+- Avoid conflicts with existing shortcuts
+- Use vim-style bindings for power users (h/j/k/l, gg/G)
+- Document ALL shortcuts in HOTKEYS.md
+- Test shortcuts don't interfere with command prompt input
