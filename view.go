@@ -134,8 +134,19 @@ func (m model) renderSinglePane() string {
 	}
 	s.WriteString(" ")
 
-	// Fuzzy search button
-	s.WriteString(homeButtonStyle.Render("[🔍]"))
+	// Context-aware search button (in-file search when viewing, directory filter when browsing)
+	// Highlight when search is active (directory filter in single-pane)
+	if m.searchMode {
+		// Active: gray background
+		activeStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeStyle.Render("[🔍]"))
+	} else {
+		// Inactive: normal styling
+		s.WriteString(homeButtonStyle.Render("[🔍]"))
+	}
 	s.WriteString(" ")
 
 	// Prompts filter toggle button

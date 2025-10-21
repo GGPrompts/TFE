@@ -194,15 +194,44 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Fuzzy search button [🔍] (X=25-29: [ + emoji(2) + ] + space)
+				// Context-aware search button [🔍] (X=25-29: [ + emoji(2) + ] + space)
 				if msg.X >= 25 && msg.X <= 29 {
-					// Launch fuzzy search
-					m.fuzzySearchActive = true
-					// Clear screen before launching fuzzy search to ensure clean terminal state
-					return m, tea.Sequence(
-						tea.ClearScreen,
-						m.launchFuzzySearch(),
-					)
+					// Context-aware search toggle:
+					// - When viewing file (full preview or dual-pane with right pane focused): Toggle in-file search (Ctrl+F)
+					// - When browsing files (left pane or single-pane): Toggle directory filter search (/)
+					if m.viewMode == viewFullPreview || (m.viewMode == viewDualPane && m.focusedPane == rightPane) {
+						// Toggle in-file search (Ctrl+F behavior)
+						if m.preview.searchActive {
+							// Deactivate search (like Esc)
+							m.preview.searchActive = false
+							m.preview.searchQuery = ""
+							m.preview.searchMatches = nil
+							m.preview.currentMatch = -1
+						} else {
+							// Activate search
+							m.preview.searchActive = true
+							m.preview.searchQuery = ""
+							m.preview.searchMatches = nil
+							m.preview.currentMatch = -1
+						}
+					} else {
+						// Toggle directory filter search (/ behavior)
+						if m.viewMode != viewFullPreview {
+							if m.searchMode {
+								// Deactivate search (like Esc)
+								m.searchMode = false
+								m.searchQuery = ""
+								m.filteredIndices = nil
+								m.cursor = 0
+							} else {
+								// Activate search
+								m.searchMode = true
+								m.searchQuery = ""
+								m.filteredIndices = m.filterFilesBySearch("")
+							}
+						}
+					}
+					return m, nil
 				}
 				// Prompts filter button [📝] (X=30-34: [ + emoji(2) + ] + space)
 				if msg.X >= 30 && msg.X <= 34 {

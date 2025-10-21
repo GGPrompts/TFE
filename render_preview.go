@@ -766,8 +766,30 @@ func (m model) renderFullPreview() string {
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
-	// Show status message if present (auto-dismiss after 3s)
-	if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
+	// Show search input if search is active
+	if m.preview.searchActive {
+		s.WriteString("\n")
+		searchStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("33")). // Blue background
+			Foreground(lipgloss.Color("0")).  // Black text
+			Bold(true).
+			Padding(0, 1)
+
+		matchCount := len(m.preview.searchMatches)
+		var searchText string
+		if matchCount > 0 {
+			currentPos := m.preview.currentMatch + 1
+			searchText = fmt.Sprintf("🔍 Search: %s█ (%d/%d matches)", m.preview.searchQuery, currentPos, matchCount)
+		} else if m.preview.searchQuery == "" {
+			searchText = "🔍 Search: █ (type to search, n/Shift+N: navigate, Esc: exit)"
+		} else {
+			searchText = fmt.Sprintf("🔍 Search: %s█ (no matches)", m.preview.searchQuery)
+		}
+
+		s.WriteString(searchStyle.Render(searchText))
+		s.WriteString("\033[0m") // Reset ANSI codes
+	} else if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
+		// Show status message if present (auto-dismiss after 3s) and search not active
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
@@ -880,11 +902,22 @@ func (m model) renderDualPane() string {
 	}
 	s.WriteString(" ")
 
-	// Fuzzy search button
-	searchButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(searchButtonStyle.Render("[🔍]"))
+	// Context-aware search button (in-file search when viewing, directory filter when browsing)
+	// Highlight when search is active (either in-file or directory filter)
+	if m.preview.searchActive || m.searchMode {
+		// Active: gray background
+		activeSearchStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeSearchStyle.Render("[🔍]"))
+	} else {
+		// Inactive: normal styling
+		searchButtonStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true)
+		s.WriteString(searchButtonStyle.Render("[🔍]"))
+	}
 	s.WriteString(" ")
 
 	// Prompts filter toggle button

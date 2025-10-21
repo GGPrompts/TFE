@@ -87,6 +87,11 @@ func (m model) renderListView(maxVisible int) string {
 			style = promptsFolderStyle
 		}
 
+		// Override with teal if it's an Obsidian vault
+		if file.isDir && isObsidianVault(file.path) {
+			style = obsidianVaultStyle
+		}
+
 		// Add star indicator for favorites
 		favIndicator := ""
 		if m.isFavorite(file.path) {
@@ -371,7 +376,9 @@ func (m model) renderDetailView(maxVisible int) string {
 				}
 			}
 
-			line = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, name, sizeWidth, size, modifiedWidth, deleted, extraWidth, location)
+			// Use visual-width padding for name column (contains emojis), regular padding for others
+		paddedName := padToVisualWidth(name, nameWidth)
+		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, deleted, extraWidth, location)
 		} else if m.showFavoritesOnly {
 			// Favorites mode: Name, Size, Modified, Location
 			// Get parent directory path for location
@@ -385,7 +392,9 @@ func (m model) renderDetailView(maxVisible int) string {
 			if len(location) > extraWidth {
 				location = "..." + location[len(location)-(extraWidth-3):]
 			}
-			line = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, name, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
+			// Use visual-width padding for name column (contains emojis), regular padding for others
+		paddedName := padToVisualWidth(name, nameWidth)
+		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
 		} else {
 			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)
@@ -393,7 +402,9 @@ func (m model) renderDetailView(maxVisible int) string {
 			if len(fileType) > extraWidth {
 				fileType = fileType[:extraWidth-2] + ".."
 			}
-			line = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, name, sizeWidth, size, modifiedWidth, modified, extraWidth, fileType)
+			// Use visual-width padding for name column (contains emojis), regular padding for others
+		paddedName := padToVisualWidth(name, nameWidth)
+		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, fileType)
 		}
 
 		style := fileStyle
@@ -412,6 +423,9 @@ func (m model) renderDetailView(maxVisible int) string {
 		if file.isDir && isClaudePromptsSubfolder(file.name) {
 			style = promptsFolderStyle
 		}
+		if file.isDir && isObsidianVault(file.path) {
+			style = obsidianVaultStyle
+		}
 
 		// Apply styling with special handling for global virtual folders to preserve emoji color
 		if nameLeadingEmoji != "" {
@@ -422,7 +436,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
 			} else {
 				if i%2 == 0 {
-					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#262626"})
+					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#333333"})
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
 				} else {
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, style.Render(nameWithoutEmoji)), 1)
@@ -436,7 +450,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				// Add alternating row background for easier reading
 				// Even rows (0, 2, 4...) get a subtle background
 				if i%2 == 0 {
-					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#262626"})
+					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#333333"})
 					line = alternateStyle.Render(line)
 				} else {
 					line = style.Render(line)
@@ -618,6 +632,10 @@ func (m model) renderTreeView(maxVisible int) string {
 
 		if file.isDir && isClaudePromptsSubfolder(file.name) {
 			style = promptsFolderStyle
+		}
+
+		if file.isDir && isObsidianVault(file.path) {
+			style = obsidianVaultStyle
 		}
 
 		// Add star indicator for favorites

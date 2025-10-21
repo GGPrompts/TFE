@@ -16,6 +16,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/mattn/go-runewidth"
 )
 
 // isClaudeContextFile checks if a file/folder is automatically loaded by Claude Code
@@ -61,6 +62,16 @@ func isClaudePromptsSubfolder(name string) bool {
 	return name == "commands" || name == "agents" || name == "skills"
 }
 
+// isObsidianVault checks if a directory is an Obsidian vault (contains .obsidian folder)
+func isObsidianVault(path string) bool {
+	obsidianPath := filepath.Join(path, ".obsidian")
+	info, err := os.Stat(obsidianPath)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
 // isDirEmpty checks if a directory is empty (no files or subdirectories)
 func isDirEmpty(path string) bool {
 	entries, err := os.ReadDir(path)
@@ -81,6 +92,11 @@ func getDirItemCount(path string) int {
 
 // getFileIcon returns the appropriate emoji icon based on file type
 func getFileIcon(item fileItem) string {
+	// Check for symlinks first (takes priority over other icons)
+	if item.isSymlink {
+		return "🌀" // Portal emoji for symlinks
+	}
+
 	if item.isDir {
 		if item.name == ".." {
 			return "⬆️" // Up arrow for parent dir
@@ -120,10 +136,14 @@ func getFileIcon(item fileItem) string {
 		case "public", "static", "assets":
 			return "🌐" // Globe
 		case "config", "configs", ".config":
-			return "⚙️ " // Gear
+			return "⚙️" // Gear
 		case "scripts":
 			return "📜" // Scroll
 		default:
+			// Check if this is an Obsidian vault
+			if isObsidianVault(item.path) {
+				return "🧠" // Brain emoji for Obsidian vaults
+			}
 			// Check if folder is empty
 			if isDirEmpty(item.path) {
 				return "📂" // Open/empty folder
@@ -142,10 +162,10 @@ func getFileIcon(item fileItem) string {
 		".py":   "🐍", // Python snake
 		".js":   "🟨", // JavaScript yellow
 		".ts":   "🔷", // TypeScript blue diamond
-		".jsx":  "⚛️ ", // React atom
-		".tsx":  "⚛️ ", // React atom
+		".jsx":  "⚛️", // React atom
+		".tsx":  "⚛️", // React atom
 		".rs":   "🦀", // Rust crab
-		".c":    "©️ ", // C copyright symbol
+		".c":    "©️", // C copyright symbol
 		".cpp":  "➕", // C++ plus
 		".h":    "📋", // Header clipboard
 		".java": "☕", // Java coffee
@@ -171,7 +191,7 @@ func getFileIcon(item fileItem) string {
 		".toml": "📄", // TOML document
 		".xml":  "📰", // XML newspaper
 		".csv":  "📈", // CSV chart
-		".sql":  "🗄️ ", // SQL database
+		".sql":  "🗄️", // SQL database
 
 		// Documents
 		".md":  "📝", // Markdown memo
@@ -181,20 +201,20 @@ func getFileIcon(item fileItem) string {
 		".docx": "📘", // DOCX blue book
 
 		// Archives
-		".zip": "🗜️ ", // ZIP compression
+		".zip": "🗜️", // ZIP compression
 		".tar": "📦", // TAR package
-		".gz":  "🗜️ ", // GZ compression
-		".7z":  "🗜️ ", // 7Z compression
-		".rar": "🗜️ ", // RAR compression
+		".gz":  "🗜️", // GZ compression
+		".7z":  "🗜️", // 7Z compression
+		".rar": "🗜️", // RAR compression
 
 		// Images
-		".png": "🖼️ ", // PNG frame
-		".jpg": "🖼️ ", // JPG frame
-		".jpeg": "🖼️ ", // JPEG frame
-		".gif": "🎞️ ", // GIF film
+		".png": "🖼️", // PNG frame
+		".jpg": "🖼️", // JPG frame
+		".jpeg": "🖼️", // JPEG frame
+		".gif": "🎞️", // GIF film
 		".svg": "🎨", // SVG palette
-		".ico": "🖼️ ", // ICO frame
-		".webp": "🖼️ ", // WebP frame
+		".ico": "🖼️", // ICO frame
+		".webp": "🖼️", // WebP frame
 
 		// Audio/Video
 		".mp3": "🎵", // MP3 music
@@ -205,9 +225,9 @@ func getFileIcon(item fileItem) string {
 
 		// System/Config
 		".env":  "🔐", // ENV lock
-		".ini":  "⚙️ ", // INI gear
-		".conf": "⚙️ ", // CONF gear
-		".cfg":  "⚙️ ", // CFG gear
+		".ini":  "⚙️", // INI gear
+		".conf": "⚙️", // CONF gear
+		".cfg":  "⚙️", // CFG gear
 		".lock": "🔒", // LOCK locked
 
 		// Build/Package
@@ -455,6 +475,19 @@ func truncateToWidth(s string, targetWidth int) string {
 
 // getFileType returns a descriptive file type string based on file extension
 func getFileType(item fileItem) string {
+	// Check for symlinks first
+	if item.isSymlink {
+		if item.symlinkTarget != "" {
+			// Shorten target if too long
+			target := item.symlinkTarget
+			if len(target) > 30 {
+				target = "..." + target[len(target)-27:]
+			}
+			return "Link → " + target
+		}
+		return "Symlink"
+	}
+
 	if item.isDir {
 		return "Folder"
 	}
@@ -642,6 +675,24 @@ func getFileType(item fileItem) string {
 	return "File"
 }
 
+// padToVisualWidth pads a string to a specific visual width using spaces
+// This correctly handles emojis and wide characters that take up more than 1 cell
+func padToVisualWidth(s string, targetWidth int) string {
+	visualWidth := runewidth.StringWidth(s)
+
+	// Fix for variation selector emojis (U+FE0F) which runewidth miscalculates
+	// These emojis render as width=2 but runewidth reports width=1
+	// Count variation selectors and add them to the width
+	variationSelectorCount := strings.Count(s, "\uFE0F")
+	visualWidth += variationSelectorCount
+
+	if visualWidth >= targetWidth {
+		return s
+	}
+	padding := targetWidth - visualWidth
+	return s + strings.Repeat(" ", padding)
+}
+
 // loadSubdirFiles loads files from a specific directory (for tree view expansion)
 func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 	entries, err := os.ReadDir(dirPath)
@@ -652,8 +703,20 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 	var dirs, files []fileItem
 
 	for _, entry := range entries {
+		fullPath := filepath.Join(dirPath, entry.Name())
+
+		// Use Lstat to detect symlinks (doesn't follow them)
+		info, err := os.Lstat(fullPath)
+		if err != nil {
+			continue
+		}
+
+		// Detect if this is a symlink
+		isSymlink := info.Mode()&os.ModeSymlink != 0
+
 		// Skip hidden files unless showHidden is true
-		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
+		// Exception: Always show symlinks, even if they start with .
+		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") && !isSymlink {
 			// Exception: Always show important development folders
 			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts"}
 			isImportantFolder := false
@@ -677,22 +740,34 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 				continue
 			}
 		}
+		var symlinkTarget string
+		var targetIsDir bool
 
-		info, err := entry.Info()
-		if err != nil {
-			continue
+		if isSymlink {
+			// Read symlink target
+			target, err := os.Readlink(fullPath)
+			if err == nil {
+				symlinkTarget = target
+				// Check if target is a directory by following the symlink
+				targetInfo, err := os.Stat(fullPath)
+				if err == nil {
+					targetIsDir = targetInfo.IsDir()
+				}
+			}
 		}
 
 		item := fileItem{
-			name:    entry.Name(),
-			path:    filepath.Join(dirPath, entry.Name()),
-			isDir:   entry.IsDir(),
-			size:    info.Size(),
-			modTime: info.ModTime(),
-			mode:    info.Mode(),
+			name:          entry.Name(),
+			path:          fullPath,
+			isDir:         targetIsDir || entry.IsDir(),
+			size:          info.Size(),
+			modTime:       info.ModTime(),
+			mode:          info.Mode(),
+			isSymlink:     isSymlink,
+			symlinkTarget: symlinkTarget,
 		}
 
-		if entry.IsDir() {
+		if item.isDir {
 			dirs = append(dirs, item)
 		} else {
 			files = append(files, item)
@@ -760,8 +835,20 @@ func (m *model) loadFiles() {
 	var dirs, files []fileItem
 
 	for _, entry := range entries {
+		fullPath := filepath.Join(m.currentPath, entry.Name())
+
+		// Use Lstat to detect symlinks (doesn't follow them)
+		info, err := os.Lstat(fullPath)
+		if err != nil {
+			continue // Skip files we can't stat
+		}
+
+		// Detect if this is a symlink
+		isSymlink := info.Mode()&os.ModeSymlink != 0
+
 		// Skip hidden files starting with . (unless showHidden is true)
-		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
+		// Exception: Always show symlinks, even if they start with .
+		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") && !isSymlink {
 			// Exception: Always show important development folders
 			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts"}
 			isImportantFolder := false
@@ -785,22 +872,34 @@ func (m *model) loadFiles() {
 				continue
 			}
 		}
+		var symlinkTarget string
+		var targetIsDir bool
 
-		info, err := entry.Info()
-		if err != nil {
-			continue // Skip files we can't stat
+		if isSymlink {
+			// Read symlink target
+			target, err := os.Readlink(fullPath)
+			if err == nil {
+				symlinkTarget = target
+				// Check if target is a directory by following the symlink
+				targetInfo, err := os.Stat(fullPath)
+				if err == nil {
+					targetIsDir = targetInfo.IsDir()
+				}
+			}
 		}
 
 		item := fileItem{
-			name:    entry.Name(),
-			path:    filepath.Join(m.currentPath, entry.Name()),
-			isDir:   entry.IsDir(),
-			size:    info.Size(),
-			modTime: info.ModTime(),
-			mode:    info.Mode(),
+			name:          entry.Name(),
+			path:          fullPath,
+			isDir:         targetIsDir || entry.IsDir(), // Use target's directory status if symlink
+			size:          info.Size(),
+			modTime:       info.ModTime(),
+			mode:          info.Mode(),
+			isSymlink:     isSymlink,
+			symlinkTarget: symlinkTarget,
 		}
 
-		if entry.IsDir() {
+		if item.isDir {
 			dirs = append(dirs, item)
 		} else {
 			files = append(files, item)
