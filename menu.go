@@ -222,7 +222,8 @@ func (m model) renderActiveDropdown() string {
 
 	// Menu item styles
 	menuItemStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
+		Foreground(lipgloss.Color("252")).
+		Background(lipgloss.Color("236")) // Add background to prevent transparency issues
 
 	menuItemSelectedStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("0")).
@@ -230,7 +231,8 @@ func (m model) renderActiveDropdown() string {
 		Bold(true)
 
 	menuItemDisabledStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240"))
+		Foreground(lipgloss.Color("240")).
+		Background(lipgloss.Color("236")) // Add background to prevent transparency issues
 
 	// Build dropdown panel
 	var lines []string
@@ -241,12 +243,12 @@ func (m model) renderActiveDropdown() string {
 		if item.IsSeparator {
 			continue
 		}
-		width := len(item.Label)
+		width := lipgloss.Width(item.Label) // Use lipgloss.Width for accurate emoji/unicode width
 		if item.IsCheckable {
-			width += 2 // "✓ " or "  "
+			width += lipgloss.Width("✓ ") // Use actual width of checkmark + space
 		}
 		if item.Shortcut != "" {
-			width += len(item.Shortcut) + 3 // spacing
+			width += lipgloss.Width(item.Shortcut) + 3 // Use lipgloss.Width for shortcut too
 		}
 		if width > maxWidth {
 			maxWidth = width
@@ -290,7 +292,7 @@ func (m model) renderActiveDropdown() string {
 		// Pad label
 		labelWidth := maxWidth - 4
 		if shortcut != "" {
-			labelWidth -= len(shortcut) + 1
+			labelWidth -= lipgloss.Width(shortcut) + 1 // Use lipgloss.Width for accurate width
 		}
 
 		line := " " + padRight(label, labelWidth)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 func (m model) View() string {
@@ -397,23 +398,46 @@ func (m model) renderSinglePane() string {
 func (m model) overlayContextMenu(baseView, menuContent string) string {
 	x, y := m.contextMenuX, m.contextMenuY
 
+	// Calculate actual menu height (number of lines + 2 for borders)
+	menuLines := strings.Split(strings.TrimSpace(menuContent), "\n")
+	menuHeight := len(menuLines)
+
+	// Calculate menu width for horizontal bounds checking
+	menuWidth := 25 // Default estimate
+	if len(menuLines) > 0 {
+		menuWidth = lipgloss.Width(menuLines[0])
+	}
+
 	// Ensure menu stays on screen with proper margins
 	if x < 1 {
 		x = 1
 	}
-	if x > m.width-25 {
-		x = m.width - 25
+	if x > m.width-menuWidth {
+		x = m.width - menuWidth
 	}
 	if y < 1 {
 		y = 1
 	}
-	if y > m.height-10 {
-		y = m.height - 10
+
+	// Dynamic height checking: reposition upward if menu would extend off bottom
+	// Leave 3 lines buffer to avoid collision with file tree bottom border
+	maxY := m.height - menuHeight - 3
+	if y > maxY {
+		// Try to position above the click point instead
+		newY := m.contextMenuY - menuHeight
+		if newY >= 1 {
+			y = newY
+		} else {
+			// If it doesn't fit above either, clamp to maxY
+			y = maxY
+			if y < 1 {
+				y = 1
+			}
+		}
 	}
 
-	// Split both views into lines
+	// Split base view into lines (menuLines already calculated above)
 	baseLines := strings.Split(baseView, "\n")
-	menuLines := strings.Split(strings.TrimSpace(menuContent), "\n")
 
 	// Ensure we have enough base lines
 	for len(baseLines) < m.height {
@@ -441,18 +465,18 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 		baseRunes := []rune(baseLine)
 
 		// Scan through base line until we reach visual position x
+		// Use runewidth to properly handle wide characters (emoji like ⭐)
 		for bytePos < len(baseRunes) && visualPos < x {
 			if baseRunes[bytePos] == '\033' {
 				inAnsi = true
-			}
-
-			if inAnsi {
-				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
-					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
+			} else if inAnsi {
+				if (baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z') ||
+					(baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z') {
 					inAnsi = false
 				}
 			} else {
-				visualPos++
+				// Use RuneWidth to get actual visual width (handles wide emoji)
+				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
 			}
 			bytePos++
 		}
@@ -462,7 +486,8 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 			newLine.WriteString(string(baseRunes[:bytePos]))
 		}
 
-		// Pad with spaces if needed to reach position x
+		// Pad with spaces if needed to reach position x (fixes empty space alignment)
+		// This ensures we always reach position x, even on empty lines
 		for visualPos < x {
 			newLine.WriteRune(' ')
 			visualPos++
@@ -478,7 +503,7 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 }
 
 // overlayDropdown overlays a dropdown menu on the base view at the specified position
-// Preserves content to the left and right of the dropdown
+// Simplified: Just places dropdown with empty space padding, no content preservation
 func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 	// Split base view into lines
 	baseLines := strings.Split(baseView, "\n")
@@ -489,12 +514,6 @@ func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 		return baseView
 	}
 
-	// Get dropdown width
-	dropdownWidth := 0
-	if len(dropdownLines) > 0 {
-		dropdownWidth = lipgloss.Width(dropdownLines[0])
-	}
-
 	// Overlay each dropdown line onto the base view
 	for i, dropdownLine := range dropdownLines {
 		lineIndex := y + i
@@ -502,76 +521,10 @@ func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 			break
 		}
 
-		baseLine := baseLines[lineIndex]
-		var newLine strings.Builder
-
-		// Preserve content to the LEFT of the dropdown
-		visualPos := 0
-		bytePos := 0
-		inAnsi := false
-		baseRunes := []rune(baseLine)
-
-		// Scan through base line until we reach visual position x
-		for bytePos < len(baseRunes) && visualPos < x {
-			if baseRunes[bytePos] == '\033' {
-				inAnsi = true
-			}
-
-			if inAnsi {
-				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
-					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
-					inAnsi = false
-				}
-			} else {
-				visualPos++
-			}
-			bytePos++
-		}
-
-		// Add the left part (up to position x)
-		if bytePos > 0 && bytePos <= len(baseRunes) {
-			newLine.WriteString(string(baseRunes[:bytePos]))
-		}
-
-		// Pad with spaces if needed to reach position x
-		for visualPos < x {
-			newLine.WriteRune(' ')
-			visualPos++
-		}
-
-		// Add the dropdown content
-		newLine.WriteString(dropdownLine)
-
-		// Preserve content to the RIGHT of the dropdown
-		// Continue from position x + dropdownWidth
-		rightStartPos := x + dropdownWidth
-		visualPos = 0
-		bytePos = 0
-		inAnsi = false
-
-		// Scan to find where rightStartPos begins in the base line
-		for bytePos < len(baseRunes) && visualPos < rightStartPos {
-			if baseRunes[bytePos] == '\033' {
-				inAnsi = true
-			}
-
-			if inAnsi {
-				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
-					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
-					inAnsi = false
-				}
-			} else {
-				visualPos++
-			}
-			bytePos++
-		}
-
-		// Add the right part (from position x + dropdownWidth onwards)
-		if bytePos < len(baseRunes) {
-			newLine.WriteString(string(baseRunes[bytePos:]))
-		}
-
-		baseLines[lineIndex] = newLine.String()
+		// Simple approach: empty space padding + dropdown
+		// This avoids all ANSI code complexity
+		padding := strings.Repeat(" ", x)
+		baseLines[lineIndex] = padding + dropdownLine
 	}
 
 	return strings.Join(baseLines, "\n")

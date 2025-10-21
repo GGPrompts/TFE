@@ -411,8 +411,8 @@ func (m model) renderContextMenu() string {
 	// Calculate menu dimensions - find the longest item
 	maxWidth := 0
 	for _, item := range items {
-		// Count runes, not bytes (better emoji support)
-		width := len([]rune(item.label))
+		// Use lipgloss.Width() for accurate visual width (handles emoji/unicode properly)
+		width := lipgloss.Width(item.label)
 		if width > maxWidth {
 			maxWidth = width
 		}
@@ -425,7 +425,7 @@ func (m model) renderContextMenu() string {
 	var menuLines []string
 	for i, item := range items {
 		// Pad all labels to the same width with spaces (ensures even borders)
-		labelWidth := len([]rune(item.label))
+		labelWidth := lipgloss.Width(item.label) // Use lipgloss.Width() for accurate visual width
 		padding := maxWidth - labelWidth
 		paddedLabel := item.label + strings.Repeat(" ", padding)
 
