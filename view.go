@@ -30,6 +30,17 @@ func (m model) View() string {
 		baseView = m.renderSinglePane()
 	}
 
+	// Overlay dropdown menu if open
+	if m.menuOpen && m.activeMenu != "" {
+		dropdown := m.renderActiveDropdown()
+		if dropdown != "" {
+			// Position dropdown below menu bar (line 1)
+			menuX := m.getMenuXPosition(m.activeMenu)
+			menuY := 1 // Below menu bar on line 0
+			baseView = m.overlayDropdown(baseView, dropdown, menuX, menuY)
+		}
+	}
+
 	// Overlay context menu if open
 	if m.contextMenuOpen {
 		menu := m.renderContextMenu()
@@ -49,32 +60,42 @@ func (m model) View() string {
 func (m model) renderSinglePane() string {
 	var s strings.Builder
 
-	// Title with mode indicator and GitHub link
-	titleText := "(T)erminal (F)ile (E)xplorer"
-	if m.commandFocused {
-		titleText += " [Command Mode]"
-	}
-	if m.filePickerMode {
-		titleText += " [📁 File Picker]"
-	}
+	// Check if we should show GitHub link (first 5 seconds) or menu bar
+	showGitHub := time.Since(m.startupTime) < 5*time.Second
 
-	// Create GitHub link (OSC 8 hyperlink format)
-	githubURL := "https://github.com/GGPrompts/TFE"
-	githubLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+	if showGitHub {
+		// Title with mode indicator and GitHub link (first 5 seconds)
+		titleText := "(T)erminal (F)ile (E)xplorer"
+		if m.commandFocused {
+			titleText += " [Command Mode]"
+		}
+		if m.filePickerMode {
+			titleText += " [📁 File Picker]"
+		}
 
-	// Calculate spacing to right-align GitHub link
-	githubText := githubURL // Display text
-	availableWidth := m.width - len(titleText) - len(githubText) - 2
-	if availableWidth < 1 {
-		availableWidth = 1
+		// Create GitHub link (OSC 8 hyperlink format)
+		githubURL := "https://github.com/GGPrompts/TFE"
+		githubLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+
+		// Calculate spacing to right-align GitHub link
+		githubText := githubURL // Display text
+		availableWidth := m.width - len(titleText) - len(githubText) - 2
+		if availableWidth < 1 {
+			availableWidth = 1
+		}
+		spacing := strings.Repeat(" ", availableWidth)
+
+		// Render title on left, GitHub link on right
+		title := titleStyle.Render(titleText) + spacing + titleStyle.Render(githubLink)
+		s.WriteString(title)
+		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n")
+	} else {
+		// Show menu bar after 5 seconds
+		menuBar := m.renderMenuBar()
+		s.WriteString(menuBar)
+		s.WriteString("\n")
 	}
-	spacing := strings.Repeat(" ", availableWidth)
-
-	// Render title on left, GitHub link on right
-	title := titleStyle.Render(titleText) + spacing + titleStyle.Render(githubLink)
-	s.WriteString(title)
-	s.WriteString("\033[0m") // Reset ANSI codes
-	s.WriteString("\n")
 
 	// Toolbar buttons
 	homeButtonStyle := lipgloss.NewStyle().
@@ -451,6 +472,45 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 		newLine.WriteString(menuLine)
 
 		baseLines[targetLine] = newLine.String()
+	}
+
+	return strings.Join(baseLines, "\n")
+}
+
+// overlayDropdown overlays a dropdown menu on the base view at the specified position
+func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
+	// Split base view into lines
+	baseLines := strings.Split(baseView, "\n")
+	dropdownLines := strings.Split(dropdown, "\n")
+
+	// Ensure we have enough lines in base view
+	if y >= len(baseLines) {
+		return baseView
+	}
+
+	// Get dropdown width
+	dropdownWidth := 0
+	if len(dropdownLines) > 0 {
+		dropdownWidth = lipgloss.Width(dropdownLines[0])
+	}
+
+	// Overlay each dropdown line onto the base view
+	for i, dropdownLine := range dropdownLines {
+		lineIndex := y + i
+		if lineIndex >= len(baseLines) {
+			break
+		}
+
+		// Simple approach: create new line with padding + dropdown
+		newLine := strings.Repeat(" ", x) + dropdownLine
+
+		// Pad to full width if needed
+		currentWidth := x + dropdownWidth
+		if currentWidth < m.width {
+			newLine += strings.Repeat(" ", m.width-currentWidth)
+		}
+
+		baseLines[lineIndex] = newLine
 	}
 
 	return strings.Join(baseLines, "\n")

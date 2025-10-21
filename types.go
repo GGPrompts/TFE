@@ -280,6 +280,11 @@ type model struct {
 	searchMode       bool   // Whether search mode is active
 	searchQuery      string // Current search query
 	filteredIndices  []int  // Indices of files matching search
+	// Menu system (dropdown menus in title bar)
+	startupTime      time.Time // When app started (for 5s GitHub link display)
+	menuOpen         bool      // Whether any menu is currently open
+	activeMenu       string    // Which menu is active ("navigate", "view", "tools", "help")
+	selectedMenuItem int       // Index of selected item in active menu (-1 = none)
 }
 
 // treeItem represents an item in the tree view with depth information
@@ -320,4 +325,21 @@ type dialogModel struct {
 	input      string // For text input dialogs
 	confirmed  bool   // User confirmed action
 	isError    bool   // For message dialogs (red vs green)
+}
+
+// MenuItem represents a single menu item
+type MenuItem struct {
+	Label       string // Display text
+	Action      string // Action identifier (e.g., "toggle-favorites", "home")
+	Shortcut    string // Keyboard shortcut display (e.g., "F6", "Ctrl+P")
+	Disabled    bool   // Whether item is disabled
+	IsSeparator bool   // Whether this is a separator line
+	IsCheckable bool   // Whether this item shows a checkmark when active
+	IsChecked   bool   // Whether checkmark is shown (for toggles)
+}
+
+// Menu represents a dropdown menu
+type Menu struct {
+	Label string     // Menu label in menu bar
+	Items []MenuItem // Menu items
 }

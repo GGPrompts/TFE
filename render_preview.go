@@ -812,29 +812,39 @@ func (m model) renderFullPreview() string {
 func (m model) renderDualPane() string {
 	var s strings.Builder
 
-	// Title with mode indicator and GitHub link
-	titleText := "(T)erminal (F)ile (E)xplorer [Dual-Pane]"
-	if m.commandFocused {
-		titleText += " [Command Mode]"
+	// Check if we should show GitHub link (first 5 seconds) or menu bar
+	showGitHub := time.Since(m.startupTime) < 5*time.Second
+
+	if showGitHub {
+		// Title with mode indicator and GitHub link (first 5 seconds)
+		titleText := "(T)erminal (F)ile (E)xplorer [Dual-Pane]"
+		if m.commandFocused {
+			titleText += " [Command Mode]"
+		}
+
+		// Create GitHub link (OSC 8 hyperlink format)
+		githubURL := "https://github.com/GGPrompts/TFE"
+		githubLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+
+		// Calculate spacing to right-align GitHub link
+		githubText := githubURL // Display text
+		availableWidth := m.width - len(titleText) - len(githubText) - 2
+		if availableWidth < 1 {
+			availableWidth = 1
+		}
+		spacing := strings.Repeat(" ", availableWidth)
+
+		// Render title on left, GitHub link on right
+		title := titleStyle.Render(titleText) + spacing + titleStyle.Render(githubLink)
+		s.WriteString(title)
+		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString("\n")
+	} else {
+		// Show menu bar after 5 seconds
+		menuBar := m.renderMenuBar()
+		s.WriteString(menuBar)
+		s.WriteString("\n")
 	}
-
-	// Create GitHub link (OSC 8 hyperlink format)
-	githubURL := "https://github.com/GGPrompts/TFE"
-	githubLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
-
-	// Calculate spacing to right-align GitHub link
-	githubText := githubURL // Display text
-	availableWidth := m.width - len(titleText) - len(githubText) - 2
-	if availableWidth < 1 {
-		availableWidth = 1
-	}
-	spacing := strings.Repeat(" ", availableWidth)
-
-	// Render title on left, GitHub link on right
-	title := titleStyle.Render(titleText) + spacing + titleStyle.Render(githubLink)
-	s.WriteString(title)
-	s.WriteString("\033[0m") // Reset ANSI codes
-	s.WriteString("\n")
 
 	// Toolbar buttons
 	// Home button - highlight with gray background when in home directory

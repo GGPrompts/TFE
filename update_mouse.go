@@ -134,6 +134,52 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
+			// Check for menu bar clicks (Y=0) - only after 5 seconds when menu bar is visible
+			if time.Since(m.startupTime) >= 5*time.Second {
+				if m.isInMenuBar(msg.X, msg.Y) {
+					menuKey := m.getMenuAtPosition(msg.X)
+					if menuKey != "" {
+						if m.menuOpen && m.activeMenu == menuKey {
+							// Clicking same menu closes it
+							m.menuOpen = false
+							m.activeMenu = ""
+							m.selectedMenuItem = -1
+						} else {
+							// Open menu
+							m.menuOpen = true
+							m.activeMenu = menuKey
+							m.selectedMenuItem = -1
+						}
+						return m, nil
+					}
+				}
+
+				// Dropdown menu clicks (if menu is open)
+				if m.menuOpen && m.isInDropdown(msg.X, msg.Y) {
+					itemIndex := m.getMenuItemAtPosition(msg.Y)
+					if itemIndex >= 0 {
+						menus := m.getMenus()
+						menu := menus[m.activeMenu]
+						if itemIndex < len(menu.Items) {
+							item := menu.Items[itemIndex]
+							// Execute action if not separator or disabled
+							if !item.IsSeparator && !item.Disabled {
+								return m.executeMenuAction(item.Action)
+							}
+						}
+					}
+					return m, nil
+				}
+
+				// Click outside menu closes it
+				if m.menuOpen {
+					m.menuOpen = false
+					m.activeMenu = ""
+					m.selectedMenuItem = -1
+					// Don't return - continue processing click
+				}
+			}
+
 			// Check for toolbar button clicks (Y=1)
 			// Toolbar: [🏠] [⭐/✨] [👁️] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑️]
 			// Layout:  0-4   5-9    10-14 15-19 20-24 25-29 30-34 35-39 40-44

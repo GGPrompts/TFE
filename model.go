@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -32,13 +33,18 @@ func initialModel() model {
 		preview: previewModel{
 			maxPreview: 10000, // Max 10k lines
 		},
-		spinner:           s,
-		loading:           false,
-		favorites:         loadFavorites(),
-		showFavoritesOnly: false,
-		expandedDirs:      make(map[string]bool),
-		commandFocused:    false, // Start in file browser mode, not command mode
-		previewMouseEnabled: true, // Mouse enabled by default
+		spinner:             s,
+		loading:             false,
+		favorites:           loadFavorites(),
+		showFavoritesOnly:   false,
+		expandedDirs:        make(map[string]bool),
+		commandFocused:      false, // Start in file browser mode, not command mode
+		previewMouseEnabled: true,  // Mouse enabled by default
+		// Menu system
+		startupTime:      time.Now(),
+		menuOpen:         false,
+		activeMenu:       "",
+		selectedMenuItem: -1,
 	}
 
 	m.loadFiles()

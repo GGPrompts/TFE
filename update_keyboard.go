@@ -150,6 +150,111 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Handle menu keyboard navigation (when menu is open)
+	if m.menuOpen {
+		switch msg.String() {
+		case "esc":
+			// Close menu
+			m.menuOpen = false
+			m.activeMenu = ""
+			m.selectedMenuItem = -1
+			return m, nil
+
+		case "left":
+			// Navigate to previous menu
+			menuOrder := getMenuOrder()
+			currentIndex := -1
+			for i, key := range menuOrder {
+				if key == m.activeMenu {
+					currentIndex = i
+					break
+				}
+			}
+			if currentIndex > 0 {
+				m.activeMenu = menuOrder[currentIndex-1]
+				m.selectedMenuItem = -1
+			}
+			return m, nil
+
+		case "right":
+			// Navigate to next menu
+			menuOrder := getMenuOrder()
+			currentIndex := -1
+			for i, key := range menuOrder {
+				if key == m.activeMenu {
+					currentIndex = i
+					break
+				}
+			}
+			if currentIndex >= 0 && currentIndex < len(menuOrder)-1 {
+				m.activeMenu = menuOrder[currentIndex+1]
+				m.selectedMenuItem = -1
+			}
+			return m, nil
+
+		case "up":
+			// Navigate up in menu items (skip separators)
+			menus := m.getMenus()
+			menu := menus[m.activeMenu]
+			if m.selectedMenuItem <= 0 {
+				// Find last non-separator item
+				for i := len(menu.Items) - 1; i >= 0; i-- {
+					if !menu.Items[i].IsSeparator {
+						m.selectedMenuItem = i
+						break
+					}
+				}
+			} else {
+				// Move up to previous non-separator
+				for i := m.selectedMenuItem - 1; i >= 0; i-- {
+					if !menu.Items[i].IsSeparator {
+						m.selectedMenuItem = i
+						break
+					}
+				}
+			}
+			return m, nil
+
+		case "down":
+			// Navigate down in menu items (skip separators)
+			menus := m.getMenus()
+			menu := menus[m.activeMenu]
+			// Find next non-separator item
+			found := false
+			for i := m.selectedMenuItem + 1; i < len(menu.Items); i++ {
+				if !menu.Items[i].IsSeparator {
+					m.selectedMenuItem = i
+					found = true
+					break
+				}
+			}
+			if !found {
+				// Wrap to first non-separator
+				for i := 0; i < len(menu.Items); i++ {
+					if !menu.Items[i].IsSeparator {
+						m.selectedMenuItem = i
+						break
+					}
+				}
+			}
+			return m, nil
+
+		case "enter":
+			// Execute selected menu item
+			if m.selectedMenuItem >= 0 {
+				menus := m.getMenus()
+				menu := menus[m.activeMenu]
+				if m.selectedMenuItem < len(menu.Items) {
+					item := menu.Items[m.selectedMenuItem]
+					if !item.IsSeparator && !item.Disabled {
+						return m.executeMenuAction(item.Action)
+					}
+				}
+			}
+			return m, nil
+		}
+	}
+
 	// Handle preview search mode input
 	if m.viewMode == viewFullPreview && m.preview.searchActive {
 		switch msg.String() {
