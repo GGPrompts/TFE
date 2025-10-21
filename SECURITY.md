@@ -19,7 +19,9 @@ Security vulnerabilities should not be reported publicly. Please do not create a
 
 ### 2. Report Privately
 
-**Email:** security@ggprompts.com (or open a private security advisory on GitHub)
+**Email:** [ggprompts@gmail.com](mailto:ggprompts@gmail.com?subject=Security%20-%20TFE) (use subject: "Security - TFE")
+
+Or open a private security advisory on GitHub.
 
 **Include in your report:**
 - Description of the vulnerability
@@ -109,7 +111,7 @@ None reported as of initial v1.0 release.
 
 ## Contact
 
-For security concerns: security@ggprompts.com
+For security concerns: [ggprompts@gmail.com](mailto:ggprompts@gmail.com?subject=Security%20-%20TFE)
 
 For general issues: [GitHub Issues](https://github.com/GGPrompts/tfe/issues)
 
