@@ -545,10 +545,16 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		}
 
 	case "fuzzy-search":
+		// Close menu and set fuzzy search active
 		m.menuOpen = false
 		m.activeMenu = ""
 		m.selectedMenuItem = -1
-		return m, m.launchFuzzySearch()
+		m.fuzzySearchActive = true
+		// Clear screen before launching fuzzy search to ensure clean terminal state
+		return m, tea.Sequence(
+			tea.ClearScreen,
+			m.launchFuzzySearch(),
+		)
 
 	case "lazygit":
 		// Launch lazygit in current directory
