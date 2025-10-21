@@ -1,205 +1,227 @@
 # Next Session Tasks
 
-## 🚨 PRIORITY: Fix Context Menu Alignment Issues
+## 🎯 PRIORITY: Add Keyboard Navigation for Header Dropdowns
 
-### Problem Summary
-The context menu (right-click/F2) has alignment issues that cause the box borders to be misaligned and sometimes overflow off-screen:
+### Feature Request
+Add keyboard shortcuts to navigate and interact with the header dropdown menus (File, Edit, View, Tools, Help) without using the mouse.
 
-1. **Emoji width inconsistencies**: Some file types (gzip files) have emojis that add extra spacing
-2. **Favorited file stars**: The ⭐ star icon on favorited files adds extra spacing that throws off alignment
-3. **Bottom border collision**: When the context menu is opened near the bottom of the terminal, the menu box art overlaps with the file tree's bottom border
-4. **Off-screen rendering**: Context menus opened toward the bottom can extend beyond the terminal height
-5. **Tree view expanded folders**: Alignment breaks when 2+ folders are expanded in tree view (tree characters ├─, └─, │ and indentation may affect positioning)
+### Why This is Important
+✅ **Accessibility** - Full keyboard navigation for users who prefer/need keyboard-only interaction
+✅ **Power User Efficiency** - Faster navigation than mouse (Alt → Arrow → Enter is quicker than mouse)
+✅ **Professional UX** - Matches traditional desktop application behavior (Windows, Linux, macOS apps)
+✅ **Consistency** - TFE already has excellent keyboard shortcuts (F1-F12, Vim bindings) - this completes the picture
+✅ **Discoverability** - Users who press Alt or F9 will discover the menu system
 
-### Specific Issues
+### Proposed Implementation
 
-**Issue 1: Variable emoji widths**
-- Some emojis render wider than others (e.g., gzip emoji vs folder emoji)
-- This causes menu item text to misalign
-- The box borders don't line up properly when items have different icon widths
+#### **Hotkey to Enter Menu Mode:**
+- **Alt** or **F9** - Enter "menu mode" and highlight the first menu (File)
+  - Alt is traditional (Windows/Linux) but may not work in all terminals
+  - F9 is the safe fallback (F10 is already "Exit", so F9 makes sense)
+  - Either key should work
 
-**Issue 2: Favorited file stars**
-- Files marked as favorites show a ⭐ icon
-- This adds visual width but the menu width calculation doesn't account for it
-- Results in ragged right edge or text overflow
+#### **Navigation Keys:**
+When in menu mode (menu bar is focused):
+- **Left/Right arrows** - Move between menus (File ↔ Edit ↔ View ↔ Tools ↔ Help)
+- **Down arrow / Enter** - Open the currently highlighted menu dropdown
+- **Escape** - Exit menu mode, return to file browser
+- **Tab** - Alternative to Right arrow (some users prefer Tab for menu navigation)
 
-**Issue 3: Border overlap**
-- The file tree is wrapped in a bordered box (lipgloss.RoundedBorder)
-- When context menu opens near bottom, it overlaps the file tree's bottom border
-- Creates visual artifacts: `└─────┘` (file tree border) colliding with `┌──────┐` (menu border)
+When dropdown is open (already implemented ✓):
+- **Up/Down arrows** - Navigate menu items (already works!)
+- **Enter** - Execute selected menu item (already works!)
+- **Escape** - Close dropdown and return to menu bar focus
+- **Left/Right arrows** - Close current menu and open adjacent menu (smooth horizontal navigation)
 
-**Issue 4: Off-screen overflow**
-- `m.contextMenuY` can be set too close to `m.height`
-- Menu extends beyond visible terminal area
-- User can't see all menu items
+#### **Visual Feedback:**
+- Menu bar item should show highlight when in menu mode:
+  ```
+  Normal:    File  Edit  View  Tools  Help
+  Focused:  [File] Edit  View  Tools  Help
+  Active:   [File] Edit  View  Tools  Help (with dropdown open below)
+  ```
+- Use existing `selectedStyle` or similar styling for consistency
 
-**Issue 5: Tree view with expanded folders**
-- When multiple folders are expanded in tree view (press 3, then → to expand)
-- Tree characters (├─, └─, │) add visual complexity and indentation
-- Context menu alignment appears to break with 2+ expanded folders
-- The tree characters may have different widths or the indentation calculation may be off
+### Implementation Details
 
-### Files to Review
-
-**Primary file:**
-- `context_menu.go` - Lines 399-471 (`renderContextMenu` function)
-  - Calculates menu width based on item labels
-  - Renders the bordered box with menu items
-  - Does NOT currently account for emoji/star width variations
-
-**Secondary files:**
-- `update_mouse.go` - Lines 756-784 (context menu positioning on right-click)
-  - Sets `m.contextMenuX` and `m.contextMenuY`
-  - Has bounds checking but might not account for menu height properly
-- `view.go` - Lines 395-478 (`overlayContextMenu` function)
-  - Overlays the context menu on the base view
-  - Ensures menu stays on screen (lines 400-412)
-  - May need better bottom-edge detection
-
-### Current Implementation (Potentially Problematic)
-
+#### **New State Variables (types.go):**
 ```go
-// context_menu.go:410-417
-// Calculate menu dimensions - find the longest item
-maxWidth := 0
-for _, item := range items {
-    // Count runes, not bytes (better emoji support)
-    width := len([]rune(item.label))  // ❌ Doesn't account for emoji visual width!
-    if width > maxWidth {
-        maxWidth = width
+menuBarFocused   bool   // True when user is navigating the menu bar
+highlightedMenu  string // Which menu is highlighted ("file", "edit", etc.)
+```
+
+#### **Keyboard Handler (update_keyboard.go):**
+
+**Entry:**
+```go
+case "alt", tea.KeyF9:
+    if !m.menuBarFocused {
+        m.menuBarFocused = true
+        m.highlightedMenu = "file" // Start with first menu
+        m.menuOpen = false
+    }
+```
+
+**Menu bar navigation:**
+```go
+if m.menuBarFocused && !m.menuOpen {
+    switch msg.String() {
+    case "left", "shift+tab":
+        // Move to previous menu
+        m.highlightedMenu = getPreviousMenu(m.highlightedMenu)
+
+    case "right", "tab":
+        // Move to next menu
+        m.highlightedMenu = getNextMenu(m.highlightedMenu)
+
+    case "down", "enter":
+        // Open the highlighted menu
+        m.menuOpen = true
+        m.activeMenu = m.highlightedMenu
+        m.selectedMenuItem = getFirstSelectableMenuItem(m.activeMenu)
+
+    case "esc":
+        // Exit menu mode
+        m.menuBarFocused = false
+        m.highlightedMenu = ""
     }
 }
 ```
 
-**Problem**: `len([]rune(item.label))` counts Unicode code points, but emojis like 🗑️ can be 2 runes wide while displaying as 2 visual columns. Meanwhile, favorited files have `⭐ filename` which adds width not captured in the original label.
-
-### Suggested Fixes
-
-**1. Use `lipgloss.Width()` for accurate width calculation**
+**Dropdown navigation (enhance existing):**
 ```go
-// Instead of:
-width := len([]rune(item.label))
+if m.menuOpen && m.activeMenu != "" {
+    switch msg.String() {
+    case "left":
+        // Close current menu, open previous menu
+        m.activeMenu = getPreviousMenu(m.activeMenu)
+        m.selectedMenuItem = getFirstSelectableMenuItem(m.activeMenu)
 
-// Use:
-width := lipgloss.Width(item.label)
-```
-This handles emoji rendering width properly.
+    case "right":
+        // Close current menu, open next menu
+        m.activeMenu = getNextMenu(m.activeMenu)
+        m.selectedMenuItem = getFirstSelectableMenuItem(m.activeMenu)
 
-**2. Account for favorite stars in width calculation**
-```go
-// In renderContextMenu, check if file is favorited:
-actualLabel := item.label
-if m.contextMenuFile != nil && m.isFavorite(m.contextMenuFile.path) {
-    actualLabel = "⭐ " + actualLabel  // Account for star width
-}
-width := lipgloss.Width(actualLabel)
-```
-
-**3. Improve bottom-edge collision detection**
-```go
-// In overlayContextMenu or when setting contextMenuY:
-menuHeight := len(menuItems) + 2  // +2 for borders
-maxY := m.height - menuHeight - 3  // -3 to avoid file tree bottom border
-if m.contextMenuY > maxY {
-    m.contextMenuY = maxY
-}
-```
-
-**4. Consider moving menu up if too close to bottom**
-```go
-// After calculating menu height:
-if m.contextMenuY + menuHeight >= m.height - 2 {
-    // Move menu above the cursor position instead
-    m.contextMenuY = m.contextMenuY - menuHeight
-    if m.contextMenuY < 1 {
-        m.contextMenuY = 1  // Don't go off top
+    // Existing up/down/enter/esc logic stays the same
     }
 }
 ```
+
+#### **Helper Functions (menu.go):**
+```go
+// getPreviousMenu returns the menu key to the left of the current menu
+func getPreviousMenu(current string) string {
+    order := getMenuOrder()
+    for i, key := range order {
+        if key == current {
+            if i == 0 {
+                return order[len(order)-1] // Wrap to last menu
+            }
+            return order[i-1]
+        }
+    }
+    return order[0]
+}
+
+// getNextMenu returns the menu key to the right of the current menu
+func getNextMenu(current string) string {
+    order := getMenuOrder()
+    for i, key := range order {
+        if key == current {
+            if i == len(order)-1 {
+                return order[0] // Wrap to first menu
+            }
+            return order[i+1]
+        }
+    }
+    return order[0]
+}
+```
+
+#### **Rendering (menu.go - renderMenuBar):**
+```go
+// When rendering each menu label, check if it's highlighted
+for _, menuKey := range menuOrder {
+    menu := menus[menuKey]
+
+    var style lipgloss.Style
+    if m.activeMenu == menuKey && m.menuOpen {
+        style = menuActiveStyle // Already exists
+    } else if m.highlightedMenu == menuKey && m.menuBarFocused {
+        style = menuHighlightedStyle // New: show focus without opening
+    } else {
+        style = menuInactiveStyle
+    }
+
+    renderedMenu := style.Render(menu.Label)
+    renderedMenus = append(renderedMenus, renderedMenu)
+}
+```
+
+**New style for highlighted (but not open) menu:**
+```go
+menuHighlightedStyle := lipgloss.NewStyle().
+    Foreground(lipgloss.Color("0")).
+    Background(lipgloss.Color("240")).  // Different from active (39)
+    Bold(true).
+    Padding(0, 1)
+```
+
+### Files to Modify
+
+1. **types.go** - Add `menuBarFocused` and `highlightedMenu` fields to model
+2. **model.go** - Initialize new fields to `false` and `""`
+3. **update_keyboard.go** - Add Alt/F9 handler and menu navigation logic
+4. **menu.go** - Add `getPreviousMenu()`, `getNextMenu()`, update `renderMenuBar()` with highlight style
+5. **HOTKEYS.md** - Document the new keyboard shortcuts
 
 ### Testing Checklist
 
-After implementing fixes:
-- [ ] Open context menu on a regular file (no star) → borders aligned properly
-- [ ] Open context menu on a favorited file (⭐) → borders aligned properly
-- [ ] Open context menu on gzip file (has wider emoji) → borders aligned properly
-- [ ] Open context menu near bottom of terminal → doesn't overlap file tree border
-- [ ] Open context menu at very bottom → menu repositions upward or fits on screen
-- [ ] Scroll file tree and test context menu at various positions → always renders correctly
-- [ ] **Tree View with expanded folders**: Switch to tree view (press 3), expand 2-3 folders (press →), then test context menu
-  - Tree characters (├─, └─, │) add visual complexity
-  - Multiple indentation levels may affect positioning
-  - Check if borders align properly when menu opens on deeply nested items
+After implementation:
+- [ ] Press Alt or F9 → First menu (File) is highlighted
+- [ ] Left/Right arrows → Navigate between menus
+- [ ] Down arrow or Enter → Open highlighted menu
+- [ ] Up/Down arrows → Navigate within dropdown (already works)
+- [ ] Left/Right arrows in dropdown → Switch to adjacent menu smoothly
+- [ ] Enter in dropdown → Execute action, close menu
+- [ ] Escape in dropdown → Return to menu bar focus (stay in menu mode)
+- [ ] Escape in menu bar → Exit menu mode, return to file browser
+- [ ] Tab key → Works as alternative to Right arrow
+- [ ] Shift+Tab → Works as alternative to Left arrow
+- [ ] Menu wrapping → Right on Help goes to File, Left on File goes to Help
 
-### Reference Files for Emoji/Icon Handling
+### Benefits
 
-Check these for examples of proper width handling:
-- `render_file_list.go` - Detail view already handles emoji alignment (might have good patterns)
-- `file_operations.go` - `getFileIcon()` function returns different emojis
+✅ **Complete keyboard workflow** - Every menu item accessible without mouse
+✅ **Discoverability** - Users explore menus with keyboard (press Alt to discover)
+✅ **Power user efficiency** - `Alt → Right → Right → Enter` faster than mouse
+✅ **Accessibility compliance** - Keyboard-only users can access all features
+✅ **Professional polish** - Matches expectations from desktop apps
 
-### Expected Outcome
+### Priority
+**High** - This is a quality-of-life improvement that elevates TFE's UX significantly
 
-**Before:**
-```
-┌─────────────────────────┐
-│ 📁 src/                 │
-│ 📄 main.go              │
-│ 🗜️  archive.gz         │  ← gzip emoji wider, text misaligned
-│ ⭐ config.json          │  ← star adds width, border doesn't match
-└──────────────────────┘
-  ┌────────────────┐         ← context menu border misaligned
-  │ 📂 Open      │         ← items don't line up
-  │ 📋 Copy Path  │
-  └──────────────┘
-```
-
-**After:**
-```
-┌─────────────────────────┐
-│ 📁 src/                 │
-│ 📄 main.go              │
-│ 🗜️  archive.gz          │  ← properly aligned
-│ ⭐ config.json          │  ← properly aligned
-│   ┌──────────────────┐  │
-│   │ 📂 Open         │  │  ← clean borders
-│   │ 📋 Copy Path    │  │  ← properly aligned
-│   └──────────────────┘  │
-└─────────────────────────┘
-```
-
-### Prompt to Use
-
-Copy-paste this into your next session:
+### Expected Time
+**45-60 minutes** - Straightforward implementation, mostly keyboard handling logic
 
 ---
 
-**PROMPT START:**
+## ✅ FIXED: Dropdown and Context Menu Alignment Issues
 
-I need help fixing alignment issues with the context menu (right-click/F2) in my TFE file explorer. The context menu has several rendering problems:
+### Issues Resolved (Session 2025-10-21)
+All dropdown and context menu alignment issues have been fixed:
 
-1. **Emoji width inconsistencies**: Different file type emojis (like gzip 🗜️) have varying visual widths, causing menu items to misalign
-2. **Favorited files**: Files with ⭐ stars have extra width not accounted for in the menu width calculation
-3. **Bottom border collision**: When opened near the bottom, the context menu overlaps the file tree's bottom border
-4. **Off-screen overflow**: Context menus can extend beyond terminal height when opened at the bottom
+✅ **Dropdown menus** - Simplified overlay with empty space padding (no ANSI bleeding)
+✅ **Context menus** - Proper emoji width handling with go-runewidth
+✅ **Menu width calculations** - Using lipgloss.Width() for accurate emoji/unicode width
+✅ **Checkmark width** - Using actual visual width instead of hardcoded +2
+✅ **Favorited files** - Context menu aligns correctly on files with ⭐ emoji
+✅ **Empty space areas** - Context menu alignment consistent below file tree
+✅ **Dynamic positioning** - Context menus reposition upward when near terminal bottom
 
-The main issue is in `context_menu.go` lines 410-417 where `len([]rune(item.label))` is used instead of `lipgloss.Width()` for width calculation. This doesn't properly account for emoji visual width.
-
-Please:
-1. Read `context_menu.go` (especially `renderContextMenu` function)
-2. Fix the width calculation to use `lipgloss.Width()` instead of `len([]rune())`
-3. Account for favorite stars (⭐) when calculating menu width
-4. Add better bottom-edge detection to prevent border collisions
-5. Implement menu repositioning (move up) when too close to terminal bottom
-
-Test cases should include: regular files, favorited files, gzip files, opening menus at various vertical positions (top, middle, bottom of terminal), and **especially in tree view with 2-3 expanded folders** (the tree characters ├─, └─, │ and indentation may affect alignment).
-
-**PROMPT END:**
-
----
-
-**Branch**: headerdropdowns
-**Priority**: 🔥 Medium (UX polish)
-**Expected Time**: 30-45 minutes
+**Commit:** `0674c8d` - fix: Resolve dropdown and context menu alignment issues
+**Branch:** headerdropdowns
+**Status:** ✅ COMPLETE
 
 ---
 
@@ -223,64 +245,10 @@ Both the **dropdown menus** and **context menus** (right-click/F2) had **repeate
 ### Solution Implemented
 **Cache tool availability at startup** instead of checking on every render.
 
-**Files modified:**
-1. **types.go** (lines 288-290): Added caching fields to model
-   ```go
-   // Menu caching (performance optimization)
-   cachedMenus    map[string]Menu  // Cached menu structure (built once)
-   toolsAvailable map[string]bool // Cached tool availability (lazygit, htop, etc.)
-   ```
-
-2. **model.go** (lines 48-56): Check tool availability once at initialization
-   ```go
-   // Menu caching - check tool availability once at startup (performance optimization)
-   toolsAvailable: map[string]bool{
-       "lazygit":     editorAvailable("lazygit"),
-       "lazydocker":  editorAvailable("lazydocker"),
-       "lnav":        editorAvailable("lnav"),
-       "htop":        editorAvailable("htop"),
-       "bottom":      editorAvailable("bottom"),
-       "micro":       editorAvailable("micro"), // Used in context menu edit action
-   },
-   ```
-
-3. **menu.go** (lines 85-118): Use cached availability in dropdown menus
-   ```go
-   // Use cached tool availability instead of filesystem lookups (performance optimization)
-   if m.toolsAvailable["lazygit"] {
-       // ... add lazygit menu item ...
-   }
-   ```
-
-4. **context_menu.go** (lines 64-98, 227): Use cached availability in context menus
-   ```go
-   // Use cached tool availability (performance optimization)
-   if m.toolsAvailable["lazygit"] {
-       items = append(items, contextMenuItem{"🌿 Git (lazygit)", "lazygit"})
-   }
-   // ... same for other tools ...
-
-   // In edit action:
-   if m.toolsAvailable["micro"] {
-       editor = "micro"
-   }
-   ```
-
-### Performance Improvement
+**Performance Improvement:**
 - **Before**: 5-6 filesystem lookups per render = **50-60+ lookups/second** during navigation ⚠️
 - **After**: 6 filesystem lookups total (at startup only) = **instant menus** ✅
 
-### Testing Results
-Build successful! Binary created: `tfe` (16MB)
-
-**Expected behavior:**
-- ✅ No lag when opening dropdown menus (File, Edit, View, Tools, Help)
-- ✅ No lag when opening context menus (right-click or F2 on files/folders)
-- ✅ Arrow key navigation is instant in both menu types
-- ✅ Mouse interaction is smooth
-- ✅ Works in both single-pane and dual-pane modes
-
-**Branch**: headerdropdowns
 **Status**: ✅ FIXED - Ready for testing
 
 ---
@@ -291,6 +259,8 @@ Build successful! Binary created: `tfe` (16MB)
 - Fixed browser opening for images/GIFs (PowerShell instead of cmd.exe)
 - Tried VHS: emojis show as boxes ❌
 - Tried asciinema: emojis show as boxes ❌
+- Dropdown menu alignment issues (emoji width, ANSI bleeding)
+- Context menu alignment issues (favorited files, empty space)
 
 ## 🐛 Bug to Fix: GIF Preview Mode
 **Problem:** When previewing a GIF file, it shows "file too big to display" with text "press V to open in image viewer", but terminal image viewers can't show animated GIFs.
@@ -576,15 +546,5 @@ explorer.exe assets          # GIF output
 
 ---
 
-**Good luck! Sleep well! 😴**
-
-When you're ready tomorrow with ☕:
-1. Open OBS Studio
-2. Window Capture → Windows Terminal
-3. `cd ~/projects/TFE/demo-content`
-4. Start OBS Recording
-5. Launch `tfe` and show off features (follow DEMO_CHEATSHEET.txt)
-6. Stop OBS Recording
-7. Optional: Convert MP4 to GIF with ffmpeg
-
-You got this! OBS will capture everything perfectly! 🚀🎥
+**Branch:** headerdropdowns
+**Status:** Ready for keyboard navigation implementation
