@@ -151,6 +151,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Failed to open in browser: "+msg.err.Error(), true)
 		}
 		return m, statusTimeoutCmd()
+
+	case fileExplorerOpenedMsg:
+		// File explorer opened (or failed to open)
+		if msg.success {
+			m.setStatusMessage("✓ Opened in file explorer", false)
+		} else {
+			m.setStatusMessage("Failed to open file explorer: "+msg.err.Error(), true)
+		}
+		return m, statusTimeoutCmd()
 	}
 
 	return m, nil

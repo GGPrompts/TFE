@@ -159,7 +159,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.preview.searchQuery = ""
 			m.preview.searchMatches = nil
 			m.preview.currentMatch = -1
-			m.setStatusMessage("Search cancelled", false)
 			return m, nil
 
 		case "enter", "n":
@@ -283,7 +282,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.preview.searchQuery = ""
 				m.preview.searchMatches = nil
 				m.preview.currentMatch = -1
-				m.setStatusMessage("🔍 Search: (type to search, Enter/n: next, Esc: exit)", false)
 			}
 			return m, nil
 
@@ -871,6 +869,13 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// User can check background processes, view logs, etc.
 		// Type 'fg' to resume TFE
 		return m, tea.Suspend
+
+	case "ctrl+o":
+		// Ctrl+O: Open current directory in system file explorer
+		// WSL: Opens in Windows Explorer
+		// Linux: Opens in default file manager (via xdg-open)
+		// macOS: Opens in Finder
+		return m, openInFileExplorer(m.currentPath)
 
 	case "esc":
 		// Context-aware ESC behavior:

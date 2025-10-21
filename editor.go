@@ -310,3 +310,57 @@ func openImageEditor(path string) tea.Cmd {
 		}),
 	)
 }
+
+// fileExplorerOpenedMsg is returned when a folder is opened in file explorer
+type fileExplorerOpenedMsg struct {
+	success bool
+	err     error
+}
+
+// openInFileExplorer opens the current directory in the system file explorer
+func openInFileExplorer(path string) tea.Cmd {
+	return func() tea.Msg {
+		var c *exec.Cmd
+
+		if isWSL() {
+			// WSL: Use explorer.exe to open Windows Explorer
+			// Convert Linux path to Windows path for better compatibility
+			cmd := exec.Command("wslpath", "-w", path)
+			output, err := cmd.Output()
+			var winPath string
+			if err == nil {
+				winPath = strings.TrimSpace(string(output))
+			} else {
+				// If conversion fails, use the Linux path (explorer.exe can handle some WSL paths)
+				winPath = path
+			}
+			c = exec.Command("explorer.exe", winPath)
+		} else if editorAvailable("xdg-open") {
+			// Linux: Use xdg-open to open default file manager
+			c = exec.Command("xdg-open", path)
+		} else if editorAvailable("open") {
+			// macOS: Use open to open Finder
+			c = exec.Command("open", path)
+		} else {
+			return fileExplorerOpenedMsg{
+				success: false,
+				err:     fmt.Errorf("no file explorer command found"),
+			}
+		}
+
+		// Start the file explorer without blocking
+		err := c.Start()
+		if err != nil {
+			return fileExplorerOpenedMsg{
+				success: false,
+				err:     err,
+			}
+		}
+
+		// Success
+		return fileExplorerOpenedMsg{
+			success: true,
+			err:     nil,
+		}
+	}
+}

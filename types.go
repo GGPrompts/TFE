@@ -63,12 +63,14 @@ const (
 
 // fileItem represents a file or directory in the file browser
 type fileItem struct {
-	name    string
-	path    string
-	isDir   bool
-	size    int64
-	modTime time.Time
-	mode    os.FileMode
+	name          string
+	path          string
+	isDir         bool
+	size          int64
+	modTime       time.Time
+	mode          os.FileMode
+	isSymlink     bool   // Whether this is a symbolic link
+	symlinkTarget string // Target path if this is a symlink
 }
 
 // previewModel holds preview pane state

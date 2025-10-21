@@ -75,6 +75,12 @@ var (
 		Foreground(lipgloss.AdaptiveColor{
 			Light: "#D7005F", // Dark magenta for light
 			Dark:  "#FF79C6", // Bright pink for dark
-		}).
-		Bold(true) // Make it bold to stand out even more
+		})
+
+	// Obsidian vault styling (teal/cyan)
+	obsidianVaultStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#008B8B", // Dark cyan for light
+			Dark:  "#50FAE9", // Bright teal for dark
+		})
 )
