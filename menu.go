@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,53 +16,113 @@ import (
 
 // getMenus returns all available menus with current state
 func (m model) getMenus() map[string]Menu {
-	return map[string]Menu{
-		"navigate": {
-			Label: "Navigate",
+	menus := map[string]Menu{
+		"file": {
+			Label: "File",
 			Items: []MenuItem{
-				{Label: "🏠 Home", Action: "home", Shortcut: "🏠 button"},
-				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
-				{Label: "🗑️ Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
+				{Label: "New Folder...", Action: "new-folder", Shortcut: "F7"},
+				{Label: "New File...", Action: "new-file"},
+				{Label: "Open", Action: "open", Shortcut: "Enter"},
+				{IsSeparator: true},
+				{Label: "Copy Path", Action: "copy-path", Shortcut: "F5"},
+				{IsSeparator: true},
+				{Label: "Exit", Action: "quit", Shortcut: "F10"},
+			},
+		},
+		"edit": {
+			Label: "Edit",
+			Items: []MenuItem{
+				{Label: "Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
+				{IsSeparator: true},
+				{Label: "Delete", Action: "delete", Shortcut: "F8"},
 			},
 		},
 		"view": {
 			Label: "View",
 			Items: []MenuItem{
-				{Label: "Display Mode: List", Action: "display-list", Shortcut: "1 or F9", IsCheckable: true, IsChecked: m.displayMode == modeList},
-				{Label: "Display Mode: Detail", Action: "display-detail", Shortcut: "2 or F9", IsCheckable: true, IsChecked: m.displayMode == modeDetail},
-				{Label: "Display Mode: Tree", Action: "display-tree", Shortcut: "3 or F9", IsCheckable: true, IsChecked: m.displayMode == modeTree},
+				{Label: "Details", Action: "display-detail", Shortcut: "2", IsCheckable: true, IsChecked: m.displayMode == modeDetail},
+				{Label: "List", Action: "display-list", Shortcut: "1", IsCheckable: true, IsChecked: m.displayMode == modeList},
+				{Label: "Tree", Action: "display-tree", Shortcut: "3", IsCheckable: true, IsChecked: m.displayMode == modeTree},
 				{IsSeparator: true},
-				{Label: "⬌ Dual Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
-				{Label: "📝 Prompts Filter", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly},
-				{IsSeparator: true},
+				{Label: "Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
 				{Label: "Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
+				{IsSeparator: true},
+				{Label: "Refresh", Action: "refresh", Shortcut: "F5"},
 			},
 		},
 		"tools": {
 			Label: "Tools",
 			Items: []MenuItem{
-				{Label: ">_ Command Mode", Action: "toggle-command", Shortcut: ":", IsCheckable: true, IsChecked: m.commandFocused},
-				{Label: "🔍 Search", Action: "toggle-search", Shortcut: "/ or Ctrl+F"},
-				{Label: "🎯 Fuzzy Search", Action: "fuzzy-search", Shortcut: "Ctrl+P"},
-				{IsSeparator: true},
-				{Label: "🎮 Games Launcher", Action: "launch-games", Shortcut: "🎮 button"},
+				{Label: "Command Prompt", Action: "toggle-command", Shortcut: ":", IsCheckable: true, IsChecked: m.commandFocused},
+				{Label: "Search in Folder", Action: "toggle-search", Shortcut: "/"},
+				{Label: "Fuzzy Search", Action: "fuzzy-search", Shortcut: "Ctrl+P"},
 			},
 		},
 		"help": {
 			Label: "Help",
 			Items: []MenuItem{
-				{Label: "⌨️ Keyboard Shortcuts", Action: "show-hotkeys", Shortcut: "F1"},
-				{Label: "ℹ️ About TFE", Action: "show-about"},
+				{Label: "Keyboard Shortcuts", Action: "show-hotkeys", Shortcut: "F1"},
+				{Label: "About TFE", Action: "show-about"},
 				{IsSeparator: true},
-				{Label: "🔗 GitHub Repository", Action: "open-github"},
+				{Label: "GitHub Repository", Action: "open-github"},
 			},
 		},
 	}
+
+	// Add TUI tools to Tools menu if available
+	toolsMenu := menus["tools"]
+	hasTools := false
+
+	if editorAvailable("lazygit") {
+		if !hasTools {
+			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+			hasTools = true
+		}
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Git (lazygit)", Action: "lazygit"})
+	}
+	if editorAvailable("lazydocker") {
+		if !hasTools {
+			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+			hasTools = true
+		}
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Docker (lazydocker)", Action: "lazydocker"})
+	}
+	if editorAvailable("lnav") {
+		if !hasTools {
+			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+			hasTools = true
+		}
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Logs (lnav)", Action: "lnav"})
+	}
+	if editorAvailable("htop") {
+		if !hasTools {
+			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+			hasTools = true
+		}
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "System Monitor (htop)", Action: "htop"})
+	}
+	if editorAvailable("bottom") {
+		if !hasTools {
+			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+			hasTools = true
+		}
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "System Monitor (bottom)", Action: "bottom"})
+	}
+
+	// Add Prompts Library and Games
+	toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly})
+	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Games Launcher", Action: "launch-games"})
+	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly})
+
+	menus["tools"] = toolsMenu
+
+	return menus
 }
 
 // getMenuOrder returns the order of menus in the menu bar
 func getMenuOrder() []string {
-	return []string{"navigate", "view", "tools", "help"}
+	return []string{"file", "edit", "view", "tools", "help"}
 }
 
 // renderMenuBar renders the menu bar (replaces GitHub link after 5s)
@@ -370,15 +432,56 @@ func (m model) getMenuItemAtPosition(y int) int {
 // executeMenuAction executes a menu item action
 func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 	switch action {
-	// Navigate menu
-	case "home":
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			m.currentPath = homeDir
-			m.cursor = 0
-			m.loadFiles()
+	// File menu
+	case "new-folder":
+		// Create new folder in current directory
+		m.dialog = dialogModel{
+			dialogType: dialogInput,
+			title:      "Create Directory",
+			message:    "Enter directory name:",
+			input:      "",
+		}
+		m.showDialog = true
+
+	case "new-file":
+		// Create new file in current directory
+		m.dialog = dialogModel{
+			dialogType: dialogInput,
+			title:      "Create File",
+			message:    "Enter filename:",
+			input:      "",
+		}
+		m.showDialog = true
+
+	case "open":
+		// Open selected file/folder (same as Enter key)
+		file := m.getCurrentFile()
+		if file != nil {
+			if file.isDir {
+				m.currentPath = file.path
+				m.cursor = 0
+				m.loadFiles()
+			} else {
+				// Preview file
+				m.loadPreview(file.path)
+				m.viewMode = viewFullPreview
+				m.calculateLayout()
+				m.populatePreviewCache()
+			}
 		}
 
+	case "copy-path":
+		// Copy current directory path to clipboard
+		if err := copyToClipboard(m.currentPath); err != nil {
+			m.setStatusMessage(fmt.Sprintf("Failed to copy: %s", err), true)
+		} else {
+			m.setStatusMessage("Path copied to clipboard", false)
+		}
+
+	case "quit":
+		return m, tea.Quit
+
+	// Edit menu
 	case "toggle-favorites":
 		m.showFavoritesOnly = !m.showFavoritesOnly
 		m.cursor = 0
@@ -386,10 +489,17 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 			m.loadFiles()
 		}
 
-	case "toggle-trash":
-		m.showTrashOnly = !m.showTrashOnly
-		m.cursor = 0
-		m.loadFiles()
+	case "delete":
+		// Delete selected file/folder
+		file := m.getCurrentFile()
+		if file != nil && file.name != ".." {
+			m.dialog = dialogModel{
+				dialogType: dialogConfirm,
+				title:      "Move to Trash",
+				message:    fmt.Sprintf("Move '%s' to trash?", file.name),
+			}
+			m.showDialog = true
+		}
 
 	// View menu
 	case "display-list":
@@ -410,14 +520,13 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		m.calculateLayout()
 		m.populatePreviewCache()
 
-	case "toggle-prompts":
-		m.showPromptsOnly = !m.showPromptsOnly
-		m.cursor = 0
-		m.loadFiles()
-
 	case "toggle-hidden":
 		m.showHidden = !m.showHidden
 		m.loadFiles()
+
+	case "refresh":
+		m.loadFiles()
+		m.setStatusMessage("Refreshed", false)
 
 	// Tools menu
 	case "toggle-command":
@@ -427,23 +536,12 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		}
 
 	case "toggle-search":
-		// Context-aware search
-		if m.viewMode == viewFullPreview || (m.viewMode == viewDualPane && m.focusedPane == rightPane) {
-			// Toggle in-file search
-			m.preview.searchActive = !m.preview.searchActive
-			if !m.preview.searchActive {
-				m.preview.searchQuery = ""
-				m.preview.searchMatches = nil
-				m.preview.currentMatch = -1
-			}
-		} else {
-			// Toggle directory filter search
-			m.searchMode = !m.searchMode
-			if !m.searchMode {
-				m.searchQuery = ""
-				m.filteredIndices = nil
-				m.cursor = 0
-			}
+		// Toggle directory filter search
+		m.searchMode = !m.searchMode
+		if !m.searchMode {
+			m.searchQuery = ""
+			m.filteredIndices = nil
+			m.cursor = 0
 		}
 
 	case "fuzzy-search":
@@ -452,8 +550,88 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		m.selectedMenuItem = -1
 		return m, m.launchFuzzySearch()
 
+	case "lazygit":
+		// Launch lazygit in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("lazygit", m.currentPath)
+
+	case "lazydocker":
+		// Launch lazydocker in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("lazydocker", m.currentPath)
+
+	case "lnav":
+		// Launch lnav in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("lnav", m.currentPath)
+
+	case "htop":
+		// Launch htop
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("htop", m.currentPath)
+
+	case "bottom":
+		// Launch bottom system monitor
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("bottom", m.currentPath)
+
+	case "toggle-prompts":
+		m.showPromptsOnly = !m.showPromptsOnly
+		m.cursor = 0
+		m.loadFiles()
+
 	case "launch-games":
-		m.setStatusMessage("Games launcher - Click 🎮 button or use Ctrl+G", false)
+		// Launch TUIClassics game launcher
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			m.setStatusMessage("Error: Could not find home directory", true)
+		} else {
+			classicsPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
+
+			// Check if classics launcher exists
+			if _, err := os.Stat(classicsPath); err == nil {
+				// Close menu and launch
+				m.menuOpen = false
+				m.activeMenu = ""
+				m.selectedMenuItem = -1
+				return m, openTUITool(classicsPath, filepath.Dir(classicsPath))
+			}
+
+			// If classics doesn't exist, check for individual games
+			binDir := filepath.Join(homeDir, "projects", "TUIClassics", "bin")
+			if entries, err := os.ReadDir(binDir); err == nil && len(entries) > 0 {
+				// Find first executable game
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						gamePath := filepath.Join(binDir, entry.Name())
+						if info, err := os.Stat(gamePath); err == nil && info.Mode()&0111 != 0 {
+							// Close menu and launch
+							m.menuOpen = false
+							m.activeMenu = ""
+							m.selectedMenuItem = -1
+							return m, openTUITool(gamePath, filepath.Dir(gamePath))
+						}
+					}
+				}
+			}
+
+			m.setStatusMessage("TUIClassics not found. Install from: github.com/GGPrompts/TUIClassics", true)
+		}
+
+	case "toggle-trash":
+		m.showTrashOnly = !m.showTrashOnly
+		m.cursor = 0
+		m.loadFiles()
 
 	// Help menu
 	case "show-hotkeys":
@@ -469,7 +647,7 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Action: "+action+" (not implemented)", false)
 	}
 
-	// Close menu after action
+	// Close menu after action (unless already closed for tools that launch)
 	m.menuOpen = false
 	m.activeMenu = ""
 	m.selectedMenuItem = -1
