@@ -25,13 +25,19 @@
 | **↓** / **j** | Move cursor down |
 | **Enter** | Enter directory / Preview file (full-screen) / Toggle tree expansion |
 | **Double-Click** | Enter directory / Preview file (full-screen) |
-| **←** | Tree: collapse folder OR go to parent / Other modes: go to parent |
-| **→** | Tree: expand folder OR enter directory / Other modes: enter directory |
+| **←** | Go to parent directory (in all modes) / In Tree view: collapse expanded folder |
+| **→** | Enter directory (in all modes) / In Tree view: expand collapsed folder |
 | **h** | Go to parent directory (vim-style) |
 | **l** | Enter directory (vim-style) |
 | **Esc** | Clear command → Exit dual-pane → Go back a directory level |
 | **Tab** | Toggle dual-pane mode / Switch focus (left ↔ right) |
 | **Space** | Toggle dual-pane mode on/off |
+
+**Tree View Navigation (when in tree mode - press 3 or F9):**
+- Use **↑/↓** or **k/j** to move between files and folders
+- Use **→** (right arrow) to expand a collapsed folder - shows its contents
+- Use **←** (left arrow) to collapse an expanded folder - hides its contents
+- Use **Enter** to toggle folder expansion (expand if collapsed, collapse if expanded)
 
 ## View Modes
 
@@ -285,7 +291,7 @@ TFE uses emoji icons to indicate file types:
 7. **Command History:** Press **:** to enter command mode, then use ↑/↓ arrows to recall previous commands
 8. **Context Menu:** Press **F2** or right-click for quick access to common actions (including TUI tools like lazygit!)
 9. **Favorites:** Use the context menu (F2/right-click) to bookmark files/folders, then **F6** to filter by favorites
-10. **Tree Navigation:** In tree view (4), use ← to collapse, → to expand folders (Windows Explorer style)
+10. **Tree Navigation:** In tree view (press 3 or F9), use **→** to expand folders, **←** to collapse, **↑/↓** to navigate (Windows Explorer style)
 11. **ESC to Go Back:** Press ESC to navigate back like Windows Explorer's back button
 12. **Prompt Templates:** Press **F11** for prompts mode, open a template with `{{VARIABLES}}`, fill fields with Tab navigation, and F5 to copy the rendered result
 13. **Run Scripts:** Right-click executable files (.sh, .bash, etc. or chmod +x) and select "▶️ Run Script" to execute them with output - press any key to return to TFE
