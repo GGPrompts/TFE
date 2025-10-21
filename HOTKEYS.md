@@ -12,7 +12,7 @@
 | **F6** | Toggle favorites filter (show only favorites) |
 | **F7** | Create new directory (prompts for name) |
 | **F8** | Delete file/folder (moves to trash - use F12 to view/restore) |
-| **F9** | Cycle through display modes (List → Detail → Tree) |
+| **F9** / **Alt** | Enter menu bar navigation mode (keyboard access to File/Edit/View/Tools/Help menus) |
 | **F10** | Quit TFE |
 | **F11** | Toggle prompts filter (show only .yaml, .md, .txt files + ~/.prompts & ~/.claude) |
 | **F12** | Toggle trash/recycle bin view (restore/permanently delete items) |
@@ -33,7 +33,7 @@
 | **Tab** | Toggle dual-pane mode / Switch focus (left ↔ right) |
 | **Space** | Toggle dual-pane mode on/off |
 
-**Tree View Navigation (when in tree mode - press 3 or F9):**
+**Tree View Navigation (when in tree mode - press 3):**
 - Use **↑/↓** or **k/j** to move between files and folders
 - Use **→** (right arrow) to expand a collapsed folder - shows its contents
 - Use **←** (left arrow) to collapse an expanded folder - hides its contents
@@ -43,11 +43,31 @@
 
 | Key | Action |
 |-----|--------|
-| **F9** | Cycle through display modes (List → Detail → Tree) |
 | **1** | Switch to List view |
 | **2** | Switch to Detail view |
 | **3** | Switch to Tree view |
 | **.** / **Ctrl+h** | Toggle hidden files visibility |
+
+## Menu Bar Navigation
+
+| Key | Action |
+|-----|--------|
+| **Alt** / **F9** | Enter menu bar navigation mode (highlights first menu) |
+| **←** / **Shift+Tab** | Navigate to previous menu (when in menu bar mode) |
+| **→** / **Tab** | Navigate to next menu (when in menu bar mode) |
+| **↓** / **Enter** | Open highlighted menu dropdown |
+| **↑/↓** | Navigate menu items (when dropdown is open) |
+| **←/→** | Switch to adjacent menu (when dropdown is open) |
+| **Enter** | Execute selected menu item |
+| **Esc** | Close dropdown (returns to menu bar) / Exit menu mode |
+
+**How it works:**
+1. Press **Alt** or **F9** to enter menu mode - the first menu (File) will be highlighted
+2. Use **←/→** or **Tab/Shift+Tab** to navigate between menus (File → Edit → View → Tools → Help)
+3. Press **↓** or **Enter** to open a dropdown
+4. Use **↑/↓** to select menu items, **Enter** to execute
+5. Press **←/→** while in a dropdown to smoothly switch to adjacent menus
+6. Press **Esc** to close dropdown (stays in menu mode) or press **Esc** again to exit menu mode
 
 ## Preview & Full-Screen Mode
 
@@ -291,7 +311,7 @@ TFE uses emoji icons to indicate file types:
 7. **Command History:** Press **:** to enter command mode, then use ↑/↓ arrows to recall previous commands
 8. **Context Menu:** Press **F2** or right-click for quick access to common actions (including TUI tools like lazygit!)
 9. **Favorites:** Use the context menu (F2/right-click) to bookmark files/folders, then **F6** to filter by favorites
-10. **Tree Navigation:** In tree view (press 3 or F9), use **→** to expand folders, **←** to collapse, **↑/↓** to navigate (Windows Explorer style)
+10. **Tree Navigation:** In tree view (press 3), use **→** to expand folders, **←** to collapse, **↑/↓** to navigate (Windows Explorer style)
 11. **ESC to Go Back:** Press ESC to navigate back like Windows Explorer's back button
 12. **Prompt Templates:** Press **F11** for prompts mode, open a template with `{{VARIABLES}}`, fill fields with Tab navigation, and F5 to copy the rendered result
 13. **Run Scripts:** Right-click executable files (.sh, .bash, etc. or chmod +x) and select "▶️ Run Script" to execute them with output - press any key to return to TFE

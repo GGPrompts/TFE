@@ -150,46 +150,59 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Handle menu bar navigation (when menu bar is focused but dropdown not open)
+	if m.menuBarFocused && !m.menuOpen {
+		switch msg.String() {
+		case "left", "shift+tab":
+			// Navigate to previous menu in menu bar
+			m.highlightedMenu = getPreviousMenu(m.highlightedMenu)
+			return m, nil
+
+		case "right", "tab":
+			// Navigate to next menu in menu bar
+			m.highlightedMenu = getNextMenu(m.highlightedMenu)
+			return m, nil
+
+		case "down", "enter":
+			// Open the highlighted menu dropdown
+			if m.highlightedMenu != "" {
+				m.menuOpen = true
+				m.activeMenu = m.highlightedMenu
+				m.selectedMenuItem = m.getFirstSelectableMenuItem(m.activeMenu)
+			}
+			return m, nil
+
+		case "esc":
+			// Exit menu bar focus mode
+			m.menuBarFocused = false
+			m.highlightedMenu = ""
+			return m, nil
+		}
+	}
+
 	// Handle menu keyboard navigation (when menu is open)
 	if m.menuOpen {
 		switch msg.String() {
 		case "esc":
-			// Close menu
+			// Close dropdown and return to menu bar focus
 			m.menuOpen = false
-			m.activeMenu = ""
 			m.selectedMenuItem = -1
+			m.menuBarFocused = true
+			m.highlightedMenu = m.activeMenu
 			return m, nil
 
-		case "left":
-			// Navigate to previous menu
-			menuOrder := getMenuOrder()
-			currentIndex := -1
-			for i, key := range menuOrder {
-				if key == m.activeMenu {
-					currentIndex = i
-					break
-				}
-			}
-			if currentIndex > 0 {
-				m.activeMenu = menuOrder[currentIndex-1]
-				m.selectedMenuItem = -1
-			}
+		case "left", "shift+tab":
+			// Close current menu and open previous menu
+			m.activeMenu = getPreviousMenu(m.activeMenu)
+			m.highlightedMenu = m.activeMenu
+			m.selectedMenuItem = m.getFirstSelectableMenuItem(m.activeMenu)
 			return m, nil
 
-		case "right":
-			// Navigate to next menu
-			menuOrder := getMenuOrder()
-			currentIndex := -1
-			for i, key := range menuOrder {
-				if key == m.activeMenu {
-					currentIndex = i
-					break
-				}
-			}
-			if currentIndex >= 0 && currentIndex < len(menuOrder)-1 {
-				m.activeMenu = menuOrder[currentIndex+1]
-				m.selectedMenuItem = -1
-			}
+		case "right", "tab":
+			// Close current menu and open next menu
+			m.activeMenu = getNextMenu(m.activeMenu)
+			m.highlightedMenu = m.activeMenu
+			m.selectedMenuItem = m.getFirstSelectableMenuItem(m.activeMenu)
 			return m, nil
 
 		case "up":
@@ -895,11 +908,24 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.addToHistory(cmd)
 			m.commandInput = ""
 			m.commandFocused = false // Exit command mode after executing
+
 			// Check for exit/quit commands
 			cmdLower := strings.ToLower(strings.TrimSpace(cmd))
 			if cmdLower == "exit" || cmdLower == "quit" {
 				return m, tea.Quit
 			}
+
+			// Check for ! prefix - run command and exit TFE
+			if strings.HasPrefix(cmd, "!") {
+				// Remove the ! prefix
+				actualCmd := strings.TrimPrefix(cmd, "!")
+				actualCmd = strings.TrimSpace(actualCmd)
+				if actualCmd != "" {
+					return m, runCommandAndExit(actualCmd, m.currentPath)
+				}
+			}
+
+			// Normal command - suspend TFE and return
 			return m, runCommand(cmd, m.currentPath)
 		}
 		// If not in command mode or no input, handle Enter for file navigation (below)
@@ -1355,14 +1381,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showHidden = !m.showHidden
 		m.loadFiles()
 
-	case "f9":
-		// F9: Cycle through display modes (List → Detail → Tree)
-		m.displayMode = (m.displayMode + 1) % 3
-		// Auto-exit dual-pane if switching to incompatible mode
-		if m.viewMode == viewDualPane && !m.isDualPaneCompatible() {
-			m.viewMode = viewSinglePane
-			m.calculateLayout()
-			m.populatePreviewCache()
+	case "alt", "f9":
+		// Alt or F9: Enter menu bar navigation mode
+		if !m.menuBarFocused && !m.menuOpen {
+			m.menuBarFocused = true
+			m.highlightedMenu = "file" // Start with first menu
 		}
 
 	case "1":

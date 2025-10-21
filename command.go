@@ -59,6 +59,35 @@ read -n 1 -s -r
 	}
 }
 
+// runCommandAndExit executes a shell command and exits TFE
+// Used when command is prefixed with ! (e.g., ":!claude --yolo")
+// This is useful for launching long-running TUI apps like Claude Code
+func runCommandAndExit(command, dir string) tea.Cmd {
+	return func() tea.Msg {
+		// Build a shell script that changes to directory and runs command
+		script := fmt.Sprintf(`
+cd %s || exit 1
+exec %s
+`, shellQuote(dir), command)
+
+		// Create the command
+		c := exec.Command("bash", "-c", script)
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+
+		// Execute command and exit TFE immediately
+		// The command will take over the terminal
+		return tea.Sequence(
+			tea.ClearScreen,
+			tea.ExecProcess(c, func(err error) tea.Msg {
+				// After command exits, quit TFE
+				return tea.Quit()
+			}),
+		)()
+	}
+}
+
 // addToHistory adds a command to the history, avoiding duplicates
 func (m *model) addToHistory(command string) {
 	if command == "" {

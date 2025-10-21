@@ -45,6 +45,8 @@ func initialModel() model {
 		menuOpen:         false,
 		activeMenu:       "",
 		selectedMenuItem: -1,
+		menuBarFocused:   false,
+		highlightedMenu:  "",
 		// Menu caching - check tool availability once at startup (performance optimization)
 		toolsAvailable: map[string]bool{
 			"lazygit":       editorAvailable("lazygit"),

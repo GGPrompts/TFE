@@ -976,11 +976,16 @@ func (m model) renderDualPane() string {
 	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
 
-	// Show helper text when not focused and empty, otherwise show input
+	// Show helper text based on focus state
+	helperStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
 	if !m.commandFocused && m.commandInput == "" {
-		helperStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+		// Not focused - show how to enter command mode
 		s.WriteString(helperStyle.Render(": to focus"))
+	} else if m.commandFocused && m.commandInput == "" {
+		// Focused but no input - show ! prefix hint
+		s.WriteString(helperStyle.Render("! prefix to run & exit"))
 	} else {
+		// Has input - show the command
 		s.WriteString(inputStyle.Render(m.commandInput))
 	}
 

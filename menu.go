@@ -55,8 +55,8 @@ func (m model) getMenus() map[string]Menu {
 		"view": {
 			Label: "View",
 			Items: []MenuItem{
-				{Label: "📋 Details", Action: "display-detail", Shortcut: "2", IsCheckable: true, IsChecked: m.displayMode == modeDetail},
 				{Label: "📄 List", Action: "display-list", Shortcut: "1", IsCheckable: true, IsChecked: m.displayMode == modeList},
+				{Label: "📋 Details", Action: "display-detail", Shortcut: "2", IsCheckable: true, IsChecked: m.displayMode == modeDetail},
 				{Label: "🌳 Tree", Action: "display-tree", Shortcut: "3", IsCheckable: true, IsChecked: m.displayMode == modeTree},
 				{IsSeparator: true},
 				{Label: "⬌ Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
@@ -143,6 +143,34 @@ func getMenuOrder() []string {
 	return []string{"file", "edit", "view", "tools", "help"}
 }
 
+// getPreviousMenu returns the menu key to the left of the current menu (with wrapping)
+func getPreviousMenu(current string) string {
+	order := getMenuOrder()
+	for i, key := range order {
+		if key == current {
+			if i == 0 {
+				return order[len(order)-1] // Wrap to last menu
+			}
+			return order[i-1]
+		}
+	}
+	return order[0] // Fallback to first menu
+}
+
+// getNextMenu returns the menu key to the right of the current menu (with wrapping)
+func getNextMenu(current string) string {
+	order := getMenuOrder()
+	for i, key := range order {
+		if key == current {
+			if i == len(order)-1 {
+				return order[0] // Wrap to first menu
+			}
+			return order[i+1]
+		}
+	}
+	return order[0] // Fallback to first menu
+}
+
 // getFirstSelectableMenuItem returns the index of the first non-separator item in the menu
 // Returns 0 if no valid items found (fallback)
 func (m model) getFirstSelectableMenuItem(menuKey string) int {
@@ -177,6 +205,12 @@ func (m model) renderMenuBar() string {
 		Bold(true).
 		Padding(0, 1)
 
+	menuHighlightedStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("0")).
+		Background(lipgloss.Color("240")).
+		Bold(true).
+		Padding(0, 1)
+
 	menuInactiveStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true).
@@ -185,10 +219,12 @@ func (m model) renderMenuBar() string {
 	for _, menuKey := range menuOrder {
 		menu := menus[menuKey]
 
-		// Style based on active state
+		// Style based on state: active (open) > highlighted (focused) > inactive
 		var style lipgloss.Style
 		if m.activeMenu == menuKey && m.menuOpen {
 			style = menuActiveStyle
+		} else if m.highlightedMenu == menuKey && m.menuBarFocused {
+			style = menuHighlightedStyle
 		} else {
 			style = menuInactiveStyle
 		}

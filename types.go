@@ -285,6 +285,8 @@ type model struct {
 	menuOpen         bool      // Whether any menu is currently open
 	activeMenu       string    // Which menu is active ("navigate", "view", "tools", "help")
 	selectedMenuItem int       // Index of selected item in active menu (-1 = none)
+	menuBarFocused   bool      // Whether menu bar has keyboard focus (Alt/F9 pressed)
+	highlightedMenu  string    // Which menu is highlighted in menu bar ("file", "edit", etc.)
 	// Menu caching (performance optimization - avoids repeated filesystem checks)
 	cachedMenus    map[string]Menu  // Cached menu structure (built once)
 	toolsAvailable map[string]bool // Cached tool availability (lazygit, htop, etc.)
