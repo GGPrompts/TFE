@@ -37,6 +37,86 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Preview Search**: Ctrl-F to search within file previews, 'n' for next match, Shift-N for previous
 - **Mouse Toggle**: Press 'm' in full preview to remove border for clean text selection
 
+## Visual Showcase
+
+### Navigation & File Operations
+![Navigation Demo](assets/demo-navigation.gif)
+*Fast keyboard and mouse navigation through directories*
+
+![File Operations](assets/demo-file-ops.gif)
+*Copy, rename, create files and folders via context menu*
+
+### Dual-Pane Mode & Preview
+![Dual-Pane Mode](assets/demo-dual-pane.gif)
+*Split-screen with live syntax-highlighted preview*
+
+![Preview Features](assets/demo-preview.gif)
+*Full-screen preview with search (Ctrl-F), line numbers, and text selection*
+
+### Display Modes & Context Menu
+![View Modes](assets/demo-view-modes.gif)
+*Switch between List, Detail, and Tree views*
+
+![Tree View](assets/demo-tree-view.gif)
+*Hierarchical tree navigation with folder expansion*
+
+![Context Menu](assets/demo-context-menu.gif)
+*Right-click menu with file operations and Quick CD*
+
+### Search & Help
+![Fuzzy Search](assets/demo-search.gif)
+*Instant fuzzy file search with Ctrl+P*
+
+![Context-Aware Help](assets/demo-help.gif)
+*F1 intelligently jumps to relevant help section*
+
+### Complete Workflow Demo
+![Complete Demo](assets/tfe-showcase.gif)
+*Full TFE workflow: navigation, preview, file operations, and prompts library*
+
+## Feature Comparison
+
+TFE stands out from other terminal file managers with unique features designed for modern AI-assisted workflows:
+
+| Feature | TFE | ranger | nnn | lf | yazi | Midnight Commander |
+|---------|-----|--------|-----|----|----- |-------------------|
+| **Language** | Go | Python | C | Go | Rust | C |
+| **AI Prompts Library** | ✅ **Unique!** | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Fillable Field Templates** | ✅ **Unique!** | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Mobile/Termux Tested** | ✅ **Fully tested** | Partial | ✅ | Partial | ⚠️ | Partial |
+| **Touch Controls** | ✅ Full support | Limited | Limited | Limited | Limited | Limited |
+| **Context-Aware F1 Help** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Dual-Pane Preview** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **Syntax Highlighting** | ✅ (Chroma) | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Fuzzy Search** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Tree View** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **Trash/Recycle Bin** | ✅ | ❌ | ⚠️ Plugin | ❌ | ❌ | ❌ |
+| **Quick CD (Shell Integration)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Image Viewing (TUI)** | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| **Markdown Preview** | ✅ (Glamour) | ✅ | ❌ | ❌ | ✅ | ❌ |
+| **Context Menu** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Mouse Support** | ✅ Full | Limited | ❌ | ❌ | ✅ | ✅ |
+| **F-Key Shortcuts** | ✅ MC-style | Custom | Custom | Custom | Custom | ✅ |
+| **Command Prompt** | ✅ Always visible | `:` command | `!` shell | `:` command | `:` command | ✅ |
+| **Favorites/Bookmarks** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **External Editor** | ✅ Auto-detect | ✅ Config | ✅ Config | ✅ Config | ✅ Config | ✅ Config |
+
+### What Makes TFE Unique?
+
+1. **🤖 AI Prompts Library** - The only terminal file manager with an integrated prompt template system designed for AI workflows. Manage prompt templates, fill variables interactively, and copy rendered prompts with F5.
+
+2. **📱 Mobile-First Design** - Extensively tested on Termux/Android with full touch controls (tap, double-tap, long-press). Other file managers have partial mobile support, but TFE is built with mobile as a first-class platform.
+
+3. **📝 Fillable Field Templates** - Interactive variable substitution with smart type detection (file paths, dates, custom inputs). No other file manager has this feature.
+
+4. **🗑️ Trash/Recycle Bin** - Safe, reversible deletion with restore functionality. Most file managers permanently delete files.
+
+5. **🎯 Context-Aware Help** - F1 intelligently jumps to the help section that matches your current context (dual-pane, preview, prompts mode, etc.).
+
+6. **🖱️ Full Mouse & Touch Support** - Click toolbar buttons, right-click for context menu, double-click navigation, column sorting - works like a GUI but in your terminal.
+
+TFE combines the power of traditional file managers with modern features designed for AI-assisted development workflows, making it perfect for developers using Claude Code, GitHub Copilot, or other AI tools.
+
 ## Installation
 
 ### Prerequisites
