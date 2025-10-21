@@ -478,6 +478,7 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 }
 
 // overlayDropdown overlays a dropdown menu on the base view at the specified position
+// Preserves content to the left and right of the dropdown
 func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 	// Split base view into lines
 	baseLines := strings.Split(baseView, "\n")
@@ -501,16 +502,76 @@ func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 			break
 		}
 
-		// Simple approach: create new line with padding + dropdown
-		newLine := strings.Repeat(" ", x) + dropdownLine
+		baseLine := baseLines[lineIndex]
+		var newLine strings.Builder
 
-		// Pad to full width if needed
-		currentWidth := x + dropdownWidth
-		if currentWidth < m.width {
-			newLine += strings.Repeat(" ", m.width-currentWidth)
+		// Preserve content to the LEFT of the dropdown
+		visualPos := 0
+		bytePos := 0
+		inAnsi := false
+		baseRunes := []rune(baseLine)
+
+		// Scan through base line until we reach visual position x
+		for bytePos < len(baseRunes) && visualPos < x {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			}
+
+			if inAnsi {
+				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
+					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
+					inAnsi = false
+				}
+			} else {
+				visualPos++
+			}
+			bytePos++
 		}
 
-		baseLines[lineIndex] = newLine
+		// Add the left part (up to position x)
+		if bytePos > 0 && bytePos <= len(baseRunes) {
+			newLine.WriteString(string(baseRunes[:bytePos]))
+		}
+
+		// Pad with spaces if needed to reach position x
+		for visualPos < x {
+			newLine.WriteRune(' ')
+			visualPos++
+		}
+
+		// Add the dropdown content
+		newLine.WriteString(dropdownLine)
+
+		// Preserve content to the RIGHT of the dropdown
+		// Continue from position x + dropdownWidth
+		rightStartPos := x + dropdownWidth
+		visualPos = 0
+		bytePos = 0
+		inAnsi = false
+
+		// Scan to find where rightStartPos begins in the base line
+		for bytePos < len(baseRunes) && visualPos < rightStartPos {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			}
+
+			if inAnsi {
+				if baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z' ||
+					baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z' {
+					inAnsi = false
+				}
+			} else {
+				visualPos++
+			}
+			bytePos++
+		}
+
+		// Add the right part (from position x + dropdownWidth onwards)
+		if bytePos < len(baseRunes) {
+			newLine.WriteString(string(baseRunes[bytePos:]))
+		}
+
+		baseLines[lineIndex] = newLine.String()
 	}
 
 	return strings.Join(baseLines, "\n")

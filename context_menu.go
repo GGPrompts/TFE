@@ -59,37 +59,37 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		items = append(items, contextMenuItem{"📄 New File...", "newfile"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 
-		// Add separator and TUI tools if available
+		// Add separator and TUI tools if available (using cached availability - performance optimization)
 		hasTools := false
-		if editorAvailable("lazygit") {
+		if m.toolsAvailable["lazygit"] {
 			if !hasTools {
 				items = append(items, contextMenuItem{"─────────", "separator"})
 				hasTools = true
 			}
 			items = append(items, contextMenuItem{"🌿 Git (lazygit)", "lazygit"})
 		}
-		if editorAvailable("lazydocker") {
+		if m.toolsAvailable["lazydocker"] {
 			if !hasTools {
 				items = append(items, contextMenuItem{"─────────", "separator"})
 				hasTools = true
 			}
 			items = append(items, contextMenuItem{"🐋 Docker (lazydocker)", "lazydocker"})
 		}
-		if editorAvailable("lnav") {
+		if m.toolsAvailable["lnav"] {
 			if !hasTools {
 				items = append(items, contextMenuItem{"─────────", "separator"})
 				hasTools = true
 			}
 			items = append(items, contextMenuItem{"📜 Logs (lnav)", "lnav"})
 		}
-		if editorAvailable("htop") {
+		if m.toolsAvailable["htop"] {
 			if !hasTools {
 				items = append(items, contextMenuItem{"─────────", "separator"})
 				hasTools = true
 			}
 			items = append(items, contextMenuItem{"📊 Processes (htop)", "htop"})
 		}
-		if editorAvailable("bottom") {
+		if m.toolsAvailable["bottom"] {
 			if !hasTools {
 				items = append(items, contextMenuItem{"─────────", "separator"})
 				hasTools = true
@@ -223,7 +223,8 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 				m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
 				return m, tea.ClearScreen
 			}
-			if editorAvailable("micro") {
+			// Use cached micro check (performance optimization)
+			if m.toolsAvailable["micro"] {
 				editor = "micro"
 			}
 			return m, openEditor(editor, m.contextMenuFile.path)

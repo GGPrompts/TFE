@@ -45,6 +45,17 @@ func initialModel() model {
 		menuOpen:         false,
 		activeMenu:       "",
 		selectedMenuItem: -1,
+		// Menu caching - check tool availability once at startup (performance optimization)
+		toolsAvailable: map[string]bool{
+			"lazygit":       editorAvailable("lazygit"),
+			"lazydocker":    editorAvailable("lazydocker"),
+			"lnav":          editorAvailable("lnav"),
+			"htop":          editorAvailable("htop"),
+			"bottom":        editorAvailable("bottom"),
+			"micro":         editorAvailable("micro"), // Used in context menu edit action
+			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
+		},
+		cachedMenus: nil, // Will be built on first access
 	}
 
 	m.loadFiles()

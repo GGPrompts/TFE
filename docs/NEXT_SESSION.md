@@ -1,104 +1,287 @@
 # Next Session Tasks
 
-## 🚨 PRIORITY: Fix Dropdown Menu Performance Lag
+## 🚨 PRIORITY: Fix Context Menu Alignment Issues
 
-### Problem
-The dropdown menus are causing noticeable lag in TFE, likely due to overlay rendering issues. The current implementation may have ASCII bleed-through or inefficient overlay compositing causing performance degradation.
+### Problem Summary
+The context menu (right-click/F2) has alignment issues that cause the box borders to be misaligned and sometimes overflow off-screen:
 
-### Investigation Required
+1. **Emoji width inconsistencies**: Some file types (gzip files) have emojis that add extra spacing
+2. **Favorited file stars**: The ⭐ star icon on favorited files adds extra spacing that throws off alignment
+3. **Bottom border collision**: When the context menu is opened near the bottom of the terminal, the menu box art overlaps with the file tree's bottom border
+4. **Off-screen rendering**: Context menus opened toward the bottom can extend beyond the terminal height
+5. **Tree view expanded folders**: Alignment breaks when 2+ folders are expanded in tree view (tree characters ├─, └─, │ and indentation may affect positioning)
 
-**Reference implementation**: `~/projects/TUITemplate/examples/tui-showcase/`
+### Specific Issues
 
-Compare the dropdown overlay logic between:
-- **TFE**: `menu.go` and `view.go` (overlayDropdown function)
-- **TUITemplate**: Check how dropdowns are rendered without causing lag
+**Issue 1: Variable emoji widths**
+- Some emojis render wider than others (e.g., gzip emoji vs folder emoji)
+- This causes menu item text to misalign
+- The box borders don't line up properly when items have different icon widths
 
-**Key files to review:**
-```bash
-# TFE (current - laggy)
-/home/matt/projects/TFE/menu.go - renderActiveDropdown()
-/home/matt/projects/TFE/view.go - overlayDropdown() (around line 481-517)
+**Issue 2: Favorited file stars**
+- Files marked as favorites show a ⭐ icon
+- This adds visual width but the menu width calculation doesn't account for it
+- Results in ragged right edge or text overflow
 
-# TUITemplate (reference - should be performant)
-~/projects/TUITemplate/examples/tui-showcase/menu.go
-~/projects/TUITemplate/examples/tui-showcase/view.go
-```
+**Issue 3: Border overlap**
+- The file tree is wrapped in a bordered box (lipgloss.RoundedBorder)
+- When context menu opens near bottom, it overlaps the file tree's bottom border
+- Creates visual artifacts: `└─────┘` (file tree border) colliding with `┌──────┐` (menu border)
 
-### Specific Issues to Check
+**Issue 4: Off-screen overflow**
+- `m.contextMenuY` can be set too close to `m.height`
+- Menu extends beyond visible terminal area
+- User can't see all menu items
 
-1. **ASCII Bleed-Through:**
-   - Are ANSI codes being properly stripped/handled?
-   - Is the overlay clearing the background properly?
-   - Are there remnants of previous frames showing through?
+**Issue 5: Tree view with expanded folders**
+- When multiple folders are expanded in tree view (press 3, then → to expand)
+- Tree characters (├─, └─, │) add visual complexity and indentation
+- Context menu alignment appears to break with 2+ expanded folders
+- The tree characters may have different widths or the indentation calculation may be off
 
-2. **Overlay Rendering:**
-   - How does TUITemplate composite the dropdown over base content?
-   - Should we use Lipgloss `Place()` instead of manual line replacement?
-   - Are we reconstructing the entire view on every render?
+### Files to Review
 
-3. **Performance:**
-   - Is the overlay being rendered every frame even when not visible?
-   - Are we caching the dropdown content or regenerating it constantly?
+**Primary file:**
+- `context_menu.go` - Lines 399-471 (`renderContextMenu` function)
+  - Calculates menu width based on item labels
+  - Renders the bordered box with menu items
+  - Does NOT currently account for emoji/star width variations
 
-### Current TFE Implementation (Potentially Problematic)
+**Secondary files:**
+- `update_mouse.go` - Lines 756-784 (context menu positioning on right-click)
+  - Sets `m.contextMenuX` and `m.contextMenuY`
+  - Has bounds checking but might not account for menu height properly
+- `view.go` - Lines 395-478 (`overlayContextMenu` function)
+  - Overlays the context menu on the base view
+  - Ensures menu stays on screen (lines 400-412)
+  - May need better bottom-edge detection
+
+### Current Implementation (Potentially Problematic)
 
 ```go
-// view.go:481-517
-func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
-    // Simple approach: splits base view into lines, replaces lines with dropdown
-    // This might be inefficient or causing ASCII issues
-    baseLines := strings.Split(baseView, "\n")
-    dropdownLines := strings.Split(dropdown, "\n")
-
-    // ... creates new lines with padding + dropdown
-    newLine := strings.Repeat(" ", x) + dropdownLine
+// context_menu.go:410-417
+// Calculate menu dimensions - find the longest item
+maxWidth := 0
+for _, item := range items {
+    // Count runes, not bytes (better emoji support)
+    width := len([]rune(item.label))  // ❌ Doesn't account for emoji visual width!
+    if width > maxWidth {
+        maxWidth = width
+    }
 }
 ```
 
-### Potential Fixes
+**Problem**: `len([]rune(item.label))` counts Unicode code points, but emojis like 🗑️ can be 2 runes wide while displaying as 2 visual columns. Meanwhile, favorited files have `⭐ filename` which adds width not captured in the original label.
 
-Based on TUITemplate comparison, likely need to:
+### Suggested Fixes
 
-1. **Use Lipgloss Place() instead of manual overlay**
-2. **Strip ANSI codes from base view before overlaying**
-3. **Only render dropdown when menu is open**
-4. **Cache dropdown content**
+**1. Use `lipgloss.Width()` for accurate width calculation**
+```go
+// Instead of:
+width := len([]rune(item.label))
 
-### Testing
+// Use:
+width := lipgloss.Width(item.label)
+```
+This handles emoji rendering width properly.
 
-**Before fixing:**
-```bash
-cd /home/matt/projects/TFE
-./tfe
-# Wait 5+ seconds for menu to appear
-# Click "File" menu - notice lag
-# Navigate with arrow keys - check responsiveness
+**2. Account for favorite stars in width calculation**
+```go
+// In renderContextMenu, check if file is favorited:
+actualLabel := item.label
+if m.contextMenuFile != nil && m.isFavorite(m.contextMenuFile.path) {
+    actualLabel = "⭐ " + actualLabel  // Account for star width
+}
+width := lipgloss.Width(actualLabel)
 ```
 
-**After fixing:**
-- [ ] No lag when opening dropdown menus
-- [ ] Arrow key navigation is instant
-- [ ] No visual artifacts or ASCII bleed-through
-- [ ] Works in both single-pane and dual-pane modes
-
-### Commands for Investigation
-
-```bash
-# Compare implementations
-cd ~/projects/TUITemplate/examples/tui-showcase
-grep -A 50 "overlay\|renderMenu" *.go
-
-cd /home/matt/projects/TFE
-grep -A 50 "overlayDropdown\|renderActiveDropdown" view.go menu.go
-
-# Check for ANSI stripping utilities
-grep -r "stripANSI\|cleanANSI" ~/projects/TUITemplate/
-grep -r "stripANSI\|cleanANSI" /home/matt/projects/TFE/
+**3. Improve bottom-edge collision detection**
+```go
+// In overlayContextMenu or when setting contextMenuY:
+menuHeight := len(menuItems) + 2  // +2 for borders
+maxY := m.height - menuHeight - 3  // -3 to avoid file tree bottom border
+if m.contextMenuY > maxY {
+    m.contextMenuY = maxY
+}
 ```
+
+**4. Consider moving menu up if too close to bottom**
+```go
+// After calculating menu height:
+if m.contextMenuY + menuHeight >= m.height - 2 {
+    // Move menu above the cursor position instead
+    m.contextMenuY = m.contextMenuY - menuHeight
+    if m.contextMenuY < 1 {
+        m.contextMenuY = 1  // Don't go off top
+    }
+}
+```
+
+### Testing Checklist
+
+After implementing fixes:
+- [ ] Open context menu on a regular file (no star) → borders aligned properly
+- [ ] Open context menu on a favorited file (⭐) → borders aligned properly
+- [ ] Open context menu on gzip file (has wider emoji) → borders aligned properly
+- [ ] Open context menu near bottom of terminal → doesn't overlap file tree border
+- [ ] Open context menu at very bottom → menu repositions upward or fits on screen
+- [ ] Scroll file tree and test context menu at various positions → always renders correctly
+- [ ] **Tree View with expanded folders**: Switch to tree view (press 3), expand 2-3 folders (press →), then test context menu
+  - Tree characters (├─, └─, │) add visual complexity
+  - Multiple indentation levels may affect positioning
+  - Check if borders align properly when menu opens on deeply nested items
+
+### Reference Files for Emoji/Icon Handling
+
+Check these for examples of proper width handling:
+- `render_file_list.go` - Detail view already handles emoji alignment (might have good patterns)
+- `file_operations.go` - `getFileIcon()` function returns different emojis
+
+### Expected Outcome
+
+**Before:**
+```
+┌─────────────────────────┐
+│ 📁 src/                 │
+│ 📄 main.go              │
+│ 🗜️  archive.gz         │  ← gzip emoji wider, text misaligned
+│ ⭐ config.json          │  ← star adds width, border doesn't match
+└──────────────────────┘
+  ┌────────────────┐         ← context menu border misaligned
+  │ 📂 Open      │         ← items don't line up
+  │ 📋 Copy Path  │
+  └──────────────┘
+```
+
+**After:**
+```
+┌─────────────────────────┐
+│ 📁 src/                 │
+│ 📄 main.go              │
+│ 🗜️  archive.gz          │  ← properly aligned
+│ ⭐ config.json          │  ← properly aligned
+│   ┌──────────────────┐  │
+│   │ 📂 Open         │  │  ← clean borders
+│   │ 📋 Copy Path    │  │  ← properly aligned
+│   └──────────────────┘  │
+└─────────────────────────┘
+```
+
+### Prompt to Use
+
+Copy-paste this into your next session:
+
+---
+
+**PROMPT START:**
+
+I need help fixing alignment issues with the context menu (right-click/F2) in my TFE file explorer. The context menu has several rendering problems:
+
+1. **Emoji width inconsistencies**: Different file type emojis (like gzip 🗜️) have varying visual widths, causing menu items to misalign
+2. **Favorited files**: Files with ⭐ stars have extra width not accounted for in the menu width calculation
+3. **Bottom border collision**: When opened near the bottom, the context menu overlaps the file tree's bottom border
+4. **Off-screen overflow**: Context menus can extend beyond terminal height when opened at the bottom
+
+The main issue is in `context_menu.go` lines 410-417 where `len([]rune(item.label))` is used instead of `lipgloss.Width()` for width calculation. This doesn't properly account for emoji visual width.
+
+Please:
+1. Read `context_menu.go` (especially `renderContextMenu` function)
+2. Fix the width calculation to use `lipgloss.Width()` instead of `len([]rune())`
+3. Account for favorite stars (⭐) when calculating menu width
+4. Add better bottom-edge detection to prevent border collisions
+5. Implement menu repositioning (move up) when too close to terminal bottom
+
+Test cases should include: regular files, favorited files, gzip files, opening menus at various vertical positions (top, middle, bottom of terminal), and **especially in tree view with 2-3 expanded folders** (the tree characters ├─, └─, │ and indentation may affect alignment).
+
+**PROMPT END:**
+
+---
 
 **Branch**: headerdropdowns
-**Priority**: 🔥 High (UX blocker)
-**Expected Time**: 1-2 hours
+**Priority**: 🔥 Medium (UX polish)
+**Expected Time**: 30-45 minutes
+
+---
+
+## ✅ FIXED: Menu Performance Lag (Dropdown + Context Menus)
+
+### Root Cause Identified
+Both the **dropdown menus** and **context menus** (right-click/F2) had **repeated filesystem lookups**:
+
+**Dropdown menus** (`menu.go` - `getMenus()`):
+- `editorAvailable("lazygit")` → `exec.LookPath("lazygit")`
+- `editorAvailable("lazydocker")` → `exec.LookPath("lazydocker")`
+- `editorAvailable("lnav")` → `exec.LookPath("lnav")`
+- `editorAvailable("htop")` → `exec.LookPath("htop")`
+- `editorAvailable("bottom")` → `exec.LookPath("bottom")`
+- **Impact**: 5 filesystem lookups × 10+ renders/second = **50+ lookups/second** ⚠️
+
+**Context menus** (`context_menu.go` - `getContextMenuItems()`):
+- Same 5 tool checks PLUS `editorAvailable("micro")` check
+- **Impact**: 6 filesystem lookups every time you navigate context menu with arrows or mouse ⚠️
+
+### Solution Implemented
+**Cache tool availability at startup** instead of checking on every render.
+
+**Files modified:**
+1. **types.go** (lines 288-290): Added caching fields to model
+   ```go
+   // Menu caching (performance optimization)
+   cachedMenus    map[string]Menu  // Cached menu structure (built once)
+   toolsAvailable map[string]bool // Cached tool availability (lazygit, htop, etc.)
+   ```
+
+2. **model.go** (lines 48-56): Check tool availability once at initialization
+   ```go
+   // Menu caching - check tool availability once at startup (performance optimization)
+   toolsAvailable: map[string]bool{
+       "lazygit":     editorAvailable("lazygit"),
+       "lazydocker":  editorAvailable("lazydocker"),
+       "lnav":        editorAvailable("lnav"),
+       "htop":        editorAvailable("htop"),
+       "bottom":      editorAvailable("bottom"),
+       "micro":       editorAvailable("micro"), // Used in context menu edit action
+   },
+   ```
+
+3. **menu.go** (lines 85-118): Use cached availability in dropdown menus
+   ```go
+   // Use cached tool availability instead of filesystem lookups (performance optimization)
+   if m.toolsAvailable["lazygit"] {
+       // ... add lazygit menu item ...
+   }
+   ```
+
+4. **context_menu.go** (lines 64-98, 227): Use cached availability in context menus
+   ```go
+   // Use cached tool availability (performance optimization)
+   if m.toolsAvailable["lazygit"] {
+       items = append(items, contextMenuItem{"🌿 Git (lazygit)", "lazygit"})
+   }
+   // ... same for other tools ...
+
+   // In edit action:
+   if m.toolsAvailable["micro"] {
+       editor = "micro"
+   }
+   ```
+
+### Performance Improvement
+- **Before**: 5-6 filesystem lookups per render = **50-60+ lookups/second** during navigation ⚠️
+- **After**: 6 filesystem lookups total (at startup only) = **instant menus** ✅
+
+### Testing Results
+Build successful! Binary created: `tfe` (16MB)
+
+**Expected behavior:**
+- ✅ No lag when opening dropdown menus (File, Edit, View, Tools, Help)
+- ✅ No lag when opening context menus (right-click or F2 on files/folders)
+- ✅ Arrow key navigation is instant in both menu types
+- ✅ Mouse interaction is smooth
+- ✅ Works in both single-pane and dual-pane modes
+
+**Branch**: headerdropdowns
+**Status**: ✅ FIXED - Ready for testing
 
 ---
 

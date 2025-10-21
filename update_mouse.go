@@ -145,10 +145,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 							m.activeMenu = ""
 							m.selectedMenuItem = -1
 						} else {
-							// Open menu
+							// Open menu and select first non-separator item
 							m.menuOpen = true
 							m.activeMenu = menuKey
-							m.selectedMenuItem = -1
+							m.selectedMenuItem = m.getFirstSelectableMenuItem(menuKey)
 						}
 						return m, nil
 					}
@@ -785,6 +785,20 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.MouseButtonWheelUp:
+		// If dropdown menu is open, scroll the menu
+		if m.menuOpen && m.activeMenu != "" {
+			if m.selectedMenuItem > 0 {
+				// Skip separators when scrolling up
+				m.selectedMenuItem--
+				menus := m.getMenus()
+				menu := menus[m.activeMenu]
+				for m.selectedMenuItem > 0 && menu.Items[m.selectedMenuItem].IsSeparator {
+					m.selectedMenuItem--
+				}
+			}
+			return m, nil
+		}
+
 		// If context menu is open, scroll the menu
 		if m.contextMenuOpen {
 			if m.contextMenuCursor > 0 {
@@ -814,6 +828,20 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.MouseButtonWheelDown:
+		// If dropdown menu is open, scroll the menu
+		if m.menuOpen && m.activeMenu != "" {
+			menus := m.getMenus()
+			menu := menus[m.activeMenu]
+			if m.selectedMenuItem < len(menu.Items)-1 {
+				// Skip separators when scrolling down
+				m.selectedMenuItem++
+				for m.selectedMenuItem < len(menu.Items)-1 && menu.Items[m.selectedMenuItem].IsSeparator {
+					m.selectedMenuItem++
+				}
+			}
+			return m, nil
+		}
+
 		// If context menu is open, scroll the menu
 		if m.contextMenuOpen {
 			menuItems := m.getContextMenuItems()

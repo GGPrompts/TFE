@@ -15,114 +15,152 @@ import (
 // When to extend: Add new menus or menu items here
 
 // getMenus returns all available menus with current state
+// Uses cached tool availability to avoid repeated filesystem lookups (performance optimization)
 func (m model) getMenus() map[string]Menu {
+	// Build menus with current state
+	// Performance: Uses m.toolsAvailable (cached at startup) instead of editorAvailable()
+	// This eliminates 5 filesystem lookups per render (was causing lag)
+	// Build File menu dynamically (add New Image if textual-paint is available)
+	fileMenuItems := []MenuItem{
+		{Label: "📁 New Folder...", Action: "new-folder", Shortcut: "F7"},
+		{Label: "📄 New File...", Action: "new-file"},
+	}
+
+	// Add "New Image..." if textual-paint is available
+	if m.toolsAvailable["textual-paint"] {
+		fileMenuItems = append(fileMenuItems, MenuItem{Label: "🎨 New Image...", Action: "new-image"})
+	}
+
+	fileMenuItems = append(fileMenuItems,
+		MenuItem{Label: "📂 Open", Action: "open", Shortcut: "Enter"},
+		MenuItem{IsSeparator: true},
+		MenuItem{Label: "📋 Copy Path", Action: "copy-path", Shortcut: "F5"},
+		MenuItem{IsSeparator: true},
+		MenuItem{Label: "🚪 Exit", Action: "quit", Shortcut: "F10"},
+	)
+
 	menus := map[string]Menu{
 		"file": {
 			Label: "File",
-			Items: []MenuItem{
-				{Label: "New Folder...", Action: "new-folder", Shortcut: "F7"},
-				{Label: "New File...", Action: "new-file"},
-				{Label: "Open", Action: "open", Shortcut: "Enter"},
-				{IsSeparator: true},
-				{Label: "Copy Path", Action: "copy-path", Shortcut: "F5"},
-				{IsSeparator: true},
-				{Label: "Exit", Action: "quit", Shortcut: "F10"},
-			},
+			Items: fileMenuItems,
 		},
 		"edit": {
 			Label: "Edit",
 			Items: []MenuItem{
-				{Label: "Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
+				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
 				{IsSeparator: true},
-				{Label: "Delete", Action: "delete", Shortcut: "F8"},
+				{Label: "🗑️  Delete", Action: "delete", Shortcut: "F8"},
 			},
 		},
 		"view": {
 			Label: "View",
 			Items: []MenuItem{
-				{Label: "Details", Action: "display-detail", Shortcut: "2", IsCheckable: true, IsChecked: m.displayMode == modeDetail},
-				{Label: "List", Action: "display-list", Shortcut: "1", IsCheckable: true, IsChecked: m.displayMode == modeList},
-				{Label: "Tree", Action: "display-tree", Shortcut: "3", IsCheckable: true, IsChecked: m.displayMode == modeTree},
+				{Label: "📋 Details", Action: "display-detail", Shortcut: "2", IsCheckable: true, IsChecked: m.displayMode == modeDetail},
+				{Label: "📄 List", Action: "display-list", Shortcut: "1", IsCheckable: true, IsChecked: m.displayMode == modeList},
+				{Label: "🌳 Tree", Action: "display-tree", Shortcut: "3", IsCheckable: true, IsChecked: m.displayMode == modeTree},
 				{IsSeparator: true},
-				{Label: "Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
-				{Label: "Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
+				{Label: "⬌ Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
+				{Label: "👁️  Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
 				{IsSeparator: true},
-				{Label: "Refresh", Action: "refresh", Shortcut: "F5"},
+				{Label: "🔄 Refresh", Action: "refresh", Shortcut: "F5"},
 			},
 		},
 		"tools": {
 			Label: "Tools",
 			Items: []MenuItem{
-				{Label: "Command Prompt", Action: "toggle-command", Shortcut: ":", IsCheckable: true, IsChecked: m.commandFocused},
-				{Label: "Search in Folder", Action: "toggle-search", Shortcut: "/"},
-				{Label: "Fuzzy Search", Action: "fuzzy-search", Shortcut: "Ctrl+P"},
+				{Label: ">_ Command Prompt", Action: "toggle-command", Shortcut: ":", IsCheckable: true, IsChecked: m.commandFocused},
+				{Label: "🔍 Search in Folder", Action: "toggle-search", Shortcut: "/"},
+				{Label: "🎯 Fuzzy Search", Action: "fuzzy-search", Shortcut: "Ctrl+P"},
 			},
 		},
 		"help": {
 			Label: "Help",
 			Items: []MenuItem{
-				{Label: "Keyboard Shortcuts", Action: "show-hotkeys", Shortcut: "F1"},
-				{Label: "About TFE", Action: "show-about"},
+				{Label: "⌨️  Keyboard Shortcuts", Action: "show-hotkeys", Shortcut: "F1"},
+				{Label: "ℹ️  About TFE", Action: "show-about"},
 				{IsSeparator: true},
-				{Label: "GitHub Repository", Action: "open-github"},
+				{Label: "🔗 GitHub Repository", Action: "open-github"},
 			},
 		},
 	}
 
-	// Add TUI tools to Tools menu if available
+	// Add TUI tools to Tools menu if available (using cached availability)
 	toolsMenu := menus["tools"]
 	hasTools := false
 
-	if editorAvailable("lazygit") {
+	// Use cached tool availability instead of filesystem lookups (performance optimization)
+	if m.toolsAvailable["lazygit"] {
 		if !hasTools {
 			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
 			hasTools = true
 		}
-		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Git (lazygit)", Action: "lazygit"})
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🌿 Git (lazygit)", Action: "lazygit"})
 	}
-	if editorAvailable("lazydocker") {
+	if m.toolsAvailable["lazydocker"] {
 		if !hasTools {
 			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
 			hasTools = true
 		}
-		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Docker (lazydocker)", Action: "lazydocker"})
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🐋 Docker (lazydocker)", Action: "lazydocker"})
 	}
-	if editorAvailable("lnav") {
+	if m.toolsAvailable["lnav"] {
 		if !hasTools {
 			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
 			hasTools = true
 		}
-		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Logs (lnav)", Action: "lnav"})
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📜 Logs (lnav)", Action: "lnav"})
 	}
-	if editorAvailable("htop") {
+	if m.toolsAvailable["htop"] {
 		if !hasTools {
 			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
 			hasTools = true
 		}
-		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "System Monitor (htop)", Action: "htop"})
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📊 Processes (htop)", Action: "htop"})
 	}
-	if editorAvailable("bottom") {
+	if m.toolsAvailable["bottom"] {
 		if !hasTools {
 			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
 			hasTools = true
 		}
-		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "System Monitor (bottom)", Action: "bottom"})
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📊 Monitor (bottom)", Action: "bottom"})
 	}
 
 	// Add Prompts Library and Games
 	toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
-	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly})
-	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Games Launcher", Action: "launch-games"})
-	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly})
+	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📝 Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly})
+	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🎮 Games Launcher", Action: "launch-games"})
+	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🗑️  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly})
 
 	menus["tools"] = toolsMenu
 
+	// The performance win comes from using m.toolsAvailable instead of editorAvailable()
+	// which eliminates 5 filesystem lookups per render (was causing dropdown lag)
 	return menus
 }
 
 // getMenuOrder returns the order of menus in the menu bar
 func getMenuOrder() []string {
 	return []string{"file", "edit", "view", "tools", "help"}
+}
+
+// getFirstSelectableMenuItem returns the index of the first non-separator item in the menu
+// Returns 0 if no valid items found (fallback)
+func (m model) getFirstSelectableMenuItem(menuKey string) int {
+	menus := m.getMenus()
+	menu, exists := menus[menuKey]
+	if !exists {
+		return 0
+	}
+
+	// Find first non-separator item
+	for i, item := range menu.Items {
+		if !item.IsSeparator {
+			return i
+		}
+	}
+
+	// Fallback to 0 if all items are separators (shouldn't happen)
+	return 0
 }
 
 // renderMenuBar renders the menu bar (replaces GitHub link after 5s)
@@ -449,6 +487,16 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 			dialogType: dialogInput,
 			title:      "Create File",
 			message:    "Enter filename:",
+			input:      "",
+		}
+		m.showDialog = true
+
+	case "new-image":
+		// Create new image and open in textual-paint
+		m.dialog = dialogModel{
+			dialogType: dialogInput,
+			title:      "Create Image",
+			message:    "Enter image filename (e.g., drawing.png):",
 			input:      "",
 		}
 		m.showDialog = true
