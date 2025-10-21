@@ -661,15 +661,20 @@ func (m model) renderTreeView(maxVisible int) string {
 		}
 
 		// Set reasonable bounds
-		if maxNameLen < 20 {
-			maxNameLen = 20
+		// Allow very narrow widths when pane is narrow (important for accordion mode)
+		if maxNameLen < 5 {
+			maxNameLen = 5  // Absolute minimum (shows a few chars + "..")
 		}
 		if maxNameLen > 100 {
 			maxNameLen = 100 // Reasonable maximum
 		}
 
 		if len(displayName) > maxNameLen {
-			displayName = displayName[:maxNameLen-2] + ".."
+			if maxNameLen > 2 {
+				displayName = displayName[:maxNameLen-2] + ".."
+			} else {
+				displayName = displayName[:maxNameLen]  // Very narrow, no room for ".."
+			}
 		}
 
 		// Build the line with special handling for global virtual folders to preserve emoji color
