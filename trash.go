@@ -11,10 +11,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"syscall"
 	"time"
 )
 
@@ -132,8 +135,30 @@ func moveToTrash(path string) error {
 	}
 
 	// Move the file/directory to trash
-	if err := os.Rename(path, trashedPath); err != nil {
-		return fmt.Errorf("failed to move to trash: %w", err)
+	// Try rename first (fast, atomic)
+	err = os.Rename(path, trashedPath)
+	if err != nil {
+		// Check if this is a cross-device error (different mount points)
+		if errors.Is(err, syscall.EXDEV) {
+			// Fallback to copy+delete for cross-device moves
+			// This happens when moving between different filesystems
+			// (e.g., /tmp → ~/.config/tfe/trash on different partitions)
+			err = copyRecursive(path, trashedPath)
+			if err != nil {
+				return fmt.Errorf("failed to copy to trash: %w", err)
+			}
+
+			// Only delete original after successful copy
+			err = os.RemoveAll(path)
+			if err != nil {
+				// Try to clean up the copy since we couldn't delete the original
+				os.RemoveAll(trashedPath)
+				return fmt.Errorf("failed to delete original after copy: %w", err)
+			}
+		} else {
+			// Some other error (permissions, etc.)
+			return fmt.Errorf("failed to move to trash: %w", err)
+		}
 	}
 
 	// Load existing trash metadata
@@ -270,6 +295,70 @@ func getTrashSize() (int64, error) {
 	}
 
 	return totalSize, nil
+}
+
+// copyRecursive copies a file or directory recursively from src to dst
+// This is used as a fallback when os.Rename() fails due to cross-device errors
+func copyRecursive(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to stat source: %w", err)
+	}
+
+	if info.IsDir() {
+		return copyDir(src, dst, info)
+	}
+	return copyFile(src, dst, info)
+}
+
+// copyDir recursively copies a directory
+func copyDir(src, dst string, info os.FileInfo) error {
+	// Create destination directory with same permissions
+	if err := os.MkdirAll(dst, info.Mode()); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Read directory entries
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	// Copy each entry recursively
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if err := copyRecursive(srcPath, dstPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// copyFile copies a single file, preserving permissions
+func copyFile(src, dst string, info os.FileInfo) error {
+	// Open source file
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source: %w", err)
+	}
+	defer srcFile.Close()
+
+	// Create destination file with same permissions
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return fmt.Errorf("failed to create destination: %w", err)
+	}
+	defer dstFile.Close()
+
+	// Copy contents
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return fmt.Errorf("failed to copy contents: %w", err)
+	}
+
+	return nil
 }
 
 // cleanupOldTrash removes items from trash older than the specified duration

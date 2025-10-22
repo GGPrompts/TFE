@@ -61,6 +61,9 @@ func initialModel() model {
 			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
 		},
 		cachedMenus: nil, // Will be built on first access
+		// Landing page - show on startup
+		showLandingPage: true,
+		landingPage:     nil, // Will be initialized on first WindowSizeMsg
 	}
 
 	m.loadFiles()

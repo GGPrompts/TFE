@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -28,7 +29,28 @@ func getAvailableEditor() string {
 
 // openEditor opens a file in an external editor
 func openEditor(editor, path string) tea.Cmd {
-	c := exec.Command(editor, path)
+	// SECURITY: Validate filename to prevent argument injection
+	// Filenames starting with '-' could be interpreted as editor flags
+	cleanPath := filepath.Clean(path)
+	filename := filepath.Base(cleanPath)
+
+	if strings.HasPrefix(filename, "-") {
+		return func() tea.Msg {
+			return editorFinishedMsg{
+				err: fmt.Errorf("invalid filename: cannot open files starting with '-' (potential argument injection)"),
+			}
+		}
+	}
+
+	// Use absolute path to avoid ambiguity
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return func() tea.Msg {
+			return editorFinishedMsg{err: err}
+		}
+	}
+
+	c := exec.Command(editor, absPath)
 	return tea.Sequence(
 		tea.ClearScreen,
 		tea.ExecProcess(c, func(err error) tea.Msg {

@@ -108,13 +108,35 @@ TFE follows a **modular architecture**. Please read `CLAUDE.md` for detailed inf
 
 ### Adding New Features
 
-When adding a new feature:
+When adding a new feature, use this decision tree to find the right location:
 
-1. **Check if it fits an existing module** (see `CLAUDE.md`)
-2. **Create a new module if needed** for substantial features
-3. **Update documentation** (`CLAUDE.md`, `README.md`, `HOTKEYS.md` as applicable)
-4. **Add tests** for new functionality (minimum 40% coverage for new code)
-5. **Update `CHANGELOG.md`** with your changes
+1. **New type/struct?** → `types.go`
+2. **Visual style?** → `styles.go`
+3. **Keyboard shortcut?** → `update_keyboard.go`
+4. **Mouse interaction?** → `update_mouse.go`
+5. **Rendering logic?** → `view.go` or `render_*.go`
+6. **File operation?** → `file_operations.go`
+7. **External tool integration?** → `editor.go`
+8. **Complex feature?** → Create a new module (e.g., `search.go`)
+
+After implementing:
+1. **Update documentation** (`CLAUDE.md`, `README.md`, `HOTKEYS.md` as applicable)
+2. **Add tests** for new functionality (minimum 40% coverage for new code)
+3. **Update `CHANGELOG.md`** with your changes
+
+### Security Considerations
+
+TFE has several security features to be aware of:
+
+- **Command allowlist** (`command.go`) - Only safe commands allowed by default; use `!` prefix for unrestricted access
+- **Path traversal protection** (`file_operations.go`) - Restricts navigation to safe directories
+- **Filename validation** (`editor.go`) - Prevents argument injection via filenames starting with `-`
+- **Cross-device safety** (`trash.go`) - Safe file operations across different filesystems
+
+If your contribution touches security-sensitive areas:
+- Add comments explaining the security implications
+- Test with potentially malicious inputs (e.g., filenames with special characters, symlinks, `../../etc`)
+- Consider cross-platform edge cases
 
 ## Testing
 
@@ -278,14 +300,53 @@ Add screenshots for UI changes
 - Address any feedback or requested changes
 - Once approved, your PR will be merged
 
+## Common Pitfalls
+
+### 1. Header Duplication
+⚠️ The header/menu bar exists in TWO locations:
+- `view.go` → `renderSinglePane()` (single-pane mode)
+- `render_preview.go` → `renderDualPane()` (dual-pane mode)
+
+If you modify the header, **update BOTH files**! See CLAUDE.md for details.
+
+### 2. Mouse Coordinates
+Mouse coordinates are 1-indexed in Bubbletea but 0-indexed internally. Always subtract 1:
+```go
+clickedRow := msg.Y - 1
+```
+
+### 3. Terminal Width
+Always check terminal width before rendering wide content:
+```go
+if m.width < 80 {
+    // Handle narrow terminal (Termux)
+}
+```
+
+### 4. File Handle Leaks
+Always close file handles with defer:
+```go
+f, err := os.Open(path)
+if err != nil {
+    return err
+}
+defer f.Close()  // Critical!
+```
+
+### 5. Testing on Mobile
+TFE is heavily used on Android via Termux. Test your changes on narrow terminals:
+- Test at 80 columns minimum
+- Check that horizontal scrolling works
+- Verify touch/mouse interactions
+
 ## Documentation Line Limits
 
 To keep documentation manageable, please adhere to these limits:
 
 - `CLAUDE.md`: 500 lines max
-- `README.md`: 400 lines max
+- `README.md`: 600 lines max (user-facing, can be longer)
 - `PLAN.md`: 400 lines max
-- `CHANGELOG.md`: 300 lines max
+- `CHANGELOG.md`: 350 lines max (create CHANGELOG2.md when exceeded)
 
 If a file exceeds its limit, archive old content to `docs/archive/`.
 

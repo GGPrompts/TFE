@@ -867,6 +867,47 @@ func (m *model) loadFiles() {
 		return
 	}
 
+	// SECURITY: Validate and clean the path to prevent directory traversal attacks
+	// This prevents malicious navigation to sensitive system directories
+	cleanPath, err := filepath.Abs(m.currentPath)
+	if err != nil {
+		m.files = []fileItem{}
+		m.setStatusMessage(fmt.Sprintf("Error: Invalid path: %v", err), true)
+		return
+	}
+
+	// Clean the path to resolve .. and . components
+	cleanPath = filepath.Clean(cleanPath)
+
+	// Optional: Restrict navigation to home directory or initial working directory
+	// This can be made configurable via a --allow-full-access flag if needed
+	homeDir, _ := os.UserHomeDir()
+	initialWD, _ := os.Getwd()
+
+	// Allow access if path is under home directory OR under initial working directory
+	allowedByHome := homeDir != "" && strings.HasPrefix(cleanPath, homeDir)
+	allowedByWD := initialWD != "" && strings.HasPrefix(cleanPath, initialWD)
+
+	if !allowedByHome && !allowedByWD {
+		// Check if we're trying to access system directories
+		restrictedPrefixes := []string{"/etc", "/root", "/boot", "/sys", "/proc"}
+		for _, prefix := range restrictedPrefixes {
+			if strings.HasPrefix(cleanPath, prefix) {
+				m.files = []fileItem{}
+				m.setStatusMessage(fmt.Sprintf("Access denied: %s (restricted system directory)", cleanPath), true)
+				// Revert to home directory for safety
+				if homeDir != "" {
+					m.currentPath = homeDir
+					m.loadFiles() // Recursive call with safe path
+				}
+				return
+			}
+		}
+	}
+
+	// Update to the cleaned path
+	m.currentPath = cleanPath
+
 	entries, err := os.ReadDir(m.currentPath)
 	if err != nil {
 		m.files = []fileItem{}

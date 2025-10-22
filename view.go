@@ -12,6 +12,14 @@ import (
 )
 
 func (m model) View() string {
+	// Show landing page if active
+	if m.showLandingPage {
+		if m.landingPage != nil {
+			return m.landingPage.Render()
+		}
+		return "Loading..."
+	}
+
 	// If fuzzy search is active, return empty string
 	// (go-fzf handles its own rendering)
 	if m.fuzzySearchActive {

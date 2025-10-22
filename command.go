@@ -29,24 +29,91 @@ type commandFinishedMsg struct {
 // 1. Echo the command that was typed
 // 2. Execute the command and show output
 // 3. Wait for user to press a key before returning
+//
+// SECURITY: Uses command allowlist to prevent arbitrary command execution.
+// For more flexibility, use the ! prefix to bypass restrictions (e.g., ":!your-command")
 func runCommand(command, dir string) tea.Cmd {
 	return func() tea.Msg {
-		// Build a shell script that:
-		// 1. Echoes the command being run
-		// 2. Executes the command
-		// 3. Prompts user to press any key to continue
-		// Note: Use bash instead of sh for better read support
-		script := fmt.Sprintf(`
-echo "$ %s"
-cd %s || exit 1
-%s
+		// Parse command into parts
+		parts := strings.Fields(command)
+		if len(parts) == 0 {
+			return commandFinishedMsg{err: fmt.Errorf("empty command")}
+		}
+
+		// Allowlist of safe read-only and utility commands
+		// These commands are deemed safe for general use in a file explorer
+		safeCommands := map[string]bool{
+			"ls":     true, // List directory
+			"cat":    true, // Display file contents
+			"grep":   true, // Search text
+			"find":   true, // Find files
+			"head":   true, // Display file start
+			"tail":   true, // Display file end
+			"wc":     true, // Count lines/words
+			"file":   true, // Determine file type
+			"git":    true, // Git operations (read: status, log, diff)
+			"tree":   true, // Directory tree
+			"du":     true, // Disk usage
+			"df":     true, // Disk free space
+			"pwd":    true, // Print working directory
+			"date":   true, // Display date/time
+			"whoami": true, // Display current user
+			"echo":   true, // Print text
+			"which":  true, // Locate command
+			"stat":   true, // File statistics
+			"diff":   true, // Compare files
+			"sort":   true, // Sort lines
+			"uniq":   true, // Filter duplicate lines
+			"cut":    true, // Extract columns
+			"awk":    true, // Text processing
+			"sed":    true, // Stream editor
+			"less":   true, // Pager
+			"more":   true, // Pager
+			"hexdump": true, // Hex viewer
+			"strings": true, // Extract strings
+		}
+
+		executable := parts[0]
+		if !safeCommands[executable] {
+			// Build wrapper script that shows error and prompts
+			errMsg := fmt.Sprintf("⚠️  Command not allowed: %s\n\nFor security, only safe read-only commands are allowed.\nUse the ! prefix to execute without restrictions:\n  Example: :!%s\n\nSafe commands: ls, cat, grep, find, git, tree, du, etc.\nSee HOTKEYS.md for full list.", executable, command)
+			script := fmt.Sprintf(`
+echo %s
 echo ""
 echo "Press any key to continue..."
 read -n 1 -s -r
-`, shellQuote(command), shellQuote(dir), command)
+`, shellQuote(errMsg))
 
-		// Create the command using bash for better compatibility with read -n
-		c := exec.Command("bash", "-c", script)
+			c := exec.Command("bash", "-c", script)
+			c.Stdin = os.Stdin
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+
+			return tea.Sequence(
+				tea.ClearScreen,
+				tea.ExecProcess(c, func(err error) tea.Msg {
+					return commandFinishedMsg{err: err}
+				}),
+			)()
+		}
+
+		// Execute command safely without shell interpretation
+		// This prevents injection attacks like "ls; rm -rf ~"
+		script := fmt.Sprintf(`
+echo "$ %s"
+cd %s || exit 1
+exec %s "$@"
+echo ""
+echo "Press any key to continue..."
+read -n 1 -s -r
+`, shellQuote(command), shellQuote(dir), shellQuote(executable))
+
+		// Pass arguments after executable as separate parameters
+		args := []string{"-c", script, "--"}
+		args = append(args, parts[1:]...)
+
+		c := exec.Command("bash", args...)
+		c.Dir = dir
 		c.Stdin = os.Stdin
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
@@ -64,9 +131,17 @@ read -n 1 -s -r
 // runCommandAndExit executes a shell command and exits TFE
 // Used when command is prefixed with ! (e.g., ":!claude --yolo")
 // This is useful for launching long-running TUI apps like Claude Code
+//
+// SECURITY NOTE: This function intentionally allows ANY command when using ! prefix.
+// This is a power-user feature for flexibility. The security boundary is:
+// - Regular commands (:ls) → Allowlist enforced in runCommand()
+// - Unrestricted commands (:!anything) → Full shell access via this function
+// Users must understand that ! prefix gives full shell access.
 func runCommandAndExit(command, dir string) tea.Cmd {
 	return func() tea.Msg {
 		// Build a shell script that changes to directory and runs command
+		// Note: command is still inserted into shell script, but this is intentional
+		// for the ! prefix feature. Users explicitly request unrestricted access.
 		script := fmt.Sprintf(`
 cd %s || exit 1
 exec %s

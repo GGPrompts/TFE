@@ -2,6 +2,7 @@ package main
 
 import (
 	"regexp"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,7 +19,20 @@ import (
 // - Helper function: isSpecialKey() for detecting non-printable keys
 
 func (m model) Init() tea.Cmd {
-	return m.spinner.Tick
+	return tea.Batch(
+		m.spinner.Tick,
+		tickCmd(), // Start landing page animation
+	)
+}
+
+// tickMsg for landing page animation
+type tickMsg struct{}
+
+// tickCmd creates a command that sends tick messages for animation
+func tickCmd() tea.Cmd {
+	return tea.Tick(time.Millisecond*50, func(t time.Time) tea.Msg {
+		return tickMsg{}
+	})
 }
 
 // stripANSI removes ANSI escape codes from a string
@@ -91,11 +105,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle window resize
 		m.height = msg.Height
 		m.width = msg.Width
+
+		// Initialize or resize landing page
+		if m.landingPage == nil {
+			m.landingPage = NewLandingPage(msg.Width, msg.Height)
+		} else {
+			m.landingPage.Resize(msg.Width, msg.Height)
+		}
+
 		m.calculateLayout()      // Recalculate pane layout on resize
 		m.populatePreviewCache() // Repopulate cache with new width
 
 		// Reset horizontal scroll on window resize
 		m.detailScrollX = 0
+
+	case tickMsg:
+		// Update landing page animation
+		if m.showLandingPage && m.landingPage != nil {
+			m.landingPage.Update()
+		}
+		return m, tickCmd() // Continue animation
 
 	case spinner.TickMsg:
 		// Update spinner animation
