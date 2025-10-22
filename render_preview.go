@@ -98,8 +98,8 @@ func wrapLine(line string, width int) []string {
 				currentLine = word
 				currentWidth = wordWidth
 			} else {
-				// Word is too long, force break it
-				wrapped = append(wrapped, word[:width])
+				// Word is too long, force break it using visual width
+				wrapped = append(wrapped, truncateToWidth(word, width))
 				currentLine = ""
 				currentWidth = 0
 			}
@@ -114,8 +114,8 @@ func wrapLine(line string, width int) []string {
 				currentLine = word
 				currentWidth = wordWidth
 			} else {
-				// Word is too long, force break it
-				wrapped = append(wrapped, word[:width])
+				// Word is too long, force break it using visual width
+				wrapped = append(wrapped, truncateToWidth(word, width))
 				currentLine = ""
 				currentWidth = 0
 			}
@@ -400,13 +400,37 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	var s strings.Builder
 	tmpl := m.preview.promptTemplate
 
+	// Calculate box content width early so we can use it for all header elements
+	var boxContentWidth int
+	if m.viewMode == viewFullPreview {
+		boxContentWidth = m.width - 6
+	} else {
+		boxContentWidth = m.rightWidth - 2
+	}
+
+	// Calculate wrapping width for header elements (leave room for padding)
+	headerWrapWidth := boxContentWidth - 2
+	if headerWrapWidth < 20 {
+		headerWrapWidth = 20 // Minimum width for readability
+	}
+
 	// Build header lines
 	var headerLines []string
 
 	// Prompt name (if available)
 	if tmpl.name != "" {
 		nameStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-		headerLines = append(headerLines, nameStyle.Render("📝 "+tmpl.name))
+		nameLine := "📝 " + tmpl.name
+
+		// Wrap name if too long (use visual width)
+		if visualWidth(nameLine) > headerWrapWidth {
+			wrapped := wrapLine(nameLine, headerWrapWidth)
+			for _, line := range wrapped {
+				headerLines = append(headerLines, nameStyle.Render(line))
+			}
+		} else {
+			headerLines = append(headerLines, nameStyle.Render(nameLine))
+		}
 		headerLines = append(headerLines, "") // Blank line
 	}
 
@@ -414,20 +438,9 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	if tmpl.description != "" {
 		descStyle := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("245"))
 
-		// Calculate available width (rough estimate)
-		var tempWidth int
-		if m.viewMode == viewFullPreview {
-			tempWidth = m.width - 8
-		} else {
-			tempWidth = m.rightWidth - 4
-		}
-		if tempWidth < 40 {
-			tempWidth = 40
-		}
-
-		// Wrap description if too long
-		if len(tmpl.description) > tempWidth {
-			wrapped := wrapLine(tmpl.description, tempWidth)
+		// Wrap description if too long (use visual width, not byte length)
+		if visualWidth(tmpl.description) > headerWrapWidth {
+			wrapped := wrapLine(tmpl.description, headerWrapWidth)
 			for _, line := range wrapped {
 				headerLines = append(headerLines, descStyle.Render(line))
 			}
@@ -458,38 +471,47 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		sourceIcon = "📁"
 		sourceLabel = "Local Prompt"
 	}
-	headerLines = append(headerLines, sourceStyle.Render(sourceIcon+" "+sourceLabel))
+
+	// Wrap source line if needed (use visual width)
+	sourceLine := sourceIcon + " " + sourceLabel
+	if visualWidth(sourceLine) > headerWrapWidth {
+		wrapped := wrapLine(sourceLine, headerWrapWidth)
+		for _, line := range wrapped {
+			headerLines = append(headerLines, sourceStyle.Render(line))
+		}
+	} else {
+		headerLines = append(headerLines, sourceStyle.Render(sourceLine))
+	}
 
 	// Variables detected (if any) - wrap long lines to prevent layout issues
 	if len(tmpl.variables) > 0 {
 		varsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 		varsLine := fmt.Sprintf("Variables: %s", strings.Join(tmpl.variables, ", "))
 
-		// Calculate available width for header (use rough estimate before full calculation)
-		var tempWidth int
-		if m.viewMode == viewFullPreview {
-			tempWidth = m.width - 8 // Conservative estimate
-		} else {
-			tempWidth = m.rightWidth - 4
-		}
-		if tempWidth < 40 {
-			tempWidth = 40
-		}
-
-		// Wrap the variables line if it's too long
-		if len(varsLine) > tempWidth {
-			// Wrap manually at available width
+		// Wrap the variables line if it's too long (use visual width, not byte length)
+		if visualWidth(varsLine) > headerWrapWidth {
+			// Wrap manually at available width using visual width
 			remaining := varsLine
 			for len(remaining) > 0 {
-				if len(remaining) <= tempWidth {
+				if visualWidth(remaining) <= headerWrapWidth {
 					headerLines = append(headerLines, varsStyle.Render(remaining))
 					break
 				}
 				// Find last comma before width limit for natural break
-				breakPoint := tempWidth
-				lastComma := strings.LastIndex(remaining[:tempWidth], ",")
-				if lastComma > 0 && lastComma > tempWidth-20 { // Use comma if it's not too far back
-					breakPoint = lastComma + 1 // Include comma
+				breakPoint := headerWrapWidth
+				// Search backwards for a comma that gives us a line within the width
+				for i := len(remaining) - 1; i >= 0; i-- {
+					if remaining[i] == ',' && visualWidth(remaining[:i+1]) <= headerWrapWidth {
+						breakPoint = i + 1 // Include comma
+						break
+					}
+				}
+				// If no good comma found, force break at width
+				if breakPoint == headerWrapWidth && visualWidth(remaining[:breakPoint]) > headerWrapWidth {
+					// Binary search for the right break point by visual width
+					for visualWidth(remaining[:breakPoint]) > headerWrapWidth && breakPoint > 0 {
+						breakPoint--
+					}
 				}
 				headerLines = append(headerLines, varsStyle.Render(strings.TrimSpace(remaining[:breakPoint])))
 				remaining = strings.TrimSpace(remaining[breakPoint:])
@@ -499,26 +521,17 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		}
 	}
 
-	// Separator line
+	// Separator line - use full header wrap width (each char is 1 visual width)
 	separatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	headerLines = append(headerLines, separatorStyle.Render("─────────────────────────────────────"))
-	headerLines = append(headerLines, "") // Blank line before content
+	separatorLine := strings.Repeat("─", headerWrapWidth) // Full width separator
+	headerLines = append(headerLines, separatorStyle.Render(separatorLine))
+	// No blank line after separator - the separator itself provides visual separation
 
 	// Calculate how many lines the header takes
 	headerHeight := len(headerLines)
 
-	// Calculate available width
-	var availableWidth int
-	var boxContentWidth int
-
-	if m.viewMode == viewFullPreview {
-		boxContentWidth = m.width - 6
-	} else {
-		boxContentWidth = m.rightWidth - 2
-	}
-
-	// Prompts don't show line numbers, so use full width
-	availableWidth = boxContentWidth - 2 // Just padding
+	// Calculate available width for content (prompts don't show line numbers, so use full width)
+	availableWidth := boxContentWidth - 2 // Just padding
 
 	if availableWidth < 20 {
 		availableWidth = 20
@@ -567,13 +580,14 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		}
 	}
 
-	// Wrap content lines (only if not markdown and not in edit/preview mode - Glamour already wraps, ANSI codes don't wrap well)
+	// Wrap content lines (markdown is already wrapped by Glamour, but ANSI-styled text needs wrapping)
 	var wrappedLines []string
-	if isMarkdownPrompt || m.promptEditMode || (m.preview.isPrompt && m.showPromptsOnly && !m.promptEditMode) {
-		// Glamour already wrapped OR has ANSI codes (edit mode or colored variables) - use as-is
+	if isMarkdownPrompt {
+		// Glamour already wrapped - use as-is
 		wrappedLines = contentLines
 	} else {
-		// Plain text - wrap manually
+		// Wrap all other content (plain text, edit mode, or colored variables)
+		// wrapLine() uses visualWidth() which correctly handles ANSI codes
 		for _, line := range contentLines {
 			wrapped := wrapLine(line, availableWidth)
 			wrappedLines = append(wrappedLines, wrapped...)
@@ -605,10 +619,15 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	// Collect rendered lines so we can join without trailing newline
 	renderedLines := make([]string, 0, maxVisible)
 
-	// Render header
+	// Render header - truncate each line to fit within box width
 	for _, line := range headerLines {
 		if len(renderedLines) >= maxVisible {
 			break
+		}
+		// Truncate to box content width to prevent terminal wrapping
+		// (lipgloss styles and emojis can exceed expected width)
+		if visualWidth(line) > boxContentWidth {
+			line = truncateToWidth(line, boxContentWidth)
 		}
 		renderedLines = append(renderedLines, line+"\033[0m")
 	}
@@ -618,6 +637,11 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		line := wrappedLines[i]
 		if isMarkdownPrompt {
 			line = "  " + line // 2-space left padding
+		}
+		// Truncate to box content width to prevent terminal wrapping
+		// (even though content was wrapped, markdown padding or ANSI codes could push it over)
+		if visualWidth(line) > boxContentWidth {
+			line = truncateToWidth(line, boxContentWidth)
 		}
 		renderedLines = append(renderedLines, line+"\033[0m")
 	}
@@ -662,6 +686,14 @@ func (m model) renderScrollbar(lineIndex, visibleLines, totalLines int) string {
 // max returns the maximum of two integers
 func max(a, b int) int {
 	if a > b {
+		return a
+	}
+	return b
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
 		return a
 	}
 	return b
