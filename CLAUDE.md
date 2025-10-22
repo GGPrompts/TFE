@@ -14,23 +14,27 @@ TFE follows a **modular architecture** where each file has a single, clear respo
 
 ```
 tfe/
-├── main.go (21 lines)           - Entry point ONLY
-├── types.go (173 lines)         - Type definitions & enums
-├── styles.go (35 lines)         - Lipgloss style definitions
-├── model.go (78 lines)          - Model initialization & layout calculations
-├── update.go (111 lines)        - Main update dispatcher & initialization
-├── update_keyboard.go (714)     - Keyboard event handling
-├── update_mouse.go (383)        - Mouse event handling
-├── view.go (189 lines)          - View dispatcher & single-pane rendering
-├── render_preview.go (468)      - Preview rendering (full & dual-pane)
-├── render_file_list.go (447)    - File list views (List/Detail/Tree)
-├── file_operations.go (657)     - File operations & formatting
-├── editor.go (90 lines)         - External editor integration
-├── command.go (127 lines)       - Command execution system
-├── dialog.go (141 lines)        - Dialog system (input/confirm)
-├── context_menu.go (313 lines)  - Right-click context menu
-├── favorites.go (150 lines)     - Favorites/bookmarks system
-└── helpers.go (69 lines)        - Helper functions for model
+├── main.go - Entry point ONLY
+├── types.go - Type definitions & enums
+├── styles.go - Lipgloss style definitions
+├── model.go - Model initialization & layout calculations
+├── update.go - Main update dispatcher & initialization
+├── update_keyboard.go - Keyboard event handling
+├── update_mouse.go - Mouse event handling
+├── view.go - View dispatcher & single-pane rendering
+├── menu.go - Menu bar rendering
+├── render_preview.go - Preview rendering (full & dual-pane)
+├── render_file_list.go - File list views (List/Detail/Tree)
+├── file_operations.go - File operations & formatting
+├── editor.go - External editor integration
+├── command.go - Command execution system
+├── dialog.go - Dialog system (input/confirm)
+├── context_menu.go - Right-click context menu
+├── favorites.go - Favorites/bookmarks system
+├── trash.go - Trash/recycle bin system
+├── prompt_parser.go - Prompt template variable parsing
+├── fuzzy_search.go - Fuzzy file search (Ctrl+P)
+└── helpers.go - Helper functions for model
 ```
 
 ## Module Responsibilities
@@ -207,6 +211,22 @@ tfe/
 
 **When to extend**: Add reusable helper functions that don't fit other modules.
 
+### 14. `trash.go` - Trash/Recycle Bin System
+**Purpose**: Move files to trash instead of permanent deletion
+**Contents**: `moveToTrash()`, `restoreFromTrash()`, trash metadata (JSON), cross-platform directory detection
+
+### 15. `prompt_parser.go` - Prompt Template Parsing
+**Purpose**: Parse and render prompt templates with {{VARIABLE}} substitution
+**Contents**: `parsePromptVariables()`, `classifyVariableType()`, `substituteVariables()`, auto-fill for DATE/TIME/FILE/DIRECTORY
+
+### 16. `fuzzy_search.go` - Fuzzy File Search
+**Purpose**: Ctrl+P fuzzy search integration
+**Contents**: `launchFuzzySearch()`, file collection, result parsing, terminal state preservation
+
+### 17. `menu.go` - Menu Bar Rendering
+**Purpose**: Renders the top menu bar with clickable emoji buttons
+**Contents**: `renderMenuBar()`, button definitions, width-aware rendering for narrow terminals
+
 ## Development Guidelines
 
 ### Adding New Features
@@ -272,34 +292,12 @@ When adding tests (future):
 **⚠️ IMPORTANT: Headers exist in TWO locations!**
 
 When modifying the header/title bar (GitHub link, menu bar, mode indicators), you must update BOTH:
+- **Single-Pane:** `view.go` → `renderSinglePane()` (~line 64)
+- **Dual-Pane:** `render_preview.go` → `renderDualPane()` (~line 816)
 
-1. **Single-Pane Mode**: `view.go` → `renderSinglePane()` (around line 64)
-2. **Dual-Pane Mode**: `render_preview.go` → `renderDualPane()` (around line 816)
+**Note:** `renderFullPreview()` has a different header intentionally (shows filename, not menu bar).
 
-**Note**: `renderFullPreview()` has a different header intentionally (shows filename, not menu bar).
-
-**Example - Adding menu bar:**
-```go
-// view.go - renderSinglePane()
-showGitHub := time.Since(m.startupTime) < 5*time.Second
-if showGitHub {
-    // GitHub link
-} else {
-    // Menu bar
-    menuBar := m.renderMenuBar()
-}
-
-// render_preview.go - renderDualPane()
-showGitHub := time.Since(m.startupTime) < 5*time.Second  // ← Same logic!
-if showGitHub {
-    // GitHub link
-} else {
-    // Menu bar
-    menuBar := m.renderMenuBar()
-}
-```
-
-**Why this matters**: Forgetting to update both locations leads to inconsistent UI between view modes.
+**Why this matters:** Forgetting to update both locations leads to inconsistent UI between view modes. Extract shared header rendering to fix this duplication (see PLAN.md issue #14).
 
 ### Adding a New Keyboard Shortcut
 
@@ -358,28 +356,13 @@ case "x":
 
 ## Refactoring History
 
-This modular architecture was achieved through a systematic refactoring process:
+This modular architecture was achieved through a systematic refactoring process that reduced `main.go` from 1668 lines to just 21 lines.
 
-- **Original**: Single `main.go` file with 1668 lines
-- **Phases 1-4**: Extracted types, styles, file operations, editor integration (Commit: 9befa48)
-- **Phase 5**: Extracted file list rendering functions (Commit: 3d992c6)
-- **Phase 6**: Extracted preview rendering and view functions (Commit: 49d6ece)
-- **Phase 7**: Extracted Update and Init functions (Commit: 03efd5c)
-- **Phase 8**: Extracted model initialization and layout (Commit: 68d5a87)
-- **Phase 9**: Split `update.go` (1145 lines) into 3 focused files:
-  - `update.go` (111 lines) - dispatcher only
-  - `update_keyboard.go` (714 lines) - keyboard handling
-  - `update_mouse.go` (383 lines) - mouse handling
-- **Final**: `main.go` reduced to 21 lines, all modules under 800 lines
+**See [docs/REFACTORING_HISTORY.md](docs/REFACTORING_HISTORY.md) for the complete timeline and lessons learned.**
 
 ## Benefits of This Architecture
 
-1. **Maintainability**: Easy to locate and modify specific functionality
-2. **Readability**: Each file is focused and easier to understand
-3. **Collaboration**: Multiple developers can work on different modules
-4. **Testing**: Isolated modules are easier to test
-5. **Scalability**: New features can be added without cluttering existing code
-6. **Navigation**: IDE features work better with smaller, focused files
+**Maintainability** - Easy to locate/modify specific functionality | **Readability** - Focused files | **Collaboration** - Multiple devs, no conflicts | **Testing** - Isolated modules | **Scalability** - Add features without clutter | **Navigation** - Better IDE support
 
 ## Important Reminder
 
@@ -393,6 +376,17 @@ Do NOT add complex logic to `main.go`. Instead:
 - When this document gains new architectural context, mirror the contributor-facing highlights in `AGENTS.md`
 
 This architecture took significant effort to establish - let's maintain it! 🏗️
+
+---
+
+## Security Considerations
+
+**⚠️ Pre-Launch Review (2025-10-22) identified critical issues - see [PLAN.md](PLAN.md) for fixes:**
+
+- **Command Injection:** `command.go:27`, `editor.go:68` - user input to shell without sanitization
+- **Path Traversal:** `file_operations.go:41` - no validation against `../../etc` traversal
+- **File Handle Leak:** `file_operations.go:298` - missing `defer file.Close()` ⚡ ONE LINE FIX
+- **Data Exposure:** History/favorites stored `0644` (world-readable) instead of `0600`
 
 ---
 
@@ -485,13 +479,13 @@ wc -l *.md docs/*.md
 ✅ **Prevents Bloat** - Proactive limits prevent files from becoming unmanageable
 ✅ **Clear Workflow** - Know exactly where each piece of information belongs
 
-### Current Status (as of 2025-10-20)
+### Current Status (as of 2025-10-22)
 
-Recent line counts:
-- CLAUDE.md: 448 lines ✅ (under 500 limit)
-- PLAN.md: 384 lines ✅ (under 400 limit)
-- CHANGELOG.md: 535 lines ⚠️ (exceeds 350 limit - needs split to CHANGELOG2.md)
+Documentation health:
+- CLAUDE.md: 491 lines ✅ (98.2% capacity - healthy buffer)
+- PLAN.md: 232 lines ✅ (58% of 400 limit)
+- CHANGELOG.md: 316 lines ✅ (90% of 350 limit)
+- CHANGELOG3.md: 50 lines ✅ (archived v0.4.0)
 - BACKLOG.md: 97 lines ✅ (under 300 limit)
-- README.md: 697 lines ✅ (under 600 limit - user-facing doc)
 
-**Status:** ⚠️ CHANGELOG.md needs splitting - ready to create CHANGELOG2.md for older versions.
+**Status:** ✅ All documentation within limits after CHANGELOG3 split and CLAUDE.md optimization.
