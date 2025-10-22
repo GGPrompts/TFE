@@ -37,10 +37,18 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle input field editing FIRST (works in both dual-pane and full preview)
-	// This must come before preview mode and dialog handling
-	if m.inputFieldsActive && len(m.promptInputFields) > 0 {
+	// Handle input field editing (only when preview pane is focused)
+	// In dual-pane mode, only capture input when right pane (preview) is focused
+	// In full preview mode, always active
+	previewFocused := m.viewMode == viewFullPreview || (m.viewMode == viewDualPane && m.focusedPane == rightPane)
+	if m.inputFieldsActive && len(m.promptInputFields) > 0 && previewFocused {
 		switch msg.String() {
+		case "pageup", "pgup", "pagedown", "pgdn", "pgdown":
+			// Allow page up/down to scroll preview even when input fields are active
+			// Don't capture these keys - let them pass through to preview scrolling
+			// This allows scrolling to see input fields that are below the viewport
+			// Fall through to preview mode handling
+
 		case "esc":
 			// Exit input fields mode and return to normal preview
 			m.inputFieldsActive = false
@@ -65,21 +73,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "up", "k":
-			// Navigate to previous field (same as Shift+Tab)
-			m.focusedInputField--
-			if m.focusedInputField < 0 {
-				m.focusedInputField = len(m.promptInputFields) - 1 // Wrap around
-			}
-			return m, nil
-
-		case "down", "j":
-			// Navigate to next field (same as Tab)
-			m.focusedInputField++
-			if m.focusedInputField >= len(m.promptInputFields) {
-				m.focusedInputField = 0 // Wrap around
-			}
-			return m, nil
+		case "up", "down", "k", "j":
+			// Allow arrow keys and vim keys to scroll the preview
+			// Don't capture these - let them pass through for document scrolling
+			// (Users can use Tab/Shift+Tab to navigate between fields)
+			// Fall through to preview scrolling
 
 		case "backspace":
 			// Delete last character from focused field
@@ -407,6 +405,79 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// View image in terminal viewer (for binary image files)
 			if m.preview.loaded && m.preview.isBinary && isImageFile(m.preview.filePath) {
 				return m, openImageViewer(m.preview.filePath)
+			}
+
+		case "f", "F":
+			// Follow symlink - load target's actual content
+			if m.preview.loaded && m.preview.filePath != "" {
+				// Check if the current preview is a symlink
+				linfo, err := os.Lstat(m.preview.filePath)
+				if err == nil && linfo.Mode()&os.ModeSymlink != 0 {
+					// It's a symlink - check if target is valid
+					targetInfo, err := os.Stat(m.preview.filePath) // Stat follows the link
+					if err != nil {
+						m.setStatusMessage("Cannot follow symlink: target does not exist", true)
+						return m, nil
+					}
+
+					if targetInfo.IsDir() {
+						// Target is a directory - navigate to it
+						m.currentPath = m.preview.filePath
+						m.cursor = 0
+						m.viewMode = viewSinglePane
+						m.loadFiles()
+						m.setStatusMessage("Navigated to symlink target directory", false)
+						return m, nil
+					} else {
+						// Target is a file - load its content by reading through the symlink
+						// Temporarily load the target by reading the symlink path (os.ReadFile follows symlinks)
+						content, err := os.ReadFile(m.preview.filePath)
+						if err != nil {
+							m.setStatusMessage(fmt.Sprintf("Cannot read target: %s", err), true)
+							return m, nil
+						}
+
+						// Get target path for display
+						target, _ := os.Readlink(m.preview.filePath)
+						m.setStatusMessage(fmt.Sprintf("Viewing symlink target: %s", target), false)
+
+						// Store original symlink path
+						symlinkPath := m.preview.filePath
+
+						// Load the content as if it's the target file
+						// Clear symlink-specific state and reload
+						m.loadPreview(symlinkPath) // This will detect it's a symlink first
+
+						// Manually override to show target content instead
+						// Detect file type and apply appropriate rendering
+						if isBinaryFile(symlinkPath) {
+							m.preview.isBinary = true
+							m.preview.content = []string{
+								"Binary file (symlink target)",
+								fmt.Sprintf("Size: %s", formatFileSize(int64(len(content)))),
+							}
+						} else {
+							// Text file - show with syntax highlighting if available
+							highlighted, ok := highlightCode(string(content), symlinkPath)
+							var lines []string
+							if ok {
+								lines = strings.Split(highlighted, "\n")
+								m.preview.isSyntaxHighlighted = true
+							} else {
+								lines = strings.Split(string(content), "\n")
+							}
+							m.preview.content = lines
+						}
+
+						m.preview.loaded = true
+						m.preview.fileSize = int64(len(content))
+						m.populatePreviewCache()
+						return m, statusTimeoutCmd()
+					}
+				} else {
+					m.setStatusMessage("Not a symlink (press 'f' only when viewing symlinks)", true)
+					return m, statusTimeoutCmd()
+				}
 			}
 
 		case "ctrl+f":
@@ -1409,6 +1480,18 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		// PRIORITY: In detail mode on narrow terminals, scroll left (most important use case)
+		// On narrow terminals (phones), horizontal scrolling is more useful than tree navigation
+		if m.displayMode == modeDetail && m.isNarrowTerminal() {
+			if m.detailScrollX > 0 {
+				// Scroll by 4 chars (even number to avoid splitting emojis which are 2 cols wide)
+				m.detailScrollX -= 4
+				if m.detailScrollX < 0 {
+					m.detailScrollX = 0
+				}
+			}
+			return m, nil
+		}
 		// In tree mode: collapse folder or go to parent
 		// In other modes: go to parent directory
 		if m.displayMode == modeTree {
@@ -1457,6 +1540,14 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.commandCursorPos < len(m.commandInput) {
 				m.commandCursorPos++
 			}
+			return m, nil
+		}
+		// PRIORITY: In detail mode on narrow terminals, scroll right (most important use case)
+		// On narrow terminals (phones), horizontal scrolling is more useful than navigation
+		if m.displayMode == modeDetail && m.isNarrowTerminal() {
+			// Scroll by 4 chars (even number to avoid splitting emojis which are 2 cols wide)
+			m.detailScrollX += 4
+			// Max scroll will be clamped in rendering
 			return m, nil
 		}
 		// In tree mode: expand folder or navigate into it

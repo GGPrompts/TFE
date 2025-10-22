@@ -27,8 +27,9 @@ func (m model) getWrappedLineCount() int {
 	}
 
 	if m.preview.isMarkdown {
-		// Markdown: no line numbers or scrollbar, content uses full box width
-		availableWidth = boxContentWidth
+		// Markdown: no line numbers or scrollbar, but add left padding for readability
+		// Subtract 2 for left padding (prevents code blocks from touching border)
+		availableWidth = boxContentWidth - 2
 	} else {
 		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
 		availableWidth = boxContentWidth - 8
@@ -158,8 +159,9 @@ func (m model) renderPreview(maxVisible int) string {
 	}
 
 	if m.preview.isMarkdown {
-		// Markdown: no line numbers or scrollbar, content uses full box width
-		availableWidth = boxContentWidth
+		// Markdown: no line numbers or scrollbar, but add left padding for readability
+		// Subtract 2 for left padding (prevents code blocks from touching border)
+		availableWidth = boxContentWidth - 2
 	} else {
 		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
 		availableWidth = boxContentWidth - 8
@@ -196,6 +198,8 @@ func (m model) renderPreview(maxVisible int) string {
 			outputLines := 0
 			for i := start; i < end && outputLines < maxVisible; i++ {
 				line := renderedLines[i]
+				// Add left padding for better readability (especially for code blocks)
+				s.WriteString("  ") // 2-space left padding
 				s.WriteString(line)
 				s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
 				s.WriteString("\n")
@@ -258,8 +262,16 @@ func (m model) renderPreview(maxVisible int) string {
 		// Space after scrollbar
 		s.WriteString(" ")
 
-		// Content line
-		s.WriteString(wrappedLines[i])
+		// Content line - ensure it doesn't exceed available width to prevent wrapping
+		contentLine := wrappedLines[i]
+
+		// Truncate to available width using ANSI-aware truncation
+		// This prevents long lines with ANSI codes from wrapping outside the box
+		if visualWidth(contentLine) > availableWidth {
+			contentLine = truncateToWidth(contentLine, availableWidth)
+		}
+
+		s.WriteString(contentLine)
 		s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
 		s.WriteString("\n")
 	}
@@ -478,10 +490,30 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		headerLines = append(headerLines, "") // Blank line
 	}
 
-	// Description (if available)
+	// Description (if available) - wrap long descriptions
 	if tmpl.description != "" {
 		descStyle := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("245"))
-		headerLines = append(headerLines, descStyle.Render(tmpl.description))
+
+		// Calculate available width (rough estimate)
+		var tempWidth int
+		if m.viewMode == viewFullPreview {
+			tempWidth = m.width - 8
+		} else {
+			tempWidth = m.rightWidth - 4
+		}
+		if tempWidth < 40 {
+			tempWidth = 40
+		}
+
+		// Wrap description if too long
+		if len(tmpl.description) > tempWidth {
+			wrapped := wrapLine(tmpl.description, tempWidth)
+			for _, line := range wrapped {
+				headerLines = append(headerLines, descStyle.Render(line))
+			}
+		} else {
+			headerLines = append(headerLines, descStyle.Render(tmpl.description))
+		}
 		headerLines = append(headerLines, "") // Blank line
 	}
 
@@ -508,11 +540,43 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	}
 	headerLines = append(headerLines, sourceStyle.Render(sourceIcon+" "+sourceLabel))
 
-	// Variables detected (if any)
+	// Variables detected (if any) - wrap long lines to prevent layout issues
 	if len(tmpl.variables) > 0 {
 		varsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 		varsLine := fmt.Sprintf("Variables: %s", strings.Join(tmpl.variables, ", "))
-		headerLines = append(headerLines, varsStyle.Render(varsLine))
+
+		// Calculate available width for header (use rough estimate before full calculation)
+		var tempWidth int
+		if m.viewMode == viewFullPreview {
+			tempWidth = m.width - 8 // Conservative estimate
+		} else {
+			tempWidth = m.rightWidth - 4
+		}
+		if tempWidth < 40 {
+			tempWidth = 40
+		}
+
+		// Wrap the variables line if it's too long
+		if len(varsLine) > tempWidth {
+			// Wrap manually at available width
+			remaining := varsLine
+			for len(remaining) > 0 {
+				if len(remaining) <= tempWidth {
+					headerLines = append(headerLines, varsStyle.Render(remaining))
+					break
+				}
+				// Find last comma before width limit for natural break
+				breakPoint := tempWidth
+				lastComma := strings.LastIndex(remaining[:tempWidth], ",")
+				if lastComma > 0 && lastComma > tempWidth-20 { // Use comma if it's not too far back
+					breakPoint = lastComma + 1 // Include comma
+				}
+				headerLines = append(headerLines, varsStyle.Render(strings.TrimSpace(remaining[:breakPoint])))
+				remaining = strings.TrimSpace(remaining[breakPoint:])
+			}
+		} else {
+			headerLines = append(headerLines, varsStyle.Render(varsLine))
+		}
 	}
 
 	// Separator line
@@ -645,6 +709,10 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	for i := start; i < end && linesRendered < maxVisible; i++ {
 		if linesRendered >= maxVisible {
 			break
+		}
+		// Add left padding for markdown prompts (prevents code blocks from touching border)
+		if isMarkdownPrompt {
+			s.WriteString("  ") // 2-space left padding
 		}
 		s.WriteString(wrappedLines[i])
 		s.WriteString("\033[0m") // Reset ANSI codes
@@ -932,7 +1000,7 @@ func (m model) renderDualPane() string {
 	viewButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
-	s.WriteString(viewButtonStyle.Render("[👁️]"))
+	s.WriteString(viewButtonStyle.Render("[V]"))
 	s.WriteString(" ")
 
 	// Pane toggle button (toggles single ↔ dual-pane)
@@ -1155,57 +1223,128 @@ func (m model) renderDualPane() string {
 		panes = lipgloss.JoinVertical(lipgloss.Left, topPaneRendered, bottomPaneRendered)
 
 	} else {
-		// HORIZONTAL SPLIT for List/Tree view - accordion style
-		// Get left pane content - use contentHeight so content fits within the box
-		var leftContent string
-		switch m.displayMode {
-		case modeList:
-			leftContent = m.renderListView(contentHeight)
-		case modeTree:
-			leftContent = m.renderTreeView(contentHeight)
-		default:
-			leftContent = m.renderListView(contentHeight)
-		}
+		// List/Tree view - use VERTICAL split on narrow terminals, HORIZONTAL on wide terminals
 
-		// Get right pane content (preview)
-		var rightContent string
-		if m.preview.loaded {
-			rightContent = m.renderPreview(contentHeight)
+		if m.isNarrowTerminal() {
+			// VERTICAL SPLIT for narrow terminals (phones) - same as detail view
+			// ACCORDION: Focused pane gets 2/3 height, unfocused gets 1/3
+			var topHeight, bottomHeight int
+			if m.focusedPane == leftPane {
+				// Top pane (file list) is focused
+				topHeight = (maxVisible * 2) / 3
+				bottomHeight = maxVisible - topHeight
+			} else {
+				// Bottom pane (preview) is focused
+				bottomHeight = (maxVisible * 2) / 3
+				topHeight = maxVisible - bottomHeight
+			}
+
+			topContentHeight := topHeight - 2    // Account for borders
+			bottomContentHeight := bottomHeight - 2
+
+			// Render top pane (file list with full width)
+			var topContent string
+			switch m.displayMode {
+			case modeList:
+				topContent = m.renderListView(topContentHeight)
+			case modeTree:
+				topContent = m.renderTreeView(topContentHeight)
+			default:
+				topContent = m.renderListView(topContentHeight)
+			}
+
+			// Render bottom pane (preview with full width)
+			var bottomContent string
+			if m.preview.loaded {
+				bottomContent = m.renderPreview(bottomContentHeight)
+			} else {
+				emptyStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("241")).
+					Italic(true)
+				bottomContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
+			}
+
+			// Border colors based on focus
+			topBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
+			bottomBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
+			if m.focusedPane == leftPane {
+				topBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+			} else {
+				bottomBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+			}
+
+			// Create boxes with full width
+			topPaneStyle := lipgloss.NewStyle().
+				Width(m.width - 6).           // Full width minus margins
+				Height(topContentHeight).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(topBorderColor)
+
+			bottomPaneStyle := lipgloss.NewStyle().
+				Width(m.width - 6).           // Full width minus margins
+				Height(bottomContentHeight).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(bottomBorderColor)
+
+			topPaneRendered := topPaneStyle.Render(topContent)
+			bottomPaneRendered := bottomPaneStyle.Render(bottomContent)
+
+			// Stack vertically
+			panes = lipgloss.JoinVertical(lipgloss.Left, topPaneRendered, bottomPaneRendered)
+
 		} else {
-			emptyStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("241")).
-				Italic(true)
-			rightContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
+			// HORIZONTAL SPLIT for wide terminals - accordion style
+			// Get left pane content - use contentHeight so content fits within the box
+			var leftContent string
+			switch m.displayMode {
+			case modeList:
+				leftContent = m.renderListView(contentHeight)
+			case modeTree:
+				leftContent = m.renderTreeView(contentHeight)
+			default:
+				leftContent = m.renderListView(contentHeight)
+			}
+
+			// Get right pane content (preview)
+			var rightContent string
+			if m.preview.loaded {
+				rightContent = m.renderPreview(contentHeight)
+			} else {
+				emptyStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("241")).
+					Italic(true)
+				rightContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
+			}
+
+			// Border colors based on focus (accordion style)
+			leftBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
+			rightBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
+			if m.focusedPane == leftPane {
+				leftBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+			} else {
+				rightBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+			}
+
+			// Use exact Width and Height to ensure panes stay perfectly aligned
+			leftPaneStyle := lipgloss.NewStyle().
+				Width(m.leftWidth - 2).      // Content width (borders added by Lipgloss)
+				Height(contentHeight).        // Exact content height (borders added by Lipgloss)
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(leftBorderColor)
+
+			rightPaneStyle := lipgloss.NewStyle().
+				Width(m.rightWidth - 2).     // Content width (borders added by Lipgloss)
+				Height(contentHeight).        // Exact content height (borders added by Lipgloss)
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(rightBorderColor)
+
+			// Apply styles to content
+			leftPaneRendered := leftPaneStyle.Render(leftContent)
+			rightPaneRendered := rightPaneStyle.Render(rightContent)
+
+			// Join panes horizontally
+			panes = lipgloss.JoinHorizontal(lipgloss.Top, leftPaneRendered, rightPaneRendered)
 		}
-
-		// Border colors based on focus (accordion style)
-		leftBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
-		rightBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
-		if m.focusedPane == leftPane {
-			leftBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
-		} else {
-			rightBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
-		}
-
-		// Use exact Width and Height to ensure panes stay perfectly aligned
-		leftPaneStyle := lipgloss.NewStyle().
-			Width(m.leftWidth - 2).      // Content width (borders added by Lipgloss)
-			Height(contentHeight).        // Exact content height (borders added by Lipgloss)
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(leftBorderColor)
-
-		rightPaneStyle := lipgloss.NewStyle().
-			Width(m.rightWidth - 2).     // Content width (borders added by Lipgloss)
-			Height(contentHeight).        // Exact content height (borders added by Lipgloss)
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(rightBorderColor)
-
-		// Apply styles to content
-		leftPaneRendered := leftPaneStyle.Render(leftContent)
-		rightPaneRendered := rightPaneStyle.Render(rightContent)
-
-		// Join panes horizontally
-		panes = lipgloss.JoinHorizontal(lipgloss.Top, leftPaneRendered, rightPaneRendered)
 	}
 
 	s.WriteString(panes)
@@ -1272,6 +1411,27 @@ func (m model) renderDualPane() string {
 			}
 		} else {
 			fileType := getFileType(*currentFile)
+
+			// For symlinks, truncate long paths to show the important trailing part
+			if currentFile.isSymlink && currentFile.symlinkTarget != "" {
+				// Calculate available space: terminal width minus other info
+				// "Selected: filename (, size, date)"
+				baseInfoLen := len("Selected: ") + len(currentFile.name) + len(", ") +
+					len(formatFileSize(currentFile.size)) + len(", ") +
+					len(formatModTime(currentFile.modTime)) + len(" ()") + 10 // padding
+
+				availableForTarget := m.width - baseInfoLen
+				if availableForTarget < 30 {
+					availableForTarget = 30 // Minimum to show something useful
+				}
+
+				fullTarget := "Link → " + currentFile.symlinkTarget
+				if len(fullTarget) > availableForTarget {
+					// Show trailing end: "...filename" instead of "Link → /very/long/pa..."
+					fileType = "..." + fullTarget[len(fullTarget)-(availableForTarget-3):]
+				}
+			}
+
 			selectedInfo = fmt.Sprintf("Selected: %s (%s, %s, %s)",
 				currentFile.name,
 				fileType,

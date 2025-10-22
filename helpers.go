@@ -76,6 +76,12 @@ func (m model) isDualPaneCompatible() bool {
 	return m.displayMode == modeList || m.displayMode == modeTree || m.displayMode == modeDetail
 }
 
+// isNarrowTerminal checks if the terminal width is too narrow for wide views
+// Returns true if width < 100 (typical phone/Termux scenario)
+func (m model) isNarrowTerminal() bool {
+	return m.width < 100
+}
+
 // isPromptFile checks if a file is a prompt file (.prompty, .yaml, .md, .txt)
 // Only files in special directories (.claude/, ~/.prompts/) are considered prompts
 // Exception: .prompty files are always prompts (Microsoft Prompty format)

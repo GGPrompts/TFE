@@ -127,7 +127,7 @@ func (m model) renderSinglePane() string {
 	s.WriteString(" ")
 
 	// View mode toggle button (cycles List → Detail → Tree)
-	s.WriteString(homeButtonStyle.Render("[👁️]"))
+	s.WriteString(homeButtonStyle.Render("[V]"))
 	s.WriteString(" ")
 
 	// Pane toggle button (toggles single ↔ dual-pane)
@@ -211,8 +211,14 @@ func (m model) renderSinglePane() string {
 	// Show helper text based on focus state
 	helperStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
 	if !m.commandFocused && m.commandInput == "" {
-		// Not focused - show how to enter command mode
-		s.WriteString(helperStyle.Render(": to focus"))
+		// Not focused - show contextual hints
+		if m.displayMode == modeDetail && m.isNarrowTerminal() {
+			// Detail view on narrow terminal - show scroll hint
+			s.WriteString(helperStyle.Render("←→ scroll | h/l nav | : focus"))
+		} else {
+			// Normal - show how to enter command mode
+			s.WriteString(helperStyle.Render(": to focus"))
+		}
 	} else if m.commandFocused && m.commandInput == "" {
 		// Focused but no input - show ! prefix hint and cursor
 		s.WriteString(helperStyle.Render("! prefix to run & exit"))
@@ -370,6 +376,27 @@ func (m model) renderSinglePane() string {
 				}
 			} else {
 				fileType := getFileType(*currentFile)
+
+				// For symlinks, truncate long paths to show the important trailing part
+				if currentFile.isSymlink && currentFile.symlinkTarget != "" {
+					// Calculate available space: terminal width minus other info
+					// "Selected: filename (, size, date)"
+					baseInfoLen := len("Selected: ") + len(currentFile.name) + len(", ") +
+						len(formatFileSize(currentFile.size)) + len(", ") +
+						len(formatModTime(currentFile.modTime)) + len(" ()") + 10 // padding
+
+					availableForTarget := m.width - baseInfoLen
+					if availableForTarget < 30 {
+						availableForTarget = 30 // Minimum to show something useful
+					}
+
+					fullTarget := "Link → " + currentFile.symlinkTarget
+					if len(fullTarget) > availableForTarget {
+						// Show trailing end: "...filename" instead of "Link → /very/long/pa..."
+						fileType = "..." + fullTarget[len(fullTarget)-(availableForTarget-3):]
+					}
+				}
+
 				selectedInfo = fmt.Sprintf("Selected: %s (%s, %s, %s)",
 					currentFile.name,
 					fileType,

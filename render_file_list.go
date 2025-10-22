@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // getVisibleRange calculates the start and end indices for visible items in the file list
@@ -103,8 +104,15 @@ func (m model) renderListView(maxVisible int) string {
 		displayName := file.name
 		maxNameLen := 40 // Default for single-pane
 		if m.viewMode == viewDualPane {
-			// Account for left pane width, icon (2), spaces (2), and padding
-			maxNameLen = m.leftWidth - 10
+			// Check if using vertical split (narrow terminal) - need to account for box borders
+			if m.isNarrowTerminal() {
+				// Vertical split: box uses (m.width - 6) with borders (-2) = m.width - 8
+				// Then subtract icon (2), spaces (2), and padding (6)
+				maxNameLen = (m.width - 8) - 10
+			} else {
+				// Horizontal split: use left pane width
+				maxNameLen = m.leftWidth - 10
+			}
 			if maxNameLen < 20 {
 				maxNameLen = 20 // Minimum reasonable length
 			}
@@ -169,13 +177,19 @@ func (m model) renderDetailView(maxVisible int) string {
 	if m.viewMode == viewDualPane {
 		availableWidth = m.leftWidth - 6 // Account for borders and padding
 	}
-	if availableWidth < 60 {
-		availableWidth = 60 // Minimum width
+
+	// On narrow terminals, use fixed wide width for horizontal scrolling
+	// This allows the full detail view to render and be scrollable
+	renderWidth := availableWidth
+	if m.isNarrowTerminal() && availableWidth < 120 {
+		renderWidth = 120 // Fixed width for detail view on narrow terminals
+	} else if availableWidth < 60 {
+		renderWidth = 60 // Minimum width for wider terminals
 	}
 
-	// Distribute column widths dynamically (total must fit in availableWidth)
+	// Distribute column widths dynamically (total must fit in renderWidth)
 	// Leave space for icons (4), star (3), spacing (6), and padding (4) = 17 chars
-	usableWidth := availableWidth - 17
+	usableWidth := renderWidth - 17
 
 	var nameWidth, sizeWidth, modifiedWidth, extraWidth int
 	if m.showTrashOnly || m.showFavoritesOnly {
@@ -188,11 +202,15 @@ func (m model) renderDetailView(maxVisible int) string {
 			extraWidth = 15
 		}
 	} else {
-		// 4 columns: Name, Size, Modified, Type
+		// 4 columns: Name, Size, Modified, Type (or symlink target)
 		nameWidth = usableWidth * 40 / 100    // 40%
 		sizeWidth = 10                         // Fixed
 		modifiedWidth = 12                     // Fixed
-		extraWidth = 15                        // Type is usually short
+		// Make Type column dynamic too - symlink targets can be long paths
+		extraWidth = usableWidth - nameWidth - sizeWidth - modifiedWidth
+		if extraWidth < 15 {
+			extraWidth = 15 // Minimum for "Type" header
+		}
 	}
 
 	// Ensure minimum widths
@@ -279,7 +297,54 @@ func (m model) renderDetailView(maxVisible int) string {
 	}
 
 	// Render header with sort indicators
-	s.WriteString(headerStyle.Render(header))
+	// Apply horizontal scroll to header if needed
+	var headerLine string
+	if m.isNarrowTerminal() && renderWidth > availableWidth {
+		// Extract visible portion using VISUAL COLUMN awareness (same as data rows)
+		// This ensures proper alignment with emoji-aware scrolling
+		scrollOffset := m.detailScrollX
+		if scrollOffset < 0 {
+			scrollOffset = 0
+		}
+
+		// Walk through header counting visual columns (not runes)
+		// This properly handles emojis which are 1 rune but 2 visual columns
+		var visibleHeader strings.Builder
+		visualCol := 0
+		headerRunes := []rune(header)
+
+		for _, r := range headerRunes {
+			charWidth := runewidth.RuneWidth(r)
+
+			// Check if this character is in the visible window
+			if visualCol+charWidth > scrollOffset && visualCol < scrollOffset+availableWidth {
+				// Only add character if it starts within visible range
+				if visualCol >= scrollOffset {
+					visibleHeader.WriteRune(r)
+				}
+			}
+
+			visualCol += charWidth
+
+			// Stop if we've passed the visible window
+			if visualCol >= scrollOffset+availableWidth {
+				break
+			}
+		}
+
+		// Pad to exact width using visual width
+		currentWidth := runewidth.StringWidth(visibleHeader.String())
+		if currentWidth < availableWidth {
+			visibleHeader.WriteString(strings.Repeat(" ", availableWidth-currentWidth))
+		}
+
+		// NOW apply styling to the visible portion only
+		headerLine = headerStyle.Render(visibleHeader.String())
+	} else {
+		// Wide terminal or no scrolling needed - style the whole header
+		headerLine = headerStyle.Render(header)
+	}
+	s.WriteString(headerLine)
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
@@ -400,9 +465,16 @@ func (m model) renderDetailView(maxVisible int) string {
 		} else {
 			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)
-			// Truncate file type if needed
+			// Truncate file type if needed (show trailing end for long paths)
 			if len(fileType) > extraWidth {
-				fileType = fileType[:extraWidth-2] + ".."
+				// For symlinks showing paths, show the end (filename) rather than beginning
+				if strings.HasPrefix(fileType, "Link → ") {
+					// Show "...filename" instead of "Link → /very/long/pa..."
+					fileType = "..." + fileType[len(fileType)-(extraWidth-3):]
+				} else {
+					// For regular types, truncate normally
+					fileType = fileType[:extraWidth-2] + ".."
+				}
 			}
 			// Use visual-width padding for name column (contains emojis), regular padding for others
 		paddedName := padToVisualWidth(name, nameWidth)
@@ -436,9 +508,16 @@ func (m model) renderDetailView(maxVisible int) string {
 
 			// Don't highlight if command prompt is focused
 			if i == m.cursor && !m.commandFocused {
-				line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
+				if m.isNarrowTerminal() && renderWidth > availableWidth {
+					// Use matrix green for narrow terminals (no background to prevent wrapping)
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, narrowSelectedStyle.Render(nameWithoutEmoji)), 1)
+				} else {
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
+				}
 			} else {
-				if i%2 == 0 {
+				// Add alternating row background for easier reading on wide terminals
+				// Disabled on narrow terminals to prevent wrapping issues with horizontal scroll
+				if !m.isNarrowTerminal() && i%2 == 0 {
 					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#333333"})
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
 				} else {
@@ -449,11 +528,17 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Normal rendering
 			// Don't highlight if command prompt is focused
 			if i == m.cursor && !m.commandFocused {
-				line = selectedStyle.Render(line)
+				if m.isNarrowTerminal() && renderWidth > availableWidth {
+					// Use matrix green for narrow terminals (no background to prevent wrapping)
+					line = narrowSelectedStyle.Render(line)
+				} else {
+					// Use blue background for wide terminals
+					line = selectedStyle.Render(line)
+				}
 			} else {
-				// Add alternating row background for easier reading
-				// Even rows (0, 2, 4...) get a subtle background
-				if i%2 == 0 {
+				// Add alternating row background for easier reading on wide terminals
+				// Disabled on narrow terminals to prevent wrapping issues with horizontal scroll
+				if !m.isNarrowTerminal() && i%2 == 0 {
 					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#333333"})
 					line = alternateStyle.Render(line)
 				} else {
@@ -468,7 +553,232 @@ func (m model) renderDetailView(maxVisible int) string {
 		s.WriteString("\n")
 	}
 
-	return strings.TrimRight(s.String(), "\n")
+	result := s.String()
+
+	// Apply horizontal scrolling on narrow terminals
+	if m.isNarrowTerminal() && renderWidth > availableWidth {
+		result = m.applyHorizontalScroll(result, availableWidth)
+	}
+
+	return strings.TrimRight(result, "\n")
+}
+
+// applyHorizontalScroll applies horizontal scrolling to all lines of rendered text
+// This is used for detail view on narrow terminals
+// IMPORTANT: Ensures output lines never exceed viewWidth to prevent terminal wrapping
+func (m model) applyHorizontalScroll(content string, viewWidth int) string {
+	lines := strings.Split(content, "\n")
+	var result strings.Builder
+
+	for _, line := range lines {
+		// Extract visible portion - viewWidth is the TOTAL visible width
+		// The line already includes "  " padding at the start
+		visibleLine := m.extractVisiblePortion(line, viewWidth)
+
+		// Pad or truncate to exact width to prevent wrapping
+		// IMPORTANT: Strip the trailing \033[0m, add padding, then re-add reset
+		// This prevents padding from inheriting highlight colors
+		plainVisible := stripANSI(visibleLine)
+		visualLen := runewidth.StringWidth(plainVisible) // Use visual width for emojis
+
+		if visualLen < viewWidth {
+			// Line is too short - add padding
+			// Remove trailing ANSI reset if present
+			resetSuffix := "\033[0m"
+			hasReset := strings.HasSuffix(visibleLine, resetSuffix)
+			if hasReset {
+				visibleLine = visibleLine[:len(visibleLine)-len(resetSuffix)]
+			}
+
+			// Add padding with explicit reset to prevent color bleeding
+			padding := viewWidth - visualLen // Use visual width difference
+			visibleLine += resetSuffix + strings.Repeat(" ", padding)
+		} else if visualLen > viewWidth {
+			// Line is too long - truncate to prevent wrapping
+			// Use ANSI-aware truncation that preserves styling
+			visibleLine = truncateToVisualWidth(visibleLine, viewWidth)
+		}
+
+		result.WriteString(visibleLine)
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+// extractVisiblePortion extracts the visible portion of a line based on scroll offset
+// Properly handles ANSI escape codes and multi-column characters (emojis)
+func (m model) extractVisiblePortion(line string, viewWidth int) string {
+	// Calculate visible window based on scroll offset
+	scrollOffset := m.detailScrollX
+	if scrollOffset < 0 {
+		scrollOffset = 0
+	}
+
+	// Build result by walking through line rune by rune
+	// Track visible column position (accounting for wide chars like emojis)
+	var result strings.Builder
+	visibleCol := 0
+	inEscape := false
+	escapeSeq := strings.Builder{}
+
+	// Track active ANSI codes to prepend them to result
+	activeANSI := strings.Builder{}
+
+	runes := []rune(line)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+
+		// Detect ANSI escape sequence start
+		if r == '\x1b' {
+			inEscape = true
+			escapeSeq.Reset()
+			escapeSeq.WriteRune(r)
+			continue
+		}
+
+		// Inside ANSI escape sequence
+		if inEscape {
+			escapeSeq.WriteRune(r)
+			// ANSI sequences end with a letter (m for color, other commands too)
+			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+				inEscape = false
+				// Save this ANSI code as active (for color/style)
+				ansiCode := escapeSeq.String()
+				if strings.Contains(ansiCode, "m") { // Color/style code
+					activeANSI.WriteString(ansiCode)
+				}
+				// If we're in visible range, write ANSI code to result
+				if visibleCol >= scrollOffset && visibleCol < scrollOffset+viewWidth {
+					result.WriteString(ansiCode)
+				}
+			}
+			continue
+		}
+
+		// Calculate visual width of this character
+		// Most chars are 1 column, emojis/wide chars are 2 columns
+		charWidth := runeWidth(r)
+
+		// Check if this character is in the visible window
+		if visibleCol+charWidth > scrollOffset && visibleCol < scrollOffset+viewWidth {
+			// First character? Prepend active ANSI codes
+			if result.Len() == 0 && activeANSI.Len() > 0 {
+				result.WriteString(activeANSI.String())
+			}
+
+			// Only add the character if it fits completely in the visible window
+			// This prevents splitting wide characters (emojis)
+			if visibleCol >= scrollOffset {
+				result.WriteRune(r)
+			}
+		}
+
+		visibleCol += charWidth
+
+		// Stop if we've passed the visible window
+		if visibleCol >= scrollOffset+viewWidth {
+			break
+		}
+	}
+
+	// If we got nothing, return empty (scrolled past content)
+	if result.Len() == 0 {
+		return ""
+	}
+
+	// Always append ANSI reset at the end to prevent formatting bleeding
+	// This ensures highlights/colors don't extend beyond the visible portion
+	result.WriteString("\033[0m")
+
+	return result.String()
+}
+
+// truncateToVisualWidth truncates a string (with ANSI codes) to a specific visual width
+// Preserves ANSI styling codes while ensuring visual width doesn't exceed target
+func truncateToVisualWidth(s string, targetWidth int) string {
+	var result strings.Builder
+	visualWidth := 0
+	inEscape := false
+	escapeSeq := strings.Builder{}
+
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+
+		// Detect ANSI escape sequence start
+		if r == '\x1b' {
+			inEscape = true
+			escapeSeq.Reset()
+			escapeSeq.WriteRune(r)
+			continue
+		}
+
+		// Inside ANSI escape sequence
+		if inEscape {
+			escapeSeq.WriteRune(r)
+			// ANSI sequences end with a letter
+			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+				inEscape = false
+				// Write ANSI code to result (doesn't count toward visual width)
+				result.WriteString(escapeSeq.String())
+			}
+			continue
+		}
+
+		// Calculate visual width of this character
+		charWidth := runewidth.RuneWidth(r)
+
+		// Check if adding this character would exceed target width
+		if visualWidth + charWidth > targetWidth {
+			// Reached target width - add reset and stop
+			result.WriteString("\033[0m")
+			break
+		}
+
+		// Add character and increment visual width
+		result.WriteRune(r)
+		visualWidth += charWidth
+	}
+
+	return result.String()
+}
+
+// runeWidth returns the visual width of a rune (1 for most, 2 for emojis/wide chars)
+func runeWidth(r rune) int {
+	// Variation selectors and combining characters have zero width
+	if r >= 0xFE00 && r <= 0xFE0F { // Variation selectors
+		return 0
+	}
+	if r >= 0x0300 && r <= 0x036F { // Combining diacritical marks
+		return 0
+	}
+	if r >= 0x1AB0 && r <= 0x1AFF { // Combining diacritical marks extended
+		return 0
+	}
+	if r >= 0x20D0 && r <= 0x20FF { // Combining diacritical marks for symbols
+		return 0
+	}
+
+	// Emojis and wide characters typically occupy 2 columns
+	// This is a simplified check - a full implementation would use unicode/width package
+	if r >= 0x1F300 && r <= 0x1F9FF { // Emoji range
+		return 2
+	}
+	if r >= 0x2600 && r <= 0x26FF { // Misc symbols (many emojis)
+		return 2
+	}
+	if r >= 0x2700 && r <= 0x27BF { // Dingbats
+		return 2
+	}
+	// East Asian Wide characters
+	if r >= 0x3000 && r <= 0x9FFF { // CJK
+		return 2
+	}
+	if r >= 0xAC00 && r <= 0xD7AF { // Hangul
+		return 2
+	}
+	return 1
 }
 
 // buildTreeItems builds a flattened list of tree items including expanded directories
@@ -653,14 +963,20 @@ func (m model) renderTreeView(maxVisible int) string {
 
 		// Calculate available width dynamically based on view mode
 		var maxNameLen int
+		indentWidth := 2 + (item.depth * 3) + 3 + 2 + 2 + 5
+
 		if m.viewMode == viewDualPane {
-			// In dual-pane: use left pane width minus UI elements
-			// Account for: indent, tree chars, icon, favorite, padding
-			indentWidth := 2 + (item.depth * 3) + 3 + 2 + 2 + 5
-			maxNameLen = m.leftWidth - indentWidth
+			// Check if using vertical split (narrow terminal) - need to account for box borders
+			if m.isNarrowTerminal() {
+				// Vertical split: box uses (m.width - 6) with borders (-2) = m.width - 8
+				// Then subtract UI elements
+				maxNameLen = (m.width - 8) - indentWidth
+			} else {
+				// Horizontal split: use left pane width minus UI elements
+				maxNameLen = m.leftWidth - indentWidth
+			}
 		} else {
-			// In single-pane: use full width minus UI elements
-			indentWidth := 2 + (item.depth * 3) + 3 + 2 + 2 + 5
+			// Single-pane: use full width minus UI elements
 			maxNameLen = m.width - indentWidth
 		}
 

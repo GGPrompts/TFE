@@ -594,6 +594,7 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 
 	case "display-detail":
 		m.displayMode = modeDetail
+		m.detailScrollX = 0 // Reset scroll when switching to detail view
 
 	case "display-tree":
 		m.displayMode = modeTree

@@ -27,7 +27,7 @@ func initialModel() model {
 		displayMode:       modeTree, // Tree view works better on narrow terminals
 		sortBy:            "name",
 		sortAsc:           true,
-		viewMode:          viewSinglePane,
+		viewMode:          viewSinglePane, // Will be set to dual-pane if narrow terminal
 		focusedPane:       leftPane,
 		lastClickIndex:    -1,
 		preview: previewModel{
@@ -64,25 +64,35 @@ func initialModel() model {
 	}
 
 	m.loadFiles()
+
+	// Auto-enable dual-pane mode on narrow terminals (phones/Termux)
+	// Dual-pane works better on narrow screens - less horizontal scrolling needed
+	if m.width < 100 {
+		m.viewMode = viewDualPane
+	}
+
 	m.calculateLayout()
 	return m
 }
 
 // calculateLayout calculates left and right pane widths for dual-pane mode
 // Uses accordion-style layout: focused pane gets 2/3, unfocused gets 1/3
-// Exception: Detail view uses vertical split (full width), so width calculations don't apply
+// Exception: Vertical split (Detail view or narrow terminals) uses full width for both panes
 func (m *model) calculateLayout() {
 	if m.viewMode == viewSinglePane || m.viewMode == viewFullPreview {
 		m.leftWidth = m.width
 		m.rightWidth = 0
 	} else {
-		// Detail view: uses vertical split (stacked layout) - set full width for both
-		// (actual rendering uses full width for top and bottom panes)
-		if m.displayMode == modeDetail {
-			m.leftWidth = m.width   // Full width for detail view (top pane)
-			m.rightWidth = m.width  // Full width for preview (bottom pane)
+		// Check if using vertical split (Detail always uses vertical, List/Tree on narrow terminals)
+		useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+
+		if useVerticalSplit {
+			// Vertical split (stacked layout) - set full width for both panes
+			// (actual rendering uses full width for top and bottom panes)
+			m.leftWidth = m.width   // Full width for top pane (file list)
+			m.rightWidth = m.width  // Full width for bottom pane (preview)
 		} else {
-			// List/Tree view: accordion-style horizontal split
+			// List/Tree view on wide terminals: accordion-style horizontal split
 			// Focused pane gets 2/3, unfocused gets 1/3
 			if m.focusedPane == leftPane {
 				m.leftWidth = (m.width * 2) / 3  // 66%

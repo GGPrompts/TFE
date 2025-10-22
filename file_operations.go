@@ -540,12 +540,8 @@ func getFileType(item fileItem) string {
 	// Check for symlinks first
 	if item.isSymlink {
 		if item.symlinkTarget != "" {
-			// Shorten target if too long
-			target := item.symlinkTarget
-			if len(target) > 30 {
-				target = "..." + target[len(target)-27:]
-			}
-			return "Link → " + target
+			// Don't truncate here - let the rendering code handle it based on available width
+			return "Link → " + item.symlinkTarget
 		}
 		return "Symlink"
 	}
@@ -1144,9 +1140,75 @@ func (m *model) loadPreview(path string) {
 	m.preview.cachedRenderedContent = ""
 	m.preview.cachedLineCount = 0
 
-	// Get file info
+	// Check if this is a symlink using Lstat (doesn't follow the link)
+	linfo, err := os.Lstat(path)
+	if err == nil && linfo.Mode()&os.ModeSymlink != 0 {
+		// This is a symlink - show symlink information
+		target, err := os.Readlink(path)
+		content := []string{
+			"🌀 Symbolic Link (Shortcut)",
+			"",
+			"Link Name: " + filepath.Base(path),
+			"",
+		}
+
+		if err != nil {
+			// Can't read symlink target
+			content = append(content, "❌ Error: Cannot read symlink target")
+			content = append(content, fmt.Sprintf("   %v", err))
+		} else {
+			// Successfully read target
+			content = append(content, "Points to: " + target)
+
+			// Resolve relative paths to absolute for clarity
+			absTarget := target
+			if !filepath.IsAbs(target) {
+				absTarget = filepath.Join(filepath.Dir(path), target)
+			}
+
+			// Check if target exists and get its info
+			targetInfo, statErr := os.Stat(path) // Stat follows the link
+
+			if statErr != nil {
+				// Broken symlink
+				content = append(content, "")
+				content = append(content, "❌ Status: BROKEN LINK")
+				content = append(content, "   Target does not exist or is not accessible")
+				content = append(content, "")
+				content = append(content, "Absolute path: " + absTarget)
+			} else {
+				// Valid symlink
+				content = append(content, "")
+				content = append(content, "✅ Status: Valid")
+				content = append(content, "")
+
+				if targetInfo.IsDir() {
+					content = append(content, "Target Type: Directory")
+					content = append(content, "")
+					content = append(content, "💡 Tip: Press Enter to navigate into this directory")
+				} else {
+					content = append(content, "Target Type: File")
+					content = append(content, "Size: " + formatFileSize(targetInfo.Size()))
+					content = append(content, "Modified: " + formatModTime(targetInfo.ModTime()))
+					content = append(content, "")
+					content = append(content, "💡 Tip: Press Enter to view the target file's contents")
+				}
+			}
+		}
+
+		m.preview.content = content
+		m.preview.loaded = true
+		m.preview.fileSize = 0
+		return
+	}
+
+	// Get file info (follows symlinks if any)
 	info, err := os.Stat(path)
 	if err != nil {
+		m.preview.content = []string{
+			fmt.Sprintf("Error reading file: %v", err),
+		}
+		m.preview.loaded = true
 		return
 	}
 
@@ -1304,8 +1366,9 @@ func (m *model) populatePreviewCache() {
 	}
 
 	if m.preview.isMarkdown {
-		// Markdown: no line numbers or scrollbar, content uses full box width
-		availableWidth = boxContentWidth
+		// Markdown: no line numbers or scrollbar, but add left padding for readability
+		// Subtract 2 for left padding (prevents code blocks from touching border)
+		availableWidth = boxContentWidth - 2
 	} else {
 		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
 		availableWidth = boxContentWidth - 8
@@ -1321,16 +1384,8 @@ func (m *model) populatePreviewCache() {
 		// For files > 2000 lines, treat as plain text to avoid performance issues
 		const maxMarkdownLines = 2000
 
-		// Also skip Glamour when preview pane is too narrow (< 45 chars)
-		// Glamour's word wrapping in narrow panes creates awkward line breaks in code blocks
-		const minGlamourWidth = 45
-
 		if len(m.preview.content) > maxMarkdownLines {
 			// Too large for Glamour - treat as plain text
-			m.preview.isMarkdown = false
-			// Fall through to regular text wrapping below
-		} else if availableWidth < minGlamourWidth {
-			// Too narrow for Glamour - show plain markdown instead
 			m.preview.isMarkdown = false
 			// Fall through to regular text wrapping below
 		} else {

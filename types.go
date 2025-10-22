@@ -225,6 +225,7 @@ type model struct {
 	displayMode displayMode
 	sortBy      string // "name", "size", "modified" for detail view
 	sortAsc     bool   // Sort ascending or descending
+	detailScrollX int  // Horizontal scroll offset for detail view (narrow terminals)
 	// Preview-related fields
 	viewMode    viewMode
 	preview     previewModel

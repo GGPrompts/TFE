@@ -94,6 +94,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.calculateLayout()      // Recalculate pane layout on resize
 		m.populatePreviewCache() // Repopulate cache with new width
 
+		// Reset horizontal scroll on window resize
+		m.detailScrollX = 0
+
 	case spinner.TickMsg:
 		// Update spinner animation
 		var cmd tea.Cmd

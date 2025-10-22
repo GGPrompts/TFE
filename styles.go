@@ -42,6 +42,14 @@ var (
 			Dark:  "#000000", // Black text on bright cyan
 		})
 
+	// Narrow terminal selection styling (matrix green - no background to prevent wrapping)
+	narrowSelectedStyle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.AdaptiveColor{
+			Light: "#00AF00", // Bright green for light backgrounds
+			Dark:  "#00FF00", // Matrix green for dark backgrounds
+		})
+
 	// Folder styling
 	folderStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.AdaptiveColor{

@@ -20,7 +20,7 @@ import (
 // - Clickable UI elements
 
 // isClickInFileListArea checks if a mouse click is in the file list area (vs preview area)
-// Handles both horizontal split (List/Tree) and vertical split (Detail) layouts
+// Handles both horizontal split and vertical split layouts
 func (m model) isClickInFileListArea(mouseX, mouseY int) bool {
 	if m.viewMode != viewDualPane {
 		return true // Single-pane mode - all clicks are in file list
@@ -34,7 +34,10 @@ func (m model) isClickInFileListArea(mouseX, mouseY int) bool {
 		return false // Click in header or footer
 	}
 
-	if m.displayMode == modeDetail {
+	// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
+	useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+
+	if useVerticalSplit {
 		// VERTICAL split: top pane is file list, bottom pane is preview
 		// ACCORDION: Calculate based on current focus (matches render_preview.go)
 		maxVisible := m.height - headerLines - footerLines
@@ -116,7 +119,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if msg.Y >= headerLines && msg.Y < m.height-footerLines {
 			oldFocus := m.focusedPane
 
-			if m.displayMode == modeDetail {
+			// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
+			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+
+			if useVerticalSplit {
 				// Calculate pane heights for vertical split based on CURRENT focus
 				// (matches render_preview.go accordion behavior)
 				maxVisible := m.height - headerLines - footerLines
@@ -131,12 +137,12 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				paneY := msg.Y - headerLines
 
 				if paneY < topHeight {
-					m.focusedPane = leftPane  // Top pane (detail view)
+					m.focusedPane = leftPane  // Top pane (file list)
 				} else {
 					m.focusedPane = rightPane // Bottom pane (preview)
 				}
 			} else {
-				// List/Tree view uses HORIZONTAL split (accordion layout)
+				// HORIZONTAL split - List/Tree view on wide terminals (accordion layout)
 				if msg.X < m.leftWidth {
 					m.focusedPane = leftPane
 				} else if msg.X > m.leftWidth { // Account for separator
@@ -202,9 +208,9 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [👁️] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑️]
-			// Layout:  0-4   5-9    10-14 15-19 20-24 25-29 30-34 35-39 40-44
-			// Note: Each button is 5 chars: [ + emoji(2) + ] + space
+			// Toolbar: [🏠] [⭐/✨] [V] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑️]
+			// Layout:  0-4   5-9    10-12 13-17 18-22 23-27 28-32 33-37 38-42
+			// Note: Most buttons are 5 chars ([ + emoji(2) + ] + space), [V] is 3 chars
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
 				if msg.X >= 0 && msg.X <= 4 {
@@ -227,11 +233,12 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// View mode toggle button [👁️] (X=10-14: [ + emoji(2) + ] + space)
-				if msg.X >= 10 && msg.X <= 14 {
-					// Cycle through display modes (List → Detail → Tree)
+				// View mode toggle button [V] (X=10-12: [ + V + ] + space)
+				if msg.X >= 10 && msg.X <= 12 {
+					// Cycle through display modes: List → Detail → Tree → List
 					if m.displayMode == modeList {
 						m.displayMode = modeDetail
+						m.detailScrollX = 0 // Reset scroll when entering detail view
 					} else if m.displayMode == modeDetail {
 						m.displayMode = modeTree
 					} else {
@@ -239,8 +246,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Pane toggle button [⬜/⬌] (X=15-19: [ + emoji(2) + ] + space)
-				if msg.X >= 15 && msg.X <= 19 {
+				// Pane toggle button [⬜/⬌] (X=13-17: [ + emoji(2) + ] + space)
+				if msg.X >= 13 && msg.X <= 17 {
 					// Toggle between single and dual-pane (like Tab or Space)
 					if m.viewMode == viewDualPane {
 						m.viewMode = viewSinglePane
@@ -251,8 +258,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.populatePreviewCache() // Refresh cache with new layout
 					return m, nil
 				}
-				// Terminal button [>_] (X=20-24: [ + >_(2) + ] + space)
-				if msg.X >= 20 && msg.X <= 24 {
+				// Terminal button [>_] (X=18-22: [ + >_(2) + ] + space)
+				if msg.X >= 18 && msg.X <= 22 {
 					// Toggle command mode focus
 					m.commandFocused = !m.commandFocused
 					if !m.commandFocused {
@@ -261,8 +268,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Context-aware search button [🔍] (X=25-29: [ + emoji(2) + ] + space)
-				if msg.X >= 25 && msg.X <= 29 {
+				// Context-aware search button [🔍] (X=23-27: [ + emoji(2) + ] + space)
+				if msg.X >= 23 && msg.X <= 27 {
 					// Context-aware search toggle:
 					// - When viewing file (full preview or dual-pane with right pane focused): Toggle in-file search (Ctrl+F)
 					// - When browsing files (left pane or single-pane): Toggle directory filter search (/)
@@ -300,8 +307,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Prompts filter button [📝] (X=30-34: [ + emoji(2) + ] + space)
-				if msg.X >= 30 && msg.X <= 34 {
+				// Prompts filter button [📝] (X=28-32: [ + emoji(2) + ] + space)
+				if msg.X >= 28 && msg.X <= 32 {
 					// Toggle prompts filter
 					m.showPromptsOnly = !m.showPromptsOnly
 
@@ -318,8 +325,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Game controller button [🎮] (X=35-39: [ + emoji(2) + ] + space)
-				if msg.X >= 35 && msg.X <= 39 {
+				// Game controller button [🎮] (X=33-37: [ + emoji(2) + ] + space)
+				if msg.X >= 33 && msg.X <= 37 {
 					// Launch TUIClassics game launcher
 					homeDir, err := os.UserHomeDir()
 					if err != nil {
@@ -354,8 +361,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.setStatusMessage("Games: Install from github.com/GGPrompts/TUIClassics (run: git clone ... && make build)", false)
 					return m, nil
 				}
-				// Trash button [🗑️] or [♻️] (X=40-44: [ + emoji(2) + ] + space)
-				if msg.X >= 40 && msg.X <= 44 {
+				// Trash button [🗑️] or [♻️] (X=38-42: [ + emoji(2) + ] + space)
+				if msg.X >= 38 && msg.X <= 42 {
 					// Toggle trash view
 					m.showTrashOnly = !m.showTrashOnly
 					m.showFavoritesOnly = false // Disable favorites filter
@@ -364,8 +371,9 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 					if m.showTrashOnly {
 						// Load trash items and convert to fileItems for display
-						// Default to detail view for trash
+						// Default to detail view for trash (supports horizontal scrolling on narrow terminals)
 						m.displayMode = modeDetail
+						m.detailScrollX = 0 // Reset scroll
 						m.loadFiles()
 					} else {
 						// Exit trash view, reload normal files

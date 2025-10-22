@@ -109,7 +109,7 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		}
 	} else {
 		// File menu items
-		items = append(items, contextMenuItem{"👁  Preview", "preview"})
+		items = append(items, contextMenuItem{"Preview", "preview"})
 
 		// Add image-specific options
 		if isImageFile(m.contextMenuFile.path) {
