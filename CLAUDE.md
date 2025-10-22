@@ -132,6 +132,7 @@ tfe/
 - `renderPreview()` - preview pane content with line numbers
 - `renderFullPreview()` - full-screen preview mode
 - `renderDualPane()` - split-pane layout
+- **Preview height tip**: When adjusting header construction, wrapping, or padding logic, always accumulate rendered rows first and only join them once. This makes it easy to clamp the preview output to exactly `maxVisible` lines (no trailing newline), which keeps the dual-pane boxes vertically aligned.
 
 **When to extend**: Modify preview rendering logic, add preview features (syntax highlighting, etc.).
 

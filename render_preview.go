@@ -194,25 +194,29 @@ func (m model) renderPreview(maxVisible int) string {
 			}
 
 			// Render visible lines without line numbers for markdown
-			// Track actual output lines to prevent overflow from wrapped code blocks
 			outputLines := 0
+
+			writeLine := func(line string) {
+				if outputLines > 0 {
+					s.WriteString("\n")
+				}
+				s.WriteString(line)
+				outputLines++
+			}
+
 			for i := start; i < end && outputLines < maxVisible; i++ {
 				line := renderedLines[i]
 				// Add left padding for better readability (especially for code blocks)
-				s.WriteString("  ") // 2-space left padding
-				s.WriteString(line)
-				s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
-				s.WriteString("\n")
-				outputLines++
-
-				// Stop if we've reached the maximum visible lines
-				// This prevents code block wrapping from causing overflow
-				if outputLines >= maxVisible {
-					break
-				}
+				writeLine("  " + line + "\033[0m") // 2-space left padding
 			}
 
-			return strings.TrimRight(s.String(), "\n")
+			// Pad with empty lines to reach exactly maxVisible lines
+			// This ensures proper alignment with the file list pane
+			for outputLines < maxVisible {
+				writeLine("\033[0m")
+			}
+
+			return s.String()
 		}
 		// If markdown flag is set but no rendered content, fall through to plain text rendering
 		// This happens when Glamour fails or file is too large
@@ -249,18 +253,27 @@ func (m model) renderPreview(maxVisible int) string {
 	}
 
 	// Render lines with line numbers and scrollbar
-	for i := start; i < end; i++ {
+	linesRendered := 0
+	writeLine := func(line string) {
+		if linesRendered > 0 {
+			s.WriteString("\n")
+		}
+		s.WriteString(line)
+		linesRendered++
+	}
+
+	for i := start; i < end && linesRendered < maxVisible; i++ {
 		// Line number (5 chars)
 		lineNum := fmt.Sprintf("%5d ", i+1)
 		lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-		s.WriteString(lineNumStyle.Render(lineNum))
+		renderedLine := lineNumStyle.Render(lineNum)
 
 		// Scrollbar right after line number (replaces the │ separator)
 		scrollbar := m.renderScrollbar(i-start, maxVisible, totalLines)
-		s.WriteString(scrollbar)
+		renderedLine += scrollbar
 
 		// Space after scrollbar
-		s.WriteString(" ")
+		renderedLine += " "
 
 		// Content line - ensure it doesn't exceed available width to prevent wrapping
 		contentLine := wrappedLines[i]
@@ -271,45 +284,100 @@ func (m model) renderPreview(maxVisible int) string {
 			contentLine = truncateToWidth(contentLine, availableWidth)
 		}
 
-		s.WriteString(contentLine)
-		s.WriteString("\033[0m") // Reset ANSI codes to prevent bleed
-		s.WriteString("\n")
+		renderedLine += contentLine
+		renderedLine += "\033[0m" // Reset ANSI codes to prevent bleed
+		writeLine(renderedLine)
 	}
 
-	return strings.TrimRight(s.String(), "\n")
+	// Pad with empty lines to reach exactly maxVisible lines
+	// This ensures proper alignment with the file list pane in dual-pane mode
+	for linesRendered < maxVisible {
+		writeLine("\033[0m")
+	}
+
+	return s.String()
 }
 
-// highlightPromptVariables highlights {{variables}} in template text with assigned colors
-func (m model) highlightPromptVariables(templateText string) string {
-	if !m.inputFieldsActive || len(m.promptInputFields) == 0 {
+// renderInlineVariables processes template text and renders variables inline
+// In EDIT MODE: Shows variables without {{}} brackets, with values inline
+// - Focused variable: highlighted background (235) + yellow foreground (220)
+// - Filled variables: shown in blue (39), just the value
+// - Unfilled variables: shown in dim gray (242), just the name
+func (m model) renderInlineVariables(templateText string) string {
+	if m.preview.promptTemplate == nil || len(m.preview.promptTemplate.variables) == 0 {
 		return templateText
-	}
-
-	// Build a map of variable names to colors
-	colorMap := make(map[string]string)
-	for _, field := range m.promptInputFields {
-		colorMap[field.name] = field.color
-	}
-
-	// Auto-filled variables (DATE, TIME) should already be in fields with green color
-	// But check template variables in case they exist but weren't added as fields
-	if m.preview.promptTemplate != nil {
-		for _, varName := range m.preview.promptTemplate.variables {
-			// Only add if not already in colorMap (from fields)
-			if _, exists := colorMap[varName]; !exists {
-				varLower := strings.ToLower(varName)
-				if varLower == "date" || varLower == "time" {
-					colorMap[varName] = "34" // Green
-				}
-			}
-		}
 	}
 
 	result := templateText
 
-	// Replace each {{variable}} with colored version
-	// Try all case variations for each variable
-	for varName, color := range colorMap {
+	// Process each variable in the template
+	for i, varName := range m.preview.promptTemplate.variables {
+		var replacement string
+		isFocused := (i == m.focusedVariableIndex)
+
+		// Check if this variable has a filled value
+		filledValue, hasFilled := m.filledVariables[varName]
+
+		if isFocused {
+			// Focused variable - show with highlight (background 235, foreground 220)
+			// NO brackets - just show the value or variable name
+			if hasFilled && filledValue != "" {
+				// Show the filled value with focus highlight
+				replacement = fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", filledValue)
+			} else {
+				// Show variable name (no brackets) with focus highlight
+				replacement = fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", varName)
+			}
+		} else if hasFilled && filledValue != "" {
+			// Filled but not focused - show value in blue (39), NO brackets
+			replacement = fmt.Sprintf("\033[38;5;39m%s\033[0m", filledValue)
+		} else {
+			// Unfilled and not focused - show variable name in dim gray (242), NO brackets
+			replacement = fmt.Sprintf("\033[38;5;242m%s\033[0m", varName)
+		}
+
+		// Replace all case variations of this variable
+		variations := []string{
+			varName,
+			strings.ToUpper(varName),
+			strings.ToLower(varName),
+			strings.Title(strings.ToLower(varName)),
+		}
+
+		for _, variant := range variations {
+			varPattern := "{{" + variant + "}}"
+			result = strings.ReplaceAll(result, varPattern, replacement)
+		}
+	}
+
+	return result
+}
+
+// highlightVariablesBeforeEdit highlights {{variables}} with unique colors BEFORE edit mode
+// File variables: blue (39), Date/Time: green (34), Custom: yellow (220)
+// Keeps the {{}} brackets visible
+func (m model) highlightVariablesBeforeEdit(templateText string) string {
+	if m.preview.promptTemplate == nil || len(m.preview.promptTemplate.variables) == 0 {
+		return templateText
+	}
+
+	result := templateText
+
+	// Assign colors based on variable type
+	for _, varName := range m.preview.promptTemplate.variables {
+		varNameLower := strings.ToLower(varName)
+		var color string
+
+		// Determine color based on variable type
+		if varNameLower == "date" || varNameLower == "time" {
+			color = "34" // Green for auto-filled date/time
+		} else if strings.Contains(varNameLower, "file") || strings.Contains(varNameLower, "path") {
+			color = "39" // Blue for file-related
+		} else {
+			color = "220" // Yellow for custom variables
+		}
+
+		// Replace all case variations
 		variations := []string{
 			varName,
 			strings.ToUpper(varName),
@@ -319,160 +387,12 @@ func (m model) highlightPromptVariables(templateText string) string {
 
 		for _, variant := range variations {
 			pattern := "{{" + variant + "}}"
-			// ANSI color: \033[38;5;<color>m for foreground
 			colored := fmt.Sprintf("\033[38;5;%sm{{%s}}\033[0m", color, variant)
 			result = strings.ReplaceAll(result, pattern, colored)
 		}
 	}
 
 	return result
-}
-
-// renderInputFields renders the input fields section below the preview
-func (m model) renderInputFields(availableWidth, availableHeight int) string {
-	if !m.inputFieldsActive || len(m.promptInputFields) == 0 {
-		return ""
-	}
-
-	// Update displayWidth for all fields based on actual available width
-	// Reserve space for focus indicator (2 chars) and label indent (2 chars)
-	// This prevents overflow in narrow windows
-	fieldDisplayWidth := availableWidth - 4 // Focus indicator + indent
-	if fieldDisplayWidth < 20 {
-		fieldDisplayWidth = 20 // Minimum readable width
-	}
-	for i := range m.promptInputFields {
-		m.promptInputFields[i].displayWidth = fieldDisplayWidth
-	}
-
-	var s strings.Builder
-
-	// Title for input fields section
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	s.WriteString(titleStyle.Render("📝 Fillable Fields"))
-	s.WriteString("\n")
-
-	// Help text
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
-	s.WriteString(helpStyle.Render("Tab: Navigate • Type: Edit • F3: File Picker • F5: Copy • 🕐 Auto-filled"))
-	s.WriteString("\n\n")
-
-	// Calculate how many fields we can show (reserve lines for: title + help + blank + indicators)
-	headerLines := 3
-	linesPerField := 2 // Label line + input line
-	totalFields := len(m.promptInputFields)
-
-	// Reserve space for scroll indicators if needed
-	availableLinesForFields := availableHeight - headerLines
-	maxFields := availableLinesForFields / linesPerField
-	if maxFields < 1 {
-		maxFields = 1
-	}
-
-	// Calculate scroll window to keep focused field visible
-	startField := 0
-	endField := totalFields
-
-	if totalFields > maxFields {
-		// We'll need scroll indicators, so reduce maxFields by 1 to account for them
-		if maxFields > 1 {
-			maxFields = maxFields - 1
-		}
-
-		// Calculate which fields to show based on focused field
-		// Try to center the focused field in the view
-		startField = m.focusedInputField - (maxFields / 2)
-		if startField < 0 {
-			startField = 0
-		}
-		endField = startField + maxFields
-		if endField > totalFields {
-			endField = totalFields
-			startField = totalFields - maxFields
-			if startField < 0 {
-				startField = 0
-			}
-		}
-	}
-
-	// Show indicator if there are fields above
-	if startField > 0 {
-		moreStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
-		s.WriteString(moreStyle.Render(fmt.Sprintf("... %d field(s) above ↑", startField)))
-		s.WriteString("\n")
-	}
-
-	// Render visible fields
-	for i := startField; i < endField; i++ {
-		field := m.promptInputFields[i]
-
-		// Field label (no indicator - it goes on the value line)
-		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(field.color))
-		fieldTypeIndicator := ""
-
-		// Check if this is an auto-filled field (DATE/TIME)
-		fieldNameLower := strings.ToLower(field.name)
-		isAutoFilled := fieldNameLower == "date" || fieldNameLower == "time"
-
-		if isAutoFilled {
-			fieldTypeIndicator = " 🕐" // Clock icon for auto-filled time/date
-		} else {
-			switch field.fieldType {
-			case fieldTypeFile:
-				fieldTypeIndicator = " 📁"
-			case fieldTypeLong:
-				fieldTypeIndicator = " 📝"
-			}
-		}
-
-		s.WriteString("  ")
-		s.WriteString(labelStyle.Render(field.name + fieldTypeIndicator + ":"))
-		s.WriteString("\n")
-
-		// Field value with focus indicator
-		focusIndicator := "  "
-		if i == m.focusedInputField {
-			focusIndicator = "▶ "
-		}
-
-		displayValue := field.getDisplayValue()
-		charCount := field.getCharCountDisplay()
-
-		// Build the input display
-		inputStyle := lipgloss.NewStyle()
-		if i == m.focusedInputField {
-			// Focused field - highlighted background
-			inputStyle = inputStyle.Background(lipgloss.Color("235"))
-		}
-
-		// Show [...] prefix for truncated long content
-		valueDisplay := displayValue
-		if field.hasContent() && len(field.value) > len(displayValue) {
-			// Truncated - add prefix
-			valueDisplay = "[...]" + displayValue + charCount
-		} else if charCount != "" {
-			valueDisplay = displayValue + charCount
-		}
-
-		// Dim style if showing default (not user-entered)
-		if !field.hasContent() {
-			inputStyle = inputStyle.Foreground(lipgloss.Color("242"))
-			valueDisplay = displayValue + " (default)"
-		}
-
-		s.WriteString(focusIndicator)
-		s.WriteString(inputStyle.Render(valueDisplay))
-		s.WriteString("\n")
-	}
-
-	// Show indicator if there are fields below
-	if endField < totalFields {
-		remainingCount := totalFields - endField
-		moreStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
-		s.WriteString(moreStyle.Render(fmt.Sprintf("... %d field(s) below ↓", remainingCount)))
-	}
-
-	return s.String()
 }
 
 // renderPromptPreview renders a prompt file with metadata header
@@ -604,49 +524,53 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		availableWidth = 20
 	}
 
-	// Determine content to display based on input fields state
+	// Determine content to display - always use preview content with inline variable highlighting
 	var contentLines []string
 	var isMarkdownPrompt bool
 
-	if m.inputFieldsActive {
-		// Show template with highlighted variables (no Glamour - colors would conflict)
-		highlightedTemplate := m.highlightPromptVariables(tmpl.template)
-		contentLines = strings.Split(highlightedTemplate, "\n")
-		isMarkdownPrompt = false // Don't apply Glamour when showing variable highlights
-	} else {
-		// Show substituted content - apply Glamour if markdown
-		contentText := strings.Join(m.preview.content, "\n")
+	// Use preview content (variables already substituted in prompt_parser.go)
+	contentText := strings.Join(m.preview.content, "\n")
 
-		// Check if this is a markdown file
-		isMarkdownPrompt = m.preview.isMarkdown
+	// Check if this is a markdown file
+	isMarkdownPrompt = m.preview.isMarkdown
 
-		if isMarkdownPrompt {
-			// Use cached Glamour rendering if available and valid (prevents lag on every frame)
-			if m.preview.cachedRenderedContent != "" && m.preview.cachedWidth == availableWidth {
-				// Use cached rendering
-				contentLines = strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
-			} else {
-				// Cache miss or invalid - render with Glamour (with timeout to prevent hangs)
-				rendered, err := renderMarkdownWithTimeout(contentText, availableWidth, 5*time.Second)
-				if err == nil {
-					// Successfully rendered with Glamour
-					contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-				} else {
-					// Glamour failed or timed out, fall back to plain text
-					contentLines = m.preview.content
-					isMarkdownPrompt = false
-				}
-			}
+	if isMarkdownPrompt && !m.promptEditMode {
+		// Use cached Glamour rendering if available and valid (prevents lag on every frame)
+		if m.preview.cachedRenderedContent != "" && m.preview.cachedWidth == availableWidth {
+			// Use cached rendering
+			contentLines = strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 		} else {
-			// Not markdown, use plain text
+			// Cache miss or invalid - render with Glamour (with timeout to prevent hangs)
+			rendered, err := renderMarkdownWithTimeout(contentText, availableWidth, 5*time.Second)
+			if err == nil {
+				// Successfully rendered with Glamour
+				contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+			} else {
+				// Glamour failed or timed out, fall back to plain text
+				contentLines = m.preview.content
+				isMarkdownPrompt = false
+			}
+		}
+	} else {
+		// Plain text or edit mode - use plain content
+		if m.promptEditMode {
+			// EDIT MODE: Show raw template with inline variable highlighting (no brackets)
+			renderedTemplate := m.renderInlineVariables(tmpl.template)
+			contentLines = strings.Split(renderedTemplate, "\n")
+		} else if m.preview.isPrompt && m.showPromptsOnly {
+			// BEFORE EDIT MODE: Show template with colored {{variables}} (keeps brackets)
+			highlightedTemplate := m.highlightVariablesBeforeEdit(tmpl.template)
+			contentLines = strings.Split(highlightedTemplate, "\n")
+		} else {
+			// Regular preview content (variables already substituted)
 			contentLines = m.preview.content
 		}
 	}
 
-	// Wrap content lines (only if not markdown - Glamour already wraps)
+	// Wrap content lines (only if not markdown and not in edit/preview mode - Glamour already wraps, ANSI codes don't wrap well)
 	var wrappedLines []string
-	if isMarkdownPrompt {
-		// Glamour already wrapped the text, use as-is
+	if isMarkdownPrompt || m.promptEditMode || (m.preview.isPrompt && m.showPromptsOnly && !m.promptEditMode) {
+		// Glamour already wrapped OR has ANSI codes (edit mode or colored variables) - use as-is
 		wrappedLines = contentLines
 	} else {
 		// Plain text - wrap manually
@@ -656,29 +580,10 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		}
 	}
 
-	// Calculate available height for content and input fields
-	var contentHeight int
-	var inputFieldsSection string
-
-	if m.inputFieldsActive {
-		// Reserve space for input fields (approximately 1/3 of available space)
-		inputFieldsHeight := maxVisible / 3
-		if inputFieldsHeight < 8 {
-			inputFieldsHeight = 8 // Minimum for at least 2 fields
-		}
-		contentHeight = maxVisible - headerHeight - inputFieldsHeight
-		if contentHeight < 5 {
-			contentHeight = 5
-		}
-
-		// Render input fields section
-		inputFieldsSection = m.renderInputFields(availableWidth, inputFieldsHeight)
-	} else {
-		// No input fields - use all available space for content
-		contentHeight = maxVisible - headerHeight
-		if contentHeight < 5 {
-			contentHeight = 5
-		}
+	// Calculate available height for content (no separate input fields section)
+	contentHeight := maxVisible - headerHeight
+	if contentHeight < 5 {
+		contentHeight = 5
 	}
 
 	// Calculate visible range for content
@@ -697,68 +602,39 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		end = totalLines
 	}
 
-	// Track total lines rendered to ensure we don't exceed maxVisible
-	linesRendered := 0
+	// Collect rendered lines so we can join without trailing newline
+	renderedLines := make([]string, 0, maxVisible)
 
 	// Render header
 	for _, line := range headerLines {
-		if linesRendered >= maxVisible {
+		if len(renderedLines) >= maxVisible {
 			break
 		}
-		s.WriteString(line)
-		s.WriteString("\033[0m") // Reset ANSI codes
-		s.WriteString("\n")
-		linesRendered++
+		renderedLines = append(renderedLines, line+"\033[0m")
 	}
 
 	// Render content (no line numbers for prompts)
-	for i := start; i < end && linesRendered < maxVisible; i++ {
-		if linesRendered >= maxVisible {
-			break
-		}
-		// Add left padding for markdown prompts (prevents code blocks from touching border)
+	for i := start; i < end && len(renderedLines) < maxVisible; i++ {
+		line := wrappedLines[i]
 		if isMarkdownPrompt {
-			s.WriteString("  ") // 2-space left padding
+			line = "  " + line // 2-space left padding
 		}
-		s.WriteString(wrappedLines[i])
-		s.WriteString("\033[0m") // Reset ANSI codes
-		s.WriteString("\n")
-		linesRendered++
-	}
-
-	// Render input fields section if active
-	if m.inputFieldsActive && inputFieldsSection != "" {
-		// Reserve 2 lines for separator
-		if linesRendered+2 < maxVisible {
-			s.WriteString("\n")
-			linesRendered++
-			separatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-			s.WriteString(separatorStyle.Render("─────────────────────────────────────"))
-			s.WriteString("\n")
-			linesRendered++
-
-			// Render input fields, but only as many lines as fit
-			inputLines := strings.Split(inputFieldsSection, "\n")
-			for i, line := range inputLines {
-				if linesRendered >= maxVisible {
-					break
-				}
-				if i > 0 {
-					s.WriteString("\n")
-				}
-				s.WriteString(line)
-				linesRendered++
-			}
-		}
+		renderedLines = append(renderedLines, line+"\033[0m")
 	}
 
 	// Pad with empty lines to reach exactly maxVisible lines
-	for linesRendered < maxVisible {
-		s.WriteString("\n")
-		linesRendered++
+	for len(renderedLines) < maxVisible {
+		renderedLines = append(renderedLines, "\033[0m")
 	}
 
-	return strings.TrimRight(s.String(), "\n")
+	for i, line := range renderedLines {
+		if i > 0 {
+			s.WriteString("\n")
+		}
+		s.WriteString(line)
+	}
+
+	return s.String()
 }
 
 // renderScrollbar renders a scrollbar indicator for the current line
@@ -869,9 +745,9 @@ func (m model) renderFullPreview() string {
 	s.WriteString("\n")
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
 
-	// Show different F5 text if viewing a prompt (with or without fillable fields)
+	// Show different F5 text if viewing a prompt
 	f5Text := "copy path"
-	if m.preview.isPrompt || (m.inputFieldsActive && len(m.promptInputFields) > 0) {
+	if m.preview.isPrompt {
 		f5Text = "copy rendered prompt"
 	}
 
