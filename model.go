@@ -38,7 +38,11 @@ func initialModel() model {
 		favorites:           loadFavorites(),
 		showFavoritesOnly:   false,
 		expandedDirs:        make(map[string]bool),
-		commandHistory:      loadCommandHistory(), // Load from disk on startup
+		// Prompt inline editing
+		promptEditMode:       false,
+		focusedVariableIndex: 0,
+		filledVariables:      make(map[string]string),
+		commandHistory:       loadCommandHistory(), // Load from disk on startup
 		commandCursorPos:    0,
 		historyPos:          0,
 		commandFocused:      false, // Start in file browser mode, not command mode
@@ -79,7 +83,7 @@ func initialModel() model {
 }
 
 // calculateLayout calculates left and right pane widths for dual-pane mode
-// Uses accordion-style layout: focused pane gets 2/3, unfocused gets 1/3
+// Uses accordion-style layout: focused pane gets 60%, unfocused gets 40%
 // Exception: Vertical split (Detail view or narrow terminals) uses full width for both panes
 func (m *model) calculateLayout() {
 	if m.viewMode == viewSinglePane || m.viewMode == viewFullPreview {
@@ -96,13 +100,13 @@ func (m *model) calculateLayout() {
 			m.rightWidth = m.width  // Full width for bottom pane (preview)
 		} else {
 			// List/Tree view on wide terminals: accordion-style horizontal split
-			// Focused pane gets 2/3, unfocused gets 1/3
+			// Focused pane gets 60%, unfocused gets 40%
 			if m.focusedPane == leftPane {
-				m.leftWidth = (m.width * 2) / 3  // 66%
-				m.rightWidth = m.width / 3       // 33%
+				m.leftWidth = (m.width * 60) / 100  // 60%
+				m.rightWidth = (m.width * 40) / 100 // 40%
 			} else {
-				m.leftWidth = m.width / 3        // 33%
-				m.rightWidth = (m.width * 2) / 3 // 66%
+				m.leftWidth = (m.width * 40) / 100  // 40%
+				m.rightWidth = (m.width * 60) / 100 // 60%
 			}
 
 			// Ensure minimum widths for usability

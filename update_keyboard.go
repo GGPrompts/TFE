@@ -87,158 +87,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle input field editing (only when preview pane is focused)
-	// In dual-pane mode, only capture input when right pane (preview) is focused
-	// In full preview mode, always active
-	previewFocused := m.viewMode == viewFullPreview || (m.viewMode == viewDualPane && m.focusedPane == rightPane)
-	if m.inputFieldsActive && len(m.promptInputFields) > 0 && previewFocused {
-		switch msg.String() {
-		case "pageup", "pgup", "pagedown", "pgdn", "pgdown":
-			// Allow page up/down to scroll preview even when input fields are active
-			// Don't capture these keys - let them pass through to preview scrolling
-			// This allows scrolling to see input fields that are below the viewport
-			// Fall through to preview mode handling
-
-		case "esc":
-			// Exit input fields mode and return to normal preview
-			m.inputFieldsActive = false
-			m.promptInputFields = nil
-			m.focusedInputField = 0
-			m.setStatusMessage("Input cancelled", false)
-			return m, nil
-
-		case "tab":
-			// Navigate to next field
-			m.focusedInputField++
-			if m.focusedInputField >= len(m.promptInputFields) {
-				m.focusedInputField = 0 // Wrap around
-			}
-			// Maintain scroll position at bottom to keep input fields visible
-			totalLines := len(m.preview.content)
-			if totalLines > 5 {
-				m.preview.scrollPos = totalLines - 5
-			}
-			return m, nil
-
-		case "shift+tab":
-			// Navigate to previous field
-			m.focusedInputField--
-			if m.focusedInputField < 0 {
-				m.focusedInputField = len(m.promptInputFields) - 1 // Wrap around
-			}
-			// Maintain scroll position at bottom to keep input fields visible
-			totalLines := len(m.preview.content)
-			if totalLines > 5 {
-				m.preview.scrollPos = totalLines - 5
-			}
-			return m, nil
-
-		case "up", "down", "k", "j":
-			// Allow arrow keys and vim keys to scroll the preview
-			// Don't capture these - let them pass through for document scrolling
-			// (Users can use Tab/Shift+Tab to navigate between fields)
-			// Fall through to preview scrolling
-
-		case "backspace":
-			// Delete last character from focused field
-			if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
-				field := &m.promptInputFields[m.focusedInputField]
-				if len(field.value) > 0 {
-					field.value = field.value[:len(field.value)-1]
-				}
-				// Maintain scroll position at bottom to keep input fields visible
-				totalLines := len(m.preview.content)
-				if totalLines > 5 {
-					m.preview.scrollPos = totalLines - 5
-				}
-			}
-			return m, nil
-
-		case "ctrl+u":
-			// Clear entire field
-			if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
-				m.promptInputFields[m.focusedInputField].value = ""
-				// Maintain scroll position at bottom to keep input fields visible
-				totalLines := len(m.preview.content)
-				if totalLines > 5 {
-					m.preview.scrollPos = totalLines - 5
-				}
-			}
-			return m, nil
-
-		case "f3":
-			// Activate file picker mode - exit to file browser to select a file
-			m.filePickerMode = true
-			m.filePickerRestorePath = m.preview.filePath // Store preview path to restore later
-			m.filePickerRestorePrompts = m.showPromptsOnly // Store prompts filter state
-			m.showPromptsOnly = false // Disable prompts filter to show all files
-			m.viewMode = viewSinglePane // Exit preview mode
-			m.loadFiles() // Reload files without prompts filter
-			m.setStatusMessage("📁 File Picker: Navigate and press Enter to select file (Esc to cancel)", false)
-			return m, nil
-
-		case "enter":
-			// Move to next field on Enter
-			m.focusedInputField++
-			if m.focusedInputField >= len(m.promptInputFields) {
-				m.focusedInputField = 0 // Wrap around
-			}
-			return m, nil
-
-		default:
-			// Handle regular character input and paste events
-			// Use msg.Runes to get raw text (avoids brackets from bracketed paste mode)
-			text := string(msg.Runes)
-
-			// Only process if not a special key and we have a valid focused field
-			if len(text) > 0 && !isSpecialKey(msg.String()) && m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
-				field := &m.promptInputFields[m.focusedInputField]
-
-				// Check if all characters are printable (including Unicode)
-				isPrintable := true
-				for _, r := range msg.Runes {
-					// Block control characters (0-31) except:
-					// - \n (newline, 10)
-					// - \r (carriage return, 13) - Windows line endings
-					// - \t (tab, 9)
-					// Allow everything else including Unicode (32+)
-					if r < 32 && r != '\n' && r != '\r' && r != '\t' {
-						isPrintable = false
-						break
-					}
-				}
-
-				if isPrintable {
-					// Detect paste (multiple characters at once)
-					isPaste := len(msg.Runes) > 1
-
-					// Strip ANSI codes to prevent pasted styled text corruption
-					cleanText := stripANSI(text)
-
-					// Add the input to the field value
-					field.value += cleanText
-
-					// Maintain scroll position at bottom to keep input fields visible
-					totalLines := len(m.preview.content)
-					if totalLines > 5 {
-						m.preview.scrollPos = totalLines - 5
-					}
-
-					// If it's a paste, show status message with line count
-					if isPaste {
-						charCount := len(cleanText)
-						lineCount := strings.Count(cleanText, "\n") + 1
-						if lineCount > 1 {
-							m.setStatusMessage(fmt.Sprintf("✓ Pasted %d chars (%d lines)", charCount, lineCount), false)
-						} else {
-							m.setStatusMessage(fmt.Sprintf("✓ Pasted %d characters", charCount), false)
-						}
-					}
-				}
-				return m, nil
-			}
-		}
-	}
 
 	// Handle menu bar navigation (when menu bar is focused but dropdown not open)
 	if m.menuBarFocused && !m.menuOpen {
@@ -401,7 +249,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle preview mode keys
 	if m.viewMode == viewFullPreview {
 		switch msg.String() {
-		case "f10", "ctrl+c", "esc":
+		case "f10", "ctrl+c":
 			// Exit preview mode (F10 replaces q)
 			m.viewMode = viewSinglePane
 			m.calculateLayout()
@@ -412,6 +260,95 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Reset mouse mode when exiting preview
 			m.previewMouseEnabled = true
 			return m, tea.EnableMouseCellMotion
+
+		case "esc":
+			// Priority 1: Exit prompt edit mode if active
+			if m.promptEditMode {
+				m.promptEditMode = false
+				m.setStatusMessage("Exited edit mode", false)
+				return m, nil
+			}
+			// Priority 2: Exit preview mode
+			m.viewMode = viewSinglePane
+			m.calculateLayout()
+			m.populatePreviewCache() // Refresh cache with new width
+			m.commandInput = ""
+			m.commandFocused = false
+			m.previewMouseEnabled = true
+			return m, tea.EnableMouseCellMotion
+
+		case "tab":
+			// Inline editing: Navigate to next variable in prompt template
+			if m.preview.isPrompt && m.preview.promptTemplate != nil && m.showPromptsOnly {
+				if !m.promptEditMode {
+					// First Tab press - enter edit mode
+					m.promptEditMode = true
+					m.focusedVariableIndex = 0
+					// Auto-fill defaults for DATE/TIME
+					m.autofillDefaults()
+					m.setStatusMessage("Edit mode: Tab/Shift+Tab to navigate, Esc to exit, F5 to copy", false)
+				} else {
+					// Already in edit mode - navigate to next variable
+					if len(m.preview.promptTemplate.variables) > 0 {
+						m.focusedVariableIndex++
+						if m.focusedVariableIndex >= len(m.preview.promptTemplate.variables) {
+							m.focusedVariableIndex = 0 // Wrap around
+						}
+					}
+				}
+				return m, nil
+			}
+
+		case "shift+tab":
+			// Inline editing: Navigate to previous variable
+			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
+				if len(m.preview.promptTemplate.variables) > 0 {
+					m.focusedVariableIndex--
+					if m.focusedVariableIndex < 0 {
+						m.focusedVariableIndex = len(m.preview.promptTemplate.variables) - 1 // Wrap around
+					}
+				}
+				return m, nil
+			}
+
+		case "backspace":
+			// Inline editing: Delete last character from focused variable
+			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
+				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+					varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+					currentValue := m.filledVariables[varName]
+					if len(currentValue) > 0 {
+						m.filledVariables[varName] = currentValue[:len(currentValue)-1]
+					}
+					return m, nil
+				}
+			}
+
+		case "ctrl+u":
+			// Inline editing: Clear focused variable
+			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
+				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+					varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+					m.filledVariables[varName] = ""
+					return m, nil
+				}
+			}
+
+		case "f3":
+			// Inline editing: File picker for focused variable
+			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
+				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+					// Activate file picker mode
+					m.filePickerMode = true
+					m.filePickerRestorePath = m.preview.filePath
+					m.filePickerRestorePrompts = m.showPromptsOnly
+					m.showPromptsOnly = false // Show all files
+					m.viewMode = viewSinglePane // Exit preview mode
+					m.loadFiles()
+					m.setStatusMessage("📁 File Picker: Navigate and press Enter to select file (Esc to cancel)", false)
+					return m, nil
+				}
+			}
 
 		case "f4":
 			// Edit file in external editor from preview (F4 replaces e/E)
@@ -438,12 +375,14 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.preview.loaded && m.preview.filePath != "" {
 				// If this is a prompt, copy the rendered template
 				if m.preview.isPrompt && m.preview.promptTemplate != nil {
-					// Get variables (use filled fields if active, otherwise context defaults)
-					var vars map[string]string
-					if m.inputFieldsActive && len(m.promptInputFields) > 0 {
-						vars = getFilledVariables(m.promptInputFields, &m)
-					} else {
-						vars = getContextVariables(&m)
+					// Get variables - start with context defaults
+					vars := getContextVariables(&m)
+
+					// Override with user-filled values from inline editing
+					for varName, value := range m.filledVariables {
+						if value != "" {
+							vars[varName] = value
+						}
 					}
 
 					// Render the template with variables substituted
@@ -634,6 +573,24 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.preview.scrollPos += m.height - 6
 			if m.preview.scrollPos > maxScroll {
 				m.preview.scrollPos = maxScroll
+			}
+
+		default:
+			// Inline editing: Handle regular character input for focused variable
+			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
+				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+					varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+
+					// Get current value
+					currentValue := m.filledVariables[varName]
+
+					// Append typed character (use msg.Runes for proper Unicode handling)
+					text := string(msg.Runes)
+					if len(text) > 0 && !isSpecialKey(msg.String()) {
+						m.filledVariables[varName] = currentValue + text
+						return m, nil
+					}
+				}
 			}
 		}
 		return m, nil
@@ -986,7 +943,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
 			m.loadFiles() // Reload files with restored filter
 			m.viewMode = viewFullPreview
-			m.inputFieldsActive = true // Re-enable input fields
 			// Reload the original preview
 			if m.filePickerRestorePath != "" {
 				m.loadPreview(m.filePickerRestorePath)
@@ -1006,28 +962,28 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.loadFiles()
 					return m, nil
 				} else {
-					// It's a file - select it and populate the input field
-					// IMPORTANT: Set the value AFTER reloading preview to avoid field recreation overwriting it
+					// It's a file - insert path into focused variable
 					selectedPath := selectedFile.path
-					selectedName := selectedFile.name
 
 					// Return to preview mode
 					m.filePickerMode = false
 					m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
 					m.loadFiles() // Reload files with restored filter
 					m.viewMode = viewFullPreview
-					m.inputFieldsActive = true // Re-enable input fields
 
-					// Reload the original preview (this recreates input fields)
+					// Reload the original preview
 					if m.filePickerRestorePath != "" {
 						m.loadPreview(m.filePickerRestorePath)
 						m.populatePreviewCache()
 					}
 
-					// NOW set the value after fields have been recreated
-					if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
-						m.promptInputFields[m.focusedInputField].value = selectedPath
-						m.setStatusMessage(fmt.Sprintf("✓ Selected: %s", selectedName), false)
+					// Set the selected file path in the focused variable
+					if m.promptEditMode && m.focusedVariableIndex >= 0 && m.preview.promptTemplate != nil {
+						if m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+							varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+							m.filledVariables[varName] = selectedPath
+							m.setStatusMessage(fmt.Sprintf("✓ Set %s = %s", varName, selectedFile.name), false)
+						}
 					}
 
 					return m, nil
@@ -1478,17 +1434,28 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "tab":
-		// Priority 1: If input fields are active, navigate between fields
-		if m.inputFieldsActive && len(m.promptInputFields) > 0 {
-			m.focusedInputField++
-			if m.focusedInputField >= len(m.promptInputFields) {
-				m.focusedInputField = 0 // Wrap around
+		// Priority 0: Prompt edit mode in dual-pane (when right pane focused on a prompt)
+		if m.viewMode == viewDualPane && m.focusedPane == rightPane && m.preview.isPrompt && m.preview.promptTemplate != nil && m.showPromptsOnly {
+			if !m.promptEditMode {
+				// First Tab press - enter edit mode
+				m.promptEditMode = true
+				m.focusedVariableIndex = 0
+				m.autofillDefaults()
+				m.setStatusMessage("Edit mode: Tab/Shift+Tab to navigate, Esc to exit, F5 to copy", false)
+			} else {
+				// Already in edit mode - navigate to next variable
+				if len(m.preview.promptTemplate.variables) > 0 {
+					m.focusedVariableIndex++
+					if m.focusedVariableIndex >= len(m.preview.promptTemplate.variables) {
+						m.focusedVariableIndex = 0 // Wrap around
+					}
+				}
 			}
 			return m, nil
 		}
 
-		// Priority 2: In dual-pane mode: cycle focus between left and right pane
-		// Priority 3: In single-pane mode: enter dual-pane mode
+		// Priority 1: In dual-pane mode: cycle focus between left and right pane
+		// Priority 2: In single-pane mode: enter dual-pane mode
 		if m.viewMode == viewDualPane {
 			// Cycle through: left → right → left
 			if m.focusedPane == leftPane {
@@ -1810,20 +1777,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// If currently viewing a prompt file, create/clear input fields
-		if m.preview.isPrompt && m.preview.promptTemplate != nil {
-			if m.showPromptsOnly {
-				// Entering prompts mode - create input fields
-				m.promptInputFields = createInputFields(m.preview.promptTemplate, &m)
-				m.inputFieldsActive = len(m.promptInputFields) > 0
-				m.focusedInputField = 0
-			} else {
-				// Exiting prompts mode - clear input fields
-				m.promptInputFields = nil
-				m.inputFieldsActive = false
-				m.focusedInputField = 0
-			}
-		}
 
 	case "f12":
 		// F12: Toggle trash/recycle bin view

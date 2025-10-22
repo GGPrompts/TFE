@@ -1327,27 +1327,10 @@ func (m *model) loadPreview(path string) {
 				m.preview.isMarkdown = true
 			}
 
-			// Create input fields for prompt variables
-			// Only activate fields when in prompts mode (F11)
-			if m.showPromptsOnly {
-				m.promptInputFields = createInputFields(tmpl, m)
-				m.inputFieldsActive = len(m.promptInputFields) > 0
-				m.focusedInputField = 0 // Focus first field by default
-
-				// Auto-scroll to bottom to show input fields (prevents them being cut off on small screens)
-				if m.inputFieldsActive {
-					// Scroll to near the end of content so input fields are visible
-					totalLines := len(m.preview.content)
-					if totalLines > 5 {
-						m.preview.scrollPos = totalLines - 5 // Show last few lines + input fields
-					}
-				}
-			} else {
-				// Not in prompts mode - clear fields
-				m.promptInputFields = nil
-				m.inputFieldsActive = false
-				m.focusedInputField = 0
-			}
+			// Initialize inline editing state for prompt variables
+			m.filledVariables = make(map[string]string)
+			m.promptEditMode = false
+			m.focusedVariableIndex = 0
 
 			// Populate cache for better scroll performance
 			m.populatePreviewCache()

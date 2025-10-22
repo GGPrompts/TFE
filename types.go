@@ -254,13 +254,13 @@ type model struct {
 	// Trash/Recycle bin system
 	showTrashOnly bool        // Filter to show trash contents
 	trashItems    []trashItem // Cached trash items when viewing trash
-	// Prompt input fields (fillable variables)
-	promptInputFields      []promptInputField // Input fields for prompt variables
-	focusedInputField      int                // Index of currently focused input field
-	inputFieldsActive      bool               // Whether input fields are active/shown
-	filePickerMode         bool               // Whether file picker mode is active (F3)
-	filePickerRestorePath  string             // Path to restore preview after file picker
-	filePickerRestorePrompts bool             // Whether to restore prompts filter after file picker
+	// Prompt inline editing (fillable variables)
+	promptEditMode         bool              // Whether prompt edit mode is active (Tab to activate)
+	focusedVariableIndex   int               // Index of currently focused variable in template
+	filledVariables        map[string]string // Map of variable name -> filled value
+	filePickerMode         bool              // Whether file picker mode is active (F3)
+	filePickerRestorePath  string            // Path to restore preview after file picker
+	filePickerRestorePrompts bool            // Whether to restore prompts filter after file picker
 	// Tree view expansion
 	expandedDirs map[string]bool // Path -> expanded state
 	treeItems    []treeItem       // Cached tree items for tree view

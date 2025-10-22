@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -614,26 +613,17 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					// In file picker mode, double-click on file should select it
 					if m.filePickerMode && !clickedFile.isDir {
 						// IMPORTANT: Set the value AFTER reloading preview to avoid field recreation overwriting it
-						selectedPath := clickedFile.path
-						selectedName := clickedFile.name
 
 						// Return to preview mode
 						m.filePickerMode = false
 						m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
 						m.loadFiles()                                   // Reload files with restored filter
 						m.viewMode = viewFullPreview
-						m.inputFieldsActive = true // Re-enable input fields
 
-						// Reload the original preview (this recreates input fields)
+						// Reload the original preview
 						if m.filePickerRestorePath != "" {
 							m.loadPreview(m.filePickerRestorePath)
 							m.populatePreviewCache()
-						}
-
-						// NOW set the value after fields have been recreated
-						if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
-							m.promptInputFields[m.focusedInputField].value = selectedPath
-							m.setStatusMessage(fmt.Sprintf("✓ Selected: %s", selectedName), false)
 						}
 
 						m.lastClickIndex = -1

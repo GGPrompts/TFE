@@ -187,7 +187,7 @@ func (m *model) findPreviousSearchMatch() {
 // This is used for context-aware F1 help navigation
 func (m model) getHelpSectionName() string {
 	// Check context in priority order (most specific first)
-	if m.inputFieldsActive {
+	if m.promptEditMode {
 		return "## Prompt Templates & Fillable Fields"
 	}
 	if m.contextMenuOpen {
@@ -215,4 +215,25 @@ func findSectionLine(content []string, sectionName string) int {
 		}
 	}
 	return -1
+}
+
+// autofillDefaults populates DATE and TIME variables with current values
+// Called when entering prompt edit mode for the first time
+func (m *model) autofillDefaults() {
+	if m.preview.promptTemplate == nil {
+		return
+	}
+
+	contextVars := getContextVariables(m)
+
+	for _, varName := range m.preview.promptTemplate.variables {
+		varNameLower := strings.ToLower(varName)
+
+		// Auto-fill DATE and TIME from context
+		if varNameLower == "date" || varNameLower == "time" {
+			if value, exists := contextVars[varName]; exists {
+				m.filledVariables[varName] = value
+			}
+		}
+	}
 }
