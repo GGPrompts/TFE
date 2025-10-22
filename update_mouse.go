@@ -334,7 +334,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 
-					classicsPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
+					classicsPath := filepath.Join(homeDir, "TUIClassics", "bin", "classics")
 
 					// Check if classics launcher exists
 					if _, err := os.Stat(classicsPath); err == nil {
@@ -343,7 +343,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 
 					// If classics doesn't exist, check for individual games
-					binDir := filepath.Join(homeDir, "projects", "TUIClassics", "bin")
+					binDir := filepath.Join(homeDir, "TUIClassics", "bin")
 					if entries, err := os.ReadDir(binDir); err == nil && len(entries) > 0 {
 						// Find first executable game
 						for _, entry := range entries {
@@ -510,7 +510,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			footerLines := 4
 			totalAvailable := m.height - headerLines - footerLines
 
-			if m.displayMode == modeDetail {
+			// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
+			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+
+			if useVerticalSplit {
 				// VERTICAL split with accordion - top pane height varies by focus
 				var topHeight int
 				if m.focusedPane == leftPane {
@@ -520,7 +523,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 				maxVisible = topHeight - 2  // Content height inside borders
 			} else {
-				// HORIZONTAL split (List/Tree) - height is fixed
+				// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
 				maxVisible = totalAvailable - 2  // Content area inside borders
 			}
 			contentHeight = maxVisible
@@ -712,7 +715,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			footerLines := 4
 			totalAvailable := m.height - headerLines - footerLines
 
-			if m.displayMode == modeDetail {
+			// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
+			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+
+			if useVerticalSplit {
 				// VERTICAL split with accordion - top pane height varies by focus
 				var topHeight int
 				if m.focusedPane == leftPane {
@@ -722,7 +728,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 				maxVisible = topHeight - 2  // Content height inside borders
 			} else {
-				// HORIZONTAL split (List/Tree) - height is fixed
+				// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
 				maxVisible = totalAvailable - 2  // Content area inside borders
 			}
 			contentHeight = maxVisible

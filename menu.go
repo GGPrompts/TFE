@@ -690,7 +690,7 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		if err != nil {
 			m.setStatusMessage("Error: Could not find home directory", true)
 		} else {
-			classicsPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
+			classicsPath := filepath.Join(homeDir, "TUIClassics", "bin", "classics")
 
 			// Check if classics launcher exists
 			if _, err := os.Stat(classicsPath); err == nil {
@@ -702,7 +702,7 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 			}
 
 			// If classics doesn't exist, check for individual games
-			binDir := filepath.Join(homeDir, "projects", "TUIClassics", "bin")
+			binDir := filepath.Join(homeDir, "TUIClassics", "bin")
 			if entries, err := os.ReadDir(binDir); err == nil && len(entries) > 0 {
 				// Find first executable game
 				for _, entry := range entries {

@@ -113,6 +113,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.focusedInputField >= len(m.promptInputFields) {
 				m.focusedInputField = 0 // Wrap around
 			}
+			// Maintain scroll position at bottom to keep input fields visible
+			totalLines := len(m.preview.content)
+			if totalLines > 5 {
+				m.preview.scrollPos = totalLines - 5
+			}
 			return m, nil
 
 		case "shift+tab":
@@ -120,6 +125,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.focusedInputField--
 			if m.focusedInputField < 0 {
 				m.focusedInputField = len(m.promptInputFields) - 1 // Wrap around
+			}
+			// Maintain scroll position at bottom to keep input fields visible
+			totalLines := len(m.preview.content)
+			if totalLines > 5 {
+				m.preview.scrollPos = totalLines - 5
 			}
 			return m, nil
 
@@ -136,6 +146,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if len(field.value) > 0 {
 					field.value = field.value[:len(field.value)-1]
 				}
+				// Maintain scroll position at bottom to keep input fields visible
+				totalLines := len(m.preview.content)
+				if totalLines > 5 {
+					m.preview.scrollPos = totalLines - 5
+				}
 			}
 			return m, nil
 
@@ -143,6 +158,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Clear entire field
 			if m.focusedInputField >= 0 && m.focusedInputField < len(m.promptInputFields) {
 				m.promptInputFields[m.focusedInputField].value = ""
+				// Maintain scroll position at bottom to keep input fields visible
+				totalLines := len(m.preview.content)
+				if totalLines > 5 {
+					m.preview.scrollPos = totalLines - 5
+				}
 			}
 			return m, nil
 
@@ -197,6 +217,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 					// Add the input to the field value
 					field.value += cleanText
+
+					// Maintain scroll position at bottom to keep input fields visible
+					totalLines := len(m.preview.content)
+					if totalLines > 5 {
+						m.preview.scrollPos = totalLines - 5
+					}
 
 					// If it's a paste, show status message with line count
 					if isPaste {
@@ -1037,6 +1063,54 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if actualCmd != "" {
 					return m, runCommandAndExit(actualCmd, m.currentPath)
 				}
+			}
+
+			// Handle cd command specially (change TFE's directory instead of subprocess)
+			if strings.HasPrefix(cmdLower, "cd ") || cmdLower == "cd" {
+				// Extract the path argument
+				pathArg := strings.TrimSpace(strings.TrimPrefix(cmd, "cd"))
+				pathArg = strings.TrimSpace(strings.TrimPrefix(pathArg, "cd")) // Handle uppercase too
+
+				var newPath string
+				if pathArg == "" || pathArg == "~" {
+					// cd with no args or cd ~ goes to home directory
+					homeDir, err := os.UserHomeDir()
+					if err != nil {
+						m.setStatusMessage("Error: Could not find home directory", true)
+						return m, nil
+					}
+					newPath = homeDir
+				} else if pathArg == "-" {
+					// cd - goes to previous directory (if we had one saved)
+					m.setStatusMessage("cd -: Previous directory not implemented yet", true)
+					return m, nil
+				} else if strings.HasPrefix(pathArg, "~/") {
+					// Expand ~ in path
+					homeDir, err := os.UserHomeDir()
+					if err != nil {
+						m.setStatusMessage("Error: Could not find home directory", true)
+						return m, nil
+					}
+					newPath = filepath.Join(homeDir, pathArg[2:])
+				} else if filepath.IsAbs(pathArg) {
+					// Absolute path
+					newPath = pathArg
+				} else {
+					// Relative path
+					newPath = filepath.Join(m.currentPath, pathArg)
+				}
+
+				// Clean the path and verify it exists
+				newPath = filepath.Clean(newPath)
+				if info, err := os.Stat(newPath); err == nil && info.IsDir() {
+					m.currentPath = newPath
+					m.cursor = 0
+					m.loadFiles()
+					m.setStatusMessage(fmt.Sprintf("Changed to: %s", newPath), false)
+				} else {
+					m.setStatusMessage(fmt.Sprintf("cd: %s: No such directory", pathArg), true)
+				}
+				return m, nil
 			}
 
 			// Normal command - suspend TFE and return

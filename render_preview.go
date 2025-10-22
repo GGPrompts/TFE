@@ -621,15 +621,21 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		isMarkdownPrompt = m.preview.isMarkdown
 
 		if isMarkdownPrompt {
-			// Render with Glamour for beautiful formatting (with timeout to prevent hangs)
-			rendered, err := renderMarkdownWithTimeout(contentText, availableWidth, 5*time.Second)
-			if err == nil {
-				// Successfully rendered with Glamour
-				contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+			// Use cached Glamour rendering if available and valid (prevents lag on every frame)
+			if m.preview.cachedRenderedContent != "" && m.preview.cachedWidth == availableWidth {
+				// Use cached rendering
+				contentLines = strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 			} else {
-				// Glamour failed or timed out, fall back to plain text
-				contentLines = m.preview.content
-				isMarkdownPrompt = false
+				// Cache miss or invalid - render with Glamour (with timeout to prevent hangs)
+				rendered, err := renderMarkdownWithTimeout(contentText, availableWidth, 5*time.Second)
+				if err == nil {
+					// Successfully rendered with Glamour
+					contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+				} else {
+					// Glamour failed or timed out, fall back to plain text
+					contentLines = m.preview.content
+					isMarkdownPrompt = false
+				}
 			}
 		} else {
 			// Not markdown, use plain text

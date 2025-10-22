@@ -1333,6 +1333,15 @@ func (m *model) loadPreview(path string) {
 				m.promptInputFields = createInputFields(tmpl, m)
 				m.inputFieldsActive = len(m.promptInputFields) > 0
 				m.focusedInputField = 0 // Focus first field by default
+
+				// Auto-scroll to bottom to show input fields (prevents them being cut off on small screens)
+				if m.inputFieldsActive {
+					// Scroll to near the end of content so input fields are visible
+					totalLines := len(m.preview.content)
+					if totalLines > 5 {
+						m.preview.scrollPos = totalLines - 5 // Show last few lines + input fields
+					}
+				}
 			} else {
 				// Not in prompts mode - clear fields
 				m.promptInputFields = nil
