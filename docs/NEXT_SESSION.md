@@ -1,442 +1,516 @@
-# Pre-Launch Comprehensive Review
+# Pre-Launch Security & Performance Fixes
 
-**Goal:** Conduct a thorough parallel review of TFE before public release, identifying issues across security, performance, UX, code quality, and mobile optimization.
+**Goal:** Fix critical issues identified in the comprehensive pre-launch review before v1.0 release.
 
----
+**Status:** ⚠️ Ready with Caveats - 8 critical issues block safe public launch (6 hours estimated)
 
-## 🚀 IMPORTANT: Run All Agents in PARALLEL
-
-Launch all 6 review agents **in a single message with multiple Task tool calls** for maximum efficiency.
+**See [PLAN.md](../PLAN.md) for complete issue list with 35 items across all priorities.**
 
 ---
 
-## Review Agent Instructions
+## 🔥 CRITICAL FIXES (MUST Complete - 6 hours)
 
-### 1. Security Review Agent
-**Agent Type:** `code-reviewer`
-**Task:**
+These issues represent security vulnerabilities and performance bugs that could cause system compromise or crashes. Fix in priority order:
+
+### 1. File Handle Leak [5 minutes] ⚡ ONE LINE FIX
+
+**File:** `file_operations.go:298-299`
+
+**Issue:** Missing `defer file.Close()` in `loadPreview()` causes file descriptor leak. Application crashes after ~1000 large file previews (ulimit exhaustion).
+
+**Fix:**
+```go
+// Line 298-299
+file, err := os.Open(path)
+if err != nil {
+    return "", err
+}
+defer file.Close()  // ← ADD THIS LINE
+
+stat, err := file.Stat()
+// ... rest of function
 ```
-Perform a comprehensive security audit of the TFE (Terminal File Explorer) codebase.
 
-Focus areas:
-- File operation safety (path traversal, symlink attacks, permission checks)
-- Command execution vulnerabilities (command injection in executeCommand, runCommand)
-- Input validation (dialog inputs, command prompt, file picker, search queries)
-- Secrets exposure risks (.env files, credentials in favorites/history)
-- Terminal escape sequence injection risks
-- Race conditions in file operations
-- Directory traversal with .. handling
-- Favorites/history file permissions and storage security
-
-Search these files:
-- file_operations.go (loadFiles, loadPreview, file I/O)
-- command.go (executeCommand, runCommand, history storage)
-- editor.go (external tool launching)
-- update_keyboard.go (input handling)
-- dialog.go (user input validation)
-
-Provide specific findings with:
-- File path and line number
-- Severity: Critical/High/Medium/Low
-- Description of vulnerability
-- Recommended fix
-- Example exploit if applicable
-
-Output format:
-## Critical Issues
-- [file:line] Description - Recommended fix
-
-## High Priority Issues
-- [file:line] Description - Recommended fix
-
-## Medium/Low Priority
-- [file:line] Description - Recommended fix
-```
+**Test:** Preview 2000+ large files rapidly, check `lsof | grep tfe` for leaked handles.
 
 ---
 
-### 2. Mobile/Narrow Terminal UX Agent
-**Agent Type:** `Explore` (thoroughness: **very thorough**)
-**Task:**
+### 2. Command Injection in executeCommand() [2 hours]
+
+**File:** `command.go:27-47`
+
+**Issue:** User input passed directly to `/bin/sh -c` without sanitization. Allows arbitrary command execution with `;`, `&&`, `||`, piping.
+
+**Exploit Example:** User types `ls; rm -rf ~` in command prompt.
+
+**Fix Option A - Command Allowlist (Recommended):**
+```go
+func (m *model) executeCommand(cmdStr string) tea.Cmd {
+    parts := strings.Fields(cmdStr)
+    if len(parts) == 0 {
+        return nil
+    }
+
+    // Allowlist of safe commands
+    safeCommands := map[string]bool{
+        "ls": true, "cat": true, "grep": true, "find": true,
+        "head": true, "tail": true, "wc": true, "file": true,
+        "git": true, "tree": true, "du": true, "df": true,
+    }
+
+    executable := parts[0]
+    if !safeCommands[executable] {
+        return func() tea.Msg {
+            return editorFinishedMsg{
+                err: fmt.Errorf("command not allowed: %s (see HOTKEYS.md for safe commands)", executable),
+            }
+        }
+    }
+
+    // Don't use shell, execute directly
+    return func() tea.Msg {
+        cmd := exec.Command(executable, parts[1:]...)
+        cmd.Dir = m.currentPath
+        output, err := cmd.CombinedOutput()
+
+        return editorFinishedMsg{
+            output: string(output),
+            err:    err,
+        }
+    }
+}
 ```
-Review mobile and narrow terminal support (width < 100 columns, primarily Termux on Android).
 
-Recent changes to validate:
-- Width calculation fixes in model.go, render_file_list.go, render_preview.go
-- Emoji/wide character handling with runewidth library
-- Horizontal scrolling in detail view
-- Vertical split (top/bottom) panes on narrow terminals
-- Mouse coordinate fixes in update_mouse.go
-- Prompt template header wrapping
-
-Check for:
-- Inconsistent use of m.isNarrowTerminal() checks
-- Hardcoded widths that should be dynamic
-- Text wrapping issues (backgrounds, selections, borders)
-- Visual width vs byte length vs rune count confusion
-- Mouse click coordinate mismatches
-- Pane height mismatches in vertical split
-- Header/data alignment issues in detail view
-- Preview content touching borders without padding
-
-Search these files:
-- render_file_list.go (list/detail/tree views)
-- render_preview.go (preview pane, markdown rendering)
-- update_mouse.go (click detection)
-- model.go (calculateLayout, width calculations)
-- file_operations.go (preview width calculations)
-
-Provide:
-- Areas where narrow terminal support is incomplete
-- Specific width calculation bugs
-- Any remaining hardcoded values
-- User experience issues on phones
-
-Output format:
-## Critical UX Issues (Blocks mobile usage)
-- [file:line] Description
-
-## Improvements Needed
-- [file:line] Description
-
-## Well-Implemented Areas
-- What's working correctly
+**Fix Option B - Confirmation Dialog (Alternative):**
+```go
+// Detect dangerous patterns
+dangerousPatterns := []string{"rm -rf", "> /dev/", "dd if=", "mkfs", ":(){ :|:& };:"}
+for _, pattern := range dangerousPatterns {
+    if strings.Contains(cmdStr, pattern) {
+        // Show confirmation dialog before executing
+        m.dialogType = "confirm"
+        m.dialogTitle = "⚠️  Dangerous Command Detected"
+        m.dialogMessage = fmt.Sprintf("Command contains '%s'. Execute anyway?", pattern)
+        // ... set up callback to execute if confirmed
+        return nil
+    }
+}
 ```
+
+**Test:** Try `ls; echo INJECTED`, `cat /etc/passwd`, `rm -rf test/`
 
 ---
 
-### 3. Performance & Resource Agent
-**Agent Type:** `debugger`
-**Task:**
+### 3. Path Traversal in loadFiles() [1 hour]
+
+**File:** `file_operations.go:41-57`
+
+**Issue:** No validation against `../../etc` style directory traversal. Users can navigate to sensitive system directories.
+
+**Fix:**
+```go
+func (m *model) loadFiles(path string) tea.Cmd {
+    return func() tea.Msg {
+        // Validate and clean path
+        absPath, err := filepath.Abs(path)
+        if err != nil {
+            return editorFinishedMsg{err: err}
+        }
+
+        cleanPath := filepath.Clean(absPath)
+
+        // Optional: Restrict to home directory or working directory tree
+        homeDir, _ := os.UserHomeDir()
+        if homeDir != "" && !strings.HasPrefix(cleanPath, homeDir) {
+            // Check if within original working directory
+            wd, _ := os.Getwd()
+            if !strings.HasPrefix(cleanPath, wd) {
+                return editorFinishedMsg{
+                    err: fmt.Errorf("access denied: path outside allowed directories"),
+                }
+            }
+        }
+
+        entries, err := os.ReadDir(cleanPath)
+        if err != nil {
+            return editorFinishedMsg{err: err}
+        }
+
+        // ... rest of function
+    }
+}
 ```
-Analyze TFE for performance bottlenecks, resource leaks, and optimization opportunities.
 
-Focus areas:
-- Memory leaks (unclosed files, unbounded slices/maps)
-- Expensive operations in rendering loops
-- File loading limits and large directory handling
-- Glamour markdown rendering timeouts
-- Cache invalidation/population logic
-- Blocking operations that could hang UI
-- Redundant file reads or operations
-- Tree view expansion performance with deep hierarchies
+**Note:** Consider making path restrictions configurable via flag `--allow-full-access` for power users.
 
-Search these files:
-- file_operations.go (loadFiles, loadPreview, caching)
-- render_*.go (rendering loops)
-- update.go, update_keyboard.go, update_mouse.go (event handling)
-- command.go (command execution, history storage)
-
-Look for:
-- Functions with defer file.Close() - are all files closed?
-- Unbounded appends to slices (history, expandedDirs, etc.)
-- Expensive operations inside for loops
-- Synchronous file I/O in UI thread
-- Missing limits on preview file size, directory entries
-- Cache invalidation bugs causing excessive re-renders
-
-Provide:
-- Specific performance bottlenecks with measurements if possible
-- Memory leak risks
-- Optimization suggestions with priority
-
-Output format:
-## Critical Performance Issues
-- [file:line] Description - Impact - Fix
-
-## Optimization Opportunities
-- [file:line] Description - Expected improvement
-
-## Resource Management
-- Areas handling resources correctly
-- Areas needing improvement
-```
+**Test:** Navigate to `../../../../../../etc`, verify prevention.
 
 ---
 
-### 4. Code Quality & Architecture Agent
-**Agent Type:** `code-reviewer`
-**Task:**
+### 4. Command Injection in openEditor() [30 minutes]
+
+**File:** `editor.go:68-91`
+
+**Issue:** Filenames starting with `-` can inject editor arguments (e.g., file named `--dangerous-flag`).
+
+**Fix:**
+```go
+func openEditor(editor string, path string) tea.Cmd {
+    // Validate filename doesn't start with dangerous characters
+    cleanPath := filepath.Clean(path)
+    filename := filepath.Base(cleanPath)
+
+    if strings.HasPrefix(filename, "-") {
+        return func() tea.Msg {
+            return editorFinishedMsg{
+                err: fmt.Errorf("invalid filename: cannot start with '-'"),
+            }
+        }
+    }
+
+    // Use absolute path to avoid ambiguity
+    absPath, err := filepath.Abs(cleanPath)
+    if err != nil {
+        return func() tea.Msg {
+            return editorFinishedMsg{err: err}
+        }
+    }
+
+    c := exec.Command(editor, absPath)
+    return tea.ExecProcess(c, func(err error) tea.Msg {
+        return editorFinishedMsg{err: err}
+    })
+}
 ```
-Review code quality and adherence to CLAUDE.md architectural principles.
 
-Check CLAUDE.md first to understand:
-- Modular architecture (11 focused files)
-- Single responsibility per file
-- Module size limits (target <800 lines)
-- Documentation requirements
-
-Then review:
-- Functions >100 lines that should be split
-- Duplicate code needing extraction
-- Error handling consistency
-- TODO/FIXME comments indicating incomplete work
-- Naming consistency
-- Adherence to Go best practices
-- Dead code or unused functions
-
-Search these files:
-- All .go files in root directory
-- Check against CLAUDE.md architecture guidelines
-
-Provide:
-- Functions violating size/complexity guidelines
-- Duplicate code opportunities
-- Architectural violations
-- Missing error handling
-- Code smell patterns
-
-Output format:
-## Architectural Issues
-- [file] Violation - Recommendation
-
-## Code Quality Issues
-- [file:line] Issue - Suggested refactoring
-
-## Well-Architected Areas
-- What's following best practices
-```
+**Test:** Create file named `--dangerous-flag.txt`, try opening with F4.
 
 ---
 
-### 5. User Experience & Edge Cases Agent
-**Agent Type:** `general-purpose`
-**Task:**
+### 5. Circular Symlink Detection [1 hour]
+
+**File:** `file_operations.go:948-959`
+
+**Issue:** No detection of circular symlinks. Causes infinite loop when navigating `dir1 → dir2 → dir1`.
+
+**Fix:**
+```go
+// Add to types.go
+type model struct {
+    // ... existing fields
+    visitedPaths map[string]bool // Track visited symlink paths
+    symlinkDepth int              // Current symlink follow depth
+}
+
+// In file_operations.go
+const maxSymlinkDepth = 40 // Linux kernel limit
+
+func (m *model) followSymlink(path string) (string, error) {
+    // Reset depth when starting fresh navigation
+    if m.symlinkDepth == 0 {
+        m.visitedPaths = make(map[string]bool)
+    }
+
+    // Check for circular reference
+    absPath, _ := filepath.Abs(path)
+    if m.visitedPaths[absPath] {
+        return "", fmt.Errorf("circular symlink detected: %s", path)
+    }
+
+    // Check depth limit
+    if m.symlinkDepth >= maxSymlinkDepth {
+        return "", fmt.Errorf("symlink depth limit exceeded (max %d)", maxSymlinkDepth)
+    }
+
+    m.visitedPaths[absPath] = true
+    m.symlinkDepth++
+
+    // Resolve symlink
+    target, err := os.Readlink(path)
+    if err != nil {
+        return "", err
+    }
+
+    return target, nil
+}
 ```
-Review UX and test edge case handling across TFE functionality.
 
-Test scenarios:
-- Empty directories, permission-denied folders
-- Very long filenames (>255 chars), paths, symlink chains
-- Circular symlinks, broken symlinks
-- Files with special characters in names
-- Binary files, very large files (>1GB)
-- Rapid navigation, quick key presses
-- All keyboard shortcuts for conflicts
-- Dialog inputs with invalid characters
-- Context menu on every file type
-- Favorites with deleted/moved files
-- Command history with very long commands
-- Prompts with many variables (>20)
-
-Check:
-- Status messages for clarity
-- Error messages for user-friendliness
-- Help text (HOTKEYS.md) accuracy
-- Graceful degradation when features unavailable
-- Recovery from errors without crashing
-
-Search these files:
-- All view/render files for user-facing text
-- HOTKEYS.md for documentation accuracy
-- update_keyboard.go for shortcut conflicts
-- dialog.go for input validation
-- file_operations.go for edge case handling
-
-Provide:
-- Missing error messages
-- Confusing UX patterns
-- Keyboard shortcut conflicts
-- Edge cases causing crashes or hangs
-
-Output format:
-## UX Issues
-- Description - Recommended improvement
-
-## Missing Error Handling
-- [file:line] Scenario - What should happen
-
-## Documentation Gaps
-- What's missing or inaccurate
-```
+**Test:** Create circular symlink `ln -s dir1 dir2/link; ln -s dir2 dir1/link`, navigate into it.
 
 ---
 
-### 6. Documentation & Launch Readiness Agent
-**Agent Type:** `documentation`
-**Task:**
+### 6. Cross-Device Trash Move [1 hour]
+
+**File:** `trash.go:135-137`
+
+**Issue:** `os.Rename()` fails when moving files across different mount points (e.g., `/tmp` → `~/.trash`). Returns cryptic `syscall.EXDEV` error.
+
+**Fix:**
+```go
+func moveToTrash(path string) error {
+    trashDir := getTrashDir()
+    trashFile := filepath.Join(trashDir, "files", filepath.Base(path))
+
+    // Try rename first (fast, atomic)
+    err := os.Rename(path, trashFile)
+    if err == nil {
+        return nil // Success
+    }
+
+    // Check if cross-device error
+    if errors.Is(err, syscall.EXDEV) {
+        // Fallback to copy+delete for cross-device moves
+        return copyAndDelete(path, trashFile)
+    }
+
+    return err
+}
+
+func copyAndDelete(src, dst string) error {
+    // Copy file/directory recursively
+    if err := copyRecursive(src, dst); err != nil {
+        return fmt.Errorf("copy failed: %w", err)
+    }
+
+    // Delete original
+    if err := os.RemoveAll(src); err != nil {
+        return fmt.Errorf("delete failed after copy: %w", err)
+    }
+
+    return nil
+}
+
+func copyRecursive(src, dst string) error {
+    info, err := os.Stat(src)
+    if err != nil {
+        return err
+    }
+
+    if info.IsDir() {
+        return copyDir(src, dst, info)
+    }
+    return copyFile(src, dst, info)
+}
+
+// Implement copyDir and copyFile with permission preservation
 ```
-Review all documentation for completeness and launch readiness.
 
-Check:
-- README.md (installation, features, screenshots, usage)
-- HOTKEYS.md (all shortcuts documented and accurate)
-- CHANGELOG.md (recent versions complete, under 350 line limit per CLAUDE.md)
-- CLAUDE.md (architecture doc current, under 500 line limit)
-- PLAN.md (under 400 line limit)
-- GitHub repo metadata (description, topics, license, about section)
-- Error messages user-facing (helpful, not technical)
-- Missing docs (contributing guide, FAQ, troubleshooting)
-
-Compare HOTKEYS.md against actual keybindings in:
-- update_keyboard.go
-- update_mouse.go
-
-Verify:
-- All F-keys documented
-- All context menu options documented
-- All special modes documented (prompts, favorites, trash)
-- Mobile-specific guidance included
-
-Provide:
-- Missing documentation sections
-- Outdated or inaccurate information
-- Documentation exceeding line limits
-- Launch checklist items
-
-Output format:
-## Critical Documentation Gaps
-- What's missing for launch
-
-## Documentation Updates Needed
-- What's inaccurate or incomplete
-
-## Launch Readiness Checklist
-- [ ] Task 1
-- [ ] Task 2
-
-## Well-Documented Areas
-- What's complete and accurate
-```
+**Test:** Move file from `/tmp` to trash, verify fallback works.
 
 ---
 
-## After All Agents Complete
+### 7. Split CHANGELOG.md → CHANGELOG3.md [COMPLETED ✅]
 
-Once all 6 agents have reported their findings, please:
-
-1. **Read all agent reports carefully**
-2. **Synthesize and categorize all findings**
-3. **Identify patterns** - Are there systemic issues?
-4. **Prioritize by severity** - Critical → High → Medium → Low
-5. **Assess launch readiness** - Can we launch or must we fix first?
-6. **Create actionable task list** with estimated effort
+**Status:** Done in commit `260f369`
 
 ---
 
-## Final Summary Format
+### 8. Create FAQ.md + CONTRIBUTING.md + Screenshots [3 hours]
+
+#### A. FAQ.md [1.5 hours]
+
+Create `FAQ.md` with common troubleshooting:
 
 ```markdown
-# TFE Pre-Launch Review Summary
+# TFE Frequently Asked Questions
 
-## Executive Summary
-[2-3 paragraphs: Overall state, major findings, launch recommendation]
+## Installation & Setup
+
+### Q: TFE won't start, shows "command not found"
+**A:** Ensure Go is installed and `~/go/bin` is in your PATH:
+\`\`\`bash
+echo 'export PATH=$PATH:~/go/bin' >> ~/.bashrc
+source ~/.bashrc
+\`\`\`
+
+### Q: Permission denied errors when accessing directories
+**A:** TFE respects file system permissions. Use `chmod` to grant access or run from directories you own.
+
+## Terminal Compatibility
+
+### Q: Emoji buttons have weird spacing (CellBlocks, ttyd, wetty)
+**A:** Web-based terminals using xterm.js have emoji rendering issues. This affects ~5% of users.
+**Workaround:** Use native terminals (Termux, WSL, iTerm2, GNOME Terminal).
+**Future:** v1.1 will add `--ascii-mode` flag.
+
+### Q: Mouse clicks don't work
+**A:** Ensure your terminal supports mouse events. Most modern terminals do. If using tmux, add `set -g mouse on` to `.tmux.conf`.
+
+## Feature Questions
+
+### Q: How do I copy files?
+**A:** Right-click → "📋 Copy to..." or use context menu (F2).
+
+### Q: Clipboard copy (F5) doesn't work
+**A:** Install clipboard utility:
+- Linux: `sudo apt install xclip`
+- macOS: Built-in (pbcopy)
+- Termux: `pkg install termux-api`
+
+## Performance
+
+### Q: TFE is slow with large directories (10,000+ files)
+**A:** Use tree view (press 3) for better performance. Detail view renders all metadata.
+
+### Q: Preview is slow for large markdown files
+**A:** Glamour rendering has 5-second timeout. Files >1MB show size warning without preview.
+
+## Termux / Mobile
+
+### Q: Text is too small on phone
+**A:** Adjust Termux font size: Long-press → Style → Font size
+
+### Q: Scrolling doesn't work on phone
+**A:** Use arrow keys or vim keys (j/k). Mouse wheel scrolling works if Termux touch mode is enabled.
+```
+
+#### B. CONTRIBUTING.md [1 hour]
+
+Create `CONTRIBUTING.md` with development setup:
+
+```markdown
+# Contributing to TFE
+
+## Development Setup
+
+1. **Install Go 1.21+**
+2. **Clone repo:**
+   \`\`\`bash
+   git clone https://github.com/GGPrompts/TFE
+   cd TFE
+   \`\`\`
+3. **Install dependencies:**
+   \`\`\`bash
+   go mod download
+   \`\`\`
+4. **Run locally:**
+   \`\`\`bash
+   go run .
+   \`\`\`
+
+## Code Architecture
+
+See [CLAUDE.md](CLAUDE.md) for complete architecture guide.
+
+**Key Principles:**
+- Keep `main.go` minimal (entry point only)
+- One responsibility per file (target <500 lines, max 800)
+- Follow decision tree for where new code belongs
+- Update CLAUDE.md when adding modules
+
+## Making Changes
+
+1. **Create feature branch:** `git checkout -b feature/your-feature`
+2. **Follow Go conventions:** Use `gofmt`, add comments
+3. **Test manually:** Verify on Termux (Android) and desktop
+4. **Update docs:** HOTKEYS.md for new shortcuts, CHANGELOG.md for changes
+5. **Submit PR:** Include description, testing notes, screenshots
+
+## Testing
+
+Currently manual testing. Automated tests welcome! See `*_test.go` files for examples.
+
+**Test checklist:**
+- [ ] Works on narrow terminals (80 columns)
+- [ ] Works on wide terminals (200+ columns)
+- [ ] No panics or crashes
+- [ ] Keyboard shortcuts don't conflict
+- [ ] Mouse interactions accurate
+
+## Questions?
+
+Open an issue or discussion on GitHub!
+```
+
+#### C. README.md Screenshots [30 minutes]
+
+Take 3-5 screenshots and add to README.md:
+
+1. **Tree view with dual-pane preview**
+2. **Detail view with file metadata**
+3. **Prompt template with fillable fields**
+4. **Context menu demonstration**
+5. **Termux on Android (mobile usage)**
+
+Use `screenshot` utility or take actual photos of Termux on phone.
 
 ---
 
-## Critical Issues (MUST Fix Before Launch)
-1. **[Category]** - [file:line] - Description
-   - **Impact:** Why this blocks launch
-   - **Fix:** What needs to happen
-   - **Effort:** Estimated time
+## Testing Before Launch
 
-2. **[Category]** - [file:line] - Description
-   ...
+After fixing all critical issues, run these tests:
 
----
+```bash
+# Security tests
+# 1. Try command injection
+#    Launch TFE, press :, type: ls; echo INJECTED
+#    Expected: Either "command not allowed" or confirmation dialog
 
-## High Priority (Should Fix Before Launch)
-1. **[Category]** - [file:line] - Description
-   - **Impact:** Why this matters
-   - **Fix:** Recommended solution
-   - **Effort:** Estimated time
+# 2. Try path traversal
+#    Navigate to ../../../../../../etc
+#    Expected: "access denied" or similar
 
----
+# 3. Test filename injection
+#    touch -- --dangerous-flag.txt
+#    Press F4 to edit
+#    Expected: "invalid filename" error
 
-## Medium Priority (Fix Soon After Launch)
-[List with brief descriptions]
+# Performance tests
+# 4. Test file handle leak
+#    for i in {1..2000}; do echo "test" > /tmp/test$i.txt; done
+#    Preview all files rapidly in TFE
+#    Check: lsof | grep tfe | wc -l
+#    Expected: Should not grow indefinitely
 
----
+# Edge case tests
+# 5. Circular symlinks
+#    mkdir -p test/dir1 test/dir2
+#    ln -s ../dir1 test/dir2/link
+#    ln -s ../dir2 test/dir1/link
+#    Navigate into symlink loop
+#    Expected: "circular symlink detected" error
 
-## Low Priority / Future Enhancements
-[List with brief descriptions]
-
----
-
-## Positive Findings
-### Security
-- [What's secure and well-implemented]
-
-### Mobile Optimization
-- [What's working well on narrow terminals]
-
-### Performance
-- [What's efficient and fast]
-
-### Code Quality
-- [Well-architected areas]
-
-### Documentation
-- [Complete and accurate docs]
-
----
-
-## Systemic Patterns Identified
-- Pattern 1: [Description across multiple files]
-- Pattern 2: [Description of recurring issue]
-
----
-
-## Launch Readiness Assessment
-
-**Overall Status:** ✅ Ready / ⚠️ Ready with Caveats / ❌ Not Ready
-
-**Reasoning:**
-[Detailed explanation of why this status was chosen]
-
-**Blocking Issues:** [Count]
-**Must-Fix Issues:** [Count]
-**Nice-to-Have Issues:** [Count]
-
----
-
-## Recommended Action Plan
-
-### Immediate (Before Launch)
-1. [ ] Fix [Critical Issue 1] - [File] - [Estimated: X hours]
-2. [ ] Fix [Critical Issue 2] - [File] - [Estimated: X hours]
-
-### Short-Term (Week 1 After Launch)
-1. [ ] Address [High Priority 1]
-2. [ ] Address [High Priority 2]
-
-### Medium-Term (Month 1)
-1. [ ] Implement [Medium Priority improvements]
-2. [ ] Add [Missing features]
-
-### Long-Term (Future Versions)
-1. [ ] Enhance [Low Priority features]
-2. [ ] Optimize [Performance improvements]
-
----
-
-## Testing Recommendations
-- [ ] Test on Android/Termux with width < 100
-- [ ] Test with very large directories (10,000+ files)
-- [ ] Test all keyboard shortcuts for conflicts
-- [ ] Test symlink handling (circular, broken, nested)
-- [ ] Test command execution with special characters
-- [ ] Fuzz test file picker and dialogs
-
----
-
-## Conclusion
-[Final recommendation: Launch now / Fix X issues first / Major work needed]
+# 6. Cross-device trash
+#    cp /etc/hosts /tmp/test.txt
+#    Move to trash from /tmp
+#    Expected: Should work (fallback to copy+delete)
 ```
 
 ---
 
-## Context for Agents
+## After Critical Fixes Complete
 
-**Project:** TFE (Terminal File Explorer)
-**Target Users:** Mobile developers using Termux on Android, WSL users, TUI enthusiasts
-**Primary Use Case:** File management on phones via Termux
-**Key Features:** Tree/list/detail views, dual-pane, markdown preview, prompts, favorites, trash, command execution, symlinks
-**Recent Work:** Massive mobile optimization (width calcs, emoji handling, scrolling, mouse coords, prompt templates)
-**Tech Stack:** Go, Bubbletea, Lipgloss, Glamour, go-runewidth
+Move to **High Priority** fixes in PLAN.md (8 hours estimated):
 
-**Ready for public launch if no critical issues found.**
+1. File permissions for history/favorites (0600 instead of 0644)
+2. Unbounded data structures (LRU cache for expandedDirs)
+3. Glamour markdown timeout (2 seconds)
+4. Detail view width on narrow terminals (dynamic columns)
+5. Header scrolling misalignment in detail view
+6. Extract header rendering function (DRY fix)
+7. Auto-switch to List view for dual-pane
+8. Empty directory message
+9. Complete HOTKEYS.md (Ctrl+F, Ctrl+P, mouse guide)
 
 ---
 
-**REMEMBER:** Run all 6 agents **in parallel** using a single message with 6 Task tool calls!
+## Launch Checklist
+
+- [ ] All 6 critical code fixes complete
+- [ ] FAQ.md created
+- [ ] CONTRIBUTING.md created
+- [ ] README.md screenshots added
+- [ ] All tests pass
+- [ ] Final Termux testing (Android)
+- [ ] Final WSL2 testing
+- [ ] Tag v1.0 release
+- [ ] GitHub release notes
+- [ ] Optional: Hacker News post
+
+---
+
+**Estimated Total Time:** 6 hours (critical fixes) + 3 hours (docs) = **9 hours to launch-ready**
+
+**Current Status:** Documentation complete (PLAN.md, CHANGELOG splits, CLAUDE.md optimized)
+
+**Next Step:** Start with the 5-minute file handle leak fix in `file_operations.go:299` ⚡
