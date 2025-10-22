@@ -1,220 +1,423 @@
-# Next Session: Pre-Launch Testing & Polish
+# Next Session Tasks - Landing Page, Games Launcher & Auto-Scroll
 
-**Goal:** Test critical security fixes and complete high-priority polish before v1.0 release.
-
-**Status:** ✅ CRITICAL FIXES COMPLETE - Ready for testing & screenshots (2-3 hours to launch)
-
-**Last Updated:** 2025-10-22
+**Created:** 2025-10-22 (Session end)
+**Estimated Time:** 45-60 minutes (3 tasks)
 
 ---
 
-## ✅ COMPLETED (Session 2025-10-22)
+## Task 1: Remove Landing Page Completely
 
-### Security Fixes - ALL COMPLETE
+**Goal:** Remove the 90s Windows-style landing page with star background that appears when launching TFE. Launch directly into the file browser.
 
-1. **Command Injection in `command.go`** ✅
-   - **What:** Implemented command allowlist (30+ safe commands: ls, cat, grep, git, etc.)
-   - **File:** `command.go:35-129`
-   - **Note:** `!` prefix allows unrestricted access (power-user feature documented)
-   - **Test:** Try `:ls; echo INJECTED` → Should show "command not allowed" error
+### What to Remove
 
-2. **Path Traversal in `loadFiles()`** ✅
-   - **What:** Added path validation restricting navigation to home/working directories
-   - **File:** `file_operations.go:870-909`
-   - **Note:** Blocks system directories (/etc, /root, /boot, /sys, /proc)
-   - **Test:** Navigate to `../../../../../../etc` → Should show "access denied"
+The landing page currently shows:
+- Starfield animation background
+- Menu with options: Browse Files, Prompts, Favorites, Trash, Settings, Exit
+- Nostalgic 90s Windows aesthetic
 
-3. **Filename Injection in `openEditor()`** ✅
-   - **What:** Validates filenames, blocks those starting with `-`
-   - **File:** `editor.go:30-59`
-   - **Test:** `touch -- --dangerous-flag.txt; tfe` then F4 → Should error
+### Files to Modify
 
-4. **Cross-Device Trash Move** ✅
-   - **What:** Detects EXDEV errors, falls back to copy+delete
-   - **Files:** `trash.go:137-162` (main), `trash.go:300-362` (helpers)
-   - **Test:** `cp /etc/hosts /tmp/test.txt; tfe /tmp` then delete → Should work
+1. **`model.go`** - Remove landing page initialization
+   - Line ~69: Change `showLandingPage: true` to `showLandingPage: false`
+   - Or remove the landing page initialization entirely
 
-### Documentation - COMPLETE
+2. **`types.go`** - (Optional) Clean up landing page fields if removing completely
+   - Lines ~296-297: `showLandingPage` and `landingPage` fields
+   - Can leave these for now or remove if you want complete cleanup
 
-5. **FAQ.md Created** ✅
-   - 38 Q&A entries covering all common user questions
-   - Sections: Installation, Terminal Compatibility, Features, Performance, Termux, Commands, Prompts, Navigation, Troubleshooting, Advanced
+3. **`update_keyboard.go`** - Remove landing page keyboard handling
+   - Lines ~34-82: Entire landing page input handling section
+   - This intercepts keys before file browser gets them
 
-6. **CONTRIBUTING.md Enhanced** ✅
-   - Added decision tree for where to add code
-   - Added security considerations section
-   - Added common pitfalls (header duplication, mouse coords, file handles)
-   - Updated documentation line limits
+4. **`view.go`** - Remove landing page rendering
+   - Find where landing page is rendered (check for `if m.showLandingPage`)
+   - Remove the conditional and always render file browser
 
-### Verified
-
-7. **Build Passes** ✅
-   - `go build` completes without errors
-   - All imports properly added (syscall, errors, io, filepath)
-
----
-
-## 📋 NEXT SESSION TASKS (2-3 hours)
-
-### Priority 1: Testing (30 minutes)
-
-Run these security tests to verify fixes:
+### Search Commands
 
 ```bash
-# 1. Command injection test
-#    Launch TFE, press :, type: ls; echo INJECTED
-#    Expected: "command not allowed" error with helpful message
+# Find all landing page references
+grep -rn "showLandingPage" .
+grep -rn "landingPage" .
+grep -rn "LandingPage" .
 
-# 2. Path traversal test
-#    Navigate to ../../../../../../etc
-#    Expected: "access denied" or prevented navigation
-
-# 3. Filename injection test
-touch -- --dangerous-flag.txt
-#    Launch TFE, select file, press F4
-#    Expected: "invalid filename: cannot start with '-'" error
-
-# 4. Cross-device trash test
-cp /etc/hosts /tmp/test.txt
-#    Launch TFE in /tmp, delete test.txt
-#    Expected: Should move to trash without EXDEV error
-
-# 5. File handle leak test (optional - requires monitoring)
-for i in {1..2000}; do echo "test" > /tmp/test$i.txt; done
-#    Preview all files rapidly in TFE
-#    Check: lsof | grep tfe | wc -l
-#    Expected: File handles should be properly closed
+# Find the landing page type definition
+grep -rn "type LandingPage" .
 ```
 
-### Priority 2: Screenshots for README.md (30 minutes)
+### Expected Behavior After Fix
 
-Take 3-5 screenshots to add to README.md:
-
-1. **Tree view with dual-pane preview** - Show the main interface
-2. **Detail view with file metadata** - Show rich file information
-3. **Prompt template with fillable fields** - Demonstrate prompt feature
-4. **Context menu (right-click)** - Show available operations
-5. **Termux on Android** (optional) - Show mobile usage
-
-Save to `examples/` directory and reference in README.md.
-
-### Priority 3: High-Priority Polish (Optional - 1.5 hours)
-
-From PLAN.md, consider these quick wins before v1.0:
-
-**Quick Fixes (<30 min each):**
-
-1. **Empty Directory Message** [15 min]
-   - Issue: Blank screen when entering empty directory
-   - Fix: Show "📂 Empty directory - Press ← to go back"
-
-2. **Auto-Switch Dual-Pane View** [20 min]
-   - Issue: Error message when entering dual-pane from Detail view
-   - Fix: Auto-switch to List view when entering dual-pane
-   - File: `update_keyboard.go:1381, 1400`
-
-3. **File Permissions for History/Favorites** [30 min]
-   - Issue: Stored with 0644 (world-readable) instead of 0600
-   - Fix: Change WriteFile permissions to 0600
-   - Files: `command.go:249`, `favorites.go` (save functions)
-
-**Larger Improvements (can defer to v1.1):**
-- Glamour markdown timeout (2 seconds instead of infinite)
-- Detail view dynamic width for narrow terminals
-- Complete HOTKEYS.md documentation
-- Unbounded data structures (LRU cache)
+- Launch TFE: `./tfe`
+- **Expected:** Goes directly to file browser (current directory)
+- **No more:** Landing page with menu options
 
 ---
 
-## 🚀 LAUNCH CHECKLIST
+## Task 2: Fix Games Launcher Path
 
-### Critical (MUST DO)
-- [x] All 4 security fixes complete
-- [x] FAQ.md created
-- [x] CONTRIBUTING.md enhanced
-- [x] Code builds successfully
-- [ ] Security tests pass (see "Testing" above)
-- [ ] README.md screenshots added (3-5 images)
+**Goal:** Update games launcher to point to `~/projects/TUIClassics` instead of current (wrong) path.
 
-### Recommended (SHOULD DO)
-- [ ] Empty directory message fix
-- [ ] File permissions fix (0600)
-- [ ] Final Termux testing (Android)
-- [ ] Final WSL2 testing
+### Current Issues
 
-### Optional (NICE TO HAVE)
-- [ ] Auto-switch dual-pane view
-- [ ] Complete HOTKEYS.md
-- [ ] Glamour timeout fix
+The games launcher is accessible from:
+1. **Emoji menu bar** - 🎮 Games button (clickable)
+2. **Tools dropdown menu** - Has a "Games" option
 
-### Release
-- [ ] Update CHANGELOG.md with all fixes
-- [ ] Tag v1.0 release: `git tag -a v1.0 -m "Initial stable release"`
-- [ ] Push tag: `git push origin v1.0`
-- [ ] Create GitHub release with notes
-- [ ] Optional: Post to Hacker News
+Both currently point to the wrong location.
 
----
+### Files to Modify
 
-## 📝 NOTES FROM LAST SESSION
+1. **`menu.go`** - Menu bar emoji buttons and Tools dropdown menu
 
-### Issues Not Actually Bugs
+### What to Find
 
-During the session, we found that some audit items were already fixed or false positives:
+Search for games launcher references:
 
-- **File Handle Leak:** All `os.Open()` calls already have `defer file.Close()`
-- **Circular Symlinks:** Go's `os.Stat()` naturally detects and errors on circular references; navigation is user-driven (not recursive) so no infinite loop risk
+```bash
+# Find games launcher code
+grep -rn "games" menu.go
+grep -rn "Games" menu.go
+grep -rn "🎮" menu.go
 
-### Audit Accuracy
+# Find tools menu definition
+grep -rn "tools" menu.go
+grep -rn "Tools" menu.go
+```
 
-The pre-launch audit had some inaccuracies:
-- Some line numbers were outdated
-- File handle leak was already fixed in current code
-- Circular symlink issue was not a real vulnerability
+### Expected Locations
 
-**Lesson:** Always verify audit findings against current code before implementing fixes.
+Look for:
+- Menu bar button definitions (emoji buttons array)
+- Tools menu items array
+- Action handlers for games button/menu item
 
-### Command Allowlist Design
+### What to Change
 
-The command allowlist balances security and usability:
-- **Default (`:command`)**: Safe read-only commands only
-- **Unrestricted (`!command`)**: Full shell access for power users
-- **Error messages**: Helpful, explain how to use `!` prefix
+**Current (wrong):** Probably points to old path or incorrect launcher
 
-This design respects user choice while protecting against accidental destructive commands.
+**New (correct):**
+```go
+// Path to games launcher
+gamesPath := filepath.Join(os.Getenv("HOME"), "projects", "TUIClassics", "launcher")
+// Or: ~/projects/TUIClassics/launcher
+```
 
----
+### Expected Behavior After Fix
 
-## 🎯 RECOMMENDED NEXT STEPS
+1. Click 🎮 Games button in menu bar
+   - **Expected:** Launches `~/projects/TUIClassics/launcher`
 
-**Option A - Quick Launch (30 min):**
-1. Run security tests
-2. Add 3 README screenshots
-3. Update CHANGELOG.md
-4. Tag v1.0 and release
-
-**Option B - Polished Launch (2-3 hours):**
-1. Run security tests
-2. Add 5 README screenshots
-3. Fix empty directory message
-4. Fix file permissions (0600)
-5. Test on Termux + WSL2
-6. Update CHANGELOG.md
-7. Tag v1.0 and release
-
-**Option C - Perfect Launch (defer polish to v1.1):**
-1. Run security tests
-2. Add README screenshots
-3. Update CHANGELOG.md with security fixes
-4. Tag v1.0 and release
-5. Create GitHub issues for v1.1 polish items
+2. Open Tools menu (T or F9), select "Games"
+   - **Expected:** Launches `~/projects/TUIClassics/launcher`
 
 ---
 
-**Time Investment:**
-- Critical security fixes: ✅ DONE (2-3 hours)
-- Testing + screenshots: 1 hour
-- High-priority polish: 1.5 hours (optional)
-- **Total to launch:** 1-2.5 hours remaining
+## Task 3: Auto-Scroll to Focused Variable in Edit Mode
 
-**Recommendation:** Run tests and add screenshots (1 hour), then release v1.0. Polish items can go in v1.1.
+**Goal:** When navigating between variables with Tab/Shift+Tab in edit mode, automatically scroll the preview to show the focused variable if it's off-screen.
+
+### Current Issue
+
+In prompt edit mode:
+1. User presses Tab to navigate to next variable
+2. If variable is several screens down, it's off-screen
+3. User has to manually scroll down (j/k keys) to find focused variable
+4. No visual feedback showing where the focus went
+
+### Expected Behavior
+
+When pressing Tab or Shift+Tab:
+1. Focus moves to next/previous variable ✅ (already works)
+2. **NEW:** Preview automatically scrolls to show the focused variable
+3. Focused variable should be centered in view (or near top)
+
+### Files to Modify
+
+1. **`update_keyboard.go`** - Tab/Shift+Tab handling in edit mode
+   - Lines ~261-278: Tab navigation code
+   - After changing `m.focusedVariableIndex`, calculate scroll position
+
+2. **`render_preview.go`** - Preview rendering with line numbers
+   - May need helper function to find line number of focused variable
+
+### Implementation Approach
+
+**Step 1:** Find the line number where the focused variable appears in the preview
+
+```go
+// In edit mode Tab handler (update_keyboard.go ~261)
+case "tab":
+    // Navigate to next variable
+    if len(m.preview.promptTemplate.variables) > 0 {
+        m.focusedVariableIndex++
+        if m.focusedVariableIndex >= len(m.preview.promptTemplate.variables) {
+            m.focusedVariableIndex = 0 // Wrap around
+        }
+
+        // NEW: Auto-scroll to focused variable
+        m.scrollToFocusedVariable()
+    }
+    return m, nil
+```
+
+**Step 2:** Add helper function to calculate scroll position
+
+```go
+// In helpers.go or update_keyboard.go
+func (m *model) scrollToFocusedVariable() {
+    if m.focusedVariableIndex < 0 || m.preview.promptTemplate == nil {
+        return
+    }
+
+    // Get focused variable name
+    varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+
+    // Find line number where this variable appears
+    // Search preview.content for "{{" + varName + "}}"
+    targetLine := -1
+    searchPattern := "{{" + varName + "}}"
+    for i, line := range m.preview.content {
+        if strings.Contains(line, searchPattern) {
+            targetLine = i
+            break
+        }
+    }
+
+    if targetLine >= 0 {
+        // Calculate scroll position to center the variable
+        visibleLines := m.height - 6  // Adjust for header/footer
+        centerOffset := visibleLines / 2
+
+        newScrollPos := targetLine - centerOffset
+        if newScrollPos < 0 {
+            newScrollPos = 0
+        }
+
+        m.preview.scrollPos = newScrollPos
+    }
+}
+```
+
+### Testing
+
+**Test 1:** Long prompt with off-screen variables
+1. Open a prompt with 5+ variables spread across 100+ lines
+2. Press Tab to enter edit mode
+3. Press Tab repeatedly
+4. **Expected:** Preview auto-scrolls to show each focused variable ✅
+5. Variable appears near center or top of screen ✅
+
+**Test 2:** Shift+Tab (previous variable)
+1. In edit mode, Tab through several variables
+2. Press Shift+Tab to go backwards
+3. **Expected:** Preview scrolls up to show previous variables ✅
+
+**Test 3:** Wrap-around behavior
+1. Tab to last variable (bottom of file)
+2. Press Tab again (wraps to first variable)
+3. **Expected:** Preview scrolls back to top ✅
+
+**Test 4:** Short prompts (no scrolling needed)
+1. Open prompt with 2 variables, all visible on one screen
+2. Press Tab to navigate
+3. **Expected:** No scrolling (all variables already visible) ✅
+
+### Edge Cases
+
+- **Variable not found in content:** If variable doesn't appear in preview.content (shouldn't happen), don't scroll
+- **Dual-pane vs fullscreen:** Auto-scroll should work in both modes
+- **First Tab press (entering edit mode):** Should scroll to first variable
+- **Multiple instances of same variable:** Scroll to first occurrence
+
+---
+
+## Testing Checklist
+
+### Test 1: Landing Page Removal
+- [ ] Build: `go build -o tfe`
+- [ ] Run: `./tfe`
+- [ ] **Expected:** File browser appears immediately (no landing page)
+- [ ] Navigate normally with arrow keys
+- [ ] All features work (prompts, favorites, etc.)
+
+### Test 2: Games Launcher (Menu Bar)
+- [ ] Launch TFE
+- [ ] Click 🎮 Games button in menu bar
+- [ ] **Expected:** TUIClassics launcher starts
+- [ ] Games menu shows available games
+- [ ] Can launch a game (test with one game)
+
+### Test 3: Games Launcher (Tools Menu)
+- [ ] Launch TFE
+- [ ] Press T or F9 to open Tools menu
+- [ ] Navigate to "Games" option
+- [ ] Press Enter
+- [ ] **Expected:** TUIClassics launcher starts
+
+### Test 4: Regression (Other Menu Items)
+- [ ] Other emoji buttons still work (📝, 🌐, 🔧, ❓)
+- [ ] Other Tools menu items still work (lazygit, htop, etc.)
+
+### Test 5: Auto-Scroll in Edit Mode
+- [ ] Open long prompt (100+ lines with 5+ variables)
+- [ ] Press Tab to enter edit mode
+- [ ] Press Tab repeatedly
+- [ ] **Expected:** Preview auto-scrolls to show focused variable
+- [ ] Press Shift+Tab to go backwards
+- [ ] **Expected:** Preview scrolls up to previous variables
+- [ ] Tab through all variables (wrap around to first)
+- [ ] **Expected:** Smooth scrolling throughout
+
+---
+
+## Implementation Tips
+
+### Finding the Code
+
+1. **Landing page:**
+   ```bash
+   # Start with model.go
+   grep -A 5 "showLandingPage" model.go
+
+   # Check view.go for rendering
+   grep -A 10 "showLandingPage" view.go
+
+   # Check keyboard handling
+   grep -A 20 "Handle landing page" update_keyboard.go
+   ```
+
+2. **Games launcher:**
+   ```bash
+   # Check menu.go for button definitions
+   grep -B 5 -A 5 "🎮" menu.go
+
+   # Check for Tools menu items
+   grep -B 5 -A 5 "Games" menu.go
+   ```
+
+### Code Pattern to Look For
+
+**Landing page initialization (model.go):**
+```go
+m := model{
+    // ...
+    showLandingPage: true,  // ← Change to false or remove
+    landingPage: nil,       // ← Can remove
+}
+```
+
+**Games launcher (menu.go):**
+```go
+// Look for something like:
+{
+    label: "🎮 Games",
+    action: func() {
+        // Wrong path here - fix it!
+        launchGames("/old/path")
+    },
+}
+```
+
+**Correct games path:**
+```go
+gamesLauncher := filepath.Join(os.Getenv("HOME"), "projects", "TUIClassics", "launcher")
+// Or use os.UserHomeDir():
+homeDir, _ := os.UserHomeDir()
+gamesLauncher := filepath.Join(homeDir, "projects", "TUIClassics", "launcher")
+```
+
+---
+
+## Rollback Plan (If Issues)
+
+If anything breaks:
+
+1. **Landing page issues:**
+   ```bash
+   # Restore showLandingPage: true in model.go
+   git diff model.go  # See what changed
+   ```
+
+2. **Games launcher issues:**
+   ```bash
+   # Check what path was used before
+   git diff menu.go
+   # Verify TUIClassics launcher exists
+   ls -la ~/projects/TUIClassics/launcher
+   ```
+
+---
+
+## Files Summary
+
+**Must modify:**
+- `model.go` - Disable landing page
+- `update_keyboard.go` - Remove landing page keyboard handling, add auto-scroll for Tab/Shift+Tab
+- `view.go` - Remove landing page rendering
+- `menu.go` - Fix games launcher path
+- `helpers.go` - Add scrollToFocusedVariable() function
+
+**Optional cleanup:**
+- `types.go` - Remove landing page type fields
+- `landing_page.go` (if exists) - Can delete entire file
+
+---
+
+## Architecture Notes (from CLAUDE.md)
+
+**Landing page:**
+- Purpose: "90s Windows nostalgic intro"
+- Added as feature, not core to file browser
+- Safe to remove without affecting core functionality
+
+**Menu system:**
+- `menu.go` - Menu bar rendering & button definitions
+- Emoji buttons are clickable shortcuts
+- Tools dropdown has TUI tool integrations
+
+---
+
+## Quick Start Prompt for Next Session
+
+Copy and paste this into your next chat:
+
+```
+I need to make three changes to TFE:
+
+1. REMOVE LANDING PAGE COMPLETELY:
+   - The app currently shows a landing page with star background when launched
+   - I want to go directly to the file browser instead
+   - Need to modify model.go, update_keyboard.go, view.go, and possibly types.go
+   - Look for "showLandingPage" and "landingPage" references
+
+2. FIX GAMES LAUNCHER PATH:
+   - The 🎮 Games button in menu bar and "Games" in Tools dropdown menu
+   - Currently points to wrong path
+   - Should point to: ~/projects/TUIClassics/launcher
+   - Need to modify menu.go
+
+3. AUTO-SCROLL TO FOCUSED VARIABLE IN EDIT MODE:
+   - When I press Tab/Shift+Tab to navigate between variables in edit mode
+   - If the focused variable is off-screen (several screens down)
+   - The preview should automatically scroll to show the focused variable
+   - Need to add scrollToFocusedVariable() helper function
+   - Need to modify Tab/Shift+Tab handlers in update_keyboard.go
+
+INVESTIGATION:
+- Find all references to landing page and remove/disable
+- Find games launcher code in menu.go and update path
+- Find Tab/Shift+Tab handling in edit mode (update_keyboard.go ~261-278)
+- Add auto-scroll logic after changing focusedVariableIndex
+
+TESTING:
+- Test that TFE launches directly to file browser (no landing page)
+- Test that games launcher works from menu bar and Tools menu
+- Test that Tab navigation auto-scrolls to show focused variables
+
+See docs/NEXT_SESSION.md for full details, implementation approach, and testing checklist.
+```
+
+---
+
+**Ready for next session! 🚀**

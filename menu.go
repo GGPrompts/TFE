@@ -219,22 +219,53 @@ func (m model) renderMenuBar() string {
 		Bold(true).
 		Padding(0, 1)
 
-	for _, menuKey := range menuOrder {
+	// Styles for first menu (no left padding for left alignment)
+	menuActiveStyleFirst := menuActiveStyle.Copy().Padding(0, 1, 0, 0)
+	menuHighlightedStyleFirst := menuHighlightedStyle.Copy().Padding(0, 1, 0, 0)
+	menuInactiveStyleFirst := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
+
+	for i, menuKey := range menuOrder {
 		menu := menus[menuKey]
+		isFirst := i == 0
 
 		// Style based on state: active (open) > highlighted (focused) > inactive
 		var style lipgloss.Style
 		if m.activeMenu == menuKey && m.menuOpen {
-			style = menuActiveStyle
+			if isFirst {
+				style = menuActiveStyleFirst
+			} else {
+				style = menuActiveStyle
+			}
 		} else if m.highlightedMenu == menuKey && m.menuBarFocused {
-			style = menuHighlightedStyle
+			if isFirst {
+				style = menuHighlightedStyleFirst
+			} else {
+				style = menuHighlightedStyle
+			}
 		} else {
-			style = menuInactiveStyle
+			if isFirst {
+				style = menuInactiveStyleFirst
+			} else {
+				style = menuInactiveStyle
+			}
 		}
 
-		// Render menu label
-		renderedMenu := style.Render(menu.Label)
-		renderedMenus = append(renderedMenus, renderedMenu)
+		// Render menu label with underlined first letter (hotkey indicator)
+		// F for File, E for Edit, V for View, T for Tools, H for Help
+		label := menu.Label
+		if len(label) > 0 {
+			// Create underline style based on current style (without padding)
+			baseStyle := style.Copy().Padding(0, 0)
+			underlineStyle := baseStyle.Copy().Underline(true)
+			firstLetter := underlineStyle.Render(string(label[0]))
+			restOfLabel := baseStyle.Render(label[1:])
+			// Apply padding to the combined result
+			renderedMenu := style.Render(firstLetter + restOfLabel)
+			renderedMenus = append(renderedMenus, renderedMenu)
+		} else {
+			renderedMenu := style.Render(menu.Label)
+			renderedMenus = append(renderedMenus, renderedMenu)
+		}
 	}
 
 	// Join with single space
@@ -369,20 +400,44 @@ func (m model) getMenuXPosition(menuKey string) int {
 		Bold(true).
 		Padding(0, 1)
 
+	// Styles for first menu (no left padding)
+	menuActiveStyleFirst := menuActiveStyle.Copy().Padding(0, 1, 0, 0)
+	menuInactiveStyleFirst := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
+
 	xPos := 0
-	for _, key := range menuOrder {
+	for i, key := range menuOrder {
 		if key == menuKey {
 			return xPos
 		}
 		menu := menus[key]
-		// Use actual rendered width
+		isFirst := i == 0
+		// Use actual rendered width (matching renderMenuBar logic with underlined first letter)
 		var style lipgloss.Style
 		if m.activeMenu == key && m.menuOpen {
-			style = menuActiveStyle
+			if isFirst {
+				style = menuActiveStyleFirst
+			} else {
+				style = menuActiveStyle
+			}
 		} else {
-			style = menuInactiveStyle
+			if isFirst {
+				style = menuInactiveStyleFirst
+			} else {
+				style = menuInactiveStyle
+			}
 		}
-		renderedMenu := style.Render(menu.Label)
+		// Calculate width with underlined first letter (same as renderMenuBar)
+		label := menu.Label
+		var renderedMenu string
+		if len(label) > 0 {
+			baseStyle := style.Copy().Padding(0, 0)
+			underlineStyle := baseStyle.Copy().Underline(true)
+			firstLetter := underlineStyle.Render(string(label[0]))
+			restOfLabel := baseStyle.Render(label[1:])
+			renderedMenu = style.Render(firstLetter + restOfLabel)
+		} else {
+			renderedMenu = style.Render(menu.Label)
+		}
 		xPos += lipgloss.Width(renderedMenu) + 1 // +1 for space separator
 	}
 	return xPos
@@ -410,18 +465,42 @@ func (m model) getMenuAtPosition(x int) string {
 		Bold(true).
 		Padding(0, 1)
 
-	xPos := 0
-	for _, menuKey := range menuOrder {
-		menu := menus[menuKey]
+	// Styles for first menu (no left padding)
+	menuActiveStyleFirst := menuActiveStyle.Copy().Padding(0, 1, 0, 0)
+	menuInactiveStyleFirst := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
 
-		// Calculate actual rendered width
+	xPos := 0
+	for i, menuKey := range menuOrder {
+		menu := menus[menuKey]
+		isFirst := i == 0
+
+		// Calculate actual rendered width (matching renderMenuBar logic with underlined first letter)
 		var style lipgloss.Style
 		if m.activeMenu == menuKey && m.menuOpen {
-			style = menuActiveStyle
+			if isFirst {
+				style = menuActiveStyleFirst
+			} else {
+				style = menuActiveStyle
+			}
 		} else {
-			style = menuInactiveStyle
+			if isFirst {
+				style = menuInactiveStyleFirst
+			} else {
+				style = menuInactiveStyle
+			}
 		}
-		renderedMenu := style.Render(menu.Label)
+		// Calculate width with underlined first letter (same as renderMenuBar)
+		label := menu.Label
+		var renderedMenu string
+		if len(label) > 0 {
+			baseStyle := style.Copy().Padding(0, 0)
+			underlineStyle := baseStyle.Copy().Underline(true)
+			firstLetter := underlineStyle.Render(string(label[0]))
+			restOfLabel := baseStyle.Render(label[1:])
+			renderedMenu = style.Render(firstLetter + restOfLabel)
+		} else {
+			renderedMenu = style.Render(menu.Label)
+		}
 		menuWidth := lipgloss.Width(renderedMenu)
 
 		if x >= xPos && x < xPos+menuWidth {

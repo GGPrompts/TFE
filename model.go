@@ -68,6 +68,8 @@ func initialModel() model {
 		// Landing page - show on startup
 		showLandingPage: true,
 		landingPage:     nil, // Will be initialized on first WindowSizeMsg
+		// Performance caching
+		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
 	}
 
 	m.loadFiles()

@@ -497,13 +497,14 @@ func visualWidth(s string) int {
 			continue
 		}
 
-		// Count visible characters
+		// Count visible characters with proper wide character support
 		if ch == '\t' {
 			// Tabs typically expand to next multiple of 8
 			width += 8 - (width % 8)
 		} else {
-			// Regular characters count as 1
-			width++
+			// Use runewidth to properly handle wide characters (emojis, CJK)
+			// Most emojis are width 2, regular ASCII is width 1
+			width += runewidth.RuneWidth(ch)
 		}
 	}
 	return width
@@ -513,11 +514,31 @@ func visualWidth(s string) int {
 func truncateToWidth(s string, targetWidth int) string {
 	width := 0
 	result := ""
+	inAnsi := false
 
 	for _, ch := range s {
+		// Handle ANSI escape sequences (don't count toward width)
+		if ch == '\033' {
+			inAnsi = true
+			result += string(ch)
+			continue
+		}
+
+		if inAnsi {
+			result += string(ch)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+
+		// Calculate character width
 		charWidth := 1
 		if ch == '\t' {
 			charWidth = 8 - (width % 8)
+		} else {
+			// Use runewidth to properly handle wide characters (emojis, CJK)
+			charWidth = runewidth.RuneWidth(ch)
 		}
 
 		if width+charWidth > targetWidth {
@@ -852,6 +873,10 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 
 // loadFiles loads the files from the current directory
 func (m *model) loadFiles() {
+	// Clear prompts directory cache when reloading files (performance optimization)
+	// This ensures cache stays fresh when files change
+	m.promptDirsCache = make(map[string]bool)
+
 	// Special handling for trash view
 	if m.showTrashOnly {
 		trashItems, err := getTrashItems()

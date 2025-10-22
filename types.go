@@ -295,6 +295,8 @@ type model struct {
 	// Landing page (90s Windows nostalgic intro)
 	showLandingPage bool          // Whether to show landing page instead of file browser
 	landingPage     *LandingPage  // Landing page state
+	// Performance: Cache for directoryContainsPrompts() to avoid repeated file I/O
+	promptDirsCache map[string]bool // Path -> contains prompts (cleared on loadFiles)
 }
 
 // treeItem represents an item in the tree view with depth information

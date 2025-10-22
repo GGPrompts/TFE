@@ -309,8 +309,8 @@ func (m model) renderSinglePane() string {
 	s.WriteString(fileListStyle.Render(fileListContent))
 	s.WriteString("\n")
 
-	// Check if we should show status message (auto-dismiss after 3s)
-	if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
+	// Check if we should show status message (auto-dismiss after 3s, except in edit mode)
+	if m.statusMessage != "" && (m.promptEditMode || time.Since(m.statusTime) < 3*time.Second) {
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
 			Foreground(lipgloss.Color("0")).

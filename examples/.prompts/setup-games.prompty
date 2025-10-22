@@ -1,0 +1,52 @@
+---
+name: Setup Games (TUIClassics)
+description: Initialize and build the TUIClassics game launcher submodule
+---
+# Setup TUIClassics Games for TFE
+
+This will install the TUIClassics game launcher so you can play games from TFE's [🎮] button!
+
+## Quick Setup (Copy and Paste)
+
+Run these commands in your TFE directory:
+
+```bash
+# Initialize the games submodule
+git submodule init games/TUIClassics
+git submodule update
+
+# Build the games
+cd games/TUIClassics
+make build
+cd ../..
+
+echo "✅ TUIClassics installed! Press F9 or click [🎮] to launch games."
+```
+
+## What This Does
+
+1. **Initializes the submodule**: Links TFE to the TUIClassics repository
+2. **Downloads the code**: Clones TUIClassics into `games/TUIClassics/`
+3. **Builds the games**: Compiles all games (minesweeper, solitaire, etc.)
+4. **Ready to play**: TFE will now find games in `./games/TUIClassics/bin/`
+
+## Manual Steps (if needed)
+
+If you already cloned TFE without `--recursive`, run:
+
+```bash
+git submodule update --init --recursive
+cd games/TUIClassics && make build
+```
+
+## After Installation
+
+- Press **F9** to open the menu → Tools → Games Launcher
+- Or click the **[🎮]** button in the header
+- Choose from: Minesweeper, Solitaire, and more!
+
+---
+
+**Project:** {{project}}
+**Directory:** {{DIRECTORY}}
+**Date:** {{DATE}}

@@ -102,8 +102,19 @@ func (m *model) isFavorite(path string) bool {
 }
 
 // directoryContainsPrompts checks if a directory contains any prompt files (recursively, up to 2 levels deep)
-func directoryContainsPrompts(dirPath string) bool {
-	return checkForPromptsRecursive(dirPath, 0, 2)
+func (m *model) directoryContainsPrompts(dirPath string) bool {
+	// Check cache first (performance optimization - avoids repeated file I/O)
+	if result, cached := m.promptDirsCache[dirPath]; cached {
+		return result
+	}
+
+	// Compute result (expensive: does file I/O recursively up to 2 levels)
+	result := checkForPromptsRecursive(dirPath, 0, 2)
+
+	// Store in cache for future lookups
+	m.promptDirsCache[dirPath] = result
+
+	return result
 }
 
 // checkForPromptsRecursive recursively checks for prompt files up to maxDepth levels
@@ -258,7 +269,7 @@ func (m *model) getFilteredFiles() []fileItem {
 				}
 
 				// Include directory if it contains prompt files
-				if directoryContainsPrompts(item.path) {
+				if m.directoryContainsPrompts(item.path) {
 					filtered = append(filtered, item)
 				}
 			} else if isPromptFile(item) {

@@ -834,7 +834,7 @@ func (m model) buildTreeItems(files []fileItem, depth int, parentLasts []bool) [
 						}
 
 						// Include directory if it contains prompt files
-						if directoryContainsPrompts(subFile.path) {
+						if m.directoryContainsPrompts(subFile.path) {
 							filteredSubFiles = append(filteredSubFiles, subFile)
 						}
 					} else if isPromptFile(subFile) {

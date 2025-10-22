@@ -822,8 +822,8 @@ func (m model) renderFullPreview() string {
 
 		s.WriteString(searchStyle.Render(searchText))
 		s.WriteString("\033[0m") // Reset ANSI codes
-	} else if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
-		// Show status message if present (auto-dismiss after 3s) and search not active
+	} else if m.statusMessage != "" && (m.promptEditMode || time.Since(m.statusTime) < 3*time.Second) {
+		// Show status message if present (auto-dismiss after 3s, except in edit mode) and search not active
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
@@ -1366,8 +1366,8 @@ func (m model) renderDualPane() string {
 	s.WriteString(statusStyle.Render(statusLine2))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
-	// Show status message if present (auto-dismiss after 3s)
-	if m.statusMessage != "" && time.Since(m.statusTime) < 3*time.Second {
+	// Show status message if present (auto-dismiss after 3s, except in edit mode)
+	if m.statusMessage != "" && (m.promptEditMode || time.Since(m.statusTime) < 3*time.Second) {
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green

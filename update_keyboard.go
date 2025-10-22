@@ -246,8 +246,215 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// PRIORITY 1: Handle file picker mode (F3 from edit mode)
+	// File picker has higher priority than edit mode because Esc should close picker first
+	if m.filePickerMode {
+		switch msg.String() {
+		case "esc":
+			// Cancel file picker and return to preview mode
+			m.filePickerMode = false
+			m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
+			m.loadFiles()                                  // Reload files with restored filter
+			m.viewMode = viewFullPreview
+			// Reload the original preview
+			if m.filePickerRestorePath != "" {
+				m.loadPreview(m.filePickerRestorePath)
+				m.populatePreviewCache()
+			}
+			m.setStatusMessage("File picker cancelled", false)
+			return m, nil
+
+		case "enter":
+			// Get current file (handles tree mode correctly)
+			selectedFile := m.getCurrentFile()
+			if selectedFile != nil {
+				if selectedFile.isDir {
+					// It's a directory - navigate into it (consistent across all views)
+					m.currentPath = selectedFile.path
+					m.cursor = 0
+					m.loadFiles()
+					return m, nil
+				} else {
+					// It's a file - insert path into focused variable
+					selectedPath := selectedFile.path
+
+					// Return to preview mode
+					m.filePickerMode = false
+					m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
+					m.loadFiles()                                  // Reload files with restored filter
+					m.viewMode = viewFullPreview
+
+					// Reload the original preview
+					if m.filePickerRestorePath != "" {
+						m.loadPreview(m.filePickerRestorePath)
+						m.populatePreviewCache()
+					}
+
+					// Set the selected file path in the focused variable
+					if m.promptEditMode && m.focusedVariableIndex >= 0 && m.preview.promptTemplate != nil {
+						if m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+							varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+							m.filledVariables[varName] = selectedPath
+							m.setStatusMessage(fmt.Sprintf("✓ Set %s = %s", varName, selectedFile.name), false)
+						}
+					}
+
+					return m, nil
+				}
+			}
+		}
+		// For all other keys in file picker mode, fall through to normal navigation
+	}
+
+	// PRIORITY 2: Handle prompt edit mode input (works in ALL view modes)
+	// This prevents hotkeys like F, M, V, D, E from interfering with text input
+	// Must be checked AFTER file picker mode (so Esc closes picker first)
+	if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
+		switch msg.String() {
+		case "esc":
+			// Exit prompt edit mode
+			m.promptEditMode = false
+			m.setStatusMessage("Exited edit mode", false)
+			return m, nil
+
+		case "tab":
+			// Navigate to next variable
+			if len(m.preview.promptTemplate.variables) > 0 {
+				m.focusedVariableIndex++
+				if m.focusedVariableIndex >= len(m.preview.promptTemplate.variables) {
+					m.focusedVariableIndex = 0 // Wrap around
+				}
+			}
+			return m, nil
+
+		case "shift+tab":
+			// Navigate to previous variable
+			if len(m.preview.promptTemplate.variables) > 0 {
+				m.focusedVariableIndex--
+				if m.focusedVariableIndex < 0 {
+					m.focusedVariableIndex = len(m.preview.promptTemplate.variables) - 1 // Wrap around
+				}
+			}
+			return m, nil
+
+		case "backspace":
+			// Delete last character from focused variable
+			if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+				varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+				currentValue := m.filledVariables[varName]
+				if len(currentValue) > 0 {
+					m.filledVariables[varName] = currentValue[:len(currentValue)-1]
+				}
+			}
+			return m, nil
+
+		case "ctrl+u":
+			// Clear focused variable
+			if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+				varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+				m.filledVariables[varName] = ""
+			}
+			return m, nil
+
+		case "f3":
+			// File picker for focused variable
+			if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+				m.filePickerMode = true
+				m.filePickerRestorePath = m.preview.filePath
+				m.filePickerRestorePrompts = m.showPromptsOnly
+				m.showPromptsOnly = false // Show all files
+				m.viewMode = viewSinglePane // Exit preview mode
+				m.loadFiles()
+				m.setStatusMessage("📁 File Picker: Navigate and press Enter to select file (Esc to cancel)", false)
+			}
+			return m, nil
+
+		case "f5":
+			// Copy rendered prompt
+			if m.preview.loaded && m.preview.filePath != "" {
+				// Get variables - start with context defaults
+				vars := getContextVariables(&m)
+
+				// Override with user-filled values from inline editing
+				for varName, value := range m.filledVariables {
+					if value != "" {
+						vars[varName] = value
+					}
+				}
+
+				// Render the template with variables substituted
+				rendered := renderPromptTemplate(m.preview.promptTemplate, vars)
+
+				// Copy to clipboard
+				if err := copyToClipboard(rendered); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to copy prompt: %s", err), true)
+				} else {
+					m.setStatusMessage("✓ Prompt copied to clipboard", false)
+				}
+			}
+			return m, nil
+
+		case "up", "k":
+			// Scroll preview up (allow scrolling while editing)
+			if m.preview.scrollPos > 0 {
+				m.preview.scrollPos--
+			}
+			return m, nil
+
+		case "down", "j":
+			// Scroll preview down (allow scrolling while editing)
+			totalLines := m.getWrappedLineCount()
+			maxScroll := totalLines - (m.height - 6)
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			if m.preview.scrollPos < maxScroll {
+				m.preview.scrollPos++
+			}
+			return m, nil
+
+		case "pageup", "pgup":
+			// Page up (allow scrolling while editing)
+			m.preview.scrollPos -= m.height - 6
+			if m.preview.scrollPos < 0 {
+				m.preview.scrollPos = 0
+			}
+			return m, nil
+
+		case "pagedown", "pgdn", "pgdown":
+			// Page down (allow scrolling while editing)
+			totalLines := m.getWrappedLineCount()
+			maxScroll := totalLines - (m.height - 6)
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+			m.preview.scrollPos += m.height - 6
+			if m.preview.scrollPos > maxScroll {
+				m.preview.scrollPos = maxScroll
+			}
+			return m, nil
+
+		default:
+			// Handle regular character input for focused variable
+			if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+				varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+				currentValue := m.filledVariables[varName]
+
+				// Append typed character (use msg.Runes for proper Unicode handling)
+				text := string(msg.Runes)
+				if len(text) > 0 && !isSpecialKey(msg.String()) {
+					m.filledVariables[varName] = currentValue + text
+					return m, nil
+				}
+			}
+		}
+		// If we got here, the key wasn't handled - return early to prevent hotkey processing
+		return m, nil
+	}
+
 	// Handle preview mode keys
 	if m.viewMode == viewFullPreview {
+		// Normal preview mode keyboard handling
 		switch msg.String() {
 		case "f10", "ctrl+c":
 			// Exit preview mode (F10 replaces q)
@@ -262,13 +469,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.EnableMouseCellMotion
 
 		case "esc":
-			// Priority 1: Exit prompt edit mode if active
-			if m.promptEditMode {
-				m.promptEditMode = false
-				m.setStatusMessage("Exited edit mode", false)
-				return m, nil
-			}
-			// Priority 2: Exit preview mode
+			// Exit preview mode (edit mode ESC is handled in universal section above)
 			m.viewMode = viewSinglePane
 			m.calculateLayout()
 			m.populatePreviewCache() // Refresh cache with new width
@@ -278,76 +479,16 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.EnableMouseCellMotion
 
 		case "tab":
-			// Inline editing: Navigate to next variable in prompt template
-			if m.preview.isPrompt && m.preview.promptTemplate != nil && m.showPromptsOnly {
-				if !m.promptEditMode {
-					// First Tab press - enter edit mode
-					m.promptEditMode = true
-					m.focusedVariableIndex = 0
-					// Auto-fill defaults for DATE/TIME
-					m.autofillDefaults()
-					m.setStatusMessage("Edit mode: Tab/Shift+Tab to navigate, Esc to exit, F5 to copy", false)
-				} else {
-					// Already in edit mode - navigate to next variable
-					if len(m.preview.promptTemplate.variables) > 0 {
-						m.focusedVariableIndex++
-						if m.focusedVariableIndex >= len(m.preview.promptTemplate.variables) {
-							m.focusedVariableIndex = 0 // Wrap around
-						}
-					}
-				}
+			// Inline editing: Enter edit mode on first Tab press
+			// (Navigation within edit mode is handled by the priority section above)
+			if m.preview.isPrompt && m.preview.promptTemplate != nil && m.showPromptsOnly && !m.promptEditMode {
+				// First Tab press - enter edit mode
+				m.promptEditMode = true
+				m.focusedVariableIndex = 0
+				// Auto-fill defaults for DATE/TIME
+				m.autofillDefaults()
+				m.setStatusMessage("Edit mode: Tab/Shift+Tab to navigate, Esc to exit, F5 to copy", false)
 				return m, nil
-			}
-
-		case "shift+tab":
-			// Inline editing: Navigate to previous variable
-			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
-				if len(m.preview.promptTemplate.variables) > 0 {
-					m.focusedVariableIndex--
-					if m.focusedVariableIndex < 0 {
-						m.focusedVariableIndex = len(m.preview.promptTemplate.variables) - 1 // Wrap around
-					}
-				}
-				return m, nil
-			}
-
-		case "backspace":
-			// Inline editing: Delete last character from focused variable
-			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
-				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
-					varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
-					currentValue := m.filledVariables[varName]
-					if len(currentValue) > 0 {
-						m.filledVariables[varName] = currentValue[:len(currentValue)-1]
-					}
-					return m, nil
-				}
-			}
-
-		case "ctrl+u":
-			// Inline editing: Clear focused variable
-			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
-				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
-					varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
-					m.filledVariables[varName] = ""
-					return m, nil
-				}
-			}
-
-		case "f3":
-			// Inline editing: File picker for focused variable
-			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
-				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
-					// Activate file picker mode
-					m.filePickerMode = true
-					m.filePickerRestorePath = m.preview.filePath
-					m.filePickerRestorePrompts = m.showPromptsOnly
-					m.showPromptsOnly = false // Show all files
-					m.viewMode = viewSinglePane // Exit preview mode
-					m.loadFiles()
-					m.setStatusMessage("📁 File Picker: Navigate and press Enter to select file (Esc to cancel)", false)
-					return m, nil
-				}
 			}
 
 		case "f4":
@@ -573,24 +714,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.preview.scrollPos += m.height - 6
 			if m.preview.scrollPos > maxScroll {
 				m.preview.scrollPos = maxScroll
-			}
-
-		default:
-			// Inline editing: Handle regular character input for focused variable
-			if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
-				if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
-					varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
-
-					// Get current value
-					currentValue := m.filledVariables[varName]
-
-					// Append typed character (use msg.Runes for proper Unicode handling)
-					text := string(msg.Runes)
-					if len(text) > 0 && !isSpecialKey(msg.String()) {
-						m.filledVariables[varName] = currentValue + text
-						return m, nil
-					}
-				}
 			}
 		}
 		return m, nil
@@ -934,66 +1057,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Handle file picker mode (F3 from input fields)
-	if m.filePickerMode {
-		switch msg.String() {
-		case "esc":
-			// Cancel file picker and return to preview mode
-			m.filePickerMode = false
-			m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
-			m.loadFiles() // Reload files with restored filter
-			m.viewMode = viewFullPreview
-			// Reload the original preview
-			if m.filePickerRestorePath != "" {
-				m.loadPreview(m.filePickerRestorePath)
-				m.populatePreviewCache()
-			}
-			m.setStatusMessage("File picker cancelled", false)
-			return m, nil
-
-		case "enter":
-			// Get current file (handles tree mode correctly)
-			selectedFile := m.getCurrentFile()
-			if selectedFile != nil {
-				if selectedFile.isDir {
-					// It's a directory - navigate into it (consistent across all views)
-					m.currentPath = selectedFile.path
-					m.cursor = 0
-					m.loadFiles()
-					return m, nil
-				} else {
-					// It's a file - insert path into focused variable
-					selectedPath := selectedFile.path
-
-					// Return to preview mode
-					m.filePickerMode = false
-					m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
-					m.loadFiles() // Reload files with restored filter
-					m.viewMode = viewFullPreview
-
-					// Reload the original preview
-					if m.filePickerRestorePath != "" {
-						m.loadPreview(m.filePickerRestorePath)
-						m.populatePreviewCache()
-					}
-
-					// Set the selected file path in the focused variable
-					if m.promptEditMode && m.focusedVariableIndex >= 0 && m.preview.promptTemplate != nil {
-						if m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
-							varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
-							m.filledVariables[varName] = selectedPath
-							m.setStatusMessage(fmt.Sprintf("✓ Set %s = %s", varName, selectedFile.name), false)
-						}
-					}
-
-					return m, nil
-				}
-			}
-		}
-		// For all other keys in file picker mode, fall through to normal navigation
-	}
-
 	// Handle command prompt input (focus-based: only active when commandFocused)
+	// NOTE: File picker mode is now handled at top of function (PRIORITY 1)
 	// Special keys that interact with command prompt
 	switch msg.String() {
 	case "enter":
@@ -1617,12 +1682,15 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-	case "h":
-		// 'h' always goes to parent (vim-style)
-		if m.currentPath != "/" {
-			m.currentPath = filepath.Dir(m.currentPath)
-			m.cursor = 0
-			m.loadFiles()
+	case "h", "H":
+		// H: Open Help menu (replaces vim-style parent navigation - use left/backspace instead)
+		if !m.menuBarFocused && !m.menuOpen {
+			m.menuBarFocused = true
+			m.menuOpen = true
+			m.activeMenu = "help"
+			m.highlightedMenu = "help"
+			m.selectedMenuItem = m.getFirstSelectableMenuItem("help")
+			return m, nil
 		}
 
 	case "right":
@@ -1680,6 +1748,50 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.menuBarFocused && !m.menuOpen {
 			m.menuBarFocused = true
 			m.highlightedMenu = "file" // Start with first menu
+		}
+
+	case "f", "F":
+		// F: Open File menu
+		if !m.menuBarFocused && !m.menuOpen {
+			m.menuBarFocused = true
+			m.menuOpen = true
+			m.activeMenu = "file"
+			m.highlightedMenu = "file"
+			m.selectedMenuItem = m.getFirstSelectableMenuItem("file")
+			return m, nil
+		}
+
+	case "e", "E":
+		// E: Open Edit menu
+		if !m.menuBarFocused && !m.menuOpen {
+			m.menuBarFocused = true
+			m.menuOpen = true
+			m.activeMenu = "edit"
+			m.highlightedMenu = "edit"
+			m.selectedMenuItem = m.getFirstSelectableMenuItem("edit")
+			return m, nil
+		}
+
+	case "v", "V":
+		// V: Open View menu
+		if !m.menuBarFocused && !m.menuOpen {
+			m.menuBarFocused = true
+			m.menuOpen = true
+			m.activeMenu = "view"
+			m.highlightedMenu = "view"
+			m.selectedMenuItem = m.getFirstSelectableMenuItem("view")
+			return m, nil
+		}
+
+	case "t", "T":
+		// T: Open Tools menu
+		if !m.menuBarFocused && !m.menuOpen {
+			m.menuBarFocused = true
+			m.menuOpen = true
+			m.activeMenu = "tools"
+			m.highlightedMenu = "tools"
+			m.selectedMenuItem = m.getFirstSelectableMenuItem("tools")
+			return m, nil
 		}
 
 	case "1":
