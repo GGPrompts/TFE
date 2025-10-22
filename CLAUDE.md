@@ -132,7 +132,21 @@ tfe/
 - `renderPreview()` - preview pane content with line numbers
 - `renderFullPreview()` - full-screen preview mode
 - `renderDualPane()` - split-pane layout
-- **Preview height tip**: When adjusting header construction, wrapping, or padding logic, always accumulate rendered rows first and only join them once. This makes it easy to clamp the preview output to exactly `maxVisible` lines (no trailing newline), which keeps the dual-pane boxes vertically aligned.
+- `renderPromptPreview()` - prompt file preview with metadata header
+
+**Critical: Preventing Height Overflow**
+
+To keep dual-pane boxes vertically aligned, ALL content must fit exactly within `maxVisible` lines:
+
+1. **Use `visualWidth()` not `len()`**: When deciding whether to wrap text, ALWAYS use `visualWidth()` instead of byte length. Emojis (📝, 🌐) and Unicode characters have visual width ≠ byte length, causing premature/missed wrapping.
+
+2. **Wrap ALL content except pre-rendered markdown**: Never skip wrapping for ANSI-styled text (colored variables, edit mode). Long lines will terminal-wrap and add extra visual rows. Only skip wrapping for Glamour-rendered markdown (already wrapped).
+
+3. **Use `truncateToWidth()` for force-breaks**: When breaking long words, use `truncateToWidth(word, width)` not `word[:width]`. Byte-position slicing breaks mid-ANSI-code (e.g., `\033[38;5;220m`), corrupting output.
+
+4. **Truncate after padding**: If adding padding (e.g., `"  " + line`), truncate the final result to `boxContentWidth` to prevent exceeding box bounds.
+
+5. **Accumulate then join once**: Build all output in `renderedLines` slice, then join with newlines (no trailing newline). Clamp to exactly `maxVisible` lines with padding loop.
 
 **When to extend**: Modify preview rendering logic, add preview features (syntax highlighting, etc.).
 
@@ -466,27 +480,18 @@ CHANGELOG2.md     → v0.2.0, v0.1.5, v0.1.0 (older versions)
 - When adding to PLAN.md, check if it's grown too large
 - Suggest moving completed PLAN.md items to CHANGELOG.md
 - Keep NEXT_SESSION.md focused on current work only
-
-**Checking file sizes:**
-```bash
-wc -l *.md docs/*.md
-```
+- Check file sizes: `wc -l *.md docs/*.md`
 
 ### Benefits of This System
 
-✅ **AI Context Efficiency** - Smaller files load faster and fit in context windows
-✅ **Human Readability** - Easier to scan and find information
-✅ **Project Maintainability** - Clear separation between active and archived info
-✅ **Prevents Bloat** - Proactive limits prevent files from becoming unmanageable
-✅ **Clear Workflow** - Know exactly where each piece of information belongs
+**AI Context Efficiency** - Smaller files load faster | **Human Readability** - Easier to scan | **Project Maintainability** - Clear separation | **Prevents Bloat** - Proactive limits | **Clear Workflow** - Know where info belongs
 
 ### Current Status (as of 2025-10-22)
 
 Documentation health:
-- CLAUDE.md: 491 lines ✅ (98.2% capacity - healthy buffer)
+- CLAUDE.md: 500 lines ✅ (at capacity - expanded preview rendering guidance)
 - PLAN.md: 232 lines ✅ (58% of 400 limit)
 - CHANGELOG.md: 316 lines ✅ (90% of 350 limit)
-- CHANGELOG3.md: 50 lines ✅ (archived v0.4.0)
 - BACKLOG.md: 97 lines ✅ (under 300 limit)
 
-**Status:** ✅ All documentation within limits after CHANGELOG3 split and CLAUDE.md optimization.
+**Status:** ✅ All documentation within limits.
