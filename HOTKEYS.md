@@ -38,6 +38,7 @@
 - Use **→** (right arrow) to expand a collapsed folder - shows its contents
 - Use **←** (left arrow) to collapse an expanded folder - hides its contents
 - Use **Enter** to toggle folder expansion (expand if collapsed, collapse if expanded)
+- Use **Ctrl+W** to collapse all expanded folders at once (reset tree view)
 
 ## View Modes
 

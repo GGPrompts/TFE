@@ -207,7 +207,12 @@ func (m model) renderPreview(maxVisible int) string {
 			for i := start; i < end && outputLines < maxVisible; i++ {
 				line := renderedLines[i]
 				// Add left padding for better readability (especially for code blocks)
-				writeLine("  " + line + "\033[0m") // 2-space left padding
+				paddedLine := "  " + line
+				// Truncate after padding to prevent exceeding box bounds (per CLAUDE.md guidance)
+				if visualWidth(paddedLine) > boxContentWidth {
+					paddedLine = truncateToWidth(paddedLine, boxContentWidth)
+				}
+				writeLine(paddedLine + "\033[0m")
 			}
 
 			// Pad with empty lines to reach exactly maxVisible lines

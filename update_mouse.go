@@ -243,7 +243,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						m.displayMode = modeTree
 					} else {
 						m.displayMode = modeList
+						// Reset tree expansion when leaving tree view
+						m.expandedDirs = make(map[string]bool)
 					}
+					m.calculateLayout() // Recalculate widths for new display mode
 					return m, nil
 				}
 				// Pane toggle button [⬜/⬌] (X=13-17: [ + emoji(2) + ] + space)
@@ -374,6 +377,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						// Default to detail view for trash (supports horizontal scrolling on narrow terminals)
 						m.displayMode = modeDetail
 						m.detailScrollX = 0 // Reset scroll
+						m.calculateLayout() // Recalculate widths for detail view
 						m.loadFiles()
 					} else {
 						// Exit trash view, reload normal files

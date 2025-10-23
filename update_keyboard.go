@@ -1764,19 +1764,35 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "1":
 		// Switch to list view
 		m.displayMode = modeList
+		// Reset tree expansion when leaving tree view
+		m.expandedDirs = make(map[string]bool)
 
 	case "2":
 		// Switch to detail view
 		m.displayMode = modeDetail
-		// Recalculate layout in case we're in dual-pane (accordion mode supports detail view)
+		// Reset tree expansion when leaving tree view
+		m.expandedDirs = make(map[string]bool)
+		// Recalculate layout to ensure correct width for detail view columns
+		m.calculateLayout()
+		// Refresh preview cache if in dual-pane mode
 		if m.viewMode == viewDualPane {
-			m.calculateLayout()
 			m.populatePreviewCache()
 		}
 
 	case "3":
 		// Switch to tree view
 		m.displayMode = modeTree
+
+	case "ctrl+w":
+		// Ctrl+W: Collapse all expanded folders in tree view
+		if m.displayMode == modeTree {
+			// Clear all expanded directories to reset tree view
+			m.expandedDirs = make(map[string]bool)
+			m.setStatusMessage("All folders collapsed", false)
+		} else {
+			// Not in tree view - show helpful message
+			m.setStatusMessage("Collapse all only works in tree view (press 3)", false)
+		}
 
 	case "f4":
 		// F4: Edit file in external editor (replaces e/E)
@@ -1867,6 +1883,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.showTrashOnly {
 			// Default to detail view for trash
 			m.displayMode = modeDetail
+			m.calculateLayout() // Recalculate widths for detail view
 		}
 
 	case "f1":

@@ -56,6 +56,7 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "📄 List", Action: "display-list", Shortcut: "1", IsCheckable: true, IsChecked: m.displayMode == modeList},
 				{Label: "📋 Details", Action: "display-detail", Shortcut: "2", IsCheckable: true, IsChecked: m.displayMode == modeDetail},
 				{Label: "🌳 Tree", Action: "display-tree", Shortcut: "3", IsCheckable: true, IsChecked: m.displayMode == modeTree},
+				{Label: "  └─ Collapse All", Action: "collapse-all-tree", Shortcut: "Ctrl+W"},
 				{IsSeparator: true},
 				{Label: "⬌ Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
 				{Label: "👁️  Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
@@ -670,13 +671,27 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 	// View menu
 	case "display-list":
 		m.displayMode = modeList
+		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
+		m.calculateLayout() // Recalculate widths for new display mode
 
 	case "display-detail":
 		m.displayMode = modeDetail
 		m.detailScrollX = 0 // Reset scroll when switching to detail view
+		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
+		m.calculateLayout() // Recalculate widths for detail view columns
 
 	case "display-tree":
 		m.displayMode = modeTree
+		m.calculateLayout() // Recalculate widths for new display mode
+
+	case "collapse-all-tree":
+		// Collapse all expanded folders in tree view
+		if m.displayMode == modeTree {
+			m.expandedDirs = make(map[string]bool)
+			m.setStatusMessage("All folders collapsed", false)
+		} else {
+			m.setStatusMessage("Collapse all only works in tree view (press 3)", false)
+		}
 
 	case "toggle-dual-pane":
 		if m.viewMode == viewDualPane {
