@@ -179,6 +179,87 @@ TFE works great without these, but install them for additional features:
 - If none are installed, you can still open images in your browser (F3 or context menu)
 - Priority order: viu > timg > chafa for viewing, textual-paint for editing
 
+**For File Type Viewers (F4 Smart Opening):**
+- **VisiData** - Interactive CSV/TSV spreadsheet viewer
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install visidata
+
+  # Or via pip
+  pip3 install visidata
+
+  # Termux
+  pip install visidata
+  ```
+- **mpv** - Video and audio player
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install mpv
+
+  # Termux
+  pkg install mpv
+  ```
+- **hexyl** - Modern hex viewer for binary files
+  ```bash
+  # Ubuntu/Debian (via cargo)
+  cargo install hexyl
+
+  # Or download binary from https://github.com/sharkdp/hexyl/releases
+  ```
+- **harlequin** - SQLite database viewer
+  ```bash
+  pip3 install harlequin
+  ```
+
+**For Text Editing:**
+- **micro** - Modern, intuitive terminal text editor (recommended)
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install micro
+
+  # Or via go
+  go install github.com/zyedidia/micro/cmd/micro@latest
+
+  # Termux
+  pkg install micro
+  ```
+  **Note:** TFE auto-detects available editors: micro > nano > vim > vi
+
+**For Tools Menu (Optional TUI Applications):**
+- **lazygit** - Terminal UI for git
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install lazygit
+
+  # Termux
+  pkg install lazygit
+  ```
+- **htop** - Interactive process viewer
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install htop
+
+  # Termux
+  pkg install htop
+  ```
+- **bottom** - System monitor (modern alternative to htop)
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install bottom
+
+  # Termux
+  pkg install bottom
+  ```
+- **pyradio** - Terminal radio player
+  ```bash
+  pip3 install pyradio
+  ```
+
+**Notes:**
+- TFE automatically detects which tools are installed
+- Missing tools show helpful install instructions when accessed
+- All features work with graceful fallbacks
+
 > 💡 **Need help installing?** Ask Claude or your AI assistant: *"Help me install TFE from https://github.com/GGPrompts/TFE on [your OS]"*
 
 ### Option 1: Automated Install (Recommended - Like Midnight Commander)
