@@ -108,6 +108,58 @@ func isIgnoreFile(name string) bool {
 	return false
 }
 
+// hasPromptVariables checks if a file contains {{variable}} placeholders
+// Uses a quick string search without full parsing for performance
+func hasPromptVariables(path string) bool {
+	// Read first 8KB of file (enough to detect variables in most cases)
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 8192)
+	n, _ := file.Read(buffer)
+	content := string(buffer[:n])
+
+	// Quick check for {{variable}} pattern
+	return strings.Contains(content, "{{") && strings.Contains(content, "}}")
+}
+
+// isInPromptsDirectory checks if a file is in a prompts-related directory
+func isInPromptsDirectory(path string) bool {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+
+	// Check if in ~/.prompts/ (global prompts)
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		globalPromptsDir := filepath.Join(homeDir, ".prompts")
+		if strings.HasPrefix(absPath, globalPromptsDir) {
+			return true
+		}
+	}
+
+	// Check if in .claude/commands/, .claude/agents/, or .claude/skills/
+	if strings.Contains(absPath, "/.claude/commands/") ||
+		strings.Contains(absPath, "/.claude/agents/") ||
+		strings.Contains(absPath, "/.claude/skills/") {
+		return true
+	}
+
+	// Check if in any directory named .prompts or prompts
+	parts := strings.Split(absPath, string(filepath.Separator))
+	for _, part := range parts {
+		if part == ".prompts" || part == "prompts" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // isObsidianVault checks if a directory is an Obsidian vault (contains .obsidian folder)
 func isObsidianVault(path string) bool {
 	obsidianPath := filepath.Join(path, ".obsidian")
@@ -226,6 +278,23 @@ func getFileIcon(item fileItem) string {
 
 	// Get file extension
 	ext := strings.ToLower(filepath.Ext(item.name))
+
+	// Check for prompt files - differentiate templates with variables from plain prompts
+	// Uses cached value from loadFiles() to avoid per-frame file reads (performance optimization)
+	if ext == ".prompty" || ext == ".md" || ext == ".txt" {
+		// Use cached value if available (populated when showPromptsOnly is true)
+		if item.hasVariables != nil {
+			if *item.hasVariables {
+				return "📝" // Memo with pencil = editable template
+			}
+			// Has been checked and has no variables
+			if ext == ".prompty" || isInPromptsDirectory(item.path) {
+				return "📄" // Document = plain prompt without variables
+			}
+			// Otherwise fall through to default .md/.txt icons
+		}
+		// If not cached (showPromptsOnly is false), fall through to default icons
+	}
 
 	// Map extensions to emoji icons
 	iconMap := map[string]string{
@@ -1055,6 +1124,16 @@ func (m *model) loadFiles() {
 			symlinkTarget: symlinkTarget,
 		}
 
+		// Cache variable check for prompt files (performance optimization)
+		// Only check if: not a directory, is a prompt-type file, and we're viewing prompts
+		if !item.isDir && m.showPromptsOnly {
+			ext := strings.ToLower(filepath.Ext(item.name))
+			if ext == ".prompty" || ext == ".md" || ext == ".txt" {
+				hasVars := hasPromptVariables(fullPath)
+				item.hasVariables = &hasVars
+			}
+		}
+
 		if item.isDir {
 			dirs = append(dirs, item)
 		} else {
@@ -1318,19 +1397,212 @@ func (m *model) loadPreview(path string) {
 		return
 	}
 
+	// Check for CSV files (text-based, but better viewed with specialized tools)
+	if isCSVFile(path) {
+		// Still read as text, but add a helpful hint
+		content, err := os.ReadFile(path)
+		if err != nil {
+			m.preview.content = []string{
+				fmt.Sprintf("Error reading file: %v", err),
+			}
+			m.preview.loaded = true
+			return
+		}
+
+		lines := strings.Split(string(content), "\n")
+		// Add header with hint based on tool availability
+		var hintLines []string
+		if getAvailableCSVViewer() != "" {
+			hintLines = []string{
+				"📈 CSV/Spreadsheet file",
+				fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+				"",
+				"✨ Press F4 to open in VisiData (interactive spreadsheet viewer)",
+				"",
+				"─────────────────────────────────────",
+				"",
+			}
+		} else {
+			hintLines = []string{
+				"📈 CSV/Spreadsheet file",
+				fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+				"",
+				"💡 Tip: Install VisiData for better viewing:",
+				"   sudo apt install visidata",
+				"   or: pipx install visidata",
+				"",
+				"─────────────────────────────────────",
+				"",
+			}
+		}
+		m.preview.content = append(hintLines, lines...)
+		m.preview.loaded = true
+		return
+	}
+
 	// Check if binary
 	if isBinaryFile(path) {
 		m.preview.isBinary = true
-		content := []string{
-			"Binary file detected",
-			fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
-			"",
-			"Cannot preview binary files",
+		var content []string
+
+		// Specific file type detection with helpful hints
+		if isPDFFile(path) {
+			if getAvailablePDFViewer() != "" {
+				content = []string{
+					"📕 PDF Document",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview PDF files in text mode",
+					"",
+					"Options:",
+					"  ✨ Press F4 to view in timg (terminal PDF viewer)",
+					"  • Press F3 to open in browser",
+				}
+			} else {
+				content = []string{
+					"📕 PDF Document",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview PDF files in text mode",
+					"",
+					"Options:",
+					"  • Press F3 to open in browser",
+					"",
+					"💡 Or install a terminal PDF viewer:",
+					"   sudo apt install timg",
+				}
+			}
+		} else if isVideoFile(path) {
+			if getAvailableVideoPlayer() != "" {
+				content = []string{
+					"🎬 Video File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview video files",
+					"",
+					"✨ Press F4 to play in mpv",
+				}
+			} else {
+				content = []string{
+					"🎬 Video File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview video files",
+					"",
+					"💡 Install mpv to play videos:",
+					"   sudo apt install mpv",
+					"   or: brew install mpv",
+				}
+			}
+		} else if isAudioFile(path) {
+			if getAvailableAudioPlayer() != "" {
+				content = []string{
+					"🎵 Audio File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview audio files",
+					"",
+					"✨ Press F4 to play in mpv",
+				}
+			} else {
+				content = []string{
+					"🎵 Audio File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview audio files",
+					"",
+					"💡 Install mpv to play audio:",
+					"   sudo apt install mpv",
+					"   or: brew install mpv",
+				}
+			}
+		} else if isDatabaseFile(path) {
+			if getAvailableDatabaseViewer() != "" {
+				content = []string{
+					"🗄️ SQLite Database",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview database files",
+					"",
+					"✨ Press F4 to open in harlequin (database viewer)",
+				}
+			} else {
+				content = []string{
+					"🗄️ SQLite Database",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview database files",
+					"",
+					"💡 Install a database viewer:",
+					"   pipx install harlequin",
+					"   or: pip install litecli",
+				}
+			}
+		} else if isArchiveFile(path) {
+			content = []string{
+				"🗜️ Archive File",
+				fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+				"",
+				"Cannot preview archive contents",
+				"",
+				"💡 Extract to view contents:",
+				"   unzip filename.zip",
+				"   tar -xzf filename.tar.gz",
+				"   7z x filename.7z",
+			}
+		} else if isImageFile(path) {
+			imageViewer := getAvailableImageViewer()
+			if imageViewer != "" {
+				content = []string{
+					"🖼️ Image File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview in text mode",
+					"",
+					"Options:",
+					fmt.Sprintf("  ✨ Press V to view in %s (terminal image viewer)", imageViewer),
+					"  • Press F3 to open in browser",
+				}
+			} else {
+				content = []string{
+					"🖼️ Image File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview in text mode",
+					"",
+					"Options:",
+					"  • Press F3 to open in browser",
+					"",
+					"💡 Install a terminal image viewer:",
+					"   sudo apt install timg",
+					"   or: cargo install viu",
+				}
+			}
+		} else {
+			// Generic binary file
+			if getAvailableHexViewer() != "" {
+				content = []string{
+					"⚙️ Binary File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview binary files",
+					"",
+					"✨ Press F4 to view in hexyl (hex viewer)",
+				}
+			} else {
+				content = []string{
+					"⚙️ Binary File",
+					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+					"",
+					"Cannot preview binary files",
+					"",
+					"💡 Install hexyl to view as hex:",
+					"   cargo install hexyl",
+					"   or: sudo apt install hexyl",
+				}
+			}
 		}
-		// Add hint for image files
-		if isImageFile(path) {
-			content = append(content, "", "Press 'V' to view image in terminal viewer")
-		}
+
 		m.preview.content = content
 		m.preview.loaded = true
 		return

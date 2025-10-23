@@ -74,6 +74,7 @@ type fileItem struct {
 	mode          os.FileMode
 	isSymlink     bool   // Whether this is a symbolic link
 	symlinkTarget string // Target path if this is a symlink
+	hasVariables  *bool  // Cached: whether prompt file has {{variables}} (nil = not checked yet)
 }
 
 // previewModel holds preview pane state

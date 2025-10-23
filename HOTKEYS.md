@@ -7,7 +7,7 @@
 | **F1** | Show this help reference |
 | **F2** | Open context menu (keyboard alternative to right-click) |
 | **F3** | Open images/HTML in browser OR view/preview file OR file picker (in input fields) |
-| **F4** | Edit file in external editor |
+| **F4** | Open file (context-aware: CSV→VisiData, video→mpv, audio→mpv, PDF→timg, DB→harlequin, binary→hexyl, text→editor) |
 | **F5** | Copy file path to clipboard (or rendered prompt in prompts mode) |
 | **F6** | Toggle favorites filter (show only favorites) |
 | **F7** | Create new directory (prompts for name) |
@@ -126,11 +126,31 @@ When selecting a file for a prompt variable:
 
 | Key | Action |
 |-----|--------|
-| **F4** | Edit file in external editor (Micro preferred, then nano/vim) |
-| **n** / **N** | Edit file in nano specifically |
+| **F4** | Open file with appropriate viewer (CSV→VisiData, video/audio→mpv, PDF→timg, DB→harlequin, binary→hexyl, text→editor) |
+| **n** / **N** | Edit file in nano specifically (text files only) |
 | **F5** | Copy file path to clipboard (or rendered prompt in F11 mode) |
 | **F7** | Create new directory (prompts for name) |
 | **F8** | Delete selected file/folder (prompts for confirmation) |
+
+### Smart File Opening (F4)
+
+TFE automatically detects file types and opens them with the best available viewer:
+
+| File Type | Viewer | Install Command |
+|-----------|--------|----------------|
+| **CSV/TSV** | VisiData | `sudo apt install visidata` or `pipx install visidata` |
+| **Video** (mp4, mkv, avi) | mpv | `sudo apt install mpv` |
+| **Audio** (mp3, wav, flac) | mpv | `sudo apt install mpv` |
+| **PDF** | timg | `sudo apt install timg` |
+| **SQLite** (.db, .sqlite) | harlequin | `pipx install harlequin` |
+| **Binary files** | hexyl | `cargo install hexyl` or `sudo apt install hexyl` |
+| **Images** | Use **V** key | `cargo install viu` or `sudo apt install timg` |
+| **Text files** | Micro/nano/vim | Built-in editors |
+
+**Fallback behavior:** If the preferred viewer isn't installed, TFE will:
+- CSV → Opens in text editor (shows raw CSV)
+- PDF → Opens in browser (F3)
+- Other binary files → Shows helpful install instructions
 
 ## Context Menu
 

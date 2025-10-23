@@ -164,23 +164,27 @@ func parseYAMLFormat(content string, tmpl *promptTemplate) error {
 }
 
 // extractVariables finds all {{VARIABLE}} placeholders in template
+// Returns variables in document order (first occurrence to last)
 func extractVariables(template string) []string {
 	// Match {{variable}} pattern (case-insensitive)
 	re := regexp.MustCompile(`\{\{([a-zA-Z0-9_]+)\}\}`)
 	matches := re.FindAllStringSubmatch(template, -1)
 
-	// Extract unique variable names
-	varMap := make(map[string]bool)
+	// Extract unique variable names while preserving order
+	// Use map to track seen variables (for deduplication)
+	// Use slice to maintain order of first occurrence
+	seen := make(map[string]bool)
+	vars := make([]string, 0, len(matches))
+
 	for _, match := range matches {
 		if len(match) > 1 {
-			varMap[match[1]] = true
+			varName := match[1]
+			// Only add if we haven't seen it before (preserves first occurrence)
+			if !seen[varName] {
+				seen[varName] = true
+				vars = append(vars, varName)
+			}
 		}
-	}
-
-	// Convert to slice
-	vars := make([]string, 0, len(varMap))
-	for v := range varMap {
-		vars = append(vars, v)
 	}
 
 	return vars

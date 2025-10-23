@@ -1,0 +1,28 @@
+{
+  "application": {
+    "name": "TFE Test App",
+    "version": "1.0.0",
+    "debug": true,
+    "features": {
+      "syntax_highlighting": true,
+      "file_preview": true,
+      "dual_pane": true
+    }
+  },
+  "server": {
+    "host": "localhost",
+    "port": 8080,
+    "ssl": false,
+    "timeout": 30
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "./data/app.db",
+    "pool_size": 10
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "outputs": ["stdout", "file"]
+  }
+}

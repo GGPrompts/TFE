@@ -294,13 +294,20 @@ func (m *model) scrollToFocusedVariable() {
 	var searchPatterns []string
 
 	if m.promptEditMode {
-		// In edit mode, variables appear without brackets (but with ANSI codes)
-		// Search for the variable name or filled value
+		// In edit mode, variables appear with ANSI styling (no brackets)
+		// We're looking for the FOCUSED variable, which has specific ANSI codes:
+		// Background 235 + Foreground 220
 		filledValue, hasFilled := m.filledVariables[varName]
 		if hasFilled && filledValue != "" {
-			searchPatterns = []string{filledValue, varName}
+			// Search for focused variable with filled value
+			searchPatterns = []string{
+				fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", filledValue),
+			}
 		} else {
-			searchPatterns = []string{varName}
+			// Search for focused variable with variable name
+			searchPatterns = []string{
+				fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", varName),
+			}
 		}
 	} else {
 		// Before edit mode, variables appear with {{}}
@@ -321,17 +328,47 @@ func (m *model) scrollToFocusedVariable() {
 	}
 
 	if targetLine >= 0 {
-		// Calculate visible lines (accounting for header)
-		visibleLines := m.height - 6 // Default offset for header/footer
+		// Calculate maxVisible the same way as renderDualPane/renderFullPreview
+		var maxVisible int
 		if m.viewMode == viewDualPane {
-			visibleLines = m.height - 8
+			headerLines := 4  // title + toolbar + command + blank separator
+			footerLines := 4  // blank after panes + 2 status lines + optional message/search
+			maxVisible = m.height - headerLines - footerLines
+			if maxVisible < 5 {
+				maxVisible = 5
+			}
+			// Account for borders
+			maxVisible = maxVisible - 2
+		} else if m.viewMode == viewFullPreview {
+			maxVisible = m.height - 4 - 0 // Reserve space for header (if shown), help, and borders
+			contentHeight := maxVisible - 2 // Content area accounting for borders
+			maxVisible = contentHeight
+		} else {
+			// Shouldn't happen, but default to dual-pane calculation
+			maxVisible = m.height - 10
 		}
 
-		// Account for header height in prompt preview
-		// Header typically takes 4-8 lines depending on metadata
-		// Estimate conservatively
-		headerEstimate := 6
-		contentHeight := visibleLines - headerEstimate
+		// Calculate actual header height (same logic as renderPromptPreview)
+		tmpl := m.preview.promptTemplate
+		var actualHeaderHeight int
+
+		// Count header lines based on prompt metadata
+		if tmpl.name != "" {
+			actualHeaderHeight += 1 // Name line (or more if wrapped, but simplified here)
+			actualHeaderHeight += 1 // Blank line
+		}
+		if tmpl.description != "" {
+			actualHeaderHeight += 1 // Description line (or more if wrapped)
+			actualHeaderHeight += 1 // Blank line
+		}
+		actualHeaderHeight += 1 // Source indicator line
+		if len(tmpl.variables) > 0 {
+			actualHeaderHeight += 1 // Variables line (or more if wrapped)
+		}
+		actualHeaderHeight += 1 // Separator line
+
+		// Content height is maxVisible minus actual header height
+		contentHeight := maxVisible - actualHeaderHeight
 		if contentHeight < 5 {
 			contentHeight = 5
 		}

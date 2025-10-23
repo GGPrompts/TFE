@@ -5,6 +5,30 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added (2025-10-23)
+- **Icon Differentiation for Prompt Templates**
+  - Prompt files now show different icons based on whether they have fillable fields
+  - 📝 (memo with pencil) = Editable template with `{{variables}}`
+  - 📄 (plain document) = Plain prompt without fillable fields
+  - **Performance-optimized with caching**: Variable check happens once on directory load (not every frame)
+  - Cached in `fileItem.hasVariables` field to prevent lag with many prompt files
+  - Only checks when viewing prompts (F11) to avoid overhead in regular file browsing
+  - Helper functions: `hasPromptVariables()`, `isInPromptsDirectory()`
+  - Files modified: `file_operations.go`, `types.go`
+
+- **Smart File Opening (F4 Enhancement)**
+  - CSV/TSV files: Opens in VisiData (interactive spreadsheet viewer)
+  - Video files (mp4, mkv, avi, mov, webm): Opens in mpv media player
+  - Audio files (mp3, wav, flac, ogg, m4a): Opens in mpv
+  - PDF files: Opens in timg (terminal image viewer) or browser fallback
+  - SQLite databases (.db, .sqlite, .sqlite3): Opens in harlequin
+  - Archive files (.zip, .tar, .gz, .7z, .rar): Detection added
+  - Binary files: Opens in hexyl (hex viewer) with helpful install instructions if missing
+  - Graceful fallbacks when specialized viewers aren't installed
+  - New file type detection functions: `isCSVFile()`, `isPDFFile()`, `isVideoFile()`, `isAudioFile()`, `isDatabaseFile()`, `isArchiveFile()`
+  - New viewer functions: `getAvailableCSVViewer()`, `openCSVViewer()`, `getAvailableVideoPlayer()`, `openVideoPlayer()`, `getAvailableAudioPlayer()`, etc.
+  - CSV preview: Shows helpful hints about VisiData with F4 shortcut
+  - Files modified: `editor.go`, `file_operations.go`, `update_keyboard.go`, `HOTKEYS.md`
+
 - **More AI Directory Exceptions for Hidden Files**
   - Added `.codex`, `.copilot`, `.devcontainer`, `.gemini`, and `.opencode` to always-visible list
   - These AI/IDE config folders now show even when "Show Hidden Files" is disabled
@@ -43,6 +67,17 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Files modified: `types.go`, `context_menu.go`, `update_keyboard.go`, `view.go`, `render_preview.go`
 
 ### Fixed (2025-10-23)
+- **Prompt Template Tab Navigation Bugs**
+  - Fixed Field 2 scroll position bug where Tab navigation scrolled to wrong location
+  - Root cause: Search pattern matched first occurrence of variable name in text (e.g., "project" in "this project") instead of the actual `{{project}}` placeholder
+  - Solution: Search for ANSI-styled variable (`\033[48;5;235m\033[38;5;220m{varName}\033[0m`) to match only the focused field
+  - Fixed scroll calculation to use actual header height (not estimated) and match `renderPromptPreview()` logic exactly
+  - Tab order now follows document order (first variable to last) instead of random order
+  - Root cause: `extractVariables()` used Go map (unordered) to store variables
+  - Solution: Preserve insertion order using separate slice while deduplicating with map
+  - Updated file picker helper text: "Arrows/double-click to navigate, Enter to select file, Esc to cancel" (more explicit than "Navigate and press Enter")
+  - Files modified: `helpers.go`, `prompt_parser.go`, `update_keyboard.go`
+
 - **File Picker Status Message Persistence**
   - Status messages now persist during file picker navigation (no 3-second timeout)
   - Helper text stays visible until destination is selected or picker is cancelled
@@ -62,6 +97,11 @@ All notable changes to the Terminal File Explorer (TFE) project.
     - `{{VARIABLES}}` in content
   - Documentation files like `CLAUDE.md` render as normal markdown
   - Files modified: `prompt_parser.go`
+
+### Removed (2025-10-23)
+- **Unused Slash Commands**
+  - Deleted `.claude/commands/prompt-engineer.md` (redundant with global agent)
+  - Deleted `.claude/commands/sync-projects.md` (project-specific, not generally useful)
 
 ### Fixed (2025-10-21)
 - **Dual-Pane Accordion Layout**

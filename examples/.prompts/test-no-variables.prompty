@@ -1,0 +1,9 @@
+---
+name: Test Prompt Without Variables
+description: This is a test prompt with no fillable fields
+---
+This is a simple prompt with no variables.
+
+Just plain text content for testing icon differentiation.
+
+No fillable fields here at all!

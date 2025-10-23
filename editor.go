@@ -152,7 +152,115 @@ func isHTMLFile(path string) bool {
 
 // isBrowserFile checks if a file should be opened in a browser
 func isBrowserFile(path string) bool {
-	return isImageFile(path) || isHTMLFile(path)
+	return isImageFile(path) || isHTMLFile(path) || isPDFFile(path)
+}
+
+// isCSVFile checks if a file is a CSV/TSV file based on extension (case-insensitive)
+func isCSVFile(path string) bool {
+	csvExts := []string{".csv", ".tsv"}
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
+	for _, ext := range csvExts {
+		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
+			return true
+		}
+	}
+	return false
+}
+
+// isPDFFile checks if a file is a PDF based on extension (case-insensitive)
+func isPDFFile(path string) bool {
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
+	return len(lowerPath) >= 4 && lowerPath[len(lowerPath)-4:] == ".pdf"
+}
+
+// isVideoFile checks if a file is a video based on extension (case-insensitive)
+func isVideoFile(path string) bool {
+	videoExts := []string{".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v"}
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
+	for _, ext := range videoExts {
+		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
+			return true
+		}
+	}
+	return false
+}
+
+// isAudioFile checks if a file is an audio file based on extension (case-insensitive)
+func isAudioFile(path string) bool {
+	audioExts := []string{".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma", ".opus", ".ape"}
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
+	for _, ext := range audioExts {
+		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
+			return true
+		}
+	}
+	return false
+}
+
+// isDatabaseFile checks if a file is a database file based on extension (case-insensitive)
+func isDatabaseFile(path string) bool {
+	dbExts := []string{".db", ".sqlite", ".sqlite3"}
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
+	for _, ext := range dbExts {
+		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
+			return true
+		}
+	}
+	return false
+}
+
+// isArchiveFile checks if a file is an archive based on extension (case-insensitive)
+func isArchiveFile(path string) bool {
+	archiveExts := []string{".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz", ".tar.gz", ".tgz"}
+	lowerPath := ""
+	for _, ch := range path {
+		if ch >= 'A' && ch <= 'Z' {
+			lowerPath += string(ch + 32)
+		} else {
+			lowerPath += string(ch)
+		}
+	}
+	for _, ext := range archiveExts {
+		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
+			return true
+		}
+	}
+	return false
 }
 
 // isWSL checks if we're running in Windows Subsystem for Linux
@@ -295,6 +403,233 @@ read -n 1 -s -r`, viewer, path)
 	}
 
 	// Set up stdin/stdout/stderr for interaction (same as command execution)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
+// getAvailableCSVViewer returns the first available CSV/spreadsheet viewer
+func getAvailableCSVViewer() string {
+	viewers := []string{"visidata", "sc-im"}
+	for _, viewer := range viewers {
+		if editorAvailable(viewer) {
+			return viewer
+		}
+	}
+	return ""
+}
+
+// openCSVViewer opens a CSV file in a spreadsheet viewer
+func openCSVViewer(path string) tea.Cmd {
+	viewer := getAvailableCSVViewer()
+	if viewer == "" {
+		// Fallback to text editor
+		editor := getAvailableEditor()
+		if editor == "" {
+			return func() tea.Msg {
+				return editorFinishedMsg{fmt.Errorf("no CSV viewer or text editor found")}
+			}
+		}
+		return openEditor(editor, path)
+	}
+
+	c := exec.Command(viewer, path)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
+// getAvailableVideoPlayer returns the first available video player
+func getAvailableVideoPlayer() string {
+	players := []string{"mpv", "vlc", "mplayer"}
+	for _, player := range players {
+		if editorAvailable(player) {
+			return player
+		}
+	}
+	return ""
+}
+
+// openVideoPlayer opens a video file in a media player
+func openVideoPlayer(path string) tea.Cmd {
+	player := getAvailableVideoPlayer()
+	if player == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{fmt.Errorf("no video player found (install mpv)")}
+		}
+	}
+
+	// mpv with terminal output
+	c := exec.Command(player, path)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
+// getAvailableAudioPlayer returns the first available audio player
+func getAvailableAudioPlayer() string {
+	players := []string{"mpv", "cmus", "moc"}
+	for _, player := range players {
+		if editorAvailable(player) {
+			return player
+		}
+	}
+	return ""
+}
+
+// openAudioPlayer opens an audio file in a media player
+func openAudioPlayer(path string) tea.Cmd {
+	player := getAvailableAudioPlayer()
+	if player == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{fmt.Errorf("no audio player found (install mpv)")}
+		}
+	}
+
+	// mpv with audio-only mode
+	c := exec.Command(player, path)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
+// getAvailableHexViewer returns the first available hex viewer
+func getAvailableHexViewer() string {
+	viewers := []string{"hexyl", "hexpatch", "hexabyte", "xxd"}
+	for _, viewer := range viewers {
+		if editorAvailable(viewer) {
+			return viewer
+		}
+	}
+	return ""
+}
+
+// openHexViewer opens a binary file in a hex viewer
+func openHexViewer(path string) tea.Cmd {
+	viewer := getAvailableHexViewer()
+	if viewer == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{fmt.Errorf("no hex viewer found (install hexyl)")}
+		}
+	}
+
+	var c *exec.Cmd
+	if viewer == "hexyl" {
+		// hexyl displays directly with built-in paging on terminals
+		// Add a pause wrapper to return to TFE cleanly
+		script := fmt.Sprintf(`hexyl '%s'
+echo ""
+echo "Press any key to return to TFE..."
+read -n 1 -s -r`, path)
+		c = exec.Command("bash", "-c", script)
+	} else {
+		// Other hex viewers
+		c = exec.Command(viewer, path)
+	}
+
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
+// getAvailableDatabaseViewer returns the first available database viewer
+func getAvailableDatabaseViewer() string {
+	viewers := []string{"harlequin", "litecli", "sqlite3"}
+	for _, viewer := range viewers {
+		if editorAvailable(viewer) {
+			return viewer
+		}
+	}
+	return ""
+}
+
+// openDatabaseViewer opens a database file in a viewer
+func openDatabaseViewer(path string) tea.Cmd {
+	viewer := getAvailableDatabaseViewer()
+	if viewer == "" {
+		return func() tea.Msg {
+			return editorFinishedMsg{fmt.Errorf("no database viewer found (install harlequin)")}
+		}
+	}
+
+	c := exec.Command(viewer, path)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
+// getAvailablePDFViewer returns the first available PDF viewer
+func getAvailablePDFViewer() string {
+	viewers := []string{"timg", "termpdf.py"}
+	for _, viewer := range viewers {
+		if editorAvailable(viewer) {
+			return viewer
+		}
+	}
+	return ""
+}
+
+// openPDFViewer opens a PDF file in a terminal viewer
+func openPDFViewer(path string) tea.Cmd {
+	viewer := getAvailablePDFViewer()
+	if viewer == "" {
+		// Fallback to browser
+		return openInBrowser(path)
+	}
+
+	var c *exec.Cmd
+	if viewer == "timg" {
+		script := fmt.Sprintf(`timg '%s'
+echo ""
+echo "Press any key to continue..."
+read -n 1 -s -r`, path)
+		c = exec.Command("bash", "-c", script)
+	} else {
+		c = exec.Command(viewer, path)
+	}
+
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
