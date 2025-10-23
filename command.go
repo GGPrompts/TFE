@@ -28,91 +28,26 @@ type commandFinishedMsg struct {
 // Similar to Midnight Commander's "pause after run" feature:
 // 1. Echo the command that was typed
 // 2. Execute the command and show output
-// 3. Wait for user to press a key before returning
+// 3. Show exit code and wait for user to press a key before returning
 //
-// SECURITY: Uses command allowlist to prevent arbitrary command execution.
-// For more flexibility, use the ! prefix to bypass restrictions (e.g., ":!your-command")
+// For long-running TUI apps (like claude, lazygit), use ! prefix to exit TFE: :!command
 func runCommand(command, dir string) tea.Cmd {
 	return func() tea.Msg {
-		// Parse command into parts
-		parts := strings.Fields(command)
-		if len(parts) == 0 {
-			return commandFinishedMsg{err: fmt.Errorf("empty command")}
-		}
-
-		// Allowlist of safe read-only and utility commands
-		// These commands are deemed safe for general use in a file explorer
-		safeCommands := map[string]bool{
-			"ls":     true, // List directory
-			"cat":    true, // Display file contents
-			"grep":   true, // Search text
-			"find":   true, // Find files
-			"head":   true, // Display file start
-			"tail":   true, // Display file end
-			"wc":     true, // Count lines/words
-			"file":   true, // Determine file type
-			"git":    true, // Git operations (read: status, log, diff)
-			"tree":   true, // Directory tree
-			"du":     true, // Disk usage
-			"df":     true, // Disk free space
-			"pwd":    true, // Print working directory
-			"date":   true, // Display date/time
-			"whoami": true, // Display current user
-			"echo":   true, // Print text
-			"which":  true, // Locate command
-			"stat":   true, // File statistics
-			"diff":   true, // Compare files
-			"sort":   true, // Sort lines
-			"uniq":   true, // Filter duplicate lines
-			"cut":    true, // Extract columns
-			"awk":    true, // Text processing
-			"sed":    true, // Stream editor
-			"less":   true, // Pager
-			"more":   true, // Pager
-			"hexdump": true, // Hex viewer
-			"strings": true, // Extract strings
-		}
-
-		executable := parts[0]
-		if !safeCommands[executable] {
-			// Build wrapper script that shows error and prompts
-			errMsg := fmt.Sprintf("⚠️  Command not allowed: %s\n\nFor security, only safe read-only commands are allowed.\nUse the ! prefix to execute without restrictions:\n  Example: :!%s\n\nSafe commands: ls, cat, grep, find, git, tree, du, etc.\nSee HOTKEYS.md for full list.", executable, command)
-			script := fmt.Sprintf(`
-echo %s
-echo ""
-echo "Press any key to continue..."
-read -n 1 -s -r
-`, shellQuote(errMsg))
-
-			c := exec.Command("bash", "-c", script)
-			c.Stdin = os.Stdin
-			c.Stdout = os.Stdout
-			c.Stderr = os.Stderr
-
-			return tea.Sequence(
-				tea.ClearScreen,
-				tea.ExecProcess(c, func(err error) tea.Msg {
-					return commandFinishedMsg{err: err}
-				}),
-			)()
-		}
-
-		// Execute command safely without shell interpretation
-		// This prevents injection attacks like "ls; rm -rf ~"
+		// Execute command - runs in current directory
+		// Commands are executed in a safe wrapper that shows output and waits for keypress
 		script := fmt.Sprintf(`
 echo "$ %s"
 cd %s || exit 1
-exec %s "$@"
+%s
+exitCode=$?
 echo ""
+echo "Exit code: $exitCode"
 echo "Press any key to continue..."
 read -n 1 -s -r
-`, shellQuote(command), shellQuote(dir), shellQuote(executable))
+exit $exitCode
+`, shellQuote(command), shellQuote(dir), command)
 
-		// Pass arguments after executable as separate parameters
-		args := []string{"-c", script, "--"}
-		args = append(args, parts[1:]...)
-
-		c := exec.Command("bash", args...)
+		c := exec.Command("bash", "-c", script)
 		c.Dir = dir
 		c.Stdin = os.Stdin
 		c.Stdout = os.Stdout
@@ -130,18 +65,11 @@ read -n 1 -s -r
 
 // runCommandAndExit executes a shell command and exits TFE
 // Used when command is prefixed with ! (e.g., ":!claude --yolo")
-// This is useful for launching long-running TUI apps like Claude Code
-//
-// SECURITY NOTE: This function intentionally allows ANY command when using ! prefix.
-// This is a power-user feature for flexibility. The security boundary is:
-// - Regular commands (:ls) → Allowlist enforced in runCommand()
-// - Unrestricted commands (:!anything) → Full shell access via this function
-// Users must understand that ! prefix gives full shell access.
+// This is useful for launching long-running TUI apps that need to take over the terminal
+// The command will run and when it exits, TFE will quit (not resume)
 func runCommandAndExit(command, dir string) tea.Cmd {
 	return func() tea.Msg {
 		// Build a shell script that changes to directory and runs command
-		// Note: command is still inserted into shell script, but this is intentional
-		// for the ! prefix feature. Users explicitly request unrestricted access.
 		script := fmt.Sprintf(`
 cd %s || exit 1
 exec %s
@@ -165,33 +93,72 @@ exec %s
 	}
 }
 
-// addToHistory adds a command to the history, avoiding duplicates
+// addToHistory adds a command to the current directory's history, avoiding duplicates
+// Commands are stored per-directory for context-specific recall
 func (m *model) addToHistory(command string) {
 	if command == "" {
 		return
 	}
 
-	// Remove duplicate if it exists
-	for i, cmd := range m.commandHistory {
+	// Get current directory history
+	dirHistory := m.commandHistoryByDir[m.currentPath]
+
+	// Remove duplicate if it exists in directory history
+	for i, cmd := range dirHistory {
 		if cmd == command {
-			m.commandHistory = append(m.commandHistory[:i], m.commandHistory[i+1:]...)
+			dirHistory = append(dirHistory[:i], dirHistory[i+1:]...)
 			break
 		}
 	}
 
-	// Add to end of history
-	m.commandHistory = append(m.commandHistory, command)
+	// Add to end of directory history
+	dirHistory = append(dirHistory, command)
 
-	// Limit history to 100 commands
-	if len(m.commandHistory) > 100 {
-		m.commandHistory = m.commandHistory[1:]
+	// Limit directory history to 50 commands
+	if len(dirHistory) > 50 {
+		dirHistory = dirHistory[1:]
 	}
+
+	// Save back to map
+	m.commandHistoryByDir[m.currentPath] = dirHistory
+
+	// Rebuild combined history (directory + global)
+	m.rebuildCombinedHistory()
 
 	// Reset history position
 	m.historyPos = len(m.commandHistory)
 
 	// Save to disk after adding
 	m.saveCommandHistory()
+}
+
+// rebuildCombinedHistory creates a combined history list from current directory + global
+// Directory-specific commands appear first (most relevant), then global commands
+// Duplicates are removed (directory version takes precedence)
+func (m *model) rebuildCombinedHistory() {
+	seen := make(map[string]bool)
+	combined := []string{}
+
+	// Add directory-specific commands first (most relevant)
+	if dirHistory, exists := m.commandHistoryByDir[m.currentPath]; exists {
+		for _, cmd := range dirHistory {
+			if !seen[cmd] {
+				combined = append(combined, cmd)
+				seen[cmd] = true
+			}
+		}
+	}
+
+	// Add global commands (if not already in directory history)
+	for _, cmd := range m.commandHistoryGlobal {
+		if !seen[cmd] {
+			combined = append(combined, cmd)
+			seen[cmd] = true
+		}
+	}
+
+	m.commandHistory = combined
+	m.historyPos = len(m.commandHistory)
 }
 
 // getPreviousCommand navigates backward in command history
@@ -271,32 +238,55 @@ func shellQuote(s string) string {
 }
 
 // loadCommandHistory reads command history from disk
-// Returns empty slice if file doesn't exist or on error
-func loadCommandHistory() []string {
+// Returns directory-specific map and global slice
+// Handles backwards compatibility with old format
+func loadCommandHistory() (map[string][]string, []string) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return []string{}
+		return make(map[string][]string), []string{}
 	}
 
 	historyPath := filepath.Join(homeDir, ".config", "tfe", "command_history.json")
 	data, err := os.ReadFile(historyPath)
 	if err != nil {
-		return []string{} // File doesn't exist yet, start fresh
+		return make(map[string][]string), []string{} // File doesn't exist yet, start fresh
 	}
 
-	var history struct {
+	// Try new format first
+	var newFormat struct {
+		Version     int                 `json:"version"`
+		Directories map[string][]string `json:"directories"`
+		Global      []string            `json:"global"`
+	}
+
+	if err := json.Unmarshal(data, &newFormat); err == nil && newFormat.Version == 2 {
+		// New format loaded successfully
+		if newFormat.Directories == nil {
+			newFormat.Directories = make(map[string][]string)
+		}
+		if newFormat.Global == nil {
+			newFormat.Global = []string{}
+		}
+		return newFormat.Directories, newFormat.Global
+	}
+
+	// Try old format for backwards compatibility
+	var oldFormat struct {
 		Commands []string `json:"commands"`
 	}
 
-	if err := json.Unmarshal(data, &history); err != nil {
-		return []string{}
+	if err := json.Unmarshal(data, &oldFormat); err == nil && len(oldFormat.Commands) > 0 {
+		// Old format - migrate to global history
+		return make(map[string][]string), oldFormat.Commands
 	}
 
-	return history.Commands
+	// Failed to parse either format
+	return make(map[string][]string), []string{}
 }
 
 // saveCommandHistory writes command history to disk
 // Creates the config directory if it doesn't exist
+// Saves in version 2 format with per-directory and global history
 func (m *model) saveCommandHistory() error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -309,11 +299,15 @@ func (m *model) saveCommandHistory() error {
 	historyPath := filepath.Join(configDir, "command_history.json")
 
 	history := struct {
-		Commands []string `json:"commands"`
-		MaxSize  int      `json:"maxSize"`
+		Version     int                 `json:"version"`
+		MaxSize     int                 `json:"maxSize"`
+		Directories map[string][]string `json:"directories"`
+		Global      []string            `json:"global"`
 	}{
-		Commands: m.commandHistory,
-		MaxSize:  100,
+		Version:     2,
+		MaxSize:     100,
+		Directories: m.commandHistoryByDir,
+		Global:      m.commandHistoryGlobal,
 	}
 
 	data, err := json.MarshalIndent(history, "", "  ")

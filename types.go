@@ -238,11 +238,13 @@ type model struct {
 	lastClickTime  time.Time
 	lastClickIndex int
 	// Command prompt (always visible)
-	commandInput      string
-	commandCursorPos  int    // Cursor position in command input (0 = start, len = end)
-	commandHistory    []string
-	historyPos        int
-	commandFocused    bool // Whether command prompt has input focus
+	commandInput         string
+	commandCursorPos     int                       // Cursor position in command input (0 = start, len = end)
+	commandHistory       []string                  // Combined history (directory + global) for navigation
+	commandHistoryByDir  map[string][]string       // Per-directory command history
+	commandHistoryGlobal []string                  // Global command history (cross-directory)
+	historyPos           int
+	commandFocused       bool // Whether command prompt has input focus
 	// Loading spinner
 	spinner spinner.Model
 	loading bool

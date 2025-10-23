@@ -769,36 +769,18 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		if err != nil {
 			m.setStatusMessage("Error: Could not find home directory", true)
 		} else {
-			classicsPath := filepath.Join(homeDir, "TUIClassics", "bin", "classics")
+			launcherPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
 
-			// Check if classics launcher exists
-			if _, err := os.Stat(classicsPath); err == nil {
+			// Check if launcher exists
+			if _, err := os.Stat(launcherPath); err == nil {
 				// Close menu and launch
 				m.menuOpen = false
 				m.activeMenu = ""
 				m.selectedMenuItem = -1
-				return m, openTUITool(classicsPath, filepath.Dir(classicsPath))
+				return m, openTUITool(launcherPath, filepath.Dir(launcherPath))
 			}
 
-			// If classics doesn't exist, check for individual games
-			binDir := filepath.Join(homeDir, "TUIClassics", "bin")
-			if entries, err := os.ReadDir(binDir); err == nil && len(entries) > 0 {
-				// Find first executable game
-				for _, entry := range entries {
-					if !entry.IsDir() {
-						gamePath := filepath.Join(binDir, entry.Name())
-						if info, err := os.Stat(gamePath); err == nil && info.Mode()&0111 != 0 {
-							// Close menu and launch
-							m.menuOpen = false
-							m.activeMenu = ""
-							m.selectedMenuItem = -1
-							return m, openTUITool(gamePath, filepath.Dir(gamePath))
-						}
-					}
-				}
-			}
-
-			m.setStatusMessage("TUIClassics not found. Install from: github.com/GGPrompts/TUIClassics", true)
+			m.setStatusMessage("TUIClassics launcher not found at ~/projects/TUIClassics/bin/classics", true)
 		}
 
 	case "toggle-trash":

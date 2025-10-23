@@ -1060,6 +1060,10 @@ func (m *model) loadFiles() {
 
 	// Apply sorting based on sortBy and sortAsc settings
 	m.sortFiles()
+
+	// Rebuild combined command history for current directory
+	// This ensures Up/Down arrows show directory-specific commands first
+	m.rebuildCombinedHistory()
 }
 
 // sortFiles sorts the file list based on sortBy and sortAsc settings

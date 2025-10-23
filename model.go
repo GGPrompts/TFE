@@ -42,7 +42,7 @@ func initialModel() model {
 		promptEditMode:       false,
 		focusedVariableIndex: 0,
 		filledVariables:      make(map[string]string),
-		commandHistory:       loadCommandHistory(), // Load from disk on startup
+		// Command history will be initialized below after loading from disk
 		commandCursorPos:    0,
 		historyPos:          0,
 		commandFocused:      false, // Start in file browser mode, not command mode
@@ -65,12 +65,19 @@ func initialModel() model {
 			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
 		},
 		cachedMenus: nil, // Will be built on first access
-		// Landing page - show on startup
-		showLandingPage: true,
-		landingPage:     nil, // Will be initialized on first WindowSizeMsg
+		// Landing page - disabled (launch directly into file browser)
+		showLandingPage: false,
+		landingPage:     nil,
 		// Performance caching
 		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
 	}
+
+	// Load command history from disk (supports per-directory and global history)
+	commandHistoryByDir, commandHistoryGlobal := loadCommandHistory()
+	m.commandHistoryByDir = commandHistoryByDir
+	m.commandHistoryGlobal = commandHistoryGlobal
+	// Build combined history for current directory
+	m.rebuildCombinedHistory()
 
 	m.loadFiles()
 

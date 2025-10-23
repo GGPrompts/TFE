@@ -237,3 +237,122 @@ func (m *model) autofillDefaults() {
 		}
 	}
 }
+
+// scrollToFocusedVariable scrolls the preview to show the currently focused variable
+// This is called when navigating between variables with Tab/Shift+Tab in edit mode
+func (m *model) scrollToFocusedVariable() {
+	if m.focusedVariableIndex < 0 || m.preview.promptTemplate == nil {
+		return
+	}
+
+	if m.focusedVariableIndex >= len(m.preview.promptTemplate.variables) {
+		return
+	}
+
+	// Get focused variable name
+	varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+
+	// We need to search in the RENDERED content (after processing and wrapping)
+	// because scrollPos is applied to the wrapped lines, not raw content
+
+	// Calculate box content width (same logic as renderPromptPreview)
+	var boxContentWidth int
+	if m.viewMode == viewFullPreview {
+		boxContentWidth = m.width - 6
+	} else {
+		boxContentWidth = m.rightWidth - 2
+	}
+
+	// Calculate available width for content (prompts don't show line numbers)
+	availableWidth := boxContentWidth - 2 // Just padding
+	if availableWidth < 20 {
+		availableWidth = 20
+	}
+
+	// Process content the same way as renderPromptPreview
+	var contentLines []string
+	if m.promptEditMode {
+		// In edit mode, use rendered template with inline variables
+		renderedTemplate := m.renderInlineVariables(m.preview.promptTemplate.template)
+		contentLines = strings.Split(renderedTemplate, "\n")
+	} else {
+		// Before edit mode, use highlighted template
+		highlightedTemplate := m.highlightVariablesBeforeEdit(m.preview.promptTemplate.template)
+		contentLines = strings.Split(highlightedTemplate, "\n")
+	}
+
+	// Wrap content lines (same as renderPromptPreview)
+	var wrappedLines []string
+	for _, line := range contentLines {
+		wrapped := wrapLine(line, availableWidth)
+		wrappedLines = append(wrappedLines, wrapped...)
+	}
+
+	// Search for the variable in wrapped lines
+	// Look for the variable name (it appears without {{}} in edit mode, or with {{}} before edit)
+	targetLine := -1
+	var searchPatterns []string
+
+	if m.promptEditMode {
+		// In edit mode, variables appear without brackets (but with ANSI codes)
+		// Search for the variable name or filled value
+		filledValue, hasFilled := m.filledVariables[varName]
+		if hasFilled && filledValue != "" {
+			searchPatterns = []string{filledValue, varName}
+		} else {
+			searchPatterns = []string{varName}
+		}
+	} else {
+		// Before edit mode, variables appear with {{}}
+		searchPatterns = []string{"{{" + varName + "}}"}
+	}
+
+	// Search in wrapped lines
+	for i, line := range wrappedLines {
+		for _, pattern := range searchPatterns {
+			if strings.Contains(line, pattern) {
+				targetLine = i
+				break
+			}
+		}
+		if targetLine >= 0 {
+			break
+		}
+	}
+
+	if targetLine >= 0 {
+		// Calculate visible lines (accounting for header)
+		visibleLines := m.height - 6 // Default offset for header/footer
+		if m.viewMode == viewDualPane {
+			visibleLines = m.height - 8
+		}
+
+		// Account for header height in prompt preview
+		// Header typically takes 4-8 lines depending on metadata
+		// Estimate conservatively
+		headerEstimate := 6
+		contentHeight := visibleLines - headerEstimate
+		if contentHeight < 5 {
+			contentHeight = 5
+		}
+
+		// Try to center the variable in the visible content area
+		centerOffset := contentHeight / 2
+		newScrollPos := targetLine - centerOffset
+
+		if newScrollPos < 0 {
+			newScrollPos = 0
+		}
+
+		// Don't scroll past the end of wrapped content
+		maxScroll := len(wrappedLines) - contentHeight
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		if newScrollPos > maxScroll {
+			newScrollPos = maxScroll
+		}
+
+		m.preview.scrollPos = newScrollPos
+	}
+}

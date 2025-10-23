@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -333,7 +334,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 
-					classicsPath := filepath.Join(homeDir, "TUIClassics", "bin", "classics")
+					classicsPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
 
 					// Check if classics launcher exists
 					if _, err := os.Stat(classicsPath); err == nil {
@@ -342,7 +343,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 
 					// If classics doesn't exist, check for individual games
-					binDir := filepath.Join(homeDir, "TUIClassics", "bin")
+					binDir := filepath.Join(homeDir, "projects", "TUIClassics", "bin")
 					if entries, err := os.ReadDir(binDir); err == nil && len(entries) > 0 {
 						// Find first executable game
 						for _, entry := range entries {
@@ -612,7 +613,13 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				if isDoubleClick {
 					// In file picker mode, double-click on file should select it
 					if m.filePickerMode && !clickedFile.isDir {
-						// IMPORTANT: Set the value AFTER reloading preview to avoid field recreation overwriting it
+						// Save edit state before reloading preview (loadPreview resets these)
+						savedEditMode := m.promptEditMode
+						savedFocusedIndex := m.focusedVariableIndex
+						savedFilledVars := make(map[string]string)
+						for k, v := range m.filledVariables {
+							savedFilledVars[k] = v
+						}
 
 						// Return to preview mode
 						m.filePickerMode = false
@@ -624,6 +631,21 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						if m.filePickerRestorePath != "" {
 							m.loadPreview(m.filePickerRestorePath)
 							m.populatePreviewCache()
+						}
+
+						// Restore edit state (loadPreview resets it)
+						m.promptEditMode = savedEditMode
+						m.focusedVariableIndex = savedFocusedIndex
+						m.filledVariables = savedFilledVars
+
+						// Set the selected file path in the focused variable
+						if m.promptEditMode && m.focusedVariableIndex >= 0 && m.preview.promptTemplate != nil {
+							if m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
+								varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
+								selectedPath := clickedFile.path
+								m.filledVariables[varName] = selectedPath
+								m.setStatusMessage(fmt.Sprintf("✓ Set %s = %s", varName, clickedFile.name), false)
+							}
 						}
 
 						m.lastClickIndex = -1

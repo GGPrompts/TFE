@@ -31,56 +31,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle landing page input first
-	if m.showLandingPage && m.landingPage != nil {
-		switch key {
-		case "up", "k":
-			m.landingPage.SelectPrev()
-			return m, nil
-		case "down", "j":
-			m.landingPage.SelectNext()
-			return m, nil
-		case "b":
-			m.landingPage.ToggleBackground()
-			return m, nil
-		case "enter":
-			// Handle menu selection
-			selected := m.landingPage.GetSelectedItem()
-			switch selected {
-			case "Browse Files":
-				m.showLandingPage = false
-				// Stay in current directory
-			case "Prompts":
-				m.showLandingPage = false
-				m.showPromptsOnly = true
-				m.statusMessage = "Showing prompt files only"
-			case "Favorites":
-				m.showLandingPage = false
-				m.showFavoritesOnly = true
-				m.statusMessage = "Showing favorites only"
-			case "Trash":
-				m.showLandingPage = false
-				m.showTrashOnly = true
-				m.statusMessage = "Showing trash contents"
-			case "Settings":
-				m.showLandingPage = false
-				m.statusMessage = "Settings not yet implemented"
-			case "Exit":
-				return m, tea.Quit
-			}
-			return m, nil
-		case "q", "esc":
-			// Exit or go back to file browser
-			if key == "q" {
-				return m, tea.Quit
-			} else {
-				m.showLandingPage = false
-			}
-			return m, nil
-		}
-		return m, nil
-	}
-
 	// If fuzzy search is active, don't process any keyboard events
 	// (go-fzf handles its own input)
 	if m.fuzzySearchActive {
@@ -278,6 +228,14 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// It's a file - insert path into focused variable
 					selectedPath := selectedFile.path
 
+					// Save edit state before reloading preview (loadPreview resets these)
+					savedEditMode := m.promptEditMode
+					savedFocusedIndex := m.focusedVariableIndex
+					savedFilledVars := make(map[string]string)
+					for k, v := range m.filledVariables {
+						savedFilledVars[k] = v
+					}
+
 					// Return to preview mode
 					m.filePickerMode = false
 					m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
@@ -289,6 +247,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.loadPreview(m.filePickerRestorePath)
 						m.populatePreviewCache()
 					}
+
+					// Restore edit state (loadPreview resets it)
+					m.promptEditMode = savedEditMode
+					m.focusedVariableIndex = savedFocusedIndex
+					m.filledVariables = savedFilledVars
 
 					// Set the selected file path in the focused variable
 					if m.promptEditMode && m.focusedVariableIndex >= 0 && m.preview.promptTemplate != nil {
@@ -324,6 +287,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if m.focusedVariableIndex >= len(m.preview.promptTemplate.variables) {
 					m.focusedVariableIndex = 0 // Wrap around
 				}
+				// Auto-scroll to show the focused variable
+				m.scrollToFocusedVariable()
 			}
 			return m, nil
 
@@ -334,6 +299,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if m.focusedVariableIndex < 0 {
 					m.focusedVariableIndex = len(m.preview.promptTemplate.variables) - 1 // Wrap around
 				}
+				// Auto-scroll to show the focused variable
+				m.scrollToFocusedVariable()
 			}
 			return m, nil
 
