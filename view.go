@@ -568,28 +568,93 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 }
 
 // overlayDropdown overlays a dropdown menu on the base view at the specified position
-// Simplified: Just places dropdown with empty space padding, no content preservation
+// Uses proper ANSI-aware overlay to preserve background content
 func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 	// Split base view into lines
 	baseLines := strings.Split(baseView, "\n")
 	dropdownLines := strings.Split(dropdown, "\n")
 
-	// Ensure we have enough lines in base view
-	if y >= len(baseLines) {
-		return baseView
+	// Ensure we have enough base lines
+	for len(baseLines) < m.height {
+		baseLines = append(baseLines, "")
 	}
 
 	// Overlay each dropdown line onto the base view
 	for i, dropdownLine := range dropdownLines {
-		lineIndex := y + i
-		if lineIndex >= len(baseLines) {
-			break
+		targetLine := y + i
+		if targetLine < 0 || targetLine >= len(baseLines) {
+			continue
 		}
 
-		// Simple approach: empty space padding + dropdown
-		// This avoids all ANSI code complexity
-		padding := strings.Repeat(" ", x)
-		baseLines[lineIndex] = padding + dropdownLine
+		baseLine := baseLines[targetLine]
+
+		// We need to overlay dropdownLine at visual column x
+		// Use a string builder to construct the new line
+		var newLine strings.Builder
+
+		// Get the part of baseLine before position x
+		// We need to handle ANSI codes properly
+		visualPos := 0
+		bytePos := 0
+		inAnsi := false
+		baseRunes := []rune(baseLine)
+
+		// Scan through base line until we reach visual position x
+		// Use runewidth to properly handle wide characters
+		for bytePos < len(baseRunes) && visualPos < x {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			} else if inAnsi {
+				if (baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z') ||
+					(baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z') {
+					inAnsi = false
+				}
+			} else {
+				// Use RuneWidth to get actual visual width
+				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
+			}
+			bytePos++
+		}
+
+		// Add the left part of the base line (up to position x)
+		if bytePos > 0 && bytePos <= len(baseRunes) {
+			newLine.WriteString(string(baseRunes[:bytePos]))
+		}
+
+		// Pad with spaces if needed to reach position x
+		for visualPos < x {
+			newLine.WriteRune(' ')
+			visualPos++
+		}
+
+		// Add the dropdown line
+		newLine.WriteString(dropdownLine)
+
+		// Now preserve the right side of the base line (after the dropdown)
+		dropdownWidth := lipgloss.Width(dropdownLine)
+		endVisualPos := x + dropdownWidth
+
+		// Continue from where we left off and skip to the end position
+		for bytePos < len(baseRunes) && visualPos < endVisualPos {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			} else if inAnsi {
+				if (baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z') ||
+					(baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z') {
+					inAnsi = false
+				}
+			} else {
+				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
+			}
+			bytePos++
+		}
+
+		// Add the remaining right part of the base line
+		if bytePos < len(baseRunes) {
+			newLine.WriteString(string(baseRunes[bytePos:]))
+		}
+
+		baseLines[targetLine] = newLine.String()
 	}
 
 	return strings.Join(baseLines, "\n")
