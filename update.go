@@ -106,13 +106,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 
-		// Initialize or resize landing page
-		if m.landingPage == nil {
-			m.landingPage = NewLandingPage(msg.Width, msg.Height)
-		} else {
-			m.landingPage.Resize(msg.Width, msg.Height)
-		}
-
 		m.calculateLayout()      // Recalculate pane layout on resize
 		m.populatePreviewCache() // Repopulate cache with new width
 
@@ -120,10 +113,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detailScrollX = 0
 
 	case tickMsg:
-		// Update landing page animation
-		if m.showLandingPage && m.landingPage != nil {
-			m.landingPage.Update()
+		// Background refresh for git repos (every 60 seconds)
+		if m.showGitReposOnly && !m.gitReposLastScan.IsZero() {
+			elapsed := time.Since(m.gitReposLastScan)
+			if elapsed >= 60*time.Second {
+				// Re-scan from the same root directory
+				m.gitReposList = m.scanGitReposRecursive(m.gitReposScanRoot, m.gitReposScanDepth, 50)
+				m.gitReposLastScan = time.Now()
+			}
 		}
+
 		return m, tickCmd() // Continue animation
 
 	case spinner.TickMsg:

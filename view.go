@@ -12,14 +12,6 @@ import (
 )
 
 func (m model) View() string {
-	// Show landing page if active
-	if m.showLandingPage {
-		if m.landingPage != nil {
-			return m.landingPage.Render()
-		}
-		return "Loading..."
-	}
-
 	// If fuzzy search is active, return empty string
 	// (go-fzf handles its own rendering)
 	if m.fuzzySearchActive {
@@ -317,7 +309,7 @@ func (m model) renderSinglePane() string {
 	if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
-			Foreground(lipgloss.Color("0")).
+			Foreground(lipgloss.Color("15")). // White for better contrast
 			Bold(true).
 			Padding(0, 1)
 

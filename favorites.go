@@ -181,6 +181,33 @@ func (m *model) getFilteredFiles() []fileItem {
 		return filtered
 	}
 
+	// Apply git repositories filtering (show ALL discovered repos from recursive scan)
+	if m.showGitReposOnly {
+		// Return cached list of git repos with ".." for navigation
+		filtered := make([]fileItem, 0, len(m.gitReposList)+1)
+
+		// Add ".." if not at root (allows navigating up to rescan from parent)
+		if m.currentPath != "/" && m.gitReposScanRoot != "" {
+			parentPath := filepath.Dir(m.gitReposScanRoot)
+			parentItem := fileItem{
+				name:  "..",
+				path:  parentPath,
+				isDir: true,
+			}
+			// Get parent directory's actual modification time
+			if info, err := os.Stat(parentPath); err == nil {
+				parentItem.modTime = info.ModTime()
+				parentItem.size = info.Size()
+				parentItem.mode = info.Mode()
+			}
+			filtered = append(filtered, parentItem)
+		}
+
+		// Add all discovered repos
+		filtered = append(filtered, m.gitReposList...)
+		return filtered
+	}
+
 	// Apply prompts filtering (show only .yaml, .md, .txt files)
 	if m.showPromptsOnly {
 		filtered := make([]fileItem, 0)

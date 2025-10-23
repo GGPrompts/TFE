@@ -192,8 +192,8 @@ func (m model) renderDetailView(maxVisible int) string {
 	usableWidth := renderWidth - 17
 
 	var nameWidth, sizeWidth, modifiedWidth, extraWidth int
-	if m.showTrashOnly || m.showFavoritesOnly {
-		// 4 columns: Name, Size, Modified/Deleted, Location
+	if m.showTrashOnly || m.showFavoritesOnly || m.showGitReposOnly {
+		// 4 columns: Name, Size, Modified/Deleted, Location/Branch
 		nameWidth = usableWidth * 35 / 100    // 35%
 		sizeWidth = 10                         // Fixed
 		modifiedWidth = 12                     // Fixed
@@ -274,6 +274,24 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 
 		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
+	} else if m.showGitReposOnly {
+		// Git repos mode: Name, Size, Modified, Branch
+		nameHeader := "Name"
+		sizeHeader := "Size"
+		modifiedHeader := "Modified"
+		branchHeader := "Branch"
+
+		// Add indicator to active column
+		switch m.sortBy {
+		case "name":
+			nameHeader += sortIndicator
+		case "size":
+			sizeHeader += sortIndicator
+		case "modified":
+			modifiedHeader += sortIndicator
+		}
+
+		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, branchHeader)
 	} else {
 		// Regular mode: Name, Size, Modified, Type
 		nameHeader := "Name"
@@ -462,6 +480,55 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Use visual-width padding for name column (contains emojis), regular padding for others
 		paddedName := padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
+		} else if m.showGitReposOnly {
+			// Git repos mode: Name (with path), Size, Modified, Branch
+			// Get parent directory path for location
+			location := filepath.Dir(file.path)
+			// Shorten home directory to ~
+			homeDir, _ := os.UserHomeDir()
+			if homeDir != "" && strings.HasPrefix(location, homeDir) {
+				location = "~" + strings.TrimPrefix(location, homeDir)
+			}
+
+			// Show path in name column if repo is not in current directory
+			repoDisplayName := file.name
+			if location != "~" && location != "." {
+				// Show relative path from scan root
+				if m.gitReposScanRoot != "" {
+					relPath, err := filepath.Rel(m.gitReposScanRoot, file.path)
+					if err == nil && relPath != file.name {
+						repoDisplayName = relPath
+					}
+				}
+			}
+
+			// Truncate long paths if needed
+			if len(repoDisplayName) > maxNameTextLen {
+				// For paths, show trailing end
+				repoDisplayName = "..." + repoDisplayName[len(repoDisplayName)-(maxNameTextLen-3):]
+			}
+
+			name = fmt.Sprintf("%s%s %s", icon, favIndicator, repoDisplayName)
+
+			branch := "-"
+			if file.isDir && file.name != ".." {
+				branchName := getGitBranch(file.path)
+				if branchName != "" {
+					// Add indicator for uncommitted changes
+					if hasUncommittedChanges(file.path) {
+						branch = branchName + " ✗"
+					} else {
+						branch = branchName
+					}
+				}
+			}
+			// Truncate long branch names if needed
+			if len(branch) > extraWidth {
+				branch = branch[:extraWidth-2] + ".."
+			}
+			// Use visual-width padding for name column (contains emojis), regular padding for others
+		paddedName := padToVisualWidth(name, nameWidth)
+		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, branch)
 		} else {
 			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)

@@ -37,4 +37,12 @@ Thumbs.db
 # Test coverage
 coverage.out
 coverage.html
+
+# External projects (user can clone separately)
 games/
+
+# Temporary files
+*.prompty.tmp
+new-prompt-*.prompty
+*-demo-*.gif
+*-recording-*.cast

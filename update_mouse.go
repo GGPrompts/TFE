@@ -219,6 +219,16 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					if err == nil {
 						m.currentPath = homeDir
 						m.cursor = 0
+
+						// If git repos filter is active, rescan from home
+						if m.showGitReposOnly {
+							m.setStatusMessage("🔍 Scanning git repositories from home...", false)
+							m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
+							m.gitReposLastScan = time.Now()
+							m.gitReposScanRoot = m.currentPath
+							m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+						}
+
 						m.loadFiles()
 					}
 					return m, nil
@@ -345,16 +355,16 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						return m, openTUITool(classicsPath, filepath.Dir(classicsPath))
 					}
 
-					// If classics doesn't exist, check for individual games
-					binDir := filepath.Join(homeDir, "projects", "TUIClassics", "bin")
-					if entries, err := os.ReadDir(binDir); err == nil && len(entries) > 0 {
+					// If classics doesn't exist, check for individual games in root directory
+					tuiClassicsDir := filepath.Join(homeDir, "projects", "TUIClassics")
+					if entries, err := os.ReadDir(tuiClassicsDir); err == nil && len(entries) > 0 {
 						// Find first executable game
 						for _, entry := range entries {
 							if !entry.IsDir() {
-								gamePath := filepath.Join(binDir, entry.Name())
+								gamePath := filepath.Join(tuiClassicsDir, entry.Name())
 								if info, err := os.Stat(gamePath); err == nil && info.Mode()&0111 != 0 {
 									// Found an executable - launch it
-									return m, openTUITool(gamePath, binDir)
+									return m, openTUITool(gamePath, tuiClassicsDir)
 								}
 							}
 						}
@@ -661,10 +671,27 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					if clickedFile.isDir {
 						m.currentPath = clickedFile.path
 						m.cursor = 0
-						// Exit favorites mode when navigating into a folder (same as Enter key behavior)
+
+						// Exit favorites mode when navigating into a folder
 						if m.showFavoritesOnly {
 							m.showFavoritesOnly = false
 						}
+
+						// Git repos mode: rescan if "..", exit if navigating to a repo
+						if m.showGitReposOnly {
+							if clickedFile.name == ".." {
+								// Navigating up - rescan from parent
+								m.setStatusMessage("🔍 Re-scanning from parent directory...", false)
+								m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
+								m.gitReposLastScan = time.Now()
+								m.gitReposScanRoot = m.currentPath
+								m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+							} else {
+								// Navigating to a repo - exit filter mode
+								m.showGitReposOnly = false
+							}
+						}
+
 						m.loadFiles()
 					} else if !m.filePickerMode {
 						// Enter full-screen preview (only if NOT in file picker mode)

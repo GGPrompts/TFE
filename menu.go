@@ -67,6 +67,7 @@ func (m model) getMenus() map[string]Menu {
 				{IsSeparator: true},
 				{Label: "📝 Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly},
 				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
+				{Label: "🔀 Git Repositories", Action: "toggle-git-repos", IsCheckable: true, IsChecked: m.showGitReposOnly},
 				{Label: "🗑️  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
 				{IsSeparator: true},
 				{Label: "🔄 Refresh", Action: "refresh", Shortcut: "F5"},
@@ -130,6 +131,13 @@ func (m model) getMenus() map[string]Menu {
 			hasTools = true
 		}
 		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📊 Monitor (bottom)", Action: "bottom"})
+	}
+	if m.toolsAvailable["pyradio"] {
+		if !hasTools {
+			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+			hasTools = true
+		}
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📻 Radio (pyradio)", Action: "pyradio"})
 	}
 
 	// Add Games Launcher
@@ -771,8 +779,17 @@ Additional context: {{variable2}}
 		m.loadFiles()
 
 	case "refresh":
+		// If git repos filter is active, re-scan for repos
+		if m.showGitReposOnly {
+			m.setStatusMessage("🔍 Re-scanning for git repositories...", false)
+			m.gitReposList = m.scanGitReposRecursive(m.gitReposScanRoot, m.gitReposScanDepth, 50)
+			m.gitReposLastScan = time.Now()
+			m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+		}
 		m.loadFiles()
-		m.setStatusMessage("Refreshed", false)
+		if !m.showGitReposOnly {
+			m.setStatusMessage("Refreshed", false)
+		}
 
 	// Tools menu
 	case "toggle-command":
@@ -837,6 +854,13 @@ Additional context: {{variable2}}
 		m.selectedMenuItem = -1
 		return m, openTUITool("bottom", m.currentPath)
 
+	case "pyradio":
+		// Launch pyradio internet radio player
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("pyradio", m.currentPath)
+
 	case "toggle-prompts":
 		m.showPromptsOnly = !m.showPromptsOnly
 		m.cursor = 0
@@ -861,6 +885,21 @@ Additional context: {{variable2}}
 
 			m.setStatusMessage("TUIClassics launcher not found at ~/projects/TUIClassics/bin/classics", true)
 		}
+
+	case "toggle-git-repos":
+		m.showGitReposOnly = !m.showGitReposOnly
+
+		// If turning ON, scan for repos recursively from current directory
+		if m.showGitReposOnly {
+			m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
+			m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
+			m.gitReposLastScan = time.Now()
+			m.gitReposScanRoot = m.currentPath
+			m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+		}
+
+		m.cursor = 0
+		m.loadFiles()
 
 	case "toggle-trash":
 		m.showTrashOnly = !m.showTrashOnly

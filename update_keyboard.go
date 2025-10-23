@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -1504,6 +1505,24 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// Populate cache synchronously for full preview (user expects instant display)
 					m.populatePreviewCache()
 					return m, nil
+				}
+			} else if m.showGitReposOnly {
+				if currentFile.name == ".." {
+					// Navigating up while git filter is active - rescan from parent
+					m.currentPath = currentFile.path
+					m.cursor = 0
+					m.setStatusMessage("🔍 Re-scanning from parent directory...", false)
+					m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
+					m.gitReposLastScan = time.Now()
+					m.gitReposScanRoot = m.currentPath
+					m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+					m.loadFiles()
+				} else if currentFile.isDir {
+					// Navigate to the repo and exit filter mode
+					m.currentPath = currentFile.path
+					m.cursor = 0
+					m.showGitReposOnly = false // Exit git repos mode
+					m.loadFiles()
 				}
 			} else if currentFile.isDir {
 				// Navigate into directory (consistent across all views)

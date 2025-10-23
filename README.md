@@ -25,7 +25,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Favorites System**: Bookmark files and folders with quick filter (F6)
 - **Clipboard Integration**: Copy file paths to system clipboard
 - **Multiple Display Modes**: List, Detail, and Tree views
-- **Nerd Font Icons**: Visual file/folder indicators using file type detection
+- **Emoji Icons**: Visual file/folder indicators using file type detection
 - **Smart Sorting**: Directories first, then files (alphabetically sorted)
 - **Scrolling Support**: Handles large directories with auto-scrolling
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
@@ -36,43 +36,43 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **File Operations**: Copy files/folders with interactive file picker, rename, create new prompts via File menu
 - **Preview Search**: Ctrl-F to search within file previews, 'n' for next match, Shift-N for previous
 - **Mouse Toggle**: Press 'm' in full preview to remove border for clean text selection
+- **Games Integration**: Optional [TUIClassics](https://github.com/GGPrompts/TUIClassics) integration - launch Snake, Minesweeper, Solitaire, 2048 via [🎮] button or Tools menu
 
-## Visual Showcase
+## Demo Video
 
-### Navigation & File Operations
-![Navigation Demo](assets/demo-navigation.gif)
-*Fast keyboard and mouse navigation through directories*
+[![TFE Demo Video](https://img.youtube.com/vi/KmRrB8zy6is/maxresdefault.jpg)](https://www.youtube.com/watch?v=KmRrB8zy6is)
 
-![File Operations](assets/demo-file-ops.gif)
-*Copy, rename, create files and folders via context menu*
+*Full walkthrough: navigation, dual-pane mode, fuzzy search, prompts library, and real-world usage with pyradio*
 
-### Dual-Pane Mode & Preview
-![Dual-Pane Mode](assets/demo-dual-pane.gif)
-*Split-screen with live syntax-highlighted preview*
+## Screenshots
 
-![Preview Features](assets/demo-preview.gif)
-*Full-screen preview with search (Ctrl-F), line numbers, and text selection*
+### Main Interface (Dark Theme)
+![TFE Main Interface](assets/screenshot-main.png)
+*Clean file browser with Detail view, toolbar buttons, and command prompt*
 
-### Display Modes & Context Menu
-![View Modes](assets/demo-view-modes.gif)
-*Switch between List, Detail, and Tree views*
+### Light Theme
+![TFE Light Mode](assets/screenshot-tfelight.png)
+*TFE with light color scheme for different terminal preferences*
 
-![Tree View](assets/demo-tree-view.gif)
-*Hierarchical tree navigation with folder expansion*
+### Dual-Pane Preview Mode
+![Dual-Pane Mode](assets/screenshot-tree-view.png)
+*Split-screen with syntax-highlighted preview and line numbers*
 
-![Context Menu](assets/demo-context-menu.gif)
+### Tree View Navigation
+![Tree View](assets/screenshot-tree-view.png)
+*Hierarchical folder navigation with expandable directories*
+
+### Context Menu
+![Context Menu](assets/screenshot-context-menu.png)
 *Right-click menu with file operations and Quick CD*
 
-### Search & Help
-![Fuzzy Search](assets/demo-search.gif)
-*Instant fuzzy file search with Ctrl+P*
+### Prompts Library (F11)
+![Prompts Library](assets/screenshot-prompts.png)
+*AI prompt templates with fillable fields and variable substitution*
 
-![Context-Aware Help](assets/demo-help.gif)
-*F1 intelligently jumps to relevant help section*
-
-### Complete Workflow Demo
-![Complete Demo](assets/tfe-showcase.gif)
-*Full TFE workflow: navigation, preview, file operations, and prompts library*
+### Fuzzy Search (Ctrl+P)
+![Fuzzy Search](assets/screenshot-search.png)
+*Fast file search with go-fzf integration*
 
 ## Feature Comparison
 
@@ -122,10 +122,10 @@ TFE combines the power of traditional file managers with modern features designe
 ### Prerequisites
 
 - Go 1.24 or higher
-- A terminal with Nerd Fonts installed (for proper icon display)
-  - **Windows Terminal**: Requires manual font selection in Settings → Appearance → Font face (e.g., "CaskaydiaCove Nerd Font")
+- A terminal with Unicode/emoji support (most modern terminals)
+  - **Windows Terminal**: Works out of the box
   - **Termux**: Works out of the box, no configuration needed
-  - **macOS/Linux**: Depends on your terminal emulator (iTerm2, Alacritty, etc.)
+  - **macOS/Linux**: Most modern terminal emulators (iTerm2, Alacritty, GNOME Terminal, etc.)
 - **For Termux users**: Install `termux-api` for clipboard support: `pkg install termux-api`
 
 ### Optional Dependencies
@@ -776,6 +776,49 @@ No config files = Simple codebase. Direct code edits = Full control. TFE's promp
 
 See [`examples/.prompts/TFE-Customization/`](examples/.prompts/TFE-Customization/) for all guides.
 
+## Games Integration (Optional)
+
+TFE integrates with **[TUIClassics](https://github.com/GGPrompts/TUIClassics)** - a collection of classic terminal games including Snake, Minesweeper, Solitaire, and 2048.
+
+### Quick Install
+
+```bash
+# Clone the games repository
+git clone https://github.com/GGPrompts/TUIClassics ~/projects/TUIClassics
+
+# Build the games launcher
+cd ~/projects/TUIClassics
+make build
+```
+
+### Accessing Games from TFE
+
+Once installed, launch games from TFE in two ways:
+
+1. **Toolbar Button**: Click the **[🎮]** emoji button
+2. **Tools Menu**: Navigate to **Tools → Games Launcher**
+
+Both methods launch the TUIClassics menu where you can select from:
+- 🐍 Snake - Classic snake game with smooth controls
+- 💣 Minesweeper - The timeless puzzle game
+- 🃏 Solitaire - Klondike solitaire card game
+- 🔢 2048 - Slide and merge tiles puzzle
+- 🎯 More games coming soon!
+
+All games feature:
+- ✅ Full mouse/touch support
+- ✅ Keyboard controls
+- ✅ Double-click to launch
+- ✅ Works on desktop and Termux/Android
+
+### Requirements
+
+- Go 1.24+ (same as TFE)
+- Terminal with mouse support (recommended)
+- Unicode/emoji support (same as TFE)
+
+**Note**: Games are a separate project and completely optional. TFE works fully without them.
+
 ## Development
 
 ### Running in Development Mode
@@ -859,4 +902,4 @@ Created by GGPrompts
 
 ---
 
-**Note**: This project requires a terminal with Nerd Fonts for proper icon display. Install from [nerdfonts.com](https://www.nerdfonts.com/) if icons don't display correctly.
+**Note**: This project uses Unicode emojis for icons. Most modern terminals support these out of the box. If icons don't display properly, ensure your terminal has Unicode/emoji support enabled.

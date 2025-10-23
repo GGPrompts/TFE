@@ -37,6 +37,8 @@ func initialModel() model {
 		loading:             false,
 		favorites:           loadFavorites(),
 		showFavoritesOnly:   false,
+		gitReposScanDepth:   3,   // Default scan depth: 3 levels (safer)
+		gitReposList:        make([]fileItem, 0),
 		expandedDirs:        make(map[string]bool),
 		// Prompt inline editing
 		promptEditMode:       false,
@@ -61,13 +63,11 @@ func initialModel() model {
 			"lnav":          editorAvailable("lnav"),
 			"htop":          editorAvailable("htop"),
 			"bottom":        editorAvailable("bottom"),
+			"pyradio":       editorAvailable("pyradio"),
 			"micro":         editorAvailable("micro"), // Used in context menu edit action
 			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
 		},
 		cachedMenus: nil, // Will be built on first access
-		// Landing page - disabled (launch directly into file browser)
-		showLandingPage: false,
-		landingPage:     nil,
 		// Performance caching
 		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
 	}

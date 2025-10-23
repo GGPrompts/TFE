@@ -254,6 +254,12 @@ type model struct {
 	showFavoritesOnly bool            // Filter to show only favorites
 	// Prompts system
 	showPromptsOnly bool // Filter to show only prompt files (.yaml, .md, .txt)
+	// Git repositories filter
+	showGitReposOnly  bool        // Filter to show only git repositories
+	gitReposList      []fileItem  // Cached list of discovered git repos (recursive scan)
+	gitReposLastScan  time.Time   // When we last scanned for git repos
+	gitReposScanRoot  string      // Root directory of last scan
+	gitReposScanDepth int         // Max depth to scan (default: 5)
 	// Trash/Recycle bin system
 	showTrashOnly bool        // Filter to show trash contents
 	trashItems    []trashItem // Cached trash items when viewing trash
@@ -296,9 +302,6 @@ type model struct {
 	// Menu caching (performance optimization - avoids repeated filesystem checks)
 	cachedMenus    map[string]Menu  // Cached menu structure (built once)
 	toolsAvailable map[string]bool // Cached tool availability (lazygit, htop, etc.)
-	// Landing page (90s Windows nostalgic intro)
-	showLandingPage bool          // Whether to show landing page instead of file browser
-	landingPage     *LandingPage  // Landing page state
 	// Performance: Cache for directoryContainsPrompts() to avoid repeated file I/O
 	promptDirsCache map[string]bool // Path -> contains prompts (cleared on loadFiles)
 }

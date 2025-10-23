@@ -832,7 +832,7 @@ func (m model) renderFullPreview() string {
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
-			Foreground(lipgloss.Color("0")).
+			Foreground(lipgloss.Color("15")). // White for better contrast
 			Bold(true).
 			Padding(0, 1)
 
@@ -1306,6 +1306,11 @@ func (m model) renderDualPane() string {
 		promptsIndicator = " • 📝 prompts only"
 	}
 
+	gitReposIndicator := ""
+	if m.showGitReposOnly {
+		gitReposIndicator = " • 🔀 git repos only"
+	}
+
 	// Show focused pane info in status bar
 	focusInfo := ""
 	if m.focusedPane == leftPane {
@@ -1368,7 +1373,7 @@ func (m model) renderDualPane() string {
 
 	// Split status into two lines to prevent truncation
 	// Line 1: Counts, indicators, view mode, focus, help
-	statusLine1 := fmt.Sprintf("%s%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, m.displayMode.String(), focusInfo, helpHint)
+	statusLine1 := fmt.Sprintf("%s%s%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, gitReposIndicator, m.displayMode.String(), focusInfo, helpHint)
 	s.WriteString(statusStyle.Render(statusLine1))
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
@@ -1383,7 +1388,7 @@ func (m model) renderDualPane() string {
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
-			Foreground(lipgloss.Color("0")).
+			Foreground(lipgloss.Color("15")). // White for better contrast
 			Bold(true).
 			Padding(0, 1)
 

@@ -170,6 +170,160 @@ func isObsidianVault(path string) bool {
 	return info.IsDir()
 }
 
+// isGitRepo checks if a directory is a git repository (contains .git folder)
+func isGitRepo(path string) bool {
+	gitPath := filepath.Join(path, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+// getGitBranch returns the current git branch name for a repository
+// Returns empty string if not a git repo or error occurs
+func getGitBranch(repoPath string) string {
+	// Read .git/HEAD to get current branch
+	headPath := filepath.Join(repoPath, ".git", "HEAD")
+	content, err := os.ReadFile(headPath)
+	if err != nil {
+		return ""
+	}
+
+	// HEAD format: "ref: refs/heads/main\n"
+	head := strings.TrimSpace(string(content))
+	if strings.HasPrefix(head, "ref: refs/heads/") {
+		return strings.TrimPrefix(head, "ref: refs/heads/")
+	}
+
+	// Detached HEAD state - show short hash
+	if len(head) >= 7 {
+		return head[:7]
+	}
+
+	return ""
+}
+
+// hasUncommittedChanges checks if a git repo has uncommitted changes
+// Returns false if not a git repo or error occurs
+func hasUncommittedChanges(repoPath string) bool {
+	// Check if index file is newer than HEAD (quick heuristic)
+	headPath := filepath.Join(repoPath, ".git", "HEAD")
+	indexPath := filepath.Join(repoPath, ".git", "index")
+
+	headInfo, err1 := os.Stat(headPath)
+	indexInfo, err2 := os.Stat(indexPath)
+
+	if err1 != nil || err2 != nil {
+		return false
+	}
+
+	// If index is newer than HEAD, likely has changes
+	// This is a heuristic - not 100% accurate but fast
+	return indexInfo.ModTime().After(headInfo.ModTime())
+}
+
+// scanGitReposRecursive recursively scans for git repositories
+// Returns list of discovered repos, limited by maxDepth and maxRepos
+func (m *model) scanGitReposRecursive(startPath string, maxDepth int, maxRepos int) []fileItem {
+	repos := make([]fileItem, 0)
+	visited := make(map[string]bool) // Prevent infinite loops with symlinks
+
+	var scan func(path string, currentDepth int)
+	scan = func(path string, currentDepth int) {
+		// Stop if we've hit depth limit or repo limit
+		if currentDepth > maxDepth || len(repos) >= maxRepos {
+			return
+		}
+
+		// Prevent infinite loops
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return
+		}
+		if visited[absPath] {
+			return
+		}
+		visited[absPath] = true
+
+		// Check if this directory is a git repo
+		if isGitRepo(path) {
+			info, err := os.Stat(path)
+			if err == nil {
+				repos = append(repos, fileItem{
+					name:    filepath.Base(path),
+					path:    path,
+					isDir:   true,
+					size:    info.Size(),
+					modTime: info.ModTime(),
+					mode:    info.Mode(),
+				})
+			}
+			// Don't scan inside git repos (skip .git and subdirs)
+			return
+		}
+
+		// Read directory entries
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return // Permission denied or invalid directory
+		}
+
+		// Recursively scan subdirectories
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			fullPath := filepath.Join(path, entry.Name())
+
+			// CRITICAL: Skip symlinks entirely - don't follow them
+			// This prevents scanning into /usr, /bin, etc. via symlinks
+			fileInfo, err := os.Lstat(fullPath)
+			if err != nil {
+				continue
+			}
+			if fileInfo.Mode()&os.ModeSymlink != 0 {
+				continue // Skip all symlinks
+			}
+
+			// Skip hidden directories (except important ones)
+			if strings.HasPrefix(entry.Name(), ".") {
+				// Exception: scan these important hidden directories
+				importantDirs := []string{".config", ".local"}
+				isImportant := false
+				for _, dir := range importantDirs {
+					if entry.Name() == dir {
+						isImportant = true
+						break
+					}
+				}
+				if !isImportant {
+					continue
+				}
+			}
+
+			// Skip common large/irrelevant directories
+			skipDirs := []string{"node_modules", "venv", ".venv", "build", "dist", "target", ".cache", "Library", "Applications"}
+			shouldSkip := false
+			for _, dir := range skipDirs {
+				if entry.Name() == dir {
+					shouldSkip = true
+					break
+				}
+			}
+			if shouldSkip {
+				continue
+			}
+
+			scan(fullPath, currentDepth+1)
+		}
+	}
+
+	scan(startPath, 0)
+	return repos
+}
+
 // isDirEmpty checks if a directory is empty (no files or subdirectories)
 func isDirEmpty(path string) bool {
 	entries, err := os.ReadDir(path)
