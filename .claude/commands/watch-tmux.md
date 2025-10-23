@@ -1,3 +1,7 @@
+---
+description: Monitor TFE in tmux session with full TUI visibility
+---
+
 # Watch TFE in Tmux Session
 
 You are monitoring TFE running in a tmux session, giving you visibility into the exact visual output the user sees.

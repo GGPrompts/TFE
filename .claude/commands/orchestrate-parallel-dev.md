@@ -1,3 +1,7 @@
+---
+description: Coordinate multiple Claude Code sessions working in parallel
+---
+
 # Orchestrate Parallel Development
 
 You are an **orchestrator Claude** coordinating multiple Claude Code sessions working in parallel.

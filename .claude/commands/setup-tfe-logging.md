@@ -1,3 +1,7 @@
+---
+description: Add debug event logging to TFE for real-time monitoring
+---
+
 # Setup TFE Event Logging
 
 You are adding debug event logging to TFE so I can monitor what's happening in the application in real-time.

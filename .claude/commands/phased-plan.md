@@ -1,3 +1,7 @@
+---
+description: Execute multi-phase plan with auto-compacting between phases
+---
+
 # Phased Plan: Multi-Phase Execution with Auto-Compacting
 
 You are executing a multi-phase plan where each phase runs in fresh context for maximum accuracy.

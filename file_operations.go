@@ -1473,8 +1473,13 @@ func (m *model) populatePreviewCache() {
 		} else {
 			markdownContent := strings.Join(m.preview.content, "\n")
 
-			// Render with 5-second timeout to prevent hangs
-			rendered, err := renderMarkdownWithTimeout(markdownContent, availableWidth, 5*time.Second)
+			// Render with timeout to prevent hangs
+			// Use longer timeout on mobile (Termux) where rendering is slower
+			timeout := 5 * time.Second
+			if editorAvailable("termux-clipboard-set") {
+				timeout = 15 * time.Second // Mobile devices need more time
+			}
+			rendered, err := renderMarkdownWithTimeout(markdownContent, availableWidth, timeout)
 
 			if err == nil {
 				// Store rendered content even if empty (Glamour might return empty for some valid markdown)

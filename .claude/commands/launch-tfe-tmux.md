@@ -1,3 +1,7 @@
+---
+description: Launch TFE in a tmux split pane for collaborative monitoring
+---
+
 Launch TFE in a tmux split pane so we can monitor it together.
 
 ```bash

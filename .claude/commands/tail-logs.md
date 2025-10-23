@@ -1,3 +1,7 @@
+---
+description: Monitor TFE application for errors, panics, and issues in real-time
+---
+
 # Monitor TFE Application Logs
 
 You are monitoring the TFE (Terminal File Explorer) application for errors, panics, and issues.

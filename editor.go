@@ -77,8 +77,10 @@ func copyToClipboard(text string) error {
 
 	// Try different clipboard commands based on platform
 	if editorAvailable("termux-clipboard-set") {
-		// Termux (Android)
-		cmd = exec.Command("termux-clipboard-set")
+		// Termux (Android) - use shell wrapper because termux-clipboard-set
+		// fails with exit status 2 when using StdinPipe directly
+		cmd = exec.Command("bash", "-c", fmt.Sprintf("termux-clipboard-set <<'CLIPBOARD_EOF'\n%s\nCLIPBOARD_EOF", text))
+		return cmd.Run()
 	} else if editorAvailable("xclip") {
 		cmd = exec.Command("xclip", "-selection", "clipboard")
 	} else if editorAvailable("xsel") {
@@ -93,6 +95,7 @@ func copyToClipboard(text string) error {
 		return fmt.Errorf("no clipboard utility found (install termux-api, xclip, xsel, or use WSL)")
 	}
 
+	// For non-Termux platforms, use the standard StdinPipe approach
 	pipe, err := cmd.StdinPipe()
 	if err != nil {
 		return err

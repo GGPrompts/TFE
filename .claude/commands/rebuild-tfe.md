@@ -1,3 +1,7 @@
+---
+description: Pull latest changes and rebuild TFE binary
+---
+
 # Pull Changes and Rebuild TFE
 
 You are pulling the latest changes and rebuilding the TFE application binary.

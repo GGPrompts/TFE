@@ -1,3 +1,7 @@
+---
+description: Summarize and export current work session to a file
+---
+
 # Save Session: Summarize and Export Current Work Session
 
 You are creating a concise summary of the current work session and saving it to a file, enabling the user to continue in a completely fresh conversation or resume later with minimal context loss.
