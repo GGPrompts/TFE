@@ -79,7 +79,11 @@ func (m model) renderSinglePane() string {
 			titleText += " [Command Mode]"
 		}
 		if m.filePickerMode {
-			titleText += " [📁 File Picker]"
+			if m.filePickerCopySource != "" {
+				titleText += " [📋 Copy Mode - Select Destination]"
+			} else {
+				titleText += " [📁 File Picker]"
+			}
 		}
 
 		// Create GitHub link (OSC 8 hyperlink format)
@@ -309,8 +313,8 @@ func (m model) renderSinglePane() string {
 	s.WriteString(fileListStyle.Render(fileListContent))
 	s.WriteString("\n")
 
-	// Check if we should show status message (auto-dismiss after 3s, except in edit mode)
-	if m.statusMessage != "" && (m.promptEditMode || time.Since(m.statusTime) < 3*time.Second) {
+	// Check if we should show status message (auto-dismiss after 3s, except in edit mode or file picker mode)
+	if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
 			Foreground(lipgloss.Color("0")).

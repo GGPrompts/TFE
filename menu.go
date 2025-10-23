@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -30,6 +31,9 @@ func (m model) getMenus() map[string]Menu {
 	if m.toolsAvailable["textual-paint"] {
 		fileMenuItems = append(fileMenuItems, MenuItem{Label: "🎨 New Image", Action: "new-image"})
 	}
+
+	// Add "New Prompt" for creating prompt templates
+	fileMenuItems = append(fileMenuItems, MenuItem{Label: "📝 New Prompt...", Action: "new-prompt"})
 
 	fileMenuItems = append(fileMenuItems,
 		MenuItem{Label: "📂 Open", Action: "open", Shortcut: "Enter"},
@@ -619,6 +623,66 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		m.activeMenu = ""
 		m.selectedMenuItem = -1
 		return m, openImageEditorNew(m.currentPath)
+
+	case "new-prompt":
+		// Create new prompt file with template
+		promptTemplate := `---
+name: My Prompt Template
+description: Brief description of what this prompt does
+inputs:
+  variable1:
+    type: string
+    description: Description of first variable
+  variable2:
+    type: string
+    description: Description of second variable
+---
+
+# System Prompt
+
+You are a helpful assistant.
+
+# User Request
+
+{{variable1}}
+
+Additional context: {{variable2}}
+
+# Instructions
+
+1. First instruction
+2. Second instruction
+3. Third instruction
+`
+		// Generate filename with timestamp to avoid conflicts
+		timestamp := time.Now().Format("20060102-150405")
+		filename := fmt.Sprintf("new-prompt-%s.prompty", timestamp)
+		filepath := filepath.Join(m.currentPath, filename)
+
+		// Write template to file
+		if err := os.WriteFile(filepath, []byte(promptTemplate), 0644); err != nil {
+			m.setStatusMessage(fmt.Sprintf("Error creating prompt: %s", err), true)
+		} else {
+			// File created successfully - open in editor
+			m.setStatusMessage(fmt.Sprintf("Created %s", filename), false)
+			m.loadFiles() // Refresh file list
+
+			// Open in editor
+			editor := getAvailableEditor()
+			if editor == "" {
+				m.setStatusMessage("Prompt created but no editor available (tried micro, nano, vim, vi)", true)
+			} else {
+				// Use cached micro check (performance optimization)
+				if m.toolsAvailable["micro"] {
+					editor = "micro"
+				}
+				// Close menu before launching editor
+				m.menuOpen = false
+				m.activeMenu = ""
+				m.selectedMenuItem = -1
+				return m, openEditor(editor, filepath)
+			}
+		}
 
 	case "open":
 		// Open selected file/folder (same as Enter key)

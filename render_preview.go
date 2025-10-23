@@ -827,8 +827,8 @@ func (m model) renderFullPreview() string {
 
 		s.WriteString(searchStyle.Render(searchText))
 		s.WriteString("\033[0m") // Reset ANSI codes
-	} else if m.statusMessage != "" && (m.promptEditMode || time.Since(m.statusTime) < 3*time.Second) {
-		// Show status message if present (auto-dismiss after 3s, except in edit mode) and search not active
+	} else if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
+		// Show status message if present (auto-dismiss after 3s, except in edit mode or file picker mode) and search not active
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green
@@ -859,6 +859,13 @@ func (m model) renderDualPane() string {
 		titleText := "(T)erminal (F)ile (E)xplorer [Dual-Pane]"
 		if m.commandFocused {
 			titleText += " [Command Mode]"
+		}
+		if m.filePickerMode {
+			if m.filePickerCopySource != "" {
+				titleText += " [📋 Copy Mode - Select Destination]"
+			} else {
+				titleText += " [📁 File Picker]"
+			}
 		}
 
 		// Create GitHub link (OSC 8 hyperlink format)
@@ -1371,8 +1378,8 @@ func (m model) renderDualPane() string {
 	s.WriteString(statusStyle.Render(statusLine2))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
-	// Show status message if present (auto-dismiss after 3s, except in edit mode)
-	if m.statusMessage != "" && (m.promptEditMode || time.Since(m.statusTime) < 3*time.Second) {
+	// Show status message if present (auto-dismiss after 3s, except in edit mode or file picker mode)
+	if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("28")). // Green

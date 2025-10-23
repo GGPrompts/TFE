@@ -201,23 +201,82 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.filePickerMode {
 		switch msg.String() {
 		case "esc":
-			// Cancel file picker and return to preview mode
+			// Cancel file picker and return to preview mode or normal view
+			wasCopyMode := m.filePickerCopySource != ""
+
 			m.filePickerMode = false
-			m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
-			m.loadFiles()                                  // Reload files with restored filter
-			m.viewMode = viewFullPreview
-			// Reload the original preview
+			m.filePickerCopySource = "" // Reset copy mode
+
+			// Only restore preview mode if we came from edit mode (prompts)
+			// If we came from context menu copy, just return to normal view
 			if m.filePickerRestorePath != "" {
+				m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
+				m.loadFiles()                                  // Reload files with restored filter
+				m.viewMode = viewFullPreview
 				m.loadPreview(m.filePickerRestorePath)
 				m.populatePreviewCache()
+				m.setStatusMessage("File picker cancelled", false)
+			} else {
+				m.loadFiles() // Just reload current directory
+				if wasCopyMode {
+					m.setStatusMessage("Copy cancelled", false)
+				} else {
+					m.setStatusMessage("File picker cancelled", false)
+				}
 			}
-			m.setStatusMessage("File picker cancelled", false)
 			return m, nil
 
 		case "enter":
 			// Get current file (handles tree mode correctly)
 			selectedFile := m.getCurrentFile()
 			if selectedFile != nil {
+				// Check if we're in copy mode (context menu copy operation)
+				if m.filePickerCopySource != "" {
+					// Copy mode: selecting destination
+					destDir := selectedFile.path
+
+					// If selected a file, use its parent directory as destination
+					if !selectedFile.isDir {
+						destDir = filepath.Dir(destDir)
+					}
+
+					// Execute copy operation
+					sourcePath := m.filePickerCopySource
+					sourceName := filepath.Base(sourcePath)
+
+					// Build full destination path
+					var destPath string
+					sourceInfo, err := os.Stat(sourcePath)
+					if err != nil {
+						m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
+						m.filePickerMode = false
+						m.filePickerCopySource = ""
+						return m, nil
+					}
+
+					if sourceInfo.IsDir() {
+						// Copying a directory: append directory name to destination
+						destPath = filepath.Join(destDir, sourceName)
+					} else {
+						// Copying a file: append filename to destination
+						destPath = filepath.Join(destDir, sourceName)
+					}
+
+					if err := m.copyFile(sourcePath, destPath); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Error copying: %s", err), true)
+					} else {
+						// Show success message with destination
+						m.setStatusMessage(fmt.Sprintf("✓ Copied '%s' to: %s", sourceName, destDir), false)
+						// Reload files to show the new copy
+						m.loadFiles()
+					}
+
+					// Reset copy mode
+					m.filePickerMode = false
+					m.filePickerCopySource = ""
+					return m, nil
+				}
+
 				if selectedFile.isDir {
 					// It's a directory - navigate into it (consistent across all views)
 					m.currentPath = selectedFile.path
@@ -749,22 +808,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 								return m, openEditor(editor, filepath)
 							}
 						}
-					}
-				} else if m.dialog.title == "Copy File" {
-					// Handle copy
-					destPath := m.dialog.input
-
-					// Handle relative vs absolute paths
-					if !filepath.IsAbs(destPath) {
-						destPath = filepath.Join(m.currentPath, destPath)
-					}
-
-					// Copy the file
-					if err := m.copyFile(m.contextMenuFile.path, destPath); err != nil {
-						m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
-					} else {
-						m.setStatusMessage(fmt.Sprintf("Copied to: %s", destPath), false)
-						m.loadFiles()
 					}
 				} else if m.dialog.title == "Rename" {
 					// Handle rename

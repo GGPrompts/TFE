@@ -30,10 +30,10 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Scrolling Support**: Handles large directories with auto-scrolling
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
 - **Double-Click Support**: Double-click to navigate folders or preview files
-- **Prompts Library**: F11 mode for AI prompt templates with fillable input fields, file picker (F3), and clipboard copy
+- **Prompts Library**: F11 mode for AI prompt templates with fillable input fields, file picker (F3), clipboard copy, and quick template creation via File menu
 - **Trash/Recycle Bin**: F12 to view deleted items, restore or permanently delete (F8 moves to trash)
 - **Image Support**: View images with viu/timg/chafa and edit with textual-paint (MS Paint in terminal!)
-- **File Operations**: Copy files/folders (📋 Copy to...), rename (✏️ Rename...) via context menu
+- **File Operations**: Copy files/folders with interactive file picker, rename, create new prompts via File menu
 - **Preview Search**: Ctrl-F to search within file previews, 'n' for next match, Shift-N for previous
 - **Mouse Toggle**: Press 'm' in full preview to remove border for clean text selection
 
@@ -181,7 +181,40 @@ TFE works great without these, but install them for additional features:
 
 > 💡 **Need help installing?** Ask Claude or your AI assistant: *"Help me install TFE from https://github.com/GGPrompts/TFE on [your OS]"*
 
-### Option 1: Quick Install (Recommended for Most Users)
+### Option 1: Automated Install (Recommended - Like Midnight Commander)
+
+**One-line installation with Quick CD feature:**
+
+```bash
+curl -sSL https://raw.githubusercontent.com/GGPrompts/TFE/main/install.sh | bash
+```
+
+This script will:
+- Install TFE binary via `go install`
+- Download the wrapper script to `~/.config/tfe/`
+- Auto-configure your shell (bash/zsh)
+- Enable the Quick CD feature (like Midnight Commander)
+
+**After installation:**
+```bash
+source ~/.bashrc    # or source ~/.zshrc
+tfe                 # Launch TFE with Quick CD enabled
+```
+
+**Uninstall:**
+```bash
+curl -sSL https://raw.githubusercontent.com/GGPrompts/TFE/main/uninstall.sh | bash
+```
+
+✅ **What you get:**
+- Global `tfe` command - launch from anywhere
+- **Quick CD feature** - right-click folder → "📂 Quick CD" → exits and changes directory
+- Automatic setup (like MC's package installation)
+- Easy to uninstall
+
+---
+
+### Option 2: Manual Go Install (Without Quick CD)
 
 **Install globally using Go:**
 
@@ -204,16 +237,16 @@ tfe    # Launch from any directory
 ✅ **What you get:**
 - Global `tfe` command - launch from anywhere
 - Clean installation via Go's package manager
-- Easy updates with `go install`
+- Easy updates with `go install github.com/GGPrompts/TFE@latest`
 
 ❌ **What's missing:**
-- Quick CD feature (see Option 2 if you want this)
+- Quick CD feature (see Option 1 or 3 if you want this)
 
 ---
 
-### Option 2: Full Installation with Quick CD Feature
+### Option 3: Clone & Build (For Developers)
 
-**For users who want the "Quick CD" feature** that lets you exit TFE and automatically change your shell to a selected directory:
+**For users who want the source code or want to customize TFE:**
 
 1. **Clone and build:**
 
@@ -254,17 +287,22 @@ tfe    # Launch from any directory with Quick CD support
 
 ### Which Option Should I Choose?
 
-**Choose Option 1** if you:
-- Just want a great terminal file manager
-- Prefer standard Go package installation
-- Don't need the Quick CD shell integration
+**Choose Option 1** (Automated Install) if you:
+- Want the easiest installation (like installing Midnight Commander)
+- Want the Quick CD feature without manual setup
+- Prefer automatic configuration
 
-**Choose Option 2** if you:
-- Want the Quick CD feature (exit TFE and auto-cd to selected folder)
-- Like having the source code locally
+**Choose Option 2** (Manual Go Install) if you:
+- Just want the binary, no Quick CD needed
+- Prefer minimal manual control over your environment
+- Don't want any shell configuration changes
+
+**Choose Option 3** (Clone & Build) if you:
 - Want to customize or contribute to TFE
+- Need the source code locally
+- Want to control exactly where TFE is installed
 
-**Note:** You can always start with Option 1 and add the wrapper later if you decide you want Quick CD!
+**Note:** You can always start with Option 2 and upgrade to Option 1 later if you want Quick CD!
 
 ## Usage
 
@@ -489,6 +527,21 @@ EOF
 ```
 
 Now when you press **F11** in TFE, you'll see `🌐 ~/.prompts/ (Global Prompts)` at the top of the file list, accessible from any directory.
+
+**Creating New Prompts:**
+
+You can create new prompt templates directly from TFE using the File menu:
+
+1. **Open the File menu** (press Alt or F9 to focus menu bar, then press F)
+2. **Select "📝 New Prompt..."**
+3. **Your editor opens** with a pre-formatted template including:
+   - Proper YAML frontmatter (`---` markers)
+   - Name and description fields
+   - Sample input variable definitions
+   - Structured sections (System Prompt, User Request, Instructions)
+   - `{{variable}}` placeholders showing the syntax
+
+The file is created as `new-prompt-YYYYMMDD-HHMMSS.prompty` in your current directory, so you can rename it and move it to `~/.prompts/` for global access or keep it in your project's `.claude/` folder for project-specific prompts.
 
 **Quick Start with Sample Prompts:**
 

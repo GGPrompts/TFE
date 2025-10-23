@@ -362,14 +362,13 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case "copy":
-		// Copy file or folder to destination
-		m.dialog = dialogModel{
-			dialogType: dialogInput,
-			title:      "Copy File",
-			message:    fmt.Sprintf("Copy '%s' to:", m.contextMenuFile.name),
-			input:      "", // User types destination path
-		}
-		m.showDialog = true
+		// Copy file or folder to destination using file picker
+		m.filePickerMode = true
+		m.filePickerCopySource = m.contextMenuFile.path // Save source path
+		m.viewMode = viewSinglePane
+		m.showPromptsOnly = false // Show all files
+		m.loadFiles()
+		m.setStatusMessage(fmt.Sprintf("📁 Select destination for: %s (Enter = select folder, Esc = cancel)", m.contextMenuFile.name), false)
 		return m, tea.ClearScreen
 
 	case "rename":

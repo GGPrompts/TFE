@@ -263,6 +263,7 @@ type model struct {
 	filePickerMode         bool              // Whether file picker mode is active (F3)
 	filePickerRestorePath  string            // Path to restore preview after file picker
 	filePickerRestorePrompts bool            // Whether to restore prompts filter after file picker
+	filePickerCopySource   string            // Source path when picking copy destination (context menu)
 	// Tree view expansion
 	expandedDirs map[string]bool // Path -> expanded state
 	treeItems    []treeItem       // Cached tree items for tree view

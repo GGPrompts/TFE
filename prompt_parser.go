@@ -70,11 +70,26 @@ func parsePromptFile(path string) (*promptTemplate, error) {
 		}
 
 	case ".md", ".txt":
-		// Plain text format - just the template
-		tmpl.template = contentStr
-		// Derive name from filename (remove extension)
-		tmpl.name = strings.TrimSuffix(filename, ext)
-		tmpl.description = ""
+		// Plain text format - check if it has YAML frontmatter first
+		if strings.HasPrefix(contentStr, "---\n") || strings.HasPrefix(contentStr, "---\r\n") {
+			// Has frontmatter - try parsing as prompty format
+			if err := parsePromptyFormat(contentStr, &tmpl); err != nil {
+				// Failed to parse frontmatter - treat as regular markdown
+				return nil, fmt.Errorf("not a valid prompt file: %w", err)
+			}
+		} else {
+			// No frontmatter - check if it has variables
+			variables := extractVariables(contentStr)
+			if len(variables) == 0 {
+				// No variables, not a prompt - return error so it's treated as regular markdown
+				return nil, fmt.Errorf("not a prompt file: no frontmatter or variables found")
+			}
+			// Has variables - treat as plain text prompt template
+			tmpl.template = contentStr
+			// Derive name from filename (remove extension)
+			tmpl.name = strings.TrimSuffix(filename, ext)
+			tmpl.description = ""
+		}
 
 	default:
 		return nil, fmt.Errorf("unsupported file format: %s", ext)

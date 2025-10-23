@@ -4,6 +4,65 @@ All notable changes to the Terminal File Explorer (TFE) project.
 
 ## [Unreleased]
 
+### Added (2025-10-23)
+- **More AI Directory Exceptions for Hidden Files**
+  - Added `.codex`, `.copilot`, `.devcontainer`, `.gemini`, and `.opencode` to always-visible list
+  - These AI/IDE config folders now show even when "Show Hidden Files" is disabled
+  - Joins existing exceptions: `.claude`, `.git`, `.vscode`, `.github`, `.config`, `.docker`, `.prompts`
+  - Custom icons: 🤖 for AI folders (.codex, .copilot, .gemini, .opencode), 🐳 for .devcontainer (Docker-based)
+  - Files modified: `file_operations.go`, `HOTKEYS.md`
+
+- **One-Line Install Script (Like Midnight Commander)**
+  - New automated install script: `curl -sSL https://raw.githubusercontent.com/GGPrompts/TFE/main/install.sh | bash`
+  - Auto-installs TFE binary via `go install`
+  - Downloads wrapper to `~/.config/tfe/tfe-wrapper.sh`
+  - Auto-detects shell (bash/zsh) and configures wrapper
+  - Enables Quick CD feature automatically (no manual setup needed)
+  - Companion uninstall script for clean removal
+  - Makes TFE installation feel "built-in" like MC
+  - Files added: `install.sh`, `uninstall.sh`
+  - Files modified: `README.md` (reorganized installation options)
+
+- **New Prompt Template Creation**
+  - Added **"📝 New Prompt..."** menu item in File menu
+  - Creates timestamped `.prompty` files with proper YAML frontmatter template
+  - Automatically opens in user's default editor (micro, nano, vim, or vi)
+  - Template includes:
+    - YAML frontmatter with `---` markers
+    - Sample name, description, and input variable definitions
+    - Structured sections (System Prompt, User Request, Instructions)
+    - Example `{{variable}}` placeholders
+  - Files modified: `menu.go`
+
+- **Interactive File Picker for Copy Operations**
+  - Replaced manual text input with visual file browser when copying files
+  - Same UX as F3 file picker in prompts mode
+  - Navigate folders with arrow keys, press Enter to select destination
+  - Shows persistent helper text: "📁 Select destination for: filename (Enter = select folder, Esc = cancel)"
+  - Header indicator: `[📋 Copy Mode - Select Destination]`
+  - Files modified: `types.go`, `context_menu.go`, `update_keyboard.go`, `view.go`, `render_preview.go`
+
+### Fixed (2025-10-23)
+- **File Picker Status Message Persistence**
+  - Status messages now persist during file picker navigation (no 3-second timeout)
+  - Helper text stays visible until destination is selected or picker is cancelled
+  - Applies to all view modes (single-pane, dual-pane, fullscreen)
+  - Files modified: `view.go`, `render_preview.go`
+
+- **Copy Path Logic**
+  - Fixed destination path construction to include filename
+  - Now properly creates `/destination/filename.ext` instead of failing
+  - Handles both file and directory destinations correctly
+  - Files modified: `update_keyboard.go`
+
+- **Prompt Detection Overly Broad**
+  - Regular `.md` files in `.claude/` directory no longer treated as prompts
+  - Now only treats files as prompts if they have:
+    - YAML frontmatter (starts with `---`) OR
+    - `{{VARIABLES}}` in content
+  - Documentation files like `CLAUDE.md` render as normal markdown
+  - Files modified: `prompt_parser.go`
+
 ### Fixed (2025-10-21)
 - **Dual-Pane Accordion Layout**
   - Fixed accordion-style distribution (2/3 focused, 1/3 unfocused)

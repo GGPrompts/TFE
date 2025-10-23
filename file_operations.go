@@ -165,6 +165,14 @@ func getFileIcon(item fileItem) string {
 		switch item.name {
 		case ".claude":
 			return "🤖" // Robot for Claude config
+		case ".codex":
+			return "🤖" // Robot for GitHub Codex
+		case ".copilot":
+			return "🤖" // Robot for GitHub Copilot
+		case ".gemini":
+			return "🤖" // Robot for Google Gemini
+		case ".opencode":
+			return "🤖" // Robot for OpenCode
 		case ".git":
 			return "📦" // Package for git
 		case ".vscode":
@@ -173,6 +181,8 @@ func getFileIcon(item fileItem) string {
 			return "🐙" // Octopus for GitHub
 		case ".docker":
 			return "🐳" // Whale for Docker
+		case ".devcontainer":
+			return "🐳" // Whale for Dev Containers (Docker-based)
 		case ".prompts":
 			return "📝" // Memo for prompts library
 		case "node_modules":
@@ -797,7 +807,7 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 		// Exception: Always show symlinks, even if they start with .
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") && !isSymlink {
 			// Exception: Always show important development folders
-			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts"}
+			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts", ".codex", ".copilot", ".devcontainer", ".gemini", ".opencode"}
 			isImportantFolder := false
 			for _, folder := range importantFolders {
 				if entry.Name() == folder {
@@ -819,7 +829,12 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 				strings.Contains(dirPath, "/.github") ||
 				strings.Contains(dirPath, "/.config") ||
 				strings.Contains(dirPath, "/.docker") ||
-				strings.Contains(dirPath, "/.prompts")
+				strings.Contains(dirPath, "/.prompts") ||
+				strings.Contains(dirPath, "/.codex") ||
+				strings.Contains(dirPath, "/.copilot") ||
+				strings.Contains(dirPath, "/.devcontainer") ||
+				strings.Contains(dirPath, "/.gemini") ||
+				strings.Contains(dirPath, "/.opencode")
 
 			if !isImportantFolder && !inImportantFolder && !isSecretsFileFlag && !isIgnoreFileFlag {
 				continue
@@ -980,7 +995,7 @@ func (m *model) loadFiles() {
 		// Exception: Always show symlinks, even if they start with .
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") && !isSymlink {
 			// Exception: Always show important development folders
-			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts"}
+			importantFolders := []string{".claude", ".git", ".vscode", ".github", ".config", ".docker", ".prompts", ".codex", ".copilot", ".devcontainer", ".gemini", ".opencode"}
 			isImportantFolder := false
 			for _, folder := range importantFolders {
 				if entry.Name() == folder {
@@ -1002,7 +1017,12 @@ func (m *model) loadFiles() {
 				strings.Contains(m.currentPath, "/.github") ||
 				strings.Contains(m.currentPath, "/.config") ||
 				strings.Contains(m.currentPath, "/.docker") ||
-				strings.Contains(m.currentPath, "/.prompts")
+				strings.Contains(m.currentPath, "/.prompts") ||
+				strings.Contains(m.currentPath, "/.codex") ||
+				strings.Contains(m.currentPath, "/.copilot") ||
+				strings.Contains(m.currentPath, "/.devcontainer") ||
+				strings.Contains(m.currentPath, "/.gemini") ||
+				strings.Contains(m.currentPath, "/.opencode")
 
 			if !isImportantFolder && !inImportantFolder && !isSecretsFileFlag && !isIgnoreFileFlag {
 				continue
