@@ -2,7 +2,19 @@
 
 All notable changes to the Terminal File Explorer (TFE) project.
 
-## [Unreleased]
+## [1.0.0] - 2025-10-23
+
+**First Public Release** 🎉
+
+TFE is now ready for public use with comprehensive documentation, screenshots, and video demo.
+
+### Documentation & Release Preparation
+- Added 6 feature screenshots (main interface, light theme, dual-pane, tree view, context menu, prompts, fuzzy search)
+- Embedded YouTube demo video showcasing all features
+- Clarified Unicode emoji icons (Nerd Fonts not required)
+- Cleaned up project structure (moved docs to `docs/`, archived old files)
+- Removed unused code (landing_page.go)
+- Updated installation instructions and prerequisites
 
 ### Added (2025-10-23)
 - **Icon Differentiation for Prompt Templates**
