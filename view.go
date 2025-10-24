@@ -557,6 +557,31 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 		// Add the menu line
 		newLine.WriteString(menuLine)
 
+		// Now preserve the right side of the base line (after the menu)
+		menuWidth := lipgloss.Width(menuLine)
+		endVisualPos := x + menuWidth
+
+		// Continue from where we left off and skip to the end position
+		for bytePos < len(baseRunes) && visualPos < endVisualPos {
+			if baseRunes[bytePos] == '\033' {
+				inAnsi = true
+			} else if inAnsi {
+				if (baseRunes[bytePos] >= 'A' && baseRunes[bytePos] <= 'Z') ||
+					(baseRunes[bytePos] >= 'a' && baseRunes[bytePos] <= 'z') {
+					inAnsi = false
+				}
+			} else {
+				// Use RuneWidth to get actual visual width (handles wide emoji)
+				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
+			}
+			bytePos++
+		}
+
+		// Add the remaining right part of the base line
+		if bytePos < len(baseRunes) {
+			newLine.WriteString(string(baseRunes[bytePos:]))
+		}
+
 		baseLines[targetLine] = newLine.String()
 	}
 
