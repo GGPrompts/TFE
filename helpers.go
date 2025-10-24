@@ -297,14 +297,28 @@ func (m *model) scrollToFocusedVariable() {
 		// In edit mode, variables appear with ANSI styling (no brackets)
 		// We're looking for the FOCUSED variable, which has specific ANSI codes:
 		// Background 235 + Foreground 220
+		//
+		// IMPORTANT: Don't search for the full line content because long lines get wrapped
+		// and no single wrapped line will contain the full pattern.
+		// Instead, search for just the highlight ANSI codes + a short prefix.
 		filledValue, hasFilled := m.filledVariables[varName]
 		if hasFilled && filledValue != "" {
-			// Search for focused variable with filled value
+			// Search for focused highlight marker + first few chars
+			// This works even when long lines are wrapped
+			searchValue := filledValue
+			if strings.Contains(filledValue, "\n") {
+				searchValue = strings.Split(filledValue, "\n")[0]
+			}
+			// Use only first 20 runes (not bytes) to avoid wrap issues and Unicode breaks
+			runes := []rune(searchValue)
+			if len(runes) > 20 {
+				searchValue = string(runes[:20])
+			}
 			searchPatterns = []string{
-				fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", filledValue),
+				fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s", searchValue),
 			}
 		} else {
-			// Search for focused variable with variable name
+			// Search for focused variable with variable name (usually short, no wrap issue)
 			searchPatterns = []string{
 				fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", varName),
 			}

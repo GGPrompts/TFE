@@ -328,14 +328,34 @@ func (m model) renderInlineVariables(templateText string) string {
 			// NO brackets - just show the value or variable name
 			if hasFilled && filledValue != "" {
 				// Show the filled value with focus highlight
-				replacement = fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", filledValue)
+				// For multi-line content, apply highlighting to each line separately
+				if strings.Contains(filledValue, "\n") {
+					lines := strings.Split(filledValue, "\n")
+					highlightedLines := make([]string, len(lines))
+					for i, line := range lines {
+						highlightedLines[i] = fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", line)
+					}
+					replacement = strings.Join(highlightedLines, "\n")
+				} else {
+					replacement = fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", filledValue)
+				}
 			} else {
 				// Show variable name (no brackets) with focus highlight
 				replacement = fmt.Sprintf("\033[48;5;235m\033[38;5;220m%s\033[0m", varName)
 			}
 		} else if hasFilled && filledValue != "" {
 			// Filled but not focused - show value in blue (39), NO brackets
-			replacement = fmt.Sprintf("\033[38;5;39m%s\033[0m", filledValue)
+			// For multi-line content, apply blue color to each line separately
+			if strings.Contains(filledValue, "\n") {
+				lines := strings.Split(filledValue, "\n")
+				highlightedLines := make([]string, len(lines))
+				for i, line := range lines {
+					highlightedLines[i] = fmt.Sprintf("\033[38;5;39m%s\033[0m", line)
+				}
+				replacement = strings.Join(highlightedLines, "\n")
+			} else {
+				replacement = fmt.Sprintf("\033[38;5;39m%s\033[0m", filledValue)
+			}
 		} else {
 			// Unfilled and not focused - show variable name in dim gray (242), NO brackets
 			replacement = fmt.Sprintf("\033[38;5;242m%s\033[0m", varName)

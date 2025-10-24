@@ -25,9 +25,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Filter out terminal response sequences (color queries, etc.)
 	// These are not real keypresses but terminal responses that leak through
 	// Examples: "1;rgb:0000/00", "11;rgb:0000/0000/0000", "b:0000/00"
+	// IMPORTANT: Only filter short sequences - don't block pastes that happen to contain ":" and "/"
 	key := msg.String()
-	if strings.Contains(key, "rgb:") ||
-	   (strings.Contains(key, ":") && strings.Contains(key, "/")) {
+	if len(msg.Runes) < 20 && // Only apply filter to short inputs (terminal responses are brief)
+		(strings.Contains(key, "rgb:") ||
+		 (strings.Contains(key, ":") && strings.Contains(key, "/"))) {
 		// Ignore terminal response sequences
 		return m, nil
 	}
@@ -470,8 +472,34 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Append typed character (use msg.Runes for proper Unicode handling)
 				text := string(msg.Runes)
 				if len(text) > 0 && !isSpecialKey(msg.String()) {
-					m.filledVariables[varName] = currentValue + text
-					return m, nil
+					// First, strip ANSI codes (they contain ESC chars which would fail printable check)
+					cleanText := stripANSI(text)
+
+					// Normalize line endings: convert \r\n and \r to \n
+					cleanText = strings.ReplaceAll(cleanText, "\r\n", "\n")
+					cleanText = strings.ReplaceAll(cleanText, "\r", "\n")
+
+					// Then check if remaining characters are printable
+					// Allow: newline (\n=10), tab (\t=9), and all Unicode > 31 except DEL (127)
+					// Reject: other control chars (0-8, 11-31, 127)
+					isPrintable := true
+					for _, r := range []rune(cleanText) {
+						if (r < 32 && r != '\n' && r != '\t') || r == 127 {
+							isPrintable = false
+							break
+						}
+					}
+
+					if isPrintable {
+						m.filledVariables[varName] = currentValue + cleanText
+
+						// Show paste feedback for large pastes
+						if len(cleanText) > 50 {
+							lineCount := strings.Count(cleanText, "\n") + 1
+							m.setStatusMessage(fmt.Sprintf("✓ Pasted %d chars (%d lines)", len(cleanText), lineCount), false)
+						}
+						return m, nil
+					}
 				}
 			}
 		}
@@ -874,10 +902,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Use msg.Runes to avoid brackets from msg.String() on paste events
 				text := string(msg.Runes)
 				if len(text) > 0 {
-					// Check if all characters are printable
+					// Check if all characters are printable (allow Unicode, reject control characters)
 					isPrintable := true
 					for _, r := range msg.Runes {
-						if r < 32 || r > 126 {
+						if r < 32 || r == 127 { // Control characters only
 							isPrintable = false
 							break
 						}
