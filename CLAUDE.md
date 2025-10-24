@@ -394,14 +394,37 @@ This architecture took significant effort to establish - let's maintain it! 🏗
 
 ---
 
-## Security Considerations
+## Security & Threat Model
 
-**⚠️ Pre-Launch Review (2025-10-22) identified critical issues - see [PLAN.md](PLAN.md) for fixes:**
+**TFE is a local terminal file manager where the user is the operator, not an attacker.**
 
-- **Command Injection:** `command.go:27`, `editor.go:68` - user input to shell without sanitization
-- **Path Traversal:** `file_operations.go:41` - no validation against `../../etc` traversal
-- **File Handle Leak:** `file_operations.go:298` - missing `defer file.Close()` ⚡ ONE LINE FIX
-- **Data Exposure:** History/favorites stored `0644` (world-readable) instead of `0600`
+### Why Common "Security Issues" Don't Apply
+
+**"Command Injection" in command prompt:**
+- ✅ **Not a vulnerability** - User is already in a terminal with full shell access
+- Users can run ANY command they want directly (e.g., `rm -rf ~`)
+- Sanitizing commands would just add friction with no security benefit
+- This is like saying `bash` has a "command injection vulnerability"
+
+**"Path Traversal" in file navigation:**
+- ✅ **Not a vulnerability** - That's the entire point of a file browser
+- Users can navigate to any path they have permissions for (e.g., `../../etc/passwd`)
+- Blocking this would make TFE completely useless
+- The OS enforces file permissions, not TFE
+
+**History/Favorites file permissions (0644 vs 0600):**
+- ✅ **Minor privacy consideration** - Not a security vulnerability
+- No privilege escalation, no data theft from other users
+- Users on shared systems can manually `chmod 600` if desired
+
+### Actual Bug Fixed
+
+**File handle leak (2025-10-24):**
+- ✅ **Fixed** - All `os.Open()` calls now have `defer file.Close()`
+- This was a resource leak bug, not a security issue
+- Files: `file_operations.go:119,647,2147` and `trash.go:347,354`
+
+**Threat Model:** TFE assumes the user has legitimate access to their system. It's not designed to defend against a malicious user attacking themselves on their own machine.
 
 ---
 
@@ -486,12 +509,12 @@ CHANGELOG2.md     → v0.2.0, v0.1.5, v0.1.0 (older versions)
 
 **AI Context Efficiency** - Smaller files load faster | **Human Readability** - Easier to scan | **Project Maintainability** - Clear separation | **Prevents Bloat** - Proactive limits | **Clear Workflow** - Know where info belongs
 
-### Current Status (as of 2025-10-22)
+### Current Status (as of 2025-10-24)
 
 Documentation health:
-- CLAUDE.md: 500 lines ✅ (at capacity - expanded preview rendering guidance)
-- PLAN.md: 232 lines ✅ (58% of 400 limit)
+- CLAUDE.md: 520 lines ⚠️ (104% of 500 limit - added threat model section)
+- PLAN.md: 234 lines ✅ (59% of 400 limit - removed false security items)
 - CHANGELOG.md: 316 lines ✅ (90% of 350 limit)
-- BACKLOG.md: 97 lines ✅ (under 300 limit)
+- BACKLOG.md: 97 lines ✅ (32% of 300 limit)
 
-**Status:** ✅ All documentation within limits.
+**Status:** ⚠️ CLAUDE.md slightly over limit (added important threat model clarification). Consider archiving older sections if adding more content.
