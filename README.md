@@ -300,7 +300,7 @@ curl -sSL https://raw.githubusercontent.com/GGPrompts/TFE/main/uninstall.sh | ba
 **Install globally using Go:**
 
 ```bash
-go install github.com/GGPrompts/TFE@latest
+go install github.com/GGPrompts/tfe@latest
 ```
 
 This installs the `tfe` binary to `~/go/bin/` (or `$GOPATH/bin`). Make sure this directory is in your PATH:
@@ -318,7 +318,7 @@ tfe    # Launch from any directory
 ✅ **What you get:**
 - Global `tfe` command - launch from anywhere
 - Clean installation via Go's package manager
-- Easy updates with `go install github.com/GGPrompts/TFE@latest`
+- Easy updates with `go install github.com/GGPrompts/tfe@latest`
 
 ❌ **What's missing:**
 - Quick CD feature (see Option 1 or 3 if you want this)

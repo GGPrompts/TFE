@@ -15,7 +15,7 @@ source ~/.bashrc
 ### Q: How do I install TFE?
 **A:** Install with Go:
 ```bash
-go install github.com/GGPrompts/TFE@latest
+go install github.com/GGPrompts/tfe@latest
 ```
 Or clone and build from source:
 ```bash

@@ -33,7 +33,7 @@ echo -e "${GREEN}✓${NC} Go found: $(go version)"
 # Install TFE binary
 echo ""
 echo -e "${BLUE}Installing TFE binary...${NC}"
-if go install github.com/GGPrompts/TFE@latest; then
+if go install github.com/GGPrompts/tfe@latest; then
     echo -e "${GREEN}✓${NC} TFE binary installed to ~/go/bin/tfe"
 else
     echo -e "${RED}✗ Failed to install TFE${NC}"
