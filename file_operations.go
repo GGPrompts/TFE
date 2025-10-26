@@ -1677,6 +1677,7 @@ func (m *model) loadPreview(path string) {
 	m.preview.tooLarge = false
 	m.preview.isMarkdown = false
 	m.preview.isSyntaxHighlighted = false
+	m.preview.hasGraphicsProtocol = false
 	m.preview.isPrompt = false
 	m.preview.promptTemplate = nil
 	// Invalidate cache when loading new file
@@ -1948,6 +1949,9 @@ func (m *model) loadPreview(path string) {
 					"",
 				}
 				content = append(header, imageLines...)
+
+				// Set flag to prevent wrapping of graphics protocol escape sequences
+				m.preview.hasGraphicsProtocol = true
 			} else {
 				// Fall back to message if no protocol support
 				imageViewer := getAvailableImageViewer()

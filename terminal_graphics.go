@@ -35,13 +35,38 @@ func detectTerminalProtocol() TerminalProtocol {
 	term := os.Getenv("TERM")
 	termProgram := os.Getenv("TERM_PROGRAM")
 
+	// Manual override via environment variable
+	// Useful for cases where auto-detection fails (e.g., WSL)
+	// Valid values: "kitty", "iterm2", "sixel", "none"
+	if override := os.Getenv("TFE_TERMINAL_PROTOCOL"); override != "" {
+		switch strings.ToLower(override) {
+		case "kitty":
+			return ProtocolKitty
+		case "iterm2":
+			return ProtocolITerm2
+		case "sixel":
+			return ProtocolSixel
+		case "none":
+			return ProtocolNone
+		}
+	}
+
 	// Check for Kitty terminal
 	if strings.Contains(term, "kitty") || os.Getenv("KITTY_WINDOW_ID") != "" {
 		return ProtocolKitty
 	}
 
 	// Check for WezTerm (supports Kitty protocol)
+	// Standard detection (works on native Linux/macOS)
 	if os.Getenv("WEZTERM_EXECUTABLE") != "" || os.Getenv("TERM_PROGRAM") == "WezTerm" {
+		return ProtocolKitty
+	}
+
+	// WSL-specific WezTerm detection
+	// WezTerm environment variables don't pass through to WSL, so we check:
+	// 1. Are we in WSL?
+	// 2. Is WezTerm in the Windows PATH?
+	if isWSL() && isWezTermInPath() {
 		return ProtocolKitty
 	}
 
@@ -60,6 +85,32 @@ func detectTerminalProtocol() TerminalProtocol {
 	}
 
 	return ProtocolNone
+}
+
+// isWezTermInPath checks if WezTerm is available in the PATH
+// This is useful for WSL where WezTerm is installed on Windows
+func isWezTermInPath() bool {
+	// Check common Windows mount points in WSL
+	wezTermPaths := []string{
+		"/mnt/c/Program Files/WezTerm/wezterm.exe",
+		"/mnt/c/Program Files (x86)/WezTerm/wezterm.exe",
+	}
+
+	for _, path := range wezTermPaths {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+	}
+
+	// Also check if wezterm.exe is in PATH
+	pathEnv := os.Getenv("PATH")
+	for _, dir := range strings.Split(pathEnv, ":") {
+		if strings.Contains(strings.ToLower(dir), "wezterm") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // renderImageWithProtocol attempts to render an image using terminal graphics protocols

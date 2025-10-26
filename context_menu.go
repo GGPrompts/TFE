@@ -59,6 +59,11 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		items = append(items, contextMenuItem{"📄 New File...", "newfile"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 
+		// Add "Open in File Explorer" for WSL users
+		if isWSL() {
+			items = append(items, contextMenuItem{"🗂️  Open in Explorer", "explorer"})
+		}
+
 		// Add git operations if this is a git repository
 		if isGitRepo(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"─────────", "separator"})
@@ -256,6 +261,13 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
 		} else {
 			m.setStatusMessage("Path copied to clipboard", false)
+		}
+		return m, tea.ClearScreen
+
+	case "explorer":
+		// Open folder in Windows File Explorer (WSL only)
+		if m.contextMenuFile.isDir && isWSL() {
+			return m, openInFileExplorer(m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 

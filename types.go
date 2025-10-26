@@ -97,6 +97,7 @@ type previewModel struct {
 	fileSize            int64
 	isMarkdown          bool // Whether the file is markdown
 	isSyntaxHighlighted bool // Whether syntax highlighting was applied
+	hasGraphicsProtocol bool // Whether content contains terminal graphics protocol data (Kitty/iTerm2/Sixel)
 	// Caching for performance
 	cachedWrappedLines    []string // Cached wrapped text lines
 	cachedRenderedContent string   // Cached Glamour-rendered markdown

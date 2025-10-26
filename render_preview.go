@@ -265,8 +265,13 @@ func (m model) renderPreview(maxVisible int) string {
 	}
 
 	// Wrap all lines first (use cache if available and width matches)
+	// IMPORTANT: Skip wrapping for graphics protocol data (Kitty/iTerm2/Sixel)
+	// These escape sequences must stay intact on their original lines
 	var wrappedLines []string
-	if m.preview.cacheValid && len(m.preview.cachedWrappedLines) > 0 && m.preview.cachedWidth == availableWidth {
+	if m.preview.hasGraphicsProtocol {
+		// Don't wrap graphics protocol data - use content as-is
+		wrappedLines = m.preview.content
+	} else if m.preview.cacheValid && len(m.preview.cachedWrappedLines) > 0 && m.preview.cachedWidth == availableWidth {
 		// Use cached wrapped lines
 		wrappedLines = m.preview.cachedWrappedLines
 	} else {
@@ -320,10 +325,14 @@ func (m model) renderPreview(maxVisible int) string {
 		// Content line - ensure it doesn't exceed available width to prevent wrapping
 		contentLine := wrappedLines[i]
 
-		// Truncate to available width using ANSI-aware truncation
-		// This prevents long lines with ANSI codes from wrapping outside the box
-		if visualWidth(contentLine) > availableWidth {
-			contentLine = truncateToWidth(contentLine, availableWidth)
+		// IMPORTANT: Don't truncate graphics protocol data - it contains escape sequences
+		// that must remain intact. Only truncate regular text content.
+		if !m.preview.hasGraphicsProtocol {
+			// Truncate to available width using ANSI-aware truncation
+			// This prevents long lines with ANSI codes from wrapping outside the box
+			if visualWidth(contentLine) > availableWidth {
+				contentLine = truncateToWidth(contentLine, availableWidth)
+			}
 		}
 
 		renderedLine += contentLine
