@@ -23,9 +23,69 @@ echo ""
 
 # Check if Go is installed
 if ! command -v go &> /dev/null; then
-    echo -e "${RED}✗ Error: Go is not installed${NC}"
-    echo "Please install Go 1.24+ from https://go.dev/dl/"
-    exit 1
+    echo -e "${YELLOW}✗ Go is not installed${NC}"
+    echo ""
+    echo "TFE requires Go 1.21+ to install."
+    echo ""
+
+    # Detect package manager
+    if command -v apt &> /dev/null; then
+        PKG_MANAGER="apt"
+        INSTALL_CMD="sudo apt update && sudo apt install -y golang-go"
+    elif command -v yum &> /dev/null; then
+        PKG_MANAGER="yum"
+        INSTALL_CMD="sudo yum install -y golang"
+    elif command -v dnf &> /dev/null; then
+        PKG_MANAGER="dnf"
+        INSTALL_CMD="sudo dnf install -y golang"
+    elif command -v pacman &> /dev/null; then
+        PKG_MANAGER="pacman"
+        INSTALL_CMD="sudo pacman -S --noconfirm go"
+    elif command -v brew &> /dev/null; then
+        PKG_MANAGER="brew"
+        INSTALL_CMD="brew install go"
+    else
+        echo -e "${RED}Could not detect package manager.${NC}"
+        echo "Please install Go manually from https://go.dev/dl/"
+        exit 1
+    fi
+
+    # Ask if user wants to install Go
+    echo -e "Would you like to install Go using ${BLUE}$PKG_MANAGER${NC}? (y/n)"
+    echo -e "${YELLOW}Command:${NC} $INSTALL_CMD"
+    echo ""
+
+    # Read from /dev/tty to work when script is piped from curl
+    read -r -p "Install Go? [y/N] " response < /dev/tty
+
+    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+        echo ""
+        echo -e "${BLUE}Installing Go...${NC}"
+
+        if eval "$INSTALL_CMD"; then
+            echo -e "${GREEN}✓${NC} Go installed successfully"
+            echo ""
+
+            # Verify Go is now available
+            if ! command -v go &> /dev/null; then
+                echo -e "${RED}✗ Go installed but not found in PATH${NC}"
+                echo "You may need to:"
+                echo "  1. Close and reopen your terminal"
+                echo "  2. Or run: source ~/.bashrc (or ~/.zshrc)"
+                exit 1
+            fi
+        else
+            echo -e "${RED}✗ Failed to install Go${NC}"
+            echo "Please install Go manually from https://go.dev/dl/"
+            exit 1
+        fi
+    else
+        echo ""
+        echo -e "${YELLOW}Installation cancelled.${NC}"
+        echo "To install TFE later, first install Go from https://go.dev/dl/"
+        echo "Then re-run this script."
+        exit 0
+    fi
 fi
 
 echo -e "${GREEN}✓${NC} Go found: $(go version)"
@@ -40,15 +100,7 @@ else
     exit 1
 fi
 
-# Verify binary is in PATH
-if ! command -v tfe &> /dev/null; then
-    echo -e "${YELLOW}⚠${NC}  TFE binary not found in PATH"
-    echo "   Add ~/go/bin to your PATH:"
-    echo "   export PATH=\$PATH:~/go/bin"
-    echo ""
-fi
-
-# Detect shell
+# Detect shell first (needed for PATH setup)
 SHELL_NAME=$(basename "$SHELL")
 SHELL_RC=""
 
@@ -70,6 +122,28 @@ case "$SHELL_NAME" in
         SHELL_RC=""
         ;;
 esac
+
+# Add ~/go/bin to PATH if needed (for bash/zsh)
+if [ -n "$SHELL_RC" ]; then
+    if ! command -v tfe &> /dev/null; then
+        echo ""
+        echo -e "${BLUE}Adding ~/go/bin to PATH...${NC}"
+
+        # Check if PATH export already exists
+        if grep -q 'export PATH=.*go/bin' "$SHELL_RC" 2>/dev/null; then
+            echo -e "${YELLOW}⚠${NC}  ~/go/bin already in PATH configuration"
+        else
+            # Add PATH export to shell config
+            echo "" >> "$SHELL_RC"
+            echo "# Add Go binaries to PATH" >> "$SHELL_RC"
+            echo 'export PATH="$PATH:$HOME/go/bin"' >> "$SHELL_RC"
+            echo -e "${GREEN}✓${NC} Added ~/go/bin to PATH in $SHELL_RC"
+
+            # Try to update PATH for current session
+            export PATH="$PATH:$HOME/go/bin"
+        fi
+    fi
+fi
 
 # Download and setup wrapper for bash/zsh
 if [ -n "$SHELL_RC" ]; then

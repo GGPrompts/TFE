@@ -8,11 +8,28 @@
 # Then use 'tfe' instead of './tfe' to launch the file explorer
 
 tfe() {
-    # Auto-detect TFE binary location (works across all devices)
-    # The wrapper is in the same directory as the tfe binary
-    local WRAPPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local TFE_BIN="$WRAPPER_DIR/tfe"
+    # Auto-detect TFE binary location
+    local TFE_BIN=""
     local CD_TARGET="$HOME/.tfe_cd_target"
+
+    # Check common locations in order of preference
+    if command -v tfe &> /dev/null; then
+        # Found in PATH (go install location: ~/go/bin/tfe)
+        TFE_BIN="$(command -v tfe)"
+    elif [ -f "$HOME/go/bin/tfe" ]; then
+        # Go install default location
+        TFE_BIN="$HOME/go/bin/tfe"
+    elif [ -f "$HOME/.config/tfe/tfe" ]; then
+        # Local installation
+        TFE_BIN="$HOME/.config/tfe/tfe"
+    elif [ -f "/usr/local/bin/tfe" ]; then
+        # System-wide installation
+        TFE_BIN="/usr/local/bin/tfe"
+    else
+        echo "Error: TFE binary not found"
+        echo "Please ensure TFE is installed and in your PATH"
+        return 1
+    fi
 
     # Clear any previous cd target
     rm -f "$CD_TARGET"
