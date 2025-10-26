@@ -1,128 +1,125 @@
 package main
 
 // Module: fuzzy_search.go
-// Purpose: Fuzzy file search functionality using go-fzf
+// Purpose: Fuzzy file search functionality using external fzf + fd/find
 // Responsibilities:
-// - Building file lists for fuzzy search
-// - Launching fuzzy finder interface
+// - Detecting available file finding tools (fd, fdfind, find)
+// - Launching external fzf with file list
 // - Processing search results
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
-	fzf "github.com/koki-develop/go-fzf"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// launchFuzzySearch creates a fuzzy search interface for all files in current directory
+// getFileFinder returns the best available file finder command
+// Preference: fd > fdfind > find
+func getFileFinder() (string, []string) {
+	// Try fd (modern, fast)
+	if _, err := exec.LookPath("fd"); err == nil {
+		return "fd", []string{
+			"--type", "f",           // Files only
+			"--hidden",              // Include hidden files
+			"--follow",              // Follow symlinks
+			"--exclude", ".git",     // Exclude .git directories
+			"--exclude", "node_modules", // Exclude node_modules
+			"--color", "never",      // No color codes
+		}
+	}
+
+	// Try fdfind (Ubuntu's renamed fd)
+	if _, err := exec.LookPath("fdfind"); err == nil {
+		return "fdfind", []string{
+			"--type", "f",
+			"--hidden",
+			"--follow",
+			"--exclude", ".git",
+			"--exclude", "node_modules",
+			"--color", "never",
+		}
+	}
+
+	// Fall back to find (always available, slower)
+	return "find", []string{
+		".",
+		"-type", "f",
+		"-not", "-path", "*/.git/*",
+		"-not", "-path", "*/node_modules/*",
+	}
+}
+
+// launchFuzzySearch uses external fzf + fd/find for blazing fast search
 func (m *model) launchFuzzySearch() tea.Cmd {
 	return func() tea.Msg {
-		// Build list of all files (recursively walk directory)
-		items := m.buildFuzzySearchItems()
+		// Check if fzf is installed
+		_, err := exec.LookPath("fzf")
+		if err != nil {
+			return fuzzySearchResultMsg{
+				selected: "",
+				err:      fmt.Errorf("fzf not found. Install: sudo apt install fzf"),
+			}
+		}
 
-		if len(items) == 0 {
+		// Get the best file finder
+		finder, args := getFileFinder()
+
+		// Build shell command that pipes file finder to fzf
+		// This is simpler and more reliable than trying to coordinate stdin/tty
+		var shellCmd string
+
+		// Optimized fzf options for performance:
+		// --no-preview: Disable preview by default (user can toggle with '?' if needed)
+		// --no-mouse: Disable mouse for better performance
+		// --cycle: Wrap around when reaching end
+		// --bind '?:toggle-preview': Press '?' to show/hide preview
+		fzfOpts := "--height=100% --layout=reverse --border --prompt='File> ' --no-preview --no-mouse --cycle --bind '?:toggle-preview' --preview='head -50 {}' --preview-window=right:50%:wrap:hidden"
+
+		if finder == "find" {
+			// find outputs relative paths like "./file.txt", clean them up
+			shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | sed 's|^\\./||' | fzf %s",
+				m.currentPath, finder, strings.Join(args, " "), fzfOpts)
+		} else {
+			// fd/fdfind already outputs clean relative paths
+			shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | fzf %s",
+				m.currentPath, finder, strings.Join(args, " "), fzfOpts)
+		}
+
+		// Run the shell command with proper TTY access
+		cmd := exec.Command("sh", "-c", shellCmd)
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+
+		// Capture output
+		output, err := cmd.Output()
+		if err != nil {
+			// User cancelled (exit code 130) or other error
+			// This is normal, not an error
 			return fuzzySearchResultMsg{
 				selected: "",
 				err:      nil,
 			}
 		}
 
-		// Create display names (relative paths from current directory)
-		displayNames := make([]string, len(items))
-		for i, item := range items {
-			// Remove the current path prefix to show relative paths
-			relPath := strings.TrimPrefix(item.path, m.currentPath)
-			relPath = strings.TrimPrefix(relPath, "/")
-			if relPath == "" {
-				relPath = item.name
-			}
-			// Add folder indicator
-			if item.isDir {
-				relPath += "/"
-			}
-			displayNames[i] = relPath
-		}
-
-		// Create fuzzy finder with optimized settings for speed
-		f, err := fzf.New(
-			fzf.WithLimit(8), // Reduced to 8 results for faster rendering
-		)
-		if err != nil {
+		// Get the selected file path
+		selectedFile := strings.TrimSpace(string(output))
+		if selectedFile == "" {
 			return fuzzySearchResultMsg{
 				selected: "",
-				err:      err,
+				err:      nil,
 			}
 		}
 
-		// Find selected item
-		idxs, err := f.Find(displayNames, func(i int) string { return displayNames[i] })
-		if err != nil {
-			return fuzzySearchResultMsg{
-				selected: "",
-				err:      err,
-			}
-		}
-
-		// Get selected file path
-		var selected string
-		if len(idxs) > 0 {
-			selected = items[idxs[0]].path
-		}
+		// Convert relative path to absolute
+		absPath := filepath.Join(m.currentPath, selectedFile)
 
 		return fuzzySearchResultMsg{
-			selected: selected,
+			selected: absPath,
 			err:      nil,
-		}
-	}
-}
-
-// buildFuzzySearchItems recursively builds a list of all files for fuzzy search
-func (m *model) buildFuzzySearchItems() []fileItem {
-	var items []fileItem
-	const maxItems = 200 // Reduced limit for faster searching
-
-	// Start with current directory files (skip "..")
-	for _, f := range m.files {
-		if f.name != ".." {
-			items = append(items, f)
-			if len(items) >= maxItems {
-				return items
-			}
-		}
-	}
-
-	// Only recurse into subdirectories if we haven't hit the limit
-	// and only go 1 level deep
-	if len(items) < maxItems {
-		m.addSubdirFiles(m.currentPath, 0, 1, &items, maxItems)
-	}
-
-	return items
-}
-
-// addSubdirFiles recursively adds files from subdirectories
-func (m *model) addSubdirFiles(dirPath string, currentDepth, maxDepth int, items *[]fileItem, maxItems int) {
-	if currentDepth >= maxDepth || len(*items) >= maxItems {
-		return
-	}
-
-	// Get files in this directory using loadSubdirFiles pattern
-	files := m.loadSubdirFiles(dirPath)
-
-	// Process each file
-	for _, file := range files {
-		// Check if we've hit the limit
-		if len(*items) >= maxItems {
-			return
-		}
-
-		// Add file to items
-		*items = append(*items, file)
-
-		// If it's a directory, recurse into it
-		if file.isDir {
-			m.addSubdirFiles(file.path, currentDepth+1, maxDepth, items, maxItems)
 		}
 	}
 }

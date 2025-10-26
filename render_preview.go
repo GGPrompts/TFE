@@ -49,7 +49,7 @@ func (m model) getWrappedLineCount() int {
 		markdownContent := strings.Join(m.preview.content, "\n")
 		// Use cached rendering with timeout to prevent hangs
 		// Note: renderMarkdownWithTimeout is in file_operations.go
-		rendered, err := renderMarkdownWithTimeout(markdownContent, availableWidth, 5*time.Second)
+		rendered, err := m.renderMarkdownWithTimeout(markdownContent, availableWidth, 5*time.Second)
 		if err == nil {
 			renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
 			return len(renderedLines)
@@ -204,10 +204,20 @@ func (m model) renderPreview(maxVisible int) string {
 				outputLines++
 			}
 
-			for i := start; i < end && outputLines < maxVisible; i++ {
+			// Reserve last line for scroll indicator in dual-pane mode
+			targetLines := maxVisible
+			if m.viewMode == viewDualPane && totalLines > 0 {
+				targetLines = maxVisible - 1
+			}
+
+			for i := start; i < end && outputLines < targetLines; i++ {
 				line := renderedLines[i]
-				// Add left padding for better readability (especially for code blocks)
-				paddedLine := "  " + line
+
+				// Add scrollbar indicator for markdown files (since they don't have line numbers)
+				scrollbar := m.renderScrollbar(outputLines, targetLines, totalLines)
+
+				// Add scrollbar + space + left padding for better readability
+				paddedLine := scrollbar + " " + line
 				// Truncate after padding to prevent exceeding box bounds (per CLAUDE.md guidance)
 				if visualWidth(paddedLine) > boxContentWidth {
 					paddedLine = truncateToWidth(paddedLine, boxContentWidth)
@@ -215,10 +225,37 @@ func (m model) renderPreview(maxVisible int) string {
 				writeLine(paddedLine + "\033[0m")
 			}
 
-			// Pad with empty lines to reach exactly maxVisible lines
-			// This ensures proper alignment with the file list pane
-			for outputLines < maxVisible {
-				writeLine("\033[0m")
+			// Add scroll position indicator in dual-pane mode
+			if m.viewMode == viewDualPane && totalLines > 0 {
+				// Calculate scroll percentage
+				scrollPercent := (m.preview.scrollPos * 100) / totalLines
+				if scrollPercent > 100 {
+					scrollPercent = 100
+				}
+
+				// Create compact scroll indicator
+				scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", m.preview.scrollPos+1, totalLines, scrollPercent)
+				scrollStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("241")).
+					Italic(true)
+
+				// Pad with empty lines to reach target
+				for outputLines < targetLines {
+					writeLine("\033[0m")
+				}
+
+				// Add scroll indicator on last line
+				if outputLines > 0 {
+					s.WriteString("\n")
+				}
+				s.WriteString(scrollStyle.Render(scrollIndicator))
+				outputLines++
+			} else {
+				// Pad with empty lines to reach exactly maxVisible lines
+				// This ensures proper alignment with the file list pane
+				for outputLines < maxVisible {
+					writeLine("\033[0m")
+				}
 			}
 
 			return s.String()
@@ -294,10 +331,40 @@ func (m model) renderPreview(maxVisible int) string {
 		writeLine(renderedLine)
 	}
 
-	// Pad with empty lines to reach exactly maxVisible lines
-	// This ensures proper alignment with the file list pane in dual-pane mode
-	for linesRendered < maxVisible {
-		writeLine("\033[0m")
+	// Add scroll position indicator as the last line in dual-pane mode
+	if m.viewMode == viewDualPane && totalLines > 0 {
+		// Calculate scroll percentage
+		scrollPercent := (m.preview.scrollPos * 100) / totalLines
+		if scrollPercent > 100 {
+			scrollPercent = 100
+		}
+
+		// Create compact scroll indicator
+		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", m.preview.scrollPos+1, totalLines, scrollPercent)
+		scrollStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Italic(true)
+
+		// Reserve last line for scroll indicator
+		targetLines := maxVisible - 1
+
+		// Pad with empty lines to reach target
+		for linesRendered < targetLines {
+			writeLine("\033[0m")
+		}
+
+		// Add scroll indicator on last line
+		if linesRendered > 0 {
+			s.WriteString("\n")
+		}
+		s.WriteString(scrollStyle.Render(scrollIndicator))
+		linesRendered++
+	} else {
+		// Pad with empty lines to reach exactly maxVisible lines
+		// This ensures proper alignment with the file list pane in dual-pane mode
+		for linesRendered < maxVisible {
+			writeLine("\033[0m")
+		}
 	}
 
 	return s.String()
@@ -590,7 +657,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 			contentLines = strings.Split(strings.TrimRight(m.preview.cachedRenderedContent, "\n"), "\n")
 		} else {
 			// Cache miss or invalid - render with Glamour (with timeout to prevent hangs)
-			rendered, err := renderMarkdownWithTimeout(contentText, availableWidth, 5*time.Second)
+			rendered, err := m.renderMarkdownWithTimeout(contentText, availableWidth, 5*time.Second)
 			if err == nil {
 				// Successfully rendered with Glamour
 				contentLines = strings.Split(strings.TrimRight(rendered, "\n"), "\n")
@@ -668,23 +735,62 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		renderedLines = append(renderedLines, line+"\033[0m")
 	}
 
-	// Render content (no line numbers for prompts)
-	for i := start; i < end && len(renderedLines) < maxVisible; i++ {
+	// Reserve last line for scroll indicator in dual-pane mode
+	targetLines := maxVisible
+	if m.viewMode == viewDualPane && totalLines > 0 {
+		targetLines = maxVisible - 1
+	}
+
+	// Render content (no line numbers for prompts, but show scrollbar)
+	contentLineIndex := 0
+	for i := start; i < end && len(renderedLines) < targetLines; i++ {
 		line := wrappedLines[i]
+
+		// Add scrollbar indicator for prompts (since they don't have line numbers)
+		scrollbar := m.renderScrollbar(contentLineIndex, targetLines-len(headerLines), totalLines)
+
+		// Add scrollbar + space + content
 		if isMarkdownPrompt {
-			line = "  " + line // 2-space left padding
+			line = scrollbar + " " + line // scrollbar + space + content
+		} else {
+			line = scrollbar + " " + line // scrollbar + space + content
 		}
+
 		// Truncate to box content width to prevent terminal wrapping
 		// (even though content was wrapped, markdown padding or ANSI codes could push it over)
 		if visualWidth(line) > boxContentWidth {
 			line = truncateToWidth(line, boxContentWidth)
 		}
 		renderedLines = append(renderedLines, line+"\033[0m")
+		contentLineIndex++
 	}
 
-	// Pad with empty lines to reach exactly maxVisible lines
-	for len(renderedLines) < maxVisible {
-		renderedLines = append(renderedLines, "\033[0m")
+	// Add scroll position indicator in dual-pane mode
+	if m.viewMode == viewDualPane && totalLines > 0 {
+		// Calculate scroll percentage
+		scrollPercent := (m.preview.scrollPos * 100) / totalLines
+		if scrollPercent > 100 {
+			scrollPercent = 100
+		}
+
+		// Create compact scroll indicator
+		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", m.preview.scrollPos+1, totalLines, scrollPercent)
+		scrollStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Italic(true)
+
+		// Pad with empty lines to reach target
+		for len(renderedLines) < targetLines {
+			renderedLines = append(renderedLines, "\033[0m")
+		}
+
+		// Add scroll indicator on last line
+		renderedLines = append(renderedLines, scrollStyle.Render(scrollIndicator))
+	} else {
+		// Pad with empty lines to reach exactly maxVisible lines
+		for len(renderedLines) < maxVisible {
+			renderedLines = append(renderedLines, "\033[0m")
+		}
 	}
 
 	for i, line := range renderedLines {
@@ -763,16 +869,46 @@ func (m model) renderFullPreview() string {
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
 
-		// File info line - update based on whether we're showing markdown or wrapped text
+		// File info line with scroll position percentage
 		var infoText string
+
+		// Calculate scroll percentage
+		totalLines := m.getWrappedLineCount()
+		var scrollPercent int
+		if totalLines > 0 {
+			// Calculate percentage based on current scroll position
+			scrollPercent = (m.preview.scrollPos * 100) / totalLines
+			if scrollPercent > 100 {
+				scrollPercent = 100
+			}
+		}
+
 		if m.preview.isMarkdown {
-			infoText = fmt.Sprintf("Size: %s | Markdown Rendered",
-				formatFileSize(m.preview.fileSize))
+			// Show scroll position for markdown too
+			if totalLines > 0 {
+				infoText = fmt.Sprintf("Size: %s | Markdown Rendered | Line %d/%d (%d%%)",
+					formatFileSize(m.preview.fileSize),
+					m.preview.scrollPos+1,
+					totalLines,
+					scrollPercent)
+			} else {
+				infoText = fmt.Sprintf("Size: %s | Markdown Rendered",
+					formatFileSize(m.preview.fileSize))
+			}
 		} else {
-			infoText = fmt.Sprintf("Size: %s | Lines: %d (wrapped) | Scroll: %d",
-				formatFileSize(m.preview.fileSize),
-				len(m.preview.content),
-				m.preview.scrollPos+1)
+			// Show scroll position for regular text
+			if totalLines > 0 {
+				infoText = fmt.Sprintf("Size: %s | Lines: %d (wrapped) | Line %d/%d (%d%%)",
+					formatFileSize(m.preview.fileSize),
+					len(m.preview.content),
+					m.preview.scrollPos+1,
+					totalLines,
+					scrollPercent)
+			} else {
+				infoText = fmt.Sprintf("Size: %s | Lines: %d (wrapped)",
+					formatFileSize(m.preview.fileSize),
+					len(m.preview.content))
+			}
 		}
 		s.WriteString(pathStyle.Render(infoText))
 		s.WriteString("\033[0m") // Reset ANSI codes

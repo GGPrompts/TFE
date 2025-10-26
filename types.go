@@ -240,6 +240,9 @@ type model struct {
 	leftWidth   int // Width of left pane in dual-pane mode
 	rightWidth  int // Width of right pane in dual-pane mode
 	focusedPane paneType // Which pane has focus in dual-pane mode
+	// Glamour renderer cache (avoid recreating on every render)
+	glamourRenderer      interface{} // *glamour.TermRenderer
+	glamourRendererWidth int         // Width renderer was created for
 	// Mouse state for preview mode
 	previewMouseEnabled bool // Whether mouse is enabled in preview mode (default: true)
 	// Double-click detection

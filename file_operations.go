@@ -1927,31 +1927,58 @@ func (m *model) loadPreview(path string) {
 				"   7z x filename.7z",
 			}
 		} else if isImageFile(path) {
-			imageViewer := getAvailableImageViewer()
-			if imageViewer != "" {
-				content = []string{
-					"🖼️ Image File",
+			// Try HD terminal graphics rendering first (Kitty/iTerm2/Sixel)
+			// Calculate dimensions for preview pane (approximate)
+			// These will be adjusted based on actual pane size when rendering
+			maxWidth := 80  // Will be refined based on preview pane width
+			maxHeight := 30 // Will be refined based on preview pane height
+
+			hdImageData, success := renderImageWithProtocol(path, maxWidth, maxHeight)
+			if success {
+				// HD image rendering succeeded - store the rendered data
+				// Split into lines for preview rendering
+				imageLines := strings.Split(strings.TrimRight(hdImageData, "\n"), "\n")
+
+				// Add header info
+				protocolName := getProtocolName()
+				header := []string{
+					fmt.Sprintf("🖼️ Image File (HD Preview via %s)", protocolName),
 					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 					"",
-					"Cannot preview in text mode",
-					"",
-					"Options:",
-					fmt.Sprintf("  ✨ Press V to view in %s (terminal image viewer)", imageViewer),
-					"  • Press F3 to open in browser",
 				}
+				content = append(header, imageLines...)
 			} else {
-				content = []string{
-					"🖼️ Image File",
-					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
-					"",
-					"Cannot preview in text mode",
-					"",
-					"Options:",
-					"  • Press F3 to open in browser",
-					"",
-					"💡 Install a terminal image viewer:",
-					"   sudo apt install timg",
-					"   or: cargo install viu",
+				// Fall back to message if no protocol support
+				imageViewer := getAvailableImageViewer()
+				if imageViewer != "" {
+					content = []string{
+						"🖼️ Image File",
+						fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+						"",
+						"Cannot preview in text mode",
+						"",
+						"Options:",
+						fmt.Sprintf("  ✨ Press V to view in %s (terminal image viewer)", imageViewer),
+						"  • Press F3 to open in browser",
+						"",
+						"💡 For HD inline previews, use WezTerm or Kitty terminal",
+					}
+				} else {
+					content = []string{
+						"🖼️ Image File",
+						fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+						"",
+						"Cannot preview in text mode",
+						"",
+						"Options:",
+						"  • Press F3 to open in browser",
+						"",
+						"💡 Install a terminal image viewer:",
+						"   sudo apt install timg",
+						"   or: cargo install viu",
+						"",
+						"💡 For HD inline previews, use WezTerm or Kitty terminal",
+					}
 				}
 			}
 		} else {
@@ -2127,7 +2154,7 @@ func (m *model) populatePreviewCache() {
 			if editorAvailable("termux-clipboard-set") {
 				timeout = 15 * time.Second // Mobile devices need more time
 			}
-			rendered, err := renderMarkdownWithTimeout(markdownContent, availableWidth, timeout)
+			rendered, err := m.renderMarkdownWithTimeout(markdownContent, availableWidth, timeout)
 
 			if err == nil {
 				// Store rendered content even if empty (Glamour might return empty for some valid markdown)
@@ -2163,7 +2190,7 @@ func (m *model) populatePreviewCache() {
 
 // renderMarkdownWithTimeout renders markdown with a timeout to prevent hangs
 // Returns rendered content and any error (including timeout)
-func renderMarkdownWithTimeout(content string, width int, timeout time.Duration) (string, error) {
+func (m *model) renderMarkdownWithTimeout(content string, width int, timeout time.Duration) (string, error) {
 	type renderResult struct {
 		rendered string
 		err      error
@@ -2183,30 +2210,42 @@ func renderMarkdownWithTimeout(content string, width int, timeout time.Duration)
 			}
 		}()
 
-		// Render markdown with custom TFE style
-		// First try custom style file, fall back to "dark" if not found
-		exePath, _ := os.Executable()
-		exeDir := filepath.Dir(exePath)
-		customStylePath := filepath.Join(exeDir, "styles", "tfe.json")
-
-		// Check if custom style exists, otherwise use built-in dark style
+		// Check if we have a cached renderer for this width
 		var renderer *glamour.TermRenderer
 		var err error
-		if _, statErr := os.Stat(customStylePath); statErr == nil {
-			renderer, err = glamour.NewTermRenderer(
-				glamour.WithStylePath(customStylePath),
-				glamour.WithWordWrap(width),
-			)
+
+		if m.glamourRenderer != nil && m.glamourRendererWidth == width {
+			// Reuse cached renderer (avoids expensive terminal probing!)
+			renderer = m.glamourRenderer.(*glamour.TermRenderer)
 		} else {
-			// Fall back to auto style (detects light/dark terminal theme)
-			renderer, err = glamour.NewTermRenderer(
-				glamour.WithAutoStyle(),
-				glamour.WithWordWrap(width),
-			)
-		}
-		if err != nil {
-			resultChan <- renderResult{rendered: "", err: err}
-			return
+			// Create new renderer and cache it
+			// First try custom style file, fall back to "dark" if not found
+			exePath, _ := os.Executable()
+			exeDir := filepath.Dir(exePath)
+			customStylePath := filepath.Join(exeDir, "styles", "tfe.json")
+
+			// Check if custom style exists, otherwise use built-in dark style
+			if _, statErr := os.Stat(customStylePath); statErr == nil {
+				renderer, err = glamour.NewTermRenderer(
+					glamour.WithStylePath(customStylePath),
+					glamour.WithWordWrap(width),
+				)
+			} else {
+				// Use fixed "dark" style instead of WithAutoStyle()
+				// This avoids slow terminal probing in WezTerm/Termux (like yazi does)
+				renderer, err = glamour.NewTermRenderer(
+					glamour.WithStandardStyle("dark"),
+					glamour.WithWordWrap(width),
+				)
+			}
+			if err != nil {
+				resultChan <- renderResult{rendered: "", err: err}
+				return
+			}
+
+			// Cache the renderer for future use
+			m.glamourRenderer = renderer
+			m.glamourRendererWidth = width
 		}
 
 		rendered, err := renderer.Render(content)

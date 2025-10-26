@@ -5,6 +5,48 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added
+- **HD Image Previews via Terminal Graphics Protocols**
+  - Added `terminal_graphics.go` module for rendering images at full resolution
+  - Supports Kitty protocol (WezTerm, Kitty terminal), iTerm2, and Sixel
+  - Auto-detects terminal capabilities and uses best available protocol
+  - Images render inline in preview pane (no more F5 exit → view → return)
+  - Supports PNG, JPG, GIF, WebP formats with automatic scaling
+  - Falls back to helpful message in unsupported terminals
+  - Dependencies: `github.com/BourgeoisBear/rasterm`, `golang.org/x/image/webp`
+  - Files added: `terminal_graphics.go`
+  - Files modified: `file_operations.go`, `go.mod`, `go.sum`, `CLAUDE.md`
+
+- **Blazing Fast Fuzzy Search (Ctrl+P)**
+  - Replaced slow `go-fzf` library with external `fzf` + `fd`/`find`
+  - Zero typing lag, instant results from entire directory tree
+  - Auto-detects best file finder: `fd` > `fdfind` > `find`
+  - Live file preview disabled by default (press `?` to toggle)
+  - No file count limits, searches recursively without depth restrictions
+  - Requires: `fzf` (external), optional: `fd`/`fdfind` for faster scans
+  - Files modified: `fuzzy_search.go`, `CLAUDE.md`
+
+- **Scroll Position Indicators**
+  - Full preview mode (F5): Shows `Line 45/120 (37%)` in info bar
+  - Dual-pane mode: Compact footer shows ` 45/120 (37%) ` at bottom
+  - Works for all file types: markdown, text, code, prompts
+  - Updates dynamically as you scroll with arrow keys or Page Up/Down
+  - Files modified: `render_preview.go`
+
+- **Markdown Files Visual Scrollbar**
+  - Added scrollbar to markdown and prompt files (previously only in code files)
+  - Appears on left edge with `│` track and `█` thumb indicator
+  - Thumb size represents visible portion of file
+  - Consistent with code file scrollbars (line number position)
+  - Files modified: `render_preview.go`
+
+- **Glamour Markdown Renderer Performance Optimization**
+  - Caches Glamour renderer instance (like yazi does)
+  - Uses fixed "dark" style instead of slow auto-detection
+  - Eliminates terminal probing lag in WezTerm/Termux
+  - First render has slight delay, all subsequent scrolls are instant
+  - 10-50x faster markdown scrolling on slow terminals
+  - Files modified: `file_operations.go`, `render_preview.go`, `types.go`
+
 - **Update Notification System**
   - Auto-checks GitHub Releases API for new versions (once per 24 hours)
   - Shows `🎉 Update Available: vX.X.X (click for details)` in header during first 5 seconds

@@ -35,6 +35,7 @@ tfe/
 ├── trash.go - Trash/recycle bin system
 ├── prompt_parser.go - Prompt template variable parsing
 ├── fuzzy_search.go - Fuzzy file search (Ctrl+P)
+├── terminal_graphics.go - HD image preview via terminal protocols
 └── helpers.go - Helper functions for model
 ```
 
@@ -255,10 +256,40 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 **Contents**: `parsePromptVariables()`, `classifyVariableType()`, `substituteVariables()`, auto-fill for DATE/TIME/FILE/DIRECTORY
 
 ### 17. `fuzzy_search.go` - Fuzzy File Search
-**Purpose**: Ctrl+P fuzzy search integration
-**Contents**: `launchFuzzySearch()`, file collection, result parsing, terminal state preservation
+**Purpose**: Ctrl+P fuzzy search using external fzf + fd/find
+**Contents**:
+- `getFileFinder()` - Auto-detects best file finder (fd > fdfind > find)
+- `launchFuzzySearch()` - Launches fzf with file list pipeline
+- `navigateToFuzzyResult()` - Navigates to selected file
 
-### 18. `menu.go` - Menu Bar Rendering
+**Dependencies**: Requires `fzf` (external), uses `fd`/`fdfind`/`find` for file discovery
+
+**Performance**: Instant search with no lag, searches entire directory tree recursively
+
+**When to extend**: Add fzf options, customize preview, add file type filtering
+
+### 18. `terminal_graphics.go` - Terminal Graphics Protocol Support
+**Purpose**: HD image preview rendering using terminal graphics protocols
+**Contents**:
+- **Protocol detection:**
+  - `detectTerminalProtocol()` - Auto-detects Kitty/iTerm2/Sixel support
+  - `getProtocolName()` - Returns human-readable protocol name
+- **Image rendering:**
+  - `renderImageWithProtocol()` - Main entry point for HD image rendering
+  - `loadImageFile()` - Loads PNG/JPG/GIF/WebP images
+  - `scaleImage()` - Scales images to fit preview pane dimensions
+- **Protocol encoders:**
+  - `encodeKittyImage()` - Kitty graphics protocol (WezTerm, Kitty)
+  - `encodeITerm2Image()` - iTerm2 inline images protocol
+  - `encodeSixelImage()` - Sixel protocol (xterm, mlterm, foot)
+
+**Dependencies**: Uses `github.com/BourgeoisBear/rasterm` for protocol encoding
+
+**When to extend**: Add new terminal protocols, improve scaling algorithms, add image format support
+
+**Supported terminals**: WezTerm (Kitty), Kitty (native), iTerm2 (macOS), xterm/mlterm/foot (Sixel)
+
+### 19. `menu.go` - Menu Bar Rendering
 **Purpose**: Renders the top menu bar with clickable emoji buttons
 **Contents**: `renderMenuBar()`, button definitions, width-aware rendering for narrow terminals
 
