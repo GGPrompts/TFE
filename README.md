@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20Termux-lightgrey)](https://github.com/GGPrompts/TFE)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL%20%7C%20Termux-lightgrey)](https://github.com/GGPrompts/TFE)
 
 A powerful and clean terminal-based file explorer built with Go and Bubbletea. TFE combines traditional file management with modern features like dual-pane preview, syntax highlighting, and an integrated AI prompts library. **Works beautifully on desktop and mobile (Termux) with full touch support.**
 
@@ -123,8 +123,8 @@ TFE combines the power of traditional file managers with modern features designe
 
 - Go 1.24 or higher
 - A terminal with Unicode/emoji support (most modern terminals)
-  - **Windows Terminal**: Works out of the box
-  - **Termux**: Works out of the box, no configuration needed
+  - **WSL (Windows)**: Use Windows Terminal with WSL/Ubuntu - works perfectly with Claude Code
+  - **Termux (Android)**: Works out of the box, no configuration needed
   - **macOS/Linux**: Most modern terminal emulators (iTerm2, Alacritty, GNOME Terminal, etc.)
 - **For Termux users**: Install `termux-api` for clipboard support: `pkg install termux-api`
 
