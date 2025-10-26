@@ -35,7 +35,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// If fuzzy search is active, don't process any keyboard events
-	// (go-fzf handles its own input)
+	// (external fzf handles its own input)
 	if m.fuzzySearchActive {
 		return m, nil
 	}

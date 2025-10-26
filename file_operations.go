@@ -1846,6 +1846,7 @@ func (m *model) loadPreview(path string) {
 					"",
 					"💡 Or install a terminal PDF viewer:",
 					"   sudo apt install timg",
+					"   or: brew install timg",
 				}
 			}
 		} else if isVideoFile(path) {
@@ -1974,7 +1975,7 @@ func (m *model) loadPreview(path string) {
 						"  • Press F3 to open in browser",
 						"",
 						"💡 Install a terminal image viewer:",
-						"   sudo apt install timg",
+						"   sudo apt install timg (or: brew install timg)",
 						"   or: cargo install viu",
 						"",
 						"💡 For HD inline previews, use WezTerm or Kitty terminal",

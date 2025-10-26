@@ -61,7 +61,7 @@ func (m *model) launchFuzzySearch() tea.Cmd {
 		if err != nil {
 			return fuzzySearchResultMsg{
 				selected: "",
-				err:      fmt.Errorf("fzf not found. Install: sudo apt install fzf"),
+				err:      fmt.Errorf("fzf not found. Install: sudo apt install fzf (Linux) or brew install fzf (macOS)"),
 			}
 		}
 

@@ -59,7 +59,7 @@ func (m model) isClickInFileListArea(mouseX, mouseY int) bool {
 // handleMouseEvent processes all mouse input
 func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// If fuzzy search is active, don't process any mouse events
-	// (go-fzf handles its own input)
+	// (external fzf handles its own input)
 	if m.fuzzySearchActive {
 		return m, nil
 	}

@@ -13,7 +13,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Mobile Ready**: Full touch controls and optimized single-pane modes for Termux/Android
 - **F-Key Controls**: Midnight Commander-style F1-F10 hotkeys for common operations
 - **Context-Aware Help**: F1 automatically jumps to relevant help section based on current mode
-- **Fuzzy Search**: Fast file search with go-fzf (Ctrl+P or click 🔍)
+- **Fuzzy Search**: Blazing fast file search with external fzf + fd/find (Ctrl+P or click 🔍)
 - **Context Menu**: Right-click or F2 for quick access to file operations
 - **Quick CD**: Exit TFE and change shell directory to selected folder
 - **Dual-Pane Mode**: Split-screen layout with file browser and live preview
@@ -32,9 +32,11 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Double-Click Support**: Double-click to navigate folders or preview files
 - **Prompts Library**: F11 mode for AI prompt templates with fillable input fields, file picker (F3), clipboard copy, and quick template creation via File menu
 - **Trash/Recycle Bin**: F12 to view deleted items, restore or permanently delete (F8 moves to trash)
+- **HD Image Previews**: Inline HD image rendering via Kitty/iTerm2/Sixel protocols in preview pane
 - **Image Support**: View images with viu/timg/chafa and edit with textual-paint (MS Paint in terminal!)
 - **File Operations**: Copy files/folders with interactive file picker, rename, create new prompts via File menu
 - **Preview Search**: Ctrl-F to search within file previews, 'n' for next match, Shift-N for previous
+- **Scroll Indicators**: Visual scroll position (Line X/Y with %) and scrollbars in markdown/code previews
 - **Mouse Toggle**: Press 'm' in full preview to remove border for clean text selection
 - **Git Workspace Management**: Visual triage of repos with status (⚡ Dirty, ↑ Ahead, ↓ Behind, ✓ Clean), context menu git operations (Pull, Push, Sync, Fetch), auto-refresh after operations
 - **Games Integration**: Optional [TUIClassics](https://github.com/GGPrompts/TUIClassics) integration - launch Snake, Minesweeper, Solitaire, 2048 via Tools menu
@@ -73,7 +75,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 
 ### Fuzzy Search (Ctrl+P)
 ![Fuzzy Search](assets/screenshot-search.png)
-*Fast file search with go-fzf integration*
+*Blazing fast file search using external fzf + fd/find*
 
 ## Feature Comparison
 
@@ -129,13 +131,34 @@ TFE combines the power of traditional file managers with modern features designe
   - **WSL (Windows)**: Use Windows Terminal with WSL/Ubuntu - works perfectly with Claude Code
   - **Termux (Android)**: Works out of the box, no configuration needed
   - **macOS/Linux**: Most modern terminal emulators (iTerm2, Alacritty, GNOME Terminal, etc.)
+- **fzf** (required for Ctrl+P fuzzy search)
+  - **Linux/WSL**: `sudo apt install fzf`
+  - **macOS**: `brew install fzf`
+  - **Termux**: `pkg install fzf`
+- **fd** or **fdfind** (recommended but optional - faster file discovery for fuzzy search)
+  - **Linux/WSL**: `sudo apt install fd-find` (command is `fdfind` on Ubuntu/Debian)
+  - **macOS**: `brew install fd`
+  - **Termux**: `pkg install fd`
+  - Falls back to standard `find` command if not installed
 - **For Termux users**: Install `termux-api` for clipboard support: `pkg install termux-api`
 
 ### Optional Dependencies
 
 TFE works great without these, but install them for additional features:
 
-**For Image Support:**
+**For HD Image Previews (Inline in Preview Pane):**
+- **No installation needed!** - TFE automatically detects and uses your terminal's graphics protocol
+- **Supported terminals:**
+  - **WezTerm** (Kitty protocol) - Linux, macOS, Windows
+  - **Kitty** (native) - Linux, macOS
+  - **iTerm2** (macOS only) - Native inline images
+  - **xterm/mlterm/foot** (Sixel protocol) - Linux
+- **Supported formats:** PNG, JPG, GIF, WebP
+- Images render at full resolution directly in the preview pane (dual-pane or full-screen)
+- Falls back to helpful message in unsupported terminals
+- **Note:** For the best experience, use WezTerm or Kitty terminal
+
+**For Image Viewing (External Viewers - Press V key):**
 - **viu** (recommended) - View images in terminal with best quality
   ```bash
   # Install via cargo (Rust package manager)
@@ -456,7 +479,7 @@ Press **F1** from anywhere in TFE to open the complete keyboard shortcuts refere
 | While viewing a file (full preview) | **Preview & Full-Screen Mode** section |
 | With context menu open | **Context Menu** section |
 | While filling prompt fields | **Prompt Templates & Fillable Fields** section |
-| While typing a command | **Command Prompt** section |
+| With command prompt focused (press :) | **Command Prompt** section |
 
 This means you get **instant access to the shortcuts that matter** for what you're currently doing, without scrolling through the entire help file. You can still manually scroll to other sections if needed.
 
@@ -740,7 +763,7 @@ TFE offers three distinct interface modes:
 
 ### Command Prompt (Always Visible)
 
-The command prompt is always visible at the top of the screen (3rd row, below the toolbar). Simply start typing any command and it will automatically focus and capture your input. Press Enter to execute commands in the current directory context:
+The command prompt is always visible at the top of the screen (3rd row, below the toolbar). Press **:** (colon) to focus the command prompt - your cursor will appear and you can type commands. Press Enter to execute commands in the current directory context:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -758,16 +781,15 @@ The command prompt is always visible at the top of the screen (3rd row, below th
 
 **Command Prompt Features:**
 - **Always visible** at the top (3rd row) - no need to enter a special mode
+- **Vim-style command mode** - Press `:` (colon) to focus, `Esc` to unfocus and clear
 - **Full cursor editing** - Left/Right arrows, Home/End, Ctrl+Left/Right for word jumping
 - **Smart editing** - Backspace, Delete, Ctrl+K (kill to end), Ctrl+U (kill to start)
 - **Persistent history** - Saved to `~/.config/tfe/command_history.json`, survives restarts
 - **History navigation** - Up/Down arrows or mouse wheel to browse previous commands
 - **Visual feedback** - Cursor `█` shows position, `!` prefix appears in red
-- **Auto-focus** - Start typing any character to automatically focus the prompt
 - **Execute commands** - Any shell command runs in the current directory
 - **TFE suspends** while the command runs, then resumes automatically
 - **Auto-refresh** - File list updates after command completes
-- Press `Esc` to unfocus and clear the prompt
 - Press `:!command` to run command and exit TFE (perfect for launching Claude Code!)
 
 **Example Commands:**
@@ -950,7 +972,7 @@ TFE follows a modular architecture with 13 focused files:
 - ✅ Command history (last 100 commands)
 - ✅ Bracketed paste support (proper paste handling)
 - ✅ Special key filtering (no more literal "end", "home", etc.)
-- ✅ Fuzzy file search with go-fzf (Ctrl+P or click 🔍)
+- ✅ Blazing fast fuzzy file search with external fzf (Ctrl+P or click 🔍)
 - ✅ Clickable toolbar buttons (home, favorites, search, etc.)
 - ✅ Column header sorting in Detail view (click to sort)
 - ✅ Rounded borders and polished UI
