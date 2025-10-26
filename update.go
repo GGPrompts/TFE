@@ -1,7 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -21,7 +27,8 @@ import (
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
-		tickCmd(), // Start landing page animation
+		tickCmd(),          // Start landing page animation
+		checkForUpdates(),  // Check for new releases on GitHub
 	)
 }
 
@@ -33,6 +40,74 @@ func tickCmd() tea.Cmd {
 	return tea.Tick(time.Millisecond*50, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
+}
+
+// checkForUpdates queries GitHub API for the latest release
+// Only checks once per day to respect rate limits
+func checkForUpdates() tea.Cmd {
+	return func() tea.Msg {
+		// Get config directory
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil // Silent fail
+		}
+
+		configDir := filepath.Join(homeDir, ".config", "tfe")
+		cacheFile := filepath.Join(configDir, "update_check.json")
+
+		// Check cache to avoid checking too often
+		var cache struct {
+			LastCheck time.Time `json:"last_check"`
+		}
+
+		// Only check once per day
+		if data, err := os.ReadFile(cacheFile); err == nil {
+			json.Unmarshal(data, &cache)
+			if time.Since(cache.LastCheck) < 24*time.Hour {
+				return nil // Checked recently
+			}
+		}
+
+		// Fetch latest release from GitHub API
+		client := &http.Client{Timeout: 3 * time.Second}
+		resp, err := client.Get("https://api.github.com/repos/GGPrompts/TFE/releases/latest")
+		if err != nil {
+			return nil // Silent fail on network issues
+		}
+		defer resp.Body.Close()
+
+		var release struct {
+			TagName string `json:"tag_name"`
+			Body    string `json:"body"`
+			HTMLURL string `json:"html_url"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+			return nil
+		}
+
+		// Update cache
+		cache.LastCheck = time.Now()
+		os.MkdirAll(configDir, 0755)
+		if data, _ := json.Marshal(cache); data != nil {
+			os.WriteFile(cacheFile, data, 0644)
+		}
+
+		// Compare versions (simple string comparison)
+		latest := strings.TrimPrefix(release.TagName, "v")
+		current := strings.TrimPrefix(Version, "v")
+
+		// Simple version comparison - for semantic versioning, consider using a library
+		if latest > current {
+			return updateAvailableMsg{
+				version:   release.TagName,
+				changelog: release.Body,
+				url:       release.HTMLURL,
+			}
+		}
+
+		return nil
+	}
 }
 
 // stripANSI removes ANSI escape codes from a string
@@ -157,6 +232,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tea.EnableMouseCellMotion,
 		)
 
+	case gitOperationFinishedMsg:
+		// Git operation has finished, we're back in TFE
+		// Refresh file list to update git status
+		m.loadFiles()
+
+		// If in git repos mode, rescan to update git status indicators
+		if m.showGitReposOnly {
+			m.setStatusMessage("🔍 Refreshing git repository status...", false)
+			m.gitReposList = m.scanGitReposRecursive(m.gitReposScanRoot, 3, 50)
+			m.setStatusMessage(fmt.Sprintf("✓ %s completed - Found %d repositories", msg.operation, len(m.gitReposList)), false)
+		} else {
+			// Show operation result
+			if msg.err == nil {
+				m.setStatusMessage(fmt.Sprintf("✓ Git %s completed successfully", msg.operation), false)
+			} else {
+				m.setStatusMessage(fmt.Sprintf("✗ Git %s failed", msg.operation), true)
+			}
+		}
+
+		// Force a refresh and restore terminal state (alt screen + mouse support)
+		return m, tea.Batch(
+			tea.EnterAltScreen,       // Re-enter alternate screen (required!)
+			tea.ClearScreen,
+			tea.EnableMouseCellMotion,
+		)
+
 	case fuzzySearchResultMsg:
 		// Fuzzy search completed
 		m.fuzzySearchActive = false
@@ -168,6 +269,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)
+
+	case updateAvailableMsg:
+		// Update notification received from GitHub
+		m.updateAvailable = true
+		m.updateVersion = msg.version
+		m.updateChangelog = msg.changelog
+		m.updateURL = msg.url
+		return m, nil
 
 	case markdownRenderedMsg:
 		// Markdown rendering completed in background

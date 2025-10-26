@@ -891,6 +891,11 @@ Additional context: {{variable2}}
 
 		// If turning ON, scan for repos recursively from current directory
 		if m.showGitReposOnly {
+			// Auto-switch to Detail view when enabling git repos filter
+			m.displayMode = modeDetail
+			m.detailScrollX = 0 // Reset scroll
+			m.calculateLayout() // Recalculate widths for detail view
+
 			m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
 			m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
 			m.gitReposLastScan = time.Now()

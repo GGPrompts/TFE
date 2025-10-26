@@ -321,6 +321,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
 							m.filledVariables[varName] = selectedPath
 							m.setStatusMessage(fmt.Sprintf("✓ Set %s = %s", varName, selectedFile.name), false)
+
+							// Invalidate cache to force header re-render with updated variable colors
+							m.preview.cacheValid = false
+							m.populatePreviewCache()
 						}
 					}
 
@@ -373,6 +377,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				currentValue := m.filledVariables[varName]
 				if len(currentValue) > 0 {
 					m.filledVariables[varName] = currentValue[:len(currentValue)-1]
+
+					// Invalidate cache to force header re-render with updated variable colors
+					m.preview.cacheValid = false
+					m.populatePreviewCache()
 				}
 			}
 			return m, nil
@@ -382,6 +390,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.focusedVariableIndex >= 0 && m.focusedVariableIndex < len(m.preview.promptTemplate.variables) {
 				varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
 				m.filledVariables[varName] = ""
+
+				// Invalidate cache to force header re-render with updated variable colors
+				m.preview.cacheValid = false
+				m.populatePreviewCache()
 			}
 			return m, nil
 
@@ -492,6 +504,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 					if isPrintable {
 						m.filledVariables[varName] = currentValue + cleanText
+
+						// Invalidate cache to force header re-render with updated variable colors
+						m.preview.cacheValid = false
+						m.populatePreviewCache()
 
 						// Show paste feedback for large pastes
 						if len(cleanText) > 50 {

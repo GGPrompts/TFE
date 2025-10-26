@@ -13,18 +13,22 @@ tfe() {
     local CD_TARGET="$HOME/.tfe_cd_target"
 
     # Check common locations in order of preference
-    if command -v tfe &> /dev/null; then
-        # Found in PATH (go install location: ~/go/bin/tfe)
-        TFE_BIN="$(command -v tfe)"
-    elif [ -f "$HOME/go/bin/tfe" ]; then
-        # Go install default location
+    # NOTE: Check specific paths first to avoid finding this wrapper function
+    if [ -f "$HOME/go/bin/tfe" ]; then
+        # Go install default location (preferred)
         TFE_BIN="$HOME/go/bin/tfe"
-    elif [ -f "$HOME/.config/tfe/tfe" ]; then
+    elif [ -f "$HOME/.local/bin/tfe" ] && [ -x "$HOME/.local/bin/tfe" ]; then
         # Local installation
+        TFE_BIN="$HOME/.local/bin/tfe"
+    elif [ -f "$HOME/.config/tfe/tfe" ]; then
+        # Alternative local installation
         TFE_BIN="$HOME/.config/tfe/tfe"
     elif [ -f "/usr/local/bin/tfe" ]; then
         # System-wide installation
         TFE_BIN="/usr/local/bin/tfe"
+    elif command -v tfe &> /dev/null; then
+        # Fallback: search PATH (but may find wrapper itself)
+        TFE_BIN="$(command -v tfe)"
     else
         echo "Error: TFE binary not found"
         echo "Please ensure TFE is installed and in your PATH"

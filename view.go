@@ -65,7 +65,7 @@ func (m model) renderSinglePane() string {
 	showGitHub := time.Since(m.startupTime) < 5*time.Second
 
 	if showGitHub {
-		// Title with mode indicator and GitHub link (first 5 seconds)
+		// Title with mode indicator (first 5 seconds)
 		titleText := "(T)erminal (F)ile (E)xplorer"
 		if m.commandFocused {
 			titleText += " [Command Mode]"
@@ -78,20 +78,31 @@ func (m model) renderSinglePane() string {
 			}
 		}
 
-		// Create GitHub link (OSC 8 hyperlink format)
-		githubURL := "https://github.com/GGPrompts/TFE"
-		githubLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+		// Right side: Update notification or GitHub link
+		var rightLink string
+		var displayText string
 
-		// Calculate spacing to right-align GitHub link
-		githubText := githubURL // Display text
-		availableWidth := m.width - len(titleText) - len(githubText) - 2
+		if m.updateAvailable {
+			// Show update available with clickable link
+			displayText = fmt.Sprintf("🎉 Update Available: %s (click for details)", m.updateVersion)
+			// Use special marker URL so we can detect clicks in mouse handler
+			rightLink = fmt.Sprintf("\033]8;;update-available\033\\%s\033]8;;\033\\", displayText)
+		} else {
+			// Show GitHub link
+			githubURL := "https://github.com/GGPrompts/TFE"
+			displayText = githubURL
+			rightLink = fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+		}
+
+		// Calculate spacing to right-align
+		availableWidth := m.width - len(titleText) - len(displayText) - 2
 		if availableWidth < 1 {
 			availableWidth = 1
 		}
 		spacing := strings.Repeat(" ", availableWidth)
 
-		// Render title on left, GitHub link on right
-		title := titleStyle.Render(titleText) + spacing + titleStyle.Render(githubLink)
+		// Render title on left, link/update on right
+		title := titleStyle.Render(titleText) + spacing + titleStyle.Render(rightLink)
 		s.WriteString(title)
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
@@ -189,8 +200,18 @@ func (m model) renderSinglePane() string {
 	}
 	s.WriteString(" ")
 
-	// Games launcher button
-	s.WriteString(homeButtonStyle.Render("[🎮]"))
+	// Git repositories toggle button
+	if m.showGitReposOnly {
+		// Active: gray background (like other active toggles)
+		activeStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeStyle.Render("[🔀]"))
+	} else {
+		// Inactive: normal styling
+		s.WriteString(homeButtonStyle.Render("[🔀]"))
+	}
 	s.WriteString(" ")
 
 	// Trash/Recycle bin button

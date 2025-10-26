@@ -75,6 +75,13 @@ type fileItem struct {
 	isSymlink     bool   // Whether this is a symbolic link
 	symlinkTarget string // Target path if this is a symlink
 	hasVariables  *bool  // Cached: whether prompt file has {{variables}} (nil = not checked yet)
+	// Git status (populated for git repositories)
+	isGitRepo      bool      // Whether this directory is a git repository
+	gitBranch      string    // Current branch name
+	gitAhead       int       // Commits ahead of remote
+	gitBehind      int       // Commits behind remote
+	gitDirty       bool      // Has uncommitted changes
+	gitLastCommit  time.Time // Time of last commit
 }
 
 // previewModel holds preview pane state
@@ -304,6 +311,11 @@ type model struct {
 	toolsAvailable map[string]bool // Cached tool availability (lazygit, htop, etc.)
 	// Performance: Cache for directoryContainsPrompts() to avoid repeated file I/O
 	promptDirsCache map[string]bool // Path -> contains prompts (cleared on loadFiles)
+	// Update notification
+	updateAvailable bool   // Whether an update is available
+	updateVersion   string // Version string of available update (e.g., "v0.6.1")
+	updateChangelog string // Changelog/release notes from GitHub
+	updateURL       string // URL to the release page
 }
 
 // treeItem represents an item in the tree view with depth information
@@ -324,6 +336,13 @@ type markdownRenderedMsg struct{}
 type fuzzySearchResultMsg struct {
 	selected string // Selected file path
 	err      error
+}
+
+// updateAvailableMsg is sent when a new release is detected
+type updateAvailableMsg struct {
+	version   string // Version tag (e.g., "v0.6.1")
+	changelog string // Release notes/changelog
+	url       string // GitHub release URL
 }
 
 // dialogType represents different types of dialogs

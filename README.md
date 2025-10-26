@@ -36,7 +36,8 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **File Operations**: Copy files/folders with interactive file picker, rename, create new prompts via File menu
 - **Preview Search**: Ctrl-F to search within file previews, 'n' for next match, Shift-N for previous
 - **Mouse Toggle**: Press 'm' in full preview to remove border for clean text selection
-- **Games Integration**: Optional [TUIClassics](https://github.com/GGPrompts/TUIClassics) integration - launch Snake, Minesweeper, Solitaire, 2048 via [🎮] button or Tools menu
+- **Git Workspace Management**: Visual triage of repos with status (⚡ Dirty, ↑ Ahead, ↓ Behind, ✓ Clean), context menu git operations (Pull, Push, Sync, Fetch), auto-refresh after operations
+- **Games Integration**: Optional [TUIClassics](https://github.com/GGPrompts/TUIClassics) integration - launch Snake, Minesweeper, Solitaire, 2048 via Tools menu
 
 ## Demo Video
 
@@ -94,6 +95,8 @@ TFE stands out from other terminal file managers with unique features designed f
 | **Quick CD (Shell Integration)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Image Viewing (TUI)** | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 | **Markdown Preview** | ✅ (Glamour) | ✅ | ❌ | ❌ | ✅ | ❌ |
+| **Git Status Indicators** | ✅ **Unique!** | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Git Operations** | ✅ (Pull/Push/Sync) | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Context Menu** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Mouse Support** | ✅ Full | Limited | ❌ | ❌ | ✅ | ✅ |
 | **F-Key Shortcuts** | ✅ MC-style | Custom | Custom | Custom | Custom | ✅ |
@@ -459,7 +462,7 @@ This means you get **instant access to the shortcuts that matter** for what you'
 
 ### Mouse Controls
 
-- **Toolbar Buttons**: Click [🏠] home, [⭐] favorites, [>_] command mode, [🔍] fuzzy search
+- **Toolbar Buttons**: Click [🏠] home, [⭐] favorites, [V] view mode, [⬌] dual-pane, [>_] command mode, [🔍] search, [📝] prompts, [🔀] git repos, [🗑️] trash
 - **Left Click**: Select item (or switch pane focus in dual-pane mode)
 - **Double Click**: Navigate into folder or preview file
 - **Right Click**: Open context menu for file operations (includes Quick CD for folders)
@@ -742,7 +745,7 @@ The command prompt is always visible at the top of the screen (3rd row, below th
 ```
 ┌─────────────────────────────────────────┐
 │ TFE - Terminal File Explorer            │  ← Title bar
-│ 🏠 ⭐ 📝 🗑️                              │  ← Toolbar (clickable buttons)
+│ 🏠 ⭐ V ⬌ >_ 🔍 📝 🔀 🗑️               │  ← Toolbar (clickable buttons)
 │ $ ls -la█                               │  ← Command prompt (3rd row)
 │                                         │
 │   ▸ folder1                             │  ← File list
@@ -778,7 +781,7 @@ The command prompt is always visible at the top of the screen (3rd row, below th
 #### Key Interface Elements
 
 1. **Title Bar**: Application name and current mode
-2. **Toolbar**: Clickable emoji buttons (🏠 Home, ⭐ Favorites, 📝 Prompts, 🗑️ Trash)
+2. **Toolbar**: Clickable emoji buttons (🏠 Home, ⭐ Favorites, V View Mode, ⬌ Dual-Pane, >_ Command, 🔍 Search, 📝 Prompts, 🔀 Git Repos, 🗑️ Trash)
 3. **Command Prompt**: Always-visible shell command input (3rd row)
 4. **File List**: Scrollable list of folders and files with type indicators
 5. **Preview Pane**: Live file preview with line numbers (dual-pane/full modes)
@@ -874,12 +877,11 @@ make build
 
 ### Accessing Games from TFE
 
-Once installed, launch games from TFE in two ways:
+Once installed, launch games from TFE via:
 
-1. **Toolbar Button**: Click the **[🎮]** emoji button
-2. **Tools Menu**: Navigate to **Tools → Games Launcher**
+**Tools Menu**: Navigate to **Tools → Games Launcher**
 
-Both methods launch the TUIClassics menu where you can select from:
+This launches the TUIClassics menu where you can select from:
 - 🐍 Snake - Classic snake game with smooth controls
 - 💣 Minesweeper - The timeless puzzle game
 - 🃏 Solitaire - Klondike solitaire card game

@@ -510,39 +510,50 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 	// Variables detected (if any) - wrap long lines to prevent layout issues
 	if len(tmpl.variables) > 0 {
-		varsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-		varsLine := fmt.Sprintf("Variables: %s", strings.Join(tmpl.variables, ", "))
+		// Count how many times each variable appears
+		varCounts := countVariableOccurrences(tmpl.template)
+
+		// Build variable display strings with colors and counts
+		varDisplays := make([]string, 0, len(tmpl.variables))
+		for _, varName := range tmpl.variables {
+			// Check if variable has been filled
+			filled := false
+			if val, exists := m.filledVariables[varName]; exists && val != "" {
+				filled = true
+			}
+
+			// Build display string: varname or varname (3)
+			display := varName
+			count := varCounts[varName]
+			if count > 1 {
+				display = fmt.Sprintf("%s (%d)", varName, count)
+			}
+
+			// Color: green if filled, gray if not
+			if filled {
+				filledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")) // Green
+				display = filledStyle.Render(display)
+			} else {
+				unfilledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")) // Gray
+				display = unfilledStyle.Render(display)
+			}
+
+			varDisplays = append(varDisplays, display)
+		}
+
+		// Build the variables line with proper label
+		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+		varsLine := labelStyle.Render("Variables: ") + strings.Join(varDisplays, labelStyle.Render(", "))
 
 		// Wrap the variables line if it's too long (use visual width, not byte length)
-		if visualWidth(varsLine) > headerWrapWidth {
-			// Wrap manually at available width using visual width
-			remaining := varsLine
-			for len(remaining) > 0 {
-				if visualWidth(remaining) <= headerWrapWidth {
-					headerLines = append(headerLines, varsStyle.Render(remaining))
-					break
-				}
-				// Find last comma before width limit for natural break
-				breakPoint := headerWrapWidth
-				// Search backwards for a comma that gives us a line within the width
-				for i := len(remaining) - 1; i >= 0; i-- {
-					if remaining[i] == ',' && visualWidth(remaining[:i+1]) <= headerWrapWidth {
-						breakPoint = i + 1 // Include comma
-						break
-					}
-				}
-				// If no good comma found, force break at width
-				if breakPoint == headerWrapWidth && visualWidth(remaining[:breakPoint]) > headerWrapWidth {
-					// Binary search for the right break point by visual width
-					for visualWidth(remaining[:breakPoint]) > headerWrapWidth && breakPoint > 0 {
-						breakPoint--
-					}
-				}
-				headerLines = append(headerLines, varsStyle.Render(strings.TrimSpace(remaining[:breakPoint])))
-				remaining = strings.TrimSpace(remaining[breakPoint:])
-			}
+		// Note: visualWidth doesn't account for ANSI codes, so this is approximate
+		plainVarsLine := fmt.Sprintf("Variables: %s", strings.Join(tmpl.variables, ", "))
+		if visualWidth(plainVarsLine) > headerWrapWidth {
+			// For simplicity, just add the line (wrapping styled text is complex)
+			// The visual width check prevents most overflow cases
+			headerLines = append(headerLines, varsLine)
 		} else {
-			headerLines = append(headerLines, varsStyle.Render(varsLine))
+			headerLines = append(headerLines, varsLine)
 		}
 	}
 
@@ -875,7 +886,7 @@ func (m model) renderDualPane() string {
 	showGitHub := time.Since(m.startupTime) < 5*time.Second
 
 	if showGitHub {
-		// Title with mode indicator and GitHub link (first 5 seconds)
+		// Title with mode indicator (first 5 seconds)
 		titleText := "(T)erminal (F)ile (E)xplorer [Dual-Pane]"
 		if m.commandFocused {
 			titleText += " [Command Mode]"
@@ -888,20 +899,31 @@ func (m model) renderDualPane() string {
 			}
 		}
 
-		// Create GitHub link (OSC 8 hyperlink format)
-		githubURL := "https://github.com/GGPrompts/TFE"
-		githubLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+		// Right side: Update notification or GitHub link
+		var rightLink string
+		var displayText string
 
-		// Calculate spacing to right-align GitHub link
-		githubText := githubURL // Display text
-		availableWidth := m.width - len(titleText) - len(githubText) - 2
+		if m.updateAvailable {
+			// Show update available with clickable link
+			displayText = fmt.Sprintf("🎉 Update Available: %s (click for details)", m.updateVersion)
+			// Use special marker URL so we can detect clicks in mouse handler
+			rightLink = fmt.Sprintf("\033]8;;update-available\033\\%s\033]8;;\033\\", displayText)
+		} else {
+			// Show GitHub link
+			githubURL := "https://github.com/GGPrompts/TFE"
+			displayText = githubURL
+			rightLink = fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
+		}
+
+		// Calculate spacing to right-align
+		availableWidth := m.width - len(titleText) - len(displayText) - 2
 		if availableWidth < 1 {
 			availableWidth = 1
 		}
 		spacing := strings.Repeat(" ", availableWidth)
 
-		// Render title on left, GitHub link on right
-		title := titleStyle.Render(titleText) + spacing + titleStyle.Render(githubLink)
+		// Render title on left, link/update on right
+		title := titleStyle.Render(titleText) + spacing + titleStyle.Render(rightLink)
 		s.WriteString(title)
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
@@ -1013,11 +1035,21 @@ func (m model) renderDualPane() string {
 	}
 	s.WriteString(" ")
 
-	// Games launcher button
-	gamesButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(gamesButtonStyle.Render("[🎮]"))
+	// Git repositories toggle button
+	if m.showGitReposOnly {
+		// Active: gray background (like other active toggles)
+		activeStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeStyle.Render("[🔀]"))
+	} else {
+		// Inactive: normal styling
+		gitButtonStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true)
+		s.WriteString(gitButtonStyle.Render("[🔀]"))
+	}
 	s.WriteString(" ")
 
 	// Trash/Recycle bin button

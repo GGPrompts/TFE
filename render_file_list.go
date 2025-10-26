@@ -275,23 +275,38 @@ func (m model) renderDetailView(maxVisible int) string {
 
 		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
 	} else if m.showGitReposOnly {
-		// Git repos mode: Name, Size, Modified, Branch
+		// Git repos mode: Name, Branch, Status, Last Commit
 		nameHeader := "Name"
-		sizeHeader := "Size"
-		modifiedHeader := "Modified"
 		branchHeader := "Branch"
+		statusHeader := "Status"
+		commitHeader := "Last Commit"
 
 		// Add indicator to active column
 		switch m.sortBy {
 		case "name":
 			nameHeader += sortIndicator
-		case "size":
-			sizeHeader += sortIndicator
-		case "modified":
-			modifiedHeader += sortIndicator
+		case "modified": // Use modified for commit time sorting
+			commitHeader += sortIndicator
 		}
 
-		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, branchHeader)
+		// Calculate dynamic widths for git repos
+		// Name: 35%, Branch: 15%, Status: 20%, Last Commit: 30%
+		branchWidth := usableWidth * 15 / 100
+		statusWidth := usableWidth * 20 / 100
+		commitWidth := usableWidth * 30 / 100
+		nameWidth = usableWidth - branchWidth - statusWidth - commitWidth
+
+		if branchWidth < 10 {
+			branchWidth = 10
+		}
+		if statusWidth < 15 {
+			statusWidth = 15
+		}
+		if commitWidth < 15 {
+			commitWidth = 15
+		}
+
+		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, branchWidth, branchHeader, statusWidth, statusHeader, commitWidth, commitHeader)
 	} else {
 		// Regular mode: Name, Size, Modified, Type
 		nameHeader := "Name"
@@ -481,7 +496,7 @@ func (m model) renderDetailView(maxVisible int) string {
 		paddedName := padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
 		} else if m.showGitReposOnly {
-			// Git repos mode: Name (with path), Size, Modified, Branch
+			// Git repos mode: Name (with path), Branch, Status, Last Commit
 			// Get parent directory path for location
 			location := filepath.Dir(file.path)
 			// Shorten home directory to ~
@@ -510,25 +525,57 @@ func (m model) renderDetailView(maxVisible int) string {
 
 			name = fmt.Sprintf("%s%s %s", icon, favIndicator, repoDisplayName)
 
+			// Get branch, status, and last commit from fileItem git fields
 			branch := "-"
-			if file.isDir && file.name != ".." {
-				branchName := getGitBranch(file.path)
-				if branchName != "" {
-					// Add indicator for uncommitted changes
-					if hasUncommittedChanges(file.path) {
-						branch = branchName + " ✗"
-					} else {
-						branch = branchName
-					}
+			status := "-"
+			lastCommit := "-"
+
+			if file.isGitRepo && file.name != ".." {
+				// Use cached git status from fileItem
+				if file.gitBranch != "" {
+					branch = file.gitBranch
 				}
+
+				// Format status using git fields
+				gitStat := gitStatus{
+					branch:        file.gitBranch,
+					ahead:         file.gitAhead,
+					behind:        file.gitBehind,
+					dirty:         file.gitDirty,
+					lastCommitTime: file.gitLastCommit,
+				}
+				status = formatGitStatus(gitStat)
+				lastCommit = formatLastCommitTime(file.gitLastCommit)
 			}
-			// Truncate long branch names if needed
-			if len(branch) > extraWidth {
-				branch = branch[:extraWidth-2] + ".."
+
+			// Calculate widths (same as header calculation)
+			branchWidth := usableWidth * 15 / 100
+			statusWidth := usableWidth * 20 / 100
+			commitWidth := usableWidth * 30 / 100
+			if branchWidth < 10 {
+				branchWidth = 10
 			}
+			if statusWidth < 15 {
+				statusWidth = 15
+			}
+			if commitWidth < 15 {
+				commitWidth = 15
+			}
+
+			// Truncate if needed
+			if len(branch) > branchWidth {
+				branch = branch[:branchWidth-2] + ".."
+			}
+			if visualWidth(status) > statusWidth {
+				status = truncateToWidth(status, statusWidth-2) + ".."
+			}
+			if len(lastCommit) > commitWidth {
+				lastCommit = lastCommit[:commitWidth-2] + ".."
+			}
+
 			// Use visual-width padding for name column (contains emojis), regular padding for others
 		paddedName := padToVisualWidth(name, nameWidth)
-		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, branch)
+		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, branchWidth, branch, statusWidth, status, commitWidth, lastCommit)
 		} else {
 			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)

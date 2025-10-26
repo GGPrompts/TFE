@@ -41,6 +41,10 @@ coverage.html
 # External projects (user can clone separately)
 games/
 
+# Personal prompts (project-specific)
+# Note: examples/.prompts is tracked and shared with users
+.prompts/
+
 # Temporary files
 *.prompty.tmp
 new-prompt-*.prompty

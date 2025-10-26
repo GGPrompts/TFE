@@ -190,6 +190,24 @@ func extractVariables(template string) []string {
 	return vars
 }
 
+// countVariableOccurrences counts how many times each variable appears in a template
+func countVariableOccurrences(template string) map[string]int {
+	counts := make(map[string]int)
+
+	// Match {{variable}} pattern (case-insensitive)
+	re := regexp.MustCompile(`\{\{([a-zA-Z0-9_]+)\}\}`)
+	matches := re.FindAllStringSubmatch(template, -1)
+
+	for _, match := range matches {
+		if len(match) > 1 {
+			varName := match[1]
+			counts[varName]++
+		}
+	}
+
+	return counts
+}
+
 // renderPromptTemplate renders a template by substituting variables
 // Variables are case-insensitive ({{file}}, {{FILE}}, {{File}} all match)
 func renderPromptTemplate(tmpl *promptTemplate, vars map[string]string) string {

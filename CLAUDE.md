@@ -28,6 +28,7 @@ tfe/
 ├── file_operations.go - File operations & formatting
 ├── editor.go - External editor integration
 ├── command.go - Command execution system
+├── git_operations.go - Git repository operations (pull, push, sync, fetch)
 ├── dialog.go - Dialog system (input/confirm)
 ├── context_menu.go - Right-click context menu
 ├── favorites.go - Favorites/bookmarks system
@@ -209,7 +210,26 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 
 **Recent additions**: Full cursor editing with word jumping, persistent history across restarts.
 
-### 12. `favorites.go` - Favorites System
+### 12. `git_operations.go` - Git Repository Operations
+**Purpose**: Git workspace management with visual triage and quick operations
+**Contents**:
+- **Git operations:**
+  - `gitPull()` - Execute git pull with feedback
+  - `gitPush()` - Execute git push with error handling
+  - `gitSync()` - Smart pull + push workflow
+  - `gitFetch()` - Update remote tracking branches
+- **Message types:**
+  - `gitOperationFinishedMsg` - Operation completion notification
+- **Integration:**
+  - Context menu integration for git repositories
+  - Auto-refresh after operations complete
+  - Status message display for success/failure
+
+**When to extend**: Add more git operations (stash, branch, merge, etc.), implement conflict resolution UI.
+
+**Recent additions**: Full git workspace management system with visual status indicators in git repos view.
+
+### 13. `favorites.go` - Favorites System
 **Purpose**: Bookmarking files and directories
 **Contents**:
 - `loadFavorites()` / `saveFavorites()` - persistence to ~/.config/tfe/favorites.json
@@ -218,7 +238,7 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 
 **When to extend**: Add favorite management features (import/export, categories, etc.).
 
-### 13. `helpers.go` - Helper Functions
+### 14. `helpers.go` - Helper Functions
 **Purpose**: Utility functions for model operations
 **Contents**:
 - `getCurrentFile()` - gets selected file (handles tree view expansion)
@@ -226,19 +246,19 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 
 **When to extend**: Add reusable helper functions that don't fit other modules.
 
-### 14. `trash.go` - Trash/Recycle Bin System
+### 15. `trash.go` - Trash/Recycle Bin System
 **Purpose**: Move files to trash instead of permanent deletion
 **Contents**: `moveToTrash()`, `restoreFromTrash()`, trash metadata (JSON), cross-platform directory detection
 
-### 15. `prompt_parser.go` - Prompt Template Parsing
+### 16. `prompt_parser.go` - Prompt Template Parsing
 **Purpose**: Parse and render prompt templates with {{VARIABLE}} substitution
 **Contents**: `parsePromptVariables()`, `classifyVariableType()`, `substituteVariables()`, auto-fill for DATE/TIME/FILE/DIRECTORY
 
-### 16. `fuzzy_search.go` - Fuzzy File Search
+### 17. `fuzzy_search.go` - Fuzzy File Search
 **Purpose**: Ctrl+P fuzzy search integration
 **Contents**: `launchFuzzySearch()`, file collection, result parsing, terminal state preservation
 
-### 17. `menu.go` - Menu Bar Rendering
+### 18. `menu.go` - Menu Bar Rendering
 **Purpose**: Renders the top menu bar with clickable emoji buttons
 **Contents**: `renderMenuBar()`, button definitions, width-aware rendering for narrow terminals
 

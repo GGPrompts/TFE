@@ -161,6 +161,77 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
+			// Check for update notification click (Y=0, first 5 seconds)
+			if time.Since(m.startupTime) < 5*time.Second && m.updateAvailable {
+				if msg.Y == 0 {
+					// Calculate approximate X position of update text
+					// Title is on left, update text is right-aligned
+					var titleText string
+					if m.viewMode == viewDualPane {
+						titleText = "(T)erminal (F)ile (E)xplorer [Dual-Pane]"
+					} else {
+						titleText = "(T)erminal (F)ile (E)xplorer"
+					}
+					if m.commandFocused {
+						titleText += " [Command Mode]"
+					}
+					if m.filePickerMode {
+						if m.filePickerCopySource != "" {
+							titleText += " [📋 Copy Mode - Select Destination]"
+						} else {
+							titleText += " [📁 File Picker]"
+						}
+					}
+
+					updateText := fmt.Sprintf("🎉 Update Available: %s (click for details)", m.updateVersion)
+
+					// If click is in the right portion of the screen (where update shows)
+					updateStartX := m.width - visualWidth(updateText) - 2
+					if msg.X >= updateStartX {
+						// Generate changelog markdown
+						changelogMD := fmt.Sprintf(`# TFE %s Release Notes
+
+## Update Command
+
+To update TFE, run:
+
+`+"```bash"+`
+go install github.com/GGPrompts/TFE@latest
+`+"```"+`
+
+Or using the installation wrapper:
+
+`+"```bash"+`
+cd ~/projects/TFE
+git pull
+./tfe-wrapper.sh
+`+"```"+`
+
+---
+
+## What's New
+
+%s
+
+---
+
+**Full Release:** %s
+`, m.updateVersion, m.updateChangelog, m.updateURL)
+
+						// Create temp file for changelog
+						tmpFile := filepath.Join(os.TempDir(), "tfe-update-changelog.md")
+						if err := os.WriteFile(tmpFile, []byte(changelogMD), 0644); err == nil {
+							// Load changelog in preview
+							m.loadPreview(tmpFile)
+							m.viewMode = viewFullPreview
+							m.calculateLayout()
+							m.populatePreviewCache()
+							return m, tea.ClearScreen
+						}
+					}
+				}
+			}
+
 			// Check for menu bar clicks (Y=0) - only after 5 seconds when menu bar is visible
 			if time.Since(m.startupTime) >= 5*time.Second {
 				if m.isInMenuBar(msg.X, msg.Y) {
@@ -338,41 +409,29 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
-				// Game controller button [🎮] (X=33-37: [ + emoji(2) + ] + space)
+				// Git repositories toggle button [🔀] (X=33-37: [ + emoji(2) + ] + space)
 				if msg.X >= 33 && msg.X <= 37 {
-					// Launch TUIClassics game launcher
-					homeDir, err := os.UserHomeDir()
-					if err != nil {
-						m.setStatusMessage("Error: Could not find home directory", true)
-						return m, nil
+					m.showGitReposOnly = !m.showGitReposOnly
+
+					if m.showGitReposOnly {
+						// Auto-switch to Detail view
+						m.displayMode = modeDetail
+						m.detailScrollX = 0 // Reset scroll
+						m.calculateLayout() // Recalculate widths for detail view
+
+						// Scan for git repos
+						m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
+						m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
+						m.gitReposScanRoot = m.currentPath
+						m.gitReposLastScan = time.Now()
+						m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+					} else {
+						m.showGitReposOnly = false
+						m.cursor = 0
+						m.loadFiles()
 					}
 
-					classicsPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
-
-					// Check if classics launcher exists
-					if _, err := os.Stat(classicsPath); err == nil {
-						// Launch the classics menu
-						return m, openTUITool(classicsPath, filepath.Dir(classicsPath))
-					}
-
-					// If classics doesn't exist, check for individual games in root directory
-					tuiClassicsDir := filepath.Join(homeDir, "projects", "TUIClassics")
-					if entries, err := os.ReadDir(tuiClassicsDir); err == nil && len(entries) > 0 {
-						// Find first executable game
-						for _, entry := range entries {
-							if !entry.IsDir() {
-								gamePath := filepath.Join(tuiClassicsDir, entry.Name())
-								if info, err := os.Stat(gamePath); err == nil && info.Mode()&0111 != 0 {
-									// Found an executable - launch it
-									return m, openTUITool(gamePath, tuiClassicsDir)
-								}
-							}
-						}
-					}
-
-					// No games found
-					m.setStatusMessage("Games: Install from github.com/GGPrompts/TUIClassics (run: git clone ... && make build)", false)
-					return m, nil
+					return m, tea.ClearScreen
 				}
 				// Trash button [🗑️] or [♻️] (X=38-42: [ + emoji(2) + ] + space)
 				if msg.X >= 38 && msg.X <= 42 {
@@ -659,6 +718,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 								selectedPath := clickedFile.path
 								m.filledVariables[varName] = selectedPath
 								m.setStatusMessage(fmt.Sprintf("✓ Set %s = %s", varName, clickedFile.name), false)
+
+								// Invalidate cache to force header re-render with updated variable colors
+								m.preview.cacheValid = false
+								m.populatePreviewCache()
 							}
 						}
 

@@ -236,6 +236,10 @@ func (m *model) autofillDefaults() {
 			}
 		}
 	}
+
+	// Invalidate cache to force header re-render with auto-filled variables
+	m.preview.cacheValid = false
+	m.populatePreviewCache()
 }
 
 // scrollToFocusedVariable scrolls the preview to show the currently focused variable

@@ -59,6 +59,16 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		items = append(items, contextMenuItem{"📄 New File...", "newfile"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 
+		// Add git operations if this is a git repository
+		if isGitRepo(m.contextMenuFile.path) {
+			items = append(items, contextMenuItem{"─────────", "separator"})
+			items = append(items, contextMenuItem{"Git Operations", "separator"}) // Section header
+			items = append(items, contextMenuItem{"  ↓ Pull", "git_pull"})
+			items = append(items, contextMenuItem{"  ↑ Push", "git_push"})
+			items = append(items, contextMenuItem{"  🔄 Sync (Pull + Push)", "git_sync"})
+			items = append(items, contextMenuItem{"  🔍 Fetch", "git_fetch"})
+		}
+
 		// Add separator and TUI tools if available (using cached availability - performance optimization)
 		hasTools := false
 		if m.toolsAvailable["lazygit"] {
@@ -290,6 +300,34 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Launch bottom system monitor
 		if m.contextMenuFile.isDir {
 			return m, openTUITool("bottom", m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "git_pull":
+		// Execute git pull
+		if m.contextMenuFile.isDir && isGitRepo(m.contextMenuFile.path) {
+			return m, gitPull(m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "git_push":
+		// Execute git push
+		if m.contextMenuFile.isDir && isGitRepo(m.contextMenuFile.path) {
+			return m, gitPush(m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "git_sync":
+		// Execute git sync (pull + push)
+		if m.contextMenuFile.isDir && isGitRepo(m.contextMenuFile.path) {
+			return m, gitSync(m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "git_fetch":
+		// Execute git fetch
+		if m.contextMenuFile.isDir && isGitRepo(m.contextMenuFile.path) {
+			return m, gitFetch(m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 
