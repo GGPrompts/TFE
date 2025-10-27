@@ -99,7 +99,22 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - New module: `git_operations.go` - Git command execution with feedback
   - Files modified: `file_operations.go`, `types.go`, `render_file_list.go`, `context_menu.go`, `update.go`
 
+- **Parent Directory Name Display**
+  - Parent directory (`..`) now shows actual folder name for better context
+  - Format: `⬆️ .. (projects)` shows which folder you're navigating to
+  - Handles edge cases: root directory shows "(root)", handles WSL paths correctly
+  - Improves navigation context especially useful in deep folder hierarchies
+  - Files modified: `render_file_list.go`
+
 ### Fixed
+- **Terminal-Aware Emoji Width Compensation**
+  - Fixed alignment issues with variation selector emojis (⬆️, ⚙️, 🗜️, 🖼️)
+  - Different terminals render these emojis as different widths (WezTerm: 1 cell, Windows Terminal: 2 cells)
+  - Added terminal detection system (`detectTerminalType()`) to identify WezTerm vs Windows Terminal
+  - Width compensation now applied only where needed (Windows Terminal gets +1 per variation selector)
+  - Perfect alignment achieved in both Windows Terminal and WezTerm at all window sizes
+  - Files modified: `types.go`, `model.go`, `file_operations.go`, `render_file_list.go`
+
 - **Git Dirty Status Detection**: Fixed false positives in uncommitted changes detection
   - Old heuristic (file mtime comparison) showed all repos as dirty
   - Now uses `git status --porcelain` for accurate detection
