@@ -401,6 +401,29 @@ When adding tests (future):
 - Test files should mirror the structure: `file_operations_test.go`, `render_preview_test.go`, etc.
 - Keep test files focused on their corresponding module
 
+### Building and Installing
+
+**⚠️ IMPORTANT: After rebuilding TFE, always update the installed binary!**
+
+The user has TFE installed at `/home/matt/.local/bin/tfe` and frequently rebuilds during development. After running `go build`, you must copy the new binary:
+
+```bash
+# After go build completes successfully
+cp ./tfe /home/matt/.local/bin/tfe
+```
+
+**Why this matters:**
+- The user tests with `./tfe` in the project folder during development
+- But uses `tfe` (from PATH) in normal usage
+- Forgetting to update the installed binary means the user won't have the latest fixes
+- This is especially critical after bug fixes or feature additions
+
+**When to do this:**
+- After any `go build` command
+- After fixing bugs that need testing
+- After implementing new features
+- Before asking the user to test the installed version
+
 ## Common Patterns
 
 ### Modifying the Header/Title Bar
