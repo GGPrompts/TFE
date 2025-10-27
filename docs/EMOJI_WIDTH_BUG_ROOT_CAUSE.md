@@ -10,7 +10,9 @@
 
 1. **Don't use WezTerm** - Primary terminal is Windows Terminal (works fine)
 2. **WezTerm was only for testing HD image previews**
-3. **HD image previews don't work in WSL anyway** (terminal graphics protocols can't cross WSL→Windows boundary)
+3. **HD image previews don't work in WSL→Windows anyway** (terminal graphics protocols can't cross the WSL boundary)
+   - WezTerm DOES support Kitty protocol (works on native Linux/macOS/Windows)
+   - The issue is WSL→Windows Terminal boundary doesn't pass through escape sequences
 4. **Even Yazi has the same WSL limitation** (not unique to TFE)
 5. **3 hours of debugging with no resolution** (diminishing returns)
 
