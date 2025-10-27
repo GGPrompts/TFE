@@ -958,6 +958,11 @@ func visualWidth(s string) int {
 		stripped += string(ch)
 	}
 
+	// Strip variation selectors to work around go-runewidth bug #76
+	// VS incorrectly reports width=1 instead of width=0, causing padding miscalculations
+	stripped = strings.ReplaceAll(stripped, "\uFE0F", "") // VS-16 (emoji presentation)
+	stripped = strings.ReplaceAll(stripped, "\uFE0E", "") // VS-15 (text presentation)
+
 	// Now use StringWidth on the whole stripped string
 	// This correctly handles emoji+variation-selector as a unit (not char-by-char)
 	return runewidth.StringWidth(stripped)
@@ -1228,7 +1233,15 @@ func getFileType(item fileItem) string {
 
 // padIconToWidth pads an icon emoji to a fixed width (2 cells) for consistent alignment
 // Some terminals render certain emojis as 1 cell, so we pad them to 2 cells
+// Also strips variation selectors for terminals that don't handle them well
 func (m model) padIconToWidth(icon string) string {
+	// Strip variation selectors for terminals that render emoji+VS as 1 cell
+	// This prevents width calculation mismatches
+	if m.terminalType == terminalWezTerm || m.terminalType == terminalTermux {
+		icon = strings.ReplaceAll(icon, "\uFE0F", "") // VS-16 (emoji presentation)
+		icon = strings.ReplaceAll(icon, "\uFE0E", "") // VS-15 (text presentation)
+	}
+
 	return m.padToVisualWidth(icon, 2)
 }
 
