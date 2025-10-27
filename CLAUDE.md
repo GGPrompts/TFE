@@ -10,6 +10,17 @@ TFE follows a **modular architecture** where each file has a single, clear respo
 
 **When adding new features, always maintain this modular architecture by creating new files or extending existing modules rather than adding everything to `main.go`.**
 
+### ⚠️ Important: Read LESSONS_LEARNED.md First
+
+Before modifying UI rendering code (especially anything involving width calculations, scrolling, or alignment), **read `docs/LESSONS_LEARNED.md`**. It contains critical lessons about:
+- Visual width vs byte length (never use `len()` for display text)
+- Terminal-specific rendering differences (WezTerm vs Windows Terminal)
+- ANSI escape code handling
+- Header vs data row alignment
+- Common pitfalls and how to avoid them
+
+**Ignoring these lessons WILL cause bugs.** Many hours have been spent debugging width calculation issues, text wrapping, and scrolling bugs. Learn from these mistakes!
+
 ## File Structure
 
 ```
@@ -343,6 +354,45 @@ import (
 4. **Separate concerns**: UI rendering separate from business logic
 5. **DRY (Don't Repeat Yourself)**: Extract common logic into helper functions
 6. **Clear naming**: File names should immediately convey their purpose
+
+### Emoji Usage Rules
+
+**⚠️ CRITICAL: Never use emoji variation selectors (U+FE0F / U+FE0E) in the codebase!**
+
+**Why this matters:**
+- go-runewidth has a bug (#76) where variation selectors are incorrectly counted as width=1 instead of width=0
+- This causes misalignment in terminal width calculations
+- Different terminals (WezTerm, Termux, Windows Terminal, etc.) render emoji+VS inconsistently
+- Adding workaround code for each terminal type creates maintenance burden
+
+**Rule:**
+- ✅ **Always use base emoji characters without variation selectors**
+- ❌ **Never use:** `"🗑️"` (U+1F5D1 + U+FE0F)
+- ✅ **Instead use:** `"🗑"` (U+1F5D1 alone)
+
+**Examples:**
+```go
+// ❌ WRONG - Has variation selector
+icon := "⚙️"  // U+2699 + U+FE0F
+trash := "🗑️" // U+1F5D1 + U+FE0F
+
+// ✅ CORRECT - Base emoji only
+icon := "⚙"   // U+2699
+trash := "🗑"  // U+1F5D1
+```
+
+**How to check:**
+- If you copy an emoji from a website, it may include variation selectors
+- Use a Unicode inspector or run: `echo -n "🗑️" | xxd` to check for U+FE0F bytes
+- Most emojis look identical with or without variation selectors
+
+**Visual impact:** Minimal to none! Base emojis render the same in 99% of cases.
+
+**Benefits:**
+- Universal compatibility across all terminals
+- No terminal-specific workaround code needed
+- Simpler, more maintainable codebase
+- Faster rendering (no string replacement overhead)
 
 ### Testing Strategy
 
