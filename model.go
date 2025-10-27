@@ -184,14 +184,15 @@ func detectTerminalType() terminalType {
 		return terminalITerm2
 	}
 
+	// Check for Termux (Android) - BEFORE xterm check
+	// Termux sets TERM=xterm-256color, so check PREFIX first
+	if strings.Contains(os.Getenv("PREFIX"), "com.termux") {
+		return terminalTermux
+	}
+
 	// Check for xterm
 	if term == "xterm" || term == "xterm-256color" {
 		return terminalXterm
-	}
-
-	// Check for Termux (Android)
-	if strings.Contains(os.Getenv("PREFIX"), "com.termux") {
-		return terminalTermux
 	}
 
 	return terminalUnknown

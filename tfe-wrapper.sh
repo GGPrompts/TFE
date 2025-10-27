@@ -17,6 +17,9 @@ tfe() {
     if [ -f "$HOME/go/bin/tfe" ]; then
         # Go install default location (preferred)
         TFE_BIN="$HOME/go/bin/tfe"
+    elif [ -f "$HOME/bin/tfe" ] && [ -x "$HOME/bin/tfe" ]; then
+        # Termux/user bin directory
+        TFE_BIN="$HOME/bin/tfe"
     elif [ -f "$HOME/.local/bin/tfe" ] && [ -x "$HOME/.local/bin/tfe" ]; then
         # Local installation
         TFE_BIN="$HOME/.local/bin/tfe"

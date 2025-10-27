@@ -934,7 +934,8 @@ func highlightCode(content, filepath string) (string, bool) {
 // This is important for consistent scrollbar alignment and box borders
 // NOTE: This is the non-terminal-aware version - use m.visualWidthCompensated() for layout calculations
 func visualWidth(s string) int {
-	width := 0
+	// Strip ANSI codes first
+	stripped := ""
 	inAnsi := false
 
 	for _, ch := range s {
@@ -953,27 +954,25 @@ func visualWidth(s string) int {
 			continue
 		}
 
-		// Count visible characters with proper wide character support
-		if ch == '\t' {
-			// Tabs typically expand to next multiple of 8
-			width += 8 - (width % 8)
-		} else {
-			// Use runewidth to properly handle wide characters (emojis, CJK)
-			// Most emojis are width 2, regular ASCII is width 1
-			width += runewidth.RuneWidth(ch)
-		}
+		// Keep visible characters
+		stripped += string(ch)
 	}
-	return width
+
+	// Now use StringWidth on the whole stripped string
+	// This correctly handles emoji+variation-selector as a unit (not char-by-char)
+	return runewidth.StringWidth(stripped)
 }
 
 // visualWidthCompensated calculates visual width with terminal-specific emoji compensation
 // Use this for layout calculations that need accurate emoji widths
+// STRIPS ANSI escape codes before calculating width
 func (m model) visualWidthCompensated(s string) int {
-	width := runewidth.StringWidth(s)
+	// Use visualWidth() which strips ANSI codes, not runewidth.StringWidth()
+	width := visualWidth(s)
 
-	// Apply variation selector compensation for Windows Terminal
+	// Apply variation selector compensation for Windows Terminal ONLY
 	// runewidth reports emoji+VS as 1 cell, but Windows Terminal renders as 2 cells
-	// WezTerm renders as 1 cell (matches runewidth), so no compensation needed there
+	// WezTerm/Kitty/iTerm2/xterm/Termux render as 1 cell (matches runewidth), so no compensation needed
 	// We ADD 1 per VS for Windows Terminal to match its wider rendering
 	variationSelectorCount := strings.Count(s, "\uFE0F")
 	if m.terminalType == terminalWindowsTerminal && variationSelectorCount > 0 {
@@ -1227,28 +1226,24 @@ func getFileType(item fileItem) string {
 	return "File"
 }
 
+// padIconToWidth pads an icon emoji to a fixed width (2 cells) for consistent alignment
+// Some terminals render certain emojis as 1 cell, so we pad them to 2 cells
+func (m model) padIconToWidth(icon string) string {
+	return m.padToVisualWidth(icon, 2)
+}
+
 // padToVisualWidth pads a string to a specific visual width using spaces
-// This correctly handles emojis and wide characters that take up more than 1 cell
+// This correctly handles emojis, wide characters, AND ANSI escape codes
 // Terminal-aware: Variation selector compensation only for WezTerm
 func (m model) padToVisualWidth(s string, targetWidth int) string {
-	visualWidth := runewidth.StringWidth(s)
+	// Use visualWidthCompensated which already handles ANSI codes via m.visualWidthCompensated
+	// which delegates to visualWidth for ANSI stripping
+	calculatedWidth := m.visualWidthCompensated(s)
 
-	// Variation selector emoji compensation (terminal-specific)
-	// runewidth reports emoji+VS as 1 cell, but Windows Terminal renders as 2 cells
-	// WezTerm renders as 1 cell (matches runewidth), so no compensation needed there
-	// We ADD 1 per VS for Windows Terminal to match its wider rendering
-	variationSelectorCount := strings.Count(s, "\uFE0F")
-	if m.terminalType == terminalWindowsTerminal && variationSelectorCount > 0 {
-		// Windows Terminal needs +1 per variation selector for its 2-cell rendering
-		visualWidth += variationSelectorCount
-	}
-	// For all other terminals (Windows Terminal, Kitty, iTerm2, xterm, Termux, Unknown):
-	// Don't add compensation - they render VS emojis correctly as 2 cells
-
-	if visualWidth >= targetWidth {
+	if calculatedWidth >= targetWidth {
 		return s
 	}
-	padding := targetWidth - visualWidth
+	padding := targetWidth - calculatedWidth
 	return s + strings.Repeat(" ", padding)
 }
 

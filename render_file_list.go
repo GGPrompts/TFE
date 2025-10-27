@@ -153,14 +153,18 @@ func (m model) renderListView(maxVisible int) string {
 
 			// Render the emoji without styling, then the rest with styling
 			// Don't highlight if command prompt is focused
+			// Pad icon to 2 cells for consistent alignment
+			paddedIcon := m.padIconToWidth(icon)
 			if i == m.cursor && !m.commandFocused {
-				line = fmt.Sprintf("  %s%s %s%s", icon, favIndicator, leadingEmoji, selectedStyle.Render(restOfName))
+				line = fmt.Sprintf("  %s%s %s%s", paddedIcon, favIndicator, leadingEmoji, selectedStyle.Render(restOfName))
 			} else {
-				line = fmt.Sprintf("  %s%s %s%s", icon, favIndicator, leadingEmoji, style.Render(restOfName))
+				line = fmt.Sprintf("  %s%s %s%s", paddedIcon, favIndicator, leadingEmoji, style.Render(restOfName))
 			}
 		} else {
 			// Normal rendering for all other files
-			line = fmt.Sprintf("  %s%s %s", icon, favIndicator, displayName)
+			// Pad icon to 2 cells for consistent alignment across different emoji widths
+			paddedIcon := m.padIconToWidth(icon)
+			line = fmt.Sprintf("  %s%s %s", paddedIcon, favIndicator, displayName)
 
 			// Apply selection style
 			// Don't highlight if command prompt is focused
@@ -469,7 +473,9 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 		}
 
-		name := fmt.Sprintf("%s%s %s", icon, favIndicator, displayName)
+		// Pad icon to 2 cells for consistent alignment across different emoji widths
+		paddedIcon := m.padIconToWidth(icon)
+		name := fmt.Sprintf("%s%s %s", paddedIcon, favIndicator, displayName)
 		size := "-"
 		if file.isDir {
 			// Show item count for directories
@@ -558,7 +564,9 @@ func (m model) renderDetailView(maxVisible int) string {
 				repoDisplayName = "..." + repoDisplayName[len(repoDisplayName)-(maxNameTextLen-3):]
 			}
 
-			name = fmt.Sprintf("%s%s %s", icon, favIndicator, repoDisplayName)
+			// Pad icon to 2 cells for consistent alignment across different emoji widths
+			paddedIcon := m.padIconToWidth(icon)
+			name = fmt.Sprintf("%s%s %s", paddedIcon, favIndicator, repoDisplayName)
 
 			// Get branch, status, and last commit from fileItem git fields
 			branch := "-"
@@ -653,24 +661,25 @@ func (m model) renderDetailView(maxVisible int) string {
 		// Apply styling with special handling for global virtual folders to preserve emoji color
 		if nameLeadingEmoji != "" {
 			// Replace the styled portion, preserving the emoji color
-			plainNameWithEmoji := fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, nameWithoutEmoji)
+			// Use paddedIcon for consistency
+			plainNameWithEmoji := fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, nameWithoutEmoji)
 
 			// Don't highlight if command prompt is focused
 			if i == m.cursor && !m.commandFocused {
 				if m.isNarrowTerminal() && renderWidth > availableWidth {
 					// Use matrix green for narrow terminals (no background to prevent wrapping)
-					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, narrowSelectedStyle.Render(nameWithoutEmoji)), 1)
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, narrowSelectedStyle.Render(nameWithoutEmoji)), 1)
 				} else {
-					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, selectedStyle.Render(nameWithoutEmoji)), 1)
 				}
 			} else {
 				// Add alternating row background for easier reading on wide terminals
 				// Disabled on narrow terminals to prevent wrapping issues with horizontal scroll
 				if !m.isNarrowTerminal() && i%2 == 0 {
 					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#333333"})
-					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
 				} else {
-					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", icon, favIndicator, nameLeadingEmoji, style.Render(nameWithoutEmoji)), 1)
+					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, style.Render(nameWithoutEmoji)), 1)
 				}
 			}
 		} else {
@@ -902,7 +911,7 @@ func (m model) runeWidth(r rune) int {
 	if r >= 0xFE00 && r <= 0xFE0F { // Variation selectors
 		// runewidth reports VS as width 1, but Windows Terminal renders emoji+VS as 2 cells total
 		// We return +1 for Windows Terminal to match its 2-cell rendering
-		// WezTerm renders emoji+VS as 1 cell (matches runewidth), return 0
+		// WezTerm/Kitty/iTerm2/xterm/Termux render emoji+VS as 1 cell (matches runewidth), return 0
 		if m.terminalType == terminalWindowsTerminal {
 			return 1 // Compensate for Windows Terminal's wider rendering
 		}
@@ -1119,8 +1128,8 @@ func (m model) renderTreeView(maxVisible int) string {
 
 		// Calculate available width dynamically based on view mode
 		var maxNameLen int
-		// Calculate icon width dynamically (terminal-aware for variation selector emojis)
-		iconWidth := m.visualWidthCompensated(icon)
+		// Icon is always padded to 2 cells for consistent alignment
+		iconWidth := 2
 		indentWidth := 2 + (item.depth * 3) + 3 + iconWidth + 2 + 5
 
 		if m.viewMode == viewDualPane {
@@ -1172,7 +1181,9 @@ func (m model) renderTreeView(maxVisible int) string {
 			}
 
 			// Build base string with emoji uncolored
-			baseString := fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, leadingEmoji)
+			// Pad icon to 2 cells for consistent alignment
+			paddedIcon := m.padIconToWidth(icon)
+			baseString := fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, paddedIcon, favIndicator, leadingEmoji)
 
 			// Render the emoji without styling, then the rest with styling
 			// Don't highlight if command prompt is focused
@@ -1183,7 +1194,9 @@ func (m model) renderTreeView(maxVisible int) string {
 			}
 		} else {
 			// Normal rendering for all other files
-			line = fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, icon, favIndicator, displayName)
+			// Pad icon to 2 cells for consistent alignment
+			paddedIcon := m.padIconToWidth(icon)
+			line = fmt.Sprintf("%s%s%s%s%s %s", indent.String(), prefix, expansionIndicator, paddedIcon, favIndicator, displayName)
 
 			// Don't highlight if command prompt is focused
 			if i == m.cursor && !m.commandFocused {
