@@ -215,8 +215,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Editor has closed, we're back in TFE
 		// Refresh file list in case file was modified
 		m.loadFiles()
-		// Force a refresh and re-enable mouse support (external editors disable it)
+		// Force a refresh and restore terminal state (alt screen + mouse support)
+		// Re-entering alt screen is crucial for image viewers (viu, timg, chafa)
+		// to prevent "Press any key to continue..." text from bleeding through
 		return m, tea.Batch(
+			tea.EnterAltScreen,       // Re-enter alternate screen (prevents text bleed)
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)

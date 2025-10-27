@@ -306,8 +306,19 @@ When in trash view:
 
 | Key | Action |
 |-----|--------|
+| **Ctrl+T** | Peek at terminal history (scrollback buffer) - view command output, images, and terminal history |
 | **Ctrl+Z** | Suspend TFE and drop to shell (type `fg` to resume) |
 
+### Terminal History (Ctrl+T)
+Press **Ctrl+T** to temporarily exit TFE and view your terminal's scrollback buffer. This lets you:
+- Review output from commands you've run in TFE
+- Scroll up to view multiple images you've viewed with **V** key
+- Check error messages or script output
+- See terminal history from before launching TFE
+
+Press any key to return to TFE. Your terminal scrollback remains intact - TFE uses an alternate screen buffer that simply hides/shows the main terminal.
+
+### Suspend to Shell (Ctrl+Z)
 When you run scripts that start background processes (like servers, tmux sessions, etc.), you can:
 1. Press **Ctrl+Z** to suspend TFE
 2. Check on background processes, view logs, run commands
@@ -380,6 +391,7 @@ TFE uses emoji icons to indicate file types:
 20. **Viewing Images:** Right-click on image files (.png, .jpg, .gif, etc.) and select "🖼️ View Image" to see them in your terminal! Requires viu, timg, or chafa. For editing, select "🎨 Edit Image" to use textual-paint (MS Paint in terminal!)
 21. **Hidden Files:** Press **.** (period) or **Ctrl+H** to toggle hidden files. Note: Important AI/development folders (.claude, .codex, .copilot, .devcontainer, .gemini, .opencode, .git, .vscode, .github, .config, .docker, .prompts), secrets files (.env, credentials, etc.), ignore files (.gitignore, .dockerignore, etc.), and all symlinks are always shown for security and project awareness
 22. **Open in File Explorer:** Press **Ctrl+O** to open the current directory in your system file explorer (Windows Explorer in WSL, Finder on macOS, or default file manager on Linux)
+23. **Terminal History:** Press **Ctrl+T** to peek at your terminal's scrollback buffer - perfect for reviewing command output or scrolling up to compare multiple images you've viewed with **V**. Press any key to return to TFE
 
 ---
 
