@@ -280,7 +280,7 @@ git pull
 			}
 
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [V] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑️]
+			// Toolbar: [🏠] [⭐/✨] [V] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑]
 			// Layout:  0-4   5-9    10-12 13-17 18-22 23-27 28-32 33-37 38-42
 			// Note: Most buttons are 5 chars ([ + emoji(2) + ] + space), [V] is 3 chars
 			if msg.Y == 1 {
@@ -434,7 +434,7 @@ git pull
 
 					return m, tea.ClearScreen
 				}
-				// Trash button [🗑️] or [♻️] (X=38-42: [ + emoji(2) + ] + space)
+				// Trash button [🗑] or [♻] (X=38-42: [ + emoji(2) + ] + space)
 				if msg.X >= 38 && msg.X <= 42 {
 					// Toggle trash view
 					m.showTrashOnly = !m.showTrashOnly

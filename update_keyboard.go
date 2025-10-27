@@ -1434,6 +1434,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.commandFocused {
 			return m, nil
 		}
+		// Clear menu focus when navigating to files
+		if m.menuBarFocused || m.highlightedMenu != "" {
+			m.menuBarFocused = false
+			m.highlightedMenu = ""
+		}
 		if m.viewMode == viewDualPane {
 			// In dual-pane mode, check which pane is focused
 			if m.focusedPane == leftPane {
@@ -1474,6 +1479,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Block vim navigation when command is focused
 		if m.commandFocused {
 			return m, nil
+		}
+		// Clear menu focus when navigating to files
+		if m.menuBarFocused || m.highlightedMenu != "" {
+			m.menuBarFocused = false
+			m.highlightedMenu = ""
 		}
 		if m.viewMode == viewDualPane {
 			// In dual-pane mode, check which pane is focused
@@ -1799,9 +1809,44 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// PRIORITY: In detail mode on narrow terminals, scroll right (most important use case)
 		// On narrow terminals (phones), horizontal scrolling is more useful than navigation
 		if m.displayMode == modeDetail && m.isNarrowTerminal() {
+			// Calculate available width (viewport)
+			// Must match the logic in render_file_list.go
+			availableWidth := m.width
+			if m.viewMode == viewDualPane {
+				availableWidth = m.leftWidth - 6 // Account for borders and padding
+			} else {
+				// Single-pane mode: terminal-specific box width calculation
+				// WezTerm/Termux: lipgloss Width() includes borders
+				// Windows Terminal: lipgloss Width() excludes borders
+				if m.terminalType == terminalWezTerm {
+					availableWidth = m.width - 8 // Box width - borders - margin
+				} else {
+					availableWidth = m.width - 6 // Windows Terminal
+				}
+			}
+
+			// Calculate render width (content width) - same logic as render_file_list.go
+			renderWidth := availableWidth
+			if m.isNarrowTerminal() && availableWidth < 120 {
+				renderWidth = 120 // Fixed width for detail view on narrow terminals
+			} else if availableWidth < 60 {
+				renderWidth = 60 // Minimum width for wider terminals
+			}
+
+			// Calculate maximum scroll offset
+			maxScroll := renderWidth - availableWidth
+			if maxScroll < 0 {
+				maxScroll = 0
+			}
+
 			// Scroll by 4 chars (even number to avoid splitting emojis which are 2 cols wide)
 			m.detailScrollX += 4
-			// Max scroll will be clamped in rendering
+
+			// Clamp to maximum scroll offset
+			if m.detailScrollX > maxScroll {
+				m.detailScrollX = maxScroll
+			}
+
 			return m, nil
 		}
 		// In tree mode: expand folder or navigate into it

@@ -120,16 +120,17 @@ func (m model) renderSinglePane() string {
 
 	// Home button (highlight if in home directory)
 	homeDir, _ := os.UserHomeDir()
+	homeIcon := "🏠"
 	if m.currentPath == homeDir {
 		// Active: gray background (in home directory)
 		activeHomeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(activeHomeStyle.Render("[🏠]"))
+		s.WriteString(activeHomeStyle.Render("[" + homeIcon + "]"))
 	} else {
 		// Inactive: normal styling
-		s.WriteString(homeButtonStyle.Render("[🏠]"))
+		s.WriteString(homeButtonStyle.Render("[" + homeIcon + "]"))
 	}
 	s.WriteString(" ")
 
@@ -142,7 +143,17 @@ func (m model) renderSinglePane() string {
 	s.WriteString(" ")
 
 	// View mode toggle button (cycles List → Detail → Tree)
-	s.WriteString(homeButtonStyle.Render("[V]"))
+	// Show different emoji based on current display mode
+	viewIcon := "📊" // Detail view (default)
+	switch m.displayMode {
+	case modeList:
+		viewIcon = "📄" // Document icon for simple list view
+	case modeDetail:
+		viewIcon = "📊" // Bar chart icon for detailed columns
+	case modeTree:
+		viewIcon = "🌲" // Tree icon for hierarchical view
+	}
+	s.WriteString(homeButtonStyle.Render("[" + viewIcon + "]"))
 	s.WriteString(" ")
 
 	// Pane toggle button (toggles single ↔ dual-pane)
@@ -173,51 +184,54 @@ func (m model) renderSinglePane() string {
 
 	// Context-aware search button (in-file search when viewing, directory filter when browsing)
 	// Highlight when search is active (directory filter in single-pane)
+	searchIcon := "🔍"
 	if m.searchMode {
 		// Active: gray background
 		activeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[🔍]"))
+		s.WriteString(activeStyle.Render("[" + searchIcon + "]"))
 	} else {
 		// Inactive: normal styling
-		s.WriteString(homeButtonStyle.Render("[🔍]"))
+		s.WriteString(homeButtonStyle.Render("[" + searchIcon + "]"))
 	}
 	s.WriteString(" ")
 
 	// Prompts filter toggle button
+	promptIcon := "📝"
 	if m.showPromptsOnly {
 		// Active: gray background (like command mode)
 		activeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[📝]"))
+		s.WriteString(activeStyle.Render("[" + promptIcon + "]"))
 	} else {
 		// Inactive: normal styling
-		s.WriteString(homeButtonStyle.Render("[📝]"))
+		s.WriteString(homeButtonStyle.Render("[" + promptIcon + "]"))
 	}
 	s.WriteString(" ")
 
 	// Git repositories toggle button
+	gitIcon := "🔀"
 	if m.showGitReposOnly {
 		// Active: gray background (like other active toggles)
 		activeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[🔀]"))
+		s.WriteString(activeStyle.Render("[" + gitIcon + "]"))
 	} else {
 		// Inactive: normal styling
-		s.WriteString(homeButtonStyle.Render("[🔀]"))
+		s.WriteString(homeButtonStyle.Render("[" + gitIcon + "]"))
 	}
 	s.WriteString(" ")
 
 	// Trash/Recycle bin button
-	trashIcon := "🗑️"
+	trashIcon := "🗑"
 	if m.showTrashOnly {
-		trashIcon = "♻️" // Recycle icon when viewing trash
+		trashIcon = "♻" // Recycle icon when viewing trash
 	}
 	s.WriteString(homeButtonStyle.Render("[" + trashIcon + "]"))
 

@@ -63,11 +63,13 @@ func detectTerminalProtocol() TerminalProtocol {
 	}
 
 	// WSL-specific WezTerm detection
-	// WezTerm environment variables don't pass through to WSL, so we check:
-	// 1. Are we in WSL?
-	// 2. Is WezTerm in the Windows PATH?
+	// WezTerm environment variables don't pass through to WSL
+	// IMPORTANT: Kitty protocol does NOT work in WezTerm on WSL/Windows
+	// Even though WezTerm supports Kitty protocol natively on Linux,
+	// the protocol fails when WezTerm is running on Windows (WSL environment)
+	// Return ProtocolNone to show fallback viewer options instead
 	if isWSL() && isWezTermInPath() {
-		return ProtocolKitty
+		return ProtocolNone  // Kitty protocol doesn't work in WSL
 	}
 
 	// Check for iTerm2

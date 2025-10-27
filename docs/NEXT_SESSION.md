@@ -2,7 +2,32 @@
 
 **Priority:** Medium
 **Added:** After implementing horizontal scrolling for Termux narrow screen support
-**Status:** Bug - Display corruption during horizontal scroll
+**Status:** ✅ RESOLVED (2025-10-27)
+
+---
+
+## ✅ RESOLUTION SUMMARY
+
+**All issues fixed!** Horizontal scrolling in Detail view now works perfectly on narrow terminals.
+
+**Root causes identified and fixed:**
+1. **Inconsistent width calculation** - Headers used `runewidth.RuneWidth()`, data rows used `m.runeWidth()`
+2. **Missing "  " prefix** - Headers lacked 2-space prefix that data rows had
+3. **Byte-based padding** - Headers used `%-*s`, data rows used `m.padToVisualWidth()`
+4. **Double-scrolling** - Headers scrolled manually + by `applyHorizontalScroll()`
+5. **No scroll bounds** - Infinite scrolling through empty space
+6. **Box width mismatch** - Single-pane content width didn't match lipgloss box width
+7. **Terminal-specific rendering** - WezTerm/Termux interpret lipgloss `Width()` differently than Windows Terminal
+
+**Files modified:**
+- `render_file_list.go` - Header alignment, visual-width padding, terminal-specific box width
+- `update_keyboard.go` - Scroll bounds checking, terminal-specific width calculation
+
+**Testing:** Verified working in WezTerm, Windows Terminal, and Termux (narrow terminals <100 cols).
+
+---
+
+## Original Problem Description
 
 ---
 
@@ -257,7 +282,7 @@ if m.horizontalScrollOffset > maxOffset {
 
 **Session Started:** [To be filled in next session]
 **Branch:** Create `fix-horizontal-scroll` or `remove-horizontal-scroll` branch
-**Status:** Investigation needed
+**Status:** ✅ RESOLVED (2025-10-27)
 
 ---
 

@@ -29,7 +29,7 @@ func initialModel() model {
 		displayMode:       modeTree,             // Tree view works better on narrow terminals
 		sortBy:            "name",
 		sortAsc:           true,
-		viewMode:          viewSinglePane, // Will be set to dual-pane if narrow terminal
+		viewMode:          viewSinglePane, // Will be set to dual-pane if terminal width >= 100
 		focusedPane:       leftPane,
 		lastClickIndex:    -1,
 		preview: previewModel{
@@ -83,11 +83,18 @@ func initialModel() model {
 
 	m.loadFiles()
 
-	// Auto-enable dual-pane mode on narrow terminals (phones/Termux)
-	// Dual-pane works better on narrow screens - less horizontal scrolling needed
-	if m.width < 100 {
+	// Auto-enable dual-pane mode on WIDE terminals only
+	// Narrow terminals (Termux, phones, small windows) stay in single-pane mode
+	// Rationale:
+	//   - Wide terminals: Side-by-side dual-pane is great (file list + preview)
+	//   - Narrow terminals: Even with vertical-split dual-pane, limited vertical space
+	//     means cramped file list AND cramped preview (especially with keyboard up)
+	//   - Single-pane: Full screen for file list, press Enter for full-screen preview
+	//     Much better use of limited screen space on mobile devices
+	if m.width >= 100 {
 		m.viewMode = viewDualPane
 	}
+	// else: keep viewSinglePane (default from line 32)
 
 	m.calculateLayout()
 	return m

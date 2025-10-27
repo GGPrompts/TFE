@@ -51,7 +51,7 @@ func (m model) getMenus() map[string]Menu {
 		"edit": {
 			Label: "Edit",
 			Items: []MenuItem{
-				{Label: "🗑️  Delete", Action: "delete", Shortcut: "F8"},
+				{Label: "🗑  Delete", Action: "delete", Shortcut: "F8"},
 			},
 		},
 		"view": {
@@ -63,12 +63,12 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "  └─ Collapse All", Action: "collapse-all-tree", Shortcut: "Ctrl+W"},
 				{IsSeparator: true},
 				{Label: "⬌ Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
-				{Label: "👁️  Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
+				{Label: "👁  Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
 				{IsSeparator: true},
 				{Label: "📝 Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly},
 				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
 				{Label: "🔀 Git Repositories", Action: "toggle-git-repos", IsCheckable: true, IsChecked: m.showGitReposOnly},
-				{Label: "🗑️  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
+				{Label: "🗑  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
 				{IsSeparator: true},
 				{Label: "🔄 Refresh", Action: "refresh", Shortcut: "F5"},
 			},
@@ -84,8 +84,8 @@ func (m model) getMenus() map[string]Menu {
 		"help": {
 			Label: "Help",
 			Items: []MenuItem{
-				{Label: "⌨️  Keyboard Shortcuts", Action: "show-hotkeys", Shortcut: "F1"},
-				{Label: "ℹ️  About TFE", Action: "show-about"},
+				{Label: "⌨  Keyboard Shortcuts", Action: "show-hotkeys", Shortcut: "F1"},
+				{Label: "ℹ  About TFE", Action: "show-about"},
 				{IsSeparator: true},
 				{Label: "🔗 GitHub Repository", Action: "open-github"},
 			},

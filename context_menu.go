@@ -44,8 +44,8 @@ func (m model) getContextMenuItems() []contextMenuItem {
 
 	// Special menu for trash view
 	if m.showTrashOnly {
-		items = append(items, contextMenuItem{"♻️  Restore", "restore"})
-		items = append(items, contextMenuItem{"🗑️  Delete Permanently", "permanent_delete"})
+		items = append(items, contextMenuItem{"♻  Restore", "restore"})
+		items = append(items, contextMenuItem{"🗑  Delete Permanently", "permanent_delete"})
 		items = append(items, contextMenuItem{"─────────", "separator"})
 		items = append(items, contextMenuItem{"🧹 Empty Trash", "empty_trash"})
 		return items
@@ -61,7 +61,7 @@ func (m model) getContextMenuItems() []contextMenuItem {
 
 		// Add "Open in File Explorer" for WSL users
 		if isWSL() {
-			items = append(items, contextMenuItem{"🗂️  Open in Explorer", "explorer"})
+			items = append(items, contextMenuItem{"🗂  Open in Explorer", "explorer"})
 		}
 
 		// Add git operations if this is a git repository
@@ -115,8 +115,8 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		// Add separator and favorites
 		items = append(items, contextMenuItem{"─────────", "separator"})
 		items = append(items, contextMenuItem{"📋 Copy to...", "copy"})
-		items = append(items, contextMenuItem{"✏️  Rename...", "rename"})
-		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
+		items = append(items, contextMenuItem{"✏  Rename...", "rename"})
+		items = append(items, contextMenuItem{"🗑  Delete", "delete"})
 		if m.isFavorite(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
 		} else {
@@ -140,13 +140,13 @@ func (m model) getContextMenuItems() []contextMenuItem {
 
 		// Add "Run Script" for executable files
 		if isExecutableFile(*m.contextMenuFile) {
-			items = append(items, contextMenuItem{"▶️  Run Script", "runscript"})
+			items = append(items, contextMenuItem{"▶  Run Script", "runscript"})
 		}
 
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
 		items = append(items, contextMenuItem{"📋 Copy to...", "copy"})
-		items = append(items, contextMenuItem{"✏️  Rename...", "rename"})
-		items = append(items, contextMenuItem{"🗑️  Delete", "delete"})
+		items = append(items, contextMenuItem{"✏  Rename...", "rename"})
+		items = append(items, contextMenuItem{"🗑  Delete", "delete"})
 		if m.isFavorite(m.contextMenuFile.path) {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
 		} else {
@@ -461,7 +461,8 @@ func (m model) renderContextMenu() string {
 	maxWidth := 0
 	for _, item := range items {
 		// Use lipgloss.Width() for accurate visual width (handles emoji/unicode properly)
-		width := lipgloss.Width(item.label)
+		label := item.label
+		width := lipgloss.Width(label)
 		if width > maxWidth {
 			maxWidth = width
 		}
@@ -473,10 +474,12 @@ func (m model) renderContextMenu() string {
 	// Build menu content with consistent width
 	var menuLines []string
 	for i, item := range items {
+		// Strip variation selectors for terminals (WezTerm/Termux) that render emoji+VS as 1 cell
 		// Pad all labels to the same width with spaces (ensures even borders)
-		labelWidth := lipgloss.Width(item.label) // Use lipgloss.Width() for accurate visual width
+		label := item.label
+		labelWidth := lipgloss.Width(label) // Use lipgloss.Width() for accurate visual width
 		padding := maxWidth - labelWidth
-		paddedLabel := item.label + strings.Repeat(" ", padding)
+		paddedLabel := label + strings.Repeat(" ", padding)
 
 		var line string
 

@@ -1022,9 +1022,9 @@ func (m model) renderFullPreview() string {
 	// Mouse toggle indicator - compact format with just emoji
 	var modeEmoji, helpText string
 	if m.previewMouseEnabled {
-		modeEmoji = "🖱️"
+		modeEmoji = "🖱"
 	} else {
-		modeEmoji = "⌨️"
+		modeEmoji = "⌨"
 	}
 
 	// Build help text
@@ -1137,19 +1137,21 @@ func (m model) renderDualPane() string {
 	// Toolbar buttons
 	// Home button - highlight with gray background when in home directory
 	homeDir, _ := os.UserHomeDir()
+	// Home button
+	homeIcon := "🏠"
 	if homeDir != "" && m.currentPath == homeDir {
 		// Active: gray background (in home directory)
 		homeButtonStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(homeButtonStyle.Render("[🏠]"))
+		s.WriteString(homeButtonStyle.Render("[" + homeIcon + "]"))
 	} else {
 		// Inactive: normal styling
 		homeButtonStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true)
-		s.WriteString(homeButtonStyle.Render("[🏠]"))
+		s.WriteString(homeButtonStyle.Render("[" + homeIcon + "]"))
 	}
 	s.WriteString(" ")
 
@@ -1165,10 +1167,20 @@ func (m model) renderDualPane() string {
 	s.WriteString(" ")
 
 	// View mode toggle button (cycles List → Detail → Tree)
+	// Show different emoji based on current display mode
+	viewIcon := "📊" // Detail view (default)
+	switch m.displayMode {
+	case modeList:
+		viewIcon = "📄" // Document icon for simple list view
+	case modeDetail:
+		viewIcon = "📊" // Bar chart icon for detailed columns
+	case modeTree:
+		viewIcon = "🌲" // Tree icon for hierarchical view
+	}
 	viewButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
-	s.WriteString(viewButtonStyle.Render("[V]"))
+	s.WriteString(viewButtonStyle.Render("[" + viewIcon + "]"))
 	s.WriteString(" ")
 
 	// Pane toggle button (toggles single ↔ dual-pane)
@@ -1202,60 +1214,63 @@ func (m model) renderDualPane() string {
 
 	// Context-aware search button (in-file search when viewing, directory filter when browsing)
 	// Highlight when search is active (either in-file or directory filter)
+	searchIcon := "🔍"
 	if m.preview.searchActive || m.searchMode {
 		// Active: gray background
 		activeSearchStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(activeSearchStyle.Render("[🔍]"))
+		s.WriteString(activeSearchStyle.Render("[" + searchIcon + "]"))
 	} else {
 		// Inactive: normal styling
 		searchButtonStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true)
-		s.WriteString(searchButtonStyle.Render("[🔍]"))
+		s.WriteString(searchButtonStyle.Render("[" + searchIcon + "]"))
 	}
 	s.WriteString(" ")
 
 	// Prompts filter toggle button
+	promptIcon := "📝"
 	if m.showPromptsOnly {
 		// Active: gray background (like command mode)
 		activeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[📝]"))
+		s.WriteString(activeStyle.Render("[" + promptIcon + "]"))
 	} else {
 		// Inactive: normal styling
 		promptButtonStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true)
-		s.WriteString(promptButtonStyle.Render("[📝]"))
+		s.WriteString(promptButtonStyle.Render("[" + promptIcon + "]"))
 	}
 	s.WriteString(" ")
 
 	// Git repositories toggle button
+	gitIcon := "🔀"
 	if m.showGitReposOnly {
 		// Active: gray background (like other active toggles)
 		activeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[🔀]"))
+		s.WriteString(activeStyle.Render("[" + gitIcon + "]"))
 	} else {
 		// Inactive: normal styling
 		gitButtonStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true)
-		s.WriteString(gitButtonStyle.Render("[🔀]"))
+		s.WriteString(gitButtonStyle.Render("[" + gitIcon + "]"))
 	}
 	s.WriteString(" ")
 
 	// Trash/Recycle bin button
-	trashIcon := "🗑️"
+	trashIcon := "🗑"
 	if m.showTrashOnly {
-		trashIcon = "♻️" // Recycle icon when viewing trash
+		trashIcon = "♻" // Recycle icon when viewing trash
 	}
 	trashButtonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).

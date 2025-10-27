@@ -418,7 +418,7 @@ func TestGetFileIcon(t *testing.T) {
 		{
 			name:     "Parent directory",
 			fileItem: fileItem{name: "..", isDir: true},
-			expected: "⬆️",
+			expected: "⬆",
 		},
 		{
 			name:     ".claude directory",

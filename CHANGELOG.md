@@ -4,6 +4,41 @@ All notable changes to the Terminal File Explorer (TFE) project.
 
 ## [Unreleased]
 
+### Changed
+- **Automatic View Mode Selection Based on Terminal Width**
+  - Narrow terminals (width < 100) now default to single-pane mode on startup
+  - Wide terminals (width >= 100) default to dual-pane mode
+  - Improves usability on mobile devices (Termux) and small terminal windows
+  - Users can still toggle between modes using the pane button ([⬜]/[⬌])
+  - Files modified: `model.go` (lines 32, 86-92)
+
+### Fixed
+- **Menu Bar Highlight Persistence**
+  - Fixed menu highlight staying visible after using letter hotkeys (F/E/V/T/H) to open menus
+  - Menu highlight now clears when navigating to files with up/down/j/k keys
+  - Mouse clicks already cleared properly, now keyboard navigation does too
+  - Files modified: `update_keyboard.go` (lines 1437-1441, 1483-1487)
+
+- **Image Preview in WezTerm on WSL**
+  - Fixed false positive: WezTerm in WSL no longer tries to use Kitty protocol (doesn't work on Windows)
+  - Now shows fallback viewer options (V key) instead of blank "HD Preview via Kitty"
+  - Added helper text footer to HD preview: "Press V to view in [viewer]" as fallback
+  - Helps users in edge cases where terminal protocol detection might fail
+  - Files modified: `terminal_graphics.go` (line 72), `file_operations.go` (lines 2097-2105)
+
+- **Detail View Horizontal Scrolling on Narrow Terminals**
+  - Fixed text corruption and misalignment when scrolling right in Detail view
+  - Fixed column headers not staying aligned with data rows during scroll
+  - Fixed text wrapping instead of truncating in single-pane mode
+  - Added terminal-specific box width calculation for WezTerm/Termux vs Windows Terminal
+  - Fixed infinite scrolling through empty space after last column
+  - Fixed headers being scrolled twice (manual + automatic) causing wrong position
+  - Fixed inconsistent width calculation between headers (runewidth.RuneWidth) and data rows (m.runeWidth)
+  - Fixed missing "  " prefix on headers causing 2-column offset
+  - Fixed headers using byte-based padding instead of visual-width-aware padding
+  - Horizontal scrolling now works perfectly on narrow terminals (<100 cols) in both single and dual-pane modes
+  - Files modified: `render_file_list.go` (lines 204-208, 276, 295, 336, 357, 362, 364-367, 378), `update_keyboard.go` (lines 1807-1815, 1816-1829)
+
 ### Added
 - **HD Image Previews via Terminal Graphics Protocols**
   - Added `terminal_graphics.go` module for rendering images at full resolution

@@ -573,7 +573,7 @@ func getFileIcon(item fileItem) string {
 
 	if item.isDir {
 		if item.name == ".." {
-			return "⬆️" // Up arrow for parent dir
+			return "⬆" // Up arrow for parent dir
 		}
 		// Check if this is the user's home directory
 		if homeDir, err := os.UserHomeDir(); err == nil {
@@ -679,10 +679,10 @@ func getFileIcon(item fileItem) string {
 		".py":   "🐍", // Python snake
 		".js":   "🟨", // JavaScript yellow
 		".ts":   "🔷", // TypeScript blue diamond
-		".jsx":  "⚛️", // React atom
-		".tsx":  "⚛️", // React atom
+		".jsx":  "⚛", // React atom
+		".tsx":  "⚛", // React atom
 		".rs":   "🦀", // Rust crab
-		".c":    "©️", // C copyright symbol
+		".c":    "©", // C copyright symbol
 		".cpp":  "➕", // C++ plus
 		".h":    "📋", // Header clipboard
 		".java": "☕", // Java coffee
@@ -708,7 +708,7 @@ func getFileIcon(item fileItem) string {
 		".toml": "📄", // TOML document
 		".xml":  "📰", // XML newspaper
 		".csv":  "📈", // CSV chart
-		".sql":  "🗄️", // SQL database
+		".sql":  "🗄", // SQL database
 
 		// Documents
 		".md":  "📝", // Markdown memo
@@ -718,20 +718,20 @@ func getFileIcon(item fileItem) string {
 		".docx": "📘", // DOCX blue book
 
 		// Archives
-		".zip": "🗜️", // ZIP compression
+		".zip": "🗜", // ZIP compression
 		".tar": "📦", // TAR package
-		".gz":  "🗜️", // GZ compression
-		".7z":  "🗜️", // 7Z compression
-		".rar": "🗜️", // RAR compression
+		".gz":  "🗜", // GZ compression
+		".7z":  "🗜", // 7Z compression
+		".rar": "🗜", // RAR compression
 
 		// Images
-		".png": "🖼️", // PNG frame
-		".jpg": "🖼️", // JPG frame
-		".jpeg": "🖼️", // JPEG frame
-		".gif": "🎞️", // GIF film
+		".png": "🖼", // PNG frame
+		".jpg": "🖼", // JPG frame
+		".jpeg": "🖼", // JPEG frame
+		".gif": "🎞", // GIF film
 		".svg": "🎨", // SVG palette
-		".ico": "🖼️", // ICO frame
-		".webp": "🖼️", // WebP frame
+		".ico": "🖼", // ICO frame
+		".webp": "🖼", // WebP frame
 
 		// Audio/Video
 		".mp3": "🎵", // MP3 music
@@ -742,9 +742,9 @@ func getFileIcon(item fileItem) string {
 
 		// System/Config
 		".env":  "🔐", // ENV lock
-		".ini":  "⚙️", // INI gear
-		".conf": "⚙️", // CONF gear
-		".cfg":  "⚙️", // CFG gear
+		".ini":  "⚙", // INI gear
+		".conf": "⚙", // CONF gear
+		".cfg":  "⚙", // CFG gear
 		".lock": "🔒", // LOCK locked
 
 		// Build/Package
@@ -958,13 +958,6 @@ func visualWidth(s string) int {
 		stripped += string(ch)
 	}
 
-	// Strip variation selectors to work around go-runewidth bug #76
-	// VS incorrectly reports width=1 instead of width=0, causing padding miscalculations
-	stripped = strings.ReplaceAll(stripped, "\uFE0F", "") // VS-16 (emoji presentation)
-	stripped = strings.ReplaceAll(stripped, "\uFE0E", "") // VS-15 (text presentation)
-
-	// Now use StringWidth on the whole stripped string
-	// This correctly handles emoji+variation-selector as a unit (not char-by-char)
 	return runewidth.StringWidth(stripped)
 }
 
@@ -1233,15 +1226,7 @@ func getFileType(item fileItem) string {
 
 // padIconToWidth pads an icon emoji to a fixed width (2 cells) for consistent alignment
 // Some terminals render certain emojis as 1 cell, so we pad them to 2 cells
-// Also strips variation selectors for terminals that don't handle them well
 func (m model) padIconToWidth(icon string) string {
-	// Strip variation selectors for terminals that render emoji+VS as 1 cell
-	// This prevents width calculation mismatches
-	if m.terminalType == terminalWezTerm || m.terminalType == terminalTermux {
-		icon = strings.ReplaceAll(icon, "\uFE0F", "") // VS-16 (emoji presentation)
-		icon = strings.ReplaceAll(icon, "\uFE0E", "") // VS-15 (text presentation)
-	}
-
 	return m.padToVisualWidth(icon, 2)
 }
 
@@ -2041,7 +2026,7 @@ func (m *model) loadPreview(path string) {
 		} else if isDatabaseFile(path) {
 			if getAvailableDatabaseViewer() != "" {
 				content = []string{
-					"🗄️ SQLite Database",
+					"🗄 SQLite Database",
 					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 					"",
 					"Cannot preview database files",
@@ -2050,7 +2035,7 @@ func (m *model) loadPreview(path string) {
 				}
 			} else {
 				content = []string{
-					"🗄️ SQLite Database",
+					"🗄 SQLite Database",
 					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 					"",
 					"Cannot preview database files",
@@ -2062,7 +2047,7 @@ func (m *model) loadPreview(path string) {
 			}
 		} else if isArchiveFile(path) {
 			content = []string{
-				"🗜️ Archive File",
+				"🗜 Archive File",
 				fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 				"",
 				"Cannot preview archive contents",
@@ -2085,14 +2070,24 @@ func (m *model) loadPreview(path string) {
 				// Split into lines for preview rendering
 				imageLines := strings.Split(strings.TrimRight(hdImageData, "\n"), "\n")
 
-				// Add header info
+				// Add header info with fallback options
 				protocolName := getProtocolName()
 				header := []string{
-					fmt.Sprintf("🖼️ Image File (HD Preview via %s)", protocolName),
+					fmt.Sprintf("🖼 Image File (HD Preview via %s)", protocolName),
 					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 					"",
 				}
 				content = append(header, imageLines...)
+
+				// Add footer with fallback viewing options
+				// Useful if protocol doesn't work (e.g., WezTerm in WSL) or user prefers external viewer
+				imageViewer := getAvailableImageViewer()
+				footer := []string{""}
+				if imageViewer != "" {
+					footer = append(footer, fmt.Sprintf("💡 Alternative: Press V to view in %s", imageViewer))
+				}
+				footer = append(footer, "   Press F3 to open in browser")
+				content = append(content, footer...)
 
 				// Set flag to prevent wrapping of graphics protocol escape sequences
 				m.preview.hasGraphicsProtocol = true
@@ -2101,7 +2096,7 @@ func (m *model) loadPreview(path string) {
 				imageViewer := getAvailableImageViewer()
 				if imageViewer != "" {
 					content = []string{
-						"🖼️ Image File",
+						"🖼 Image File",
 						fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 						"",
 						"Cannot preview in text mode",
@@ -2114,7 +2109,7 @@ func (m *model) loadPreview(path string) {
 					}
 				} else {
 					content = []string{
-						"🖼️ Image File",
+						"🖼 Image File",
 						fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 						"",
 						"Cannot preview in text mode",
@@ -2134,7 +2129,7 @@ func (m *model) loadPreview(path string) {
 			// Generic binary file
 			if getAvailableHexViewer() != "" {
 				content = []string{
-					"⚙️ Binary File",
+					"⚙ Binary File",
 					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 					"",
 					"Cannot preview binary files",
@@ -2143,7 +2138,7 @@ func (m *model) loadPreview(path string) {
 				}
 			} else {
 				content = []string{
-					"⚙️ Binary File",
+					"⚙ Binary File",
 					fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
 					"",
 					"Cannot preview binary files",

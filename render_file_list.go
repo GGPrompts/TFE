@@ -191,9 +191,21 @@ func (m model) renderDetailView(maxVisible int) string {
 	files := m.getFilteredFiles()
 
 	// Calculate available width for columns based on view mode
+	// Must account for box borders and padding in BOTH single and dual-pane modes
 	availableWidth := m.width
 	if m.viewMode == viewDualPane {
 		availableWidth = m.leftWidth - 6 // Account for borders and padding
+	} else {
+		// Single-pane mode: box in view.go has Width(m.width - 6) + Border()
+		// Different terminals interpret lipgloss Width() differently:
+		// - Windows Terminal: Width() = content width (borders added on top)
+		// - WezTerm/Termux: Width() = total width (borders included in Width())
+		// For WezTerm/Termux, we need to subtract borders (2 chars) from content area
+		if m.terminalType == terminalWezTerm {
+			availableWidth = m.width - 8 // Box width - borders (2) - margin (6) = m.width - 8
+		} else {
+			availableWidth = m.width - 6 // Windows Terminal and others
+		}
 	}
 
 	// On narrow terminals, use fixed wide width for horizontal scrolling
@@ -273,7 +285,8 @@ func (m model) renderDetailView(maxVisible int) string {
 			deletedHeader += sortIndicator
 		}
 
-		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, deletedHeader, extraWidth, locationHeader)
+		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
+		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, deletedHeader, extraWidth, locationHeader)
 	} else if m.showFavoritesOnly {
 		// Favorites mode: Name, Size, Modified, Location
 		nameHeader := "Name"
@@ -291,7 +304,8 @@ func (m model) renderDetailView(maxVisible int) string {
 			modifiedHeader += sortIndicator
 		}
 
-		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
+		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
+		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
 	} else if m.showGitReposOnly {
 		// Git repos mode: Name, Branch, Status, Last Commit
 		nameHeader := "Name"
@@ -331,7 +345,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		// Recalculate nameWidth after applying minimums
 		nameWidth = usableWidth - branchWidth - statusWidth - commitWidth
 
-		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, branchWidth, branchHeader, statusWidth, statusHeader, commitWidth, commitHeader)
+		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
+		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, branchWidth, branchHeader, statusWidth, statusHeader, commitWidth, commitHeader)
 	} else {
 		// Regular mode: Name, Size, Modified, Type
 		nameHeader := "Name"
@@ -351,57 +366,16 @@ func (m model) renderDetailView(maxVisible int) string {
 			typeHeader += sortIndicator
 		}
 
-		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, typeHeader)
+		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
+		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, typeHeader)
 	}
 
-	// Render header with sort indicators
-	// Apply horizontal scroll to header if needed
-	var headerLine string
-	if m.isNarrowTerminal() && renderWidth > availableWidth {
-		// Extract visible portion using VISUAL COLUMN awareness (same as data rows)
-		// This ensures proper alignment with emoji-aware scrolling
-		scrollOffset := m.detailScrollX
-		if scrollOffset < 0 {
-			scrollOffset = 0
-		}
+	// Add "  " prefix to header to match data row padding
+	header = "  " + header
 
-		// Walk through header counting visual columns (not runes)
-		// This properly handles emojis which are 1 rune but 2 visual columns
-		var visibleHeader strings.Builder
-		visualCol := 0
-		headerRunes := []rune(header)
-
-		for _, r := range headerRunes {
-			charWidth := runewidth.RuneWidth(r)
-
-			// Check if this character is in the visible window
-			if visualCol+charWidth > scrollOffset && visualCol < scrollOffset+availableWidth {
-				// Only add character if it starts within visible range
-				if visualCol >= scrollOffset {
-					visibleHeader.WriteRune(r)
-				}
-			}
-
-			visualCol += charWidth
-
-			// Stop if we've passed the visible window
-			if visualCol >= scrollOffset+availableWidth {
-				break
-			}
-		}
-
-		// Pad to exact width using terminal-aware visual width
-		currentWidth := m.visualWidthCompensated(visibleHeader.String())
-		if currentWidth < availableWidth {
-			visibleHeader.WriteString(strings.Repeat(" ", availableWidth-currentWidth))
-		}
-
-		// NOW apply styling to the visible portion only
-		headerLine = headerStyle.Render(visibleHeader.String())
-	} else {
-		// Wide terminal or no scrolling needed - style the whole header
-		headerLine = headerStyle.Render(header)
-	}
+	// Apply styling to header - DO NOT scroll here!
+	// The header will be scrolled along with data rows by applyHorizontalScroll() later
+	headerLine := headerStyle.Render(header)
 	s.WriteString(headerLine)
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
