@@ -445,7 +445,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			// Scroll preview down (allow scrolling while editing)
 			totalLines := m.getWrappedLineCount()
-			maxScroll := totalLines - (m.height - 6)
+			visibleLines := m.getPreviewVisibleLines()
+			maxScroll := totalLines - visibleLines
 			if maxScroll < 0 {
 				maxScroll = 0
 			}
@@ -456,7 +457,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		case "pageup", "pgup":
 			// Page up (allow scrolling while editing)
-			m.preview.scrollPos -= m.height - 6
+			visibleLines := m.getPreviewVisibleLines()
+			m.preview.scrollPos -= visibleLines
 			if m.preview.scrollPos < 0 {
 				m.preview.scrollPos = 0
 			}
@@ -465,11 +467,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "pagedown", "pgdn", "pgdown":
 			// Page down (allow scrolling while editing)
 			totalLines := m.getWrappedLineCount()
-			maxScroll := totalLines - (m.height - 6)
+			visibleLines := m.getPreviewVisibleLines()
+			maxScroll := totalLines - visibleLines
 			if maxScroll < 0 {
 				maxScroll = 0
 			}
-			m.preview.scrollPos += m.height - 6
+			m.preview.scrollPos += visibleLines
 			if m.preview.scrollPos > maxScroll {
 				m.preview.scrollPos = maxScroll
 			}
@@ -780,7 +783,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			// Scroll preview down
 			totalLines := m.getWrappedLineCount()
-			maxScroll := totalLines - (m.height - 6)
+			visibleLines := m.getPreviewVisibleLines()
+			maxScroll := totalLines - visibleLines
 			if maxScroll < 0 {
 				maxScroll = 0
 			}
@@ -789,18 +793,20 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 		case "pageup", "pgup":
-			m.preview.scrollPos -= m.height - 6
+			visibleLines := m.getPreviewVisibleLines()
+			m.preview.scrollPos -= visibleLines
 			if m.preview.scrollPos < 0 {
 				m.preview.scrollPos = 0
 			}
 
 		case "pagedown", "pgdn", "pgdown":
 			totalLines := m.getWrappedLineCount()
-			maxScroll := totalLines - (m.height - 6)
+			visibleLines := m.getPreviewVisibleLines()
+			maxScroll := totalLines - visibleLines
 			if maxScroll < 0 {
 				maxScroll = 0
 			}
-			m.preview.scrollPos += m.height - 6
+			m.preview.scrollPos += visibleLines
 			if m.preview.scrollPos > maxScroll {
 				m.preview.scrollPos = maxScroll
 			}
@@ -1484,8 +1490,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				// Scroll preview down
-				// Calculate visible lines: m.height - 5 (header) - 2 (preview title) = m.height - 7
-				visibleLines := m.height - 7
+				visibleLines := m.getPreviewVisibleLines()
 				totalLines := m.getWrappedLineCount()
 				maxScroll := totalLines - visibleLines
 				if maxScroll < 0 {
@@ -1705,8 +1710,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// Page down in dual-pane mode (only works when right pane focused)
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
-			// Calculate visible lines: m.height - 5 (header) - 2 (preview title) = m.height - 7
-			visibleLines := m.height - 7
+			visibleLines := m.getPreviewVisibleLines()
 			totalLines := m.getWrappedLineCount()
 			maxScroll := totalLines - visibleLines
 			if maxScroll < 0 {

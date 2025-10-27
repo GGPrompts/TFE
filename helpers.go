@@ -411,3 +411,46 @@ func (m *model) scrollToFocusedVariable() {
 		m.preview.scrollPos = newScrollPos
 	}
 }
+
+// getPreviewVisibleLines returns the number of content lines visible in the preview pane
+// This accounts for headers, borders, and the scroll indicator line reservation in dual-pane mode
+func (m model) getPreviewVisibleLines() int {
+	totalLines := m.getWrappedLineCount()
+	if totalLines == 0 {
+		return 0
+	}
+
+	var visibleLines int
+
+	if m.viewMode == viewFullPreview {
+		// Full preview mode: m.height - 4 (borders/help) - headerLines (title/info when mouse enabled)
+		headerLines := 0
+		if m.previewMouseEnabled {
+			headerLines = 2
+		}
+		maxVisible := m.height - 4 - headerLines
+		visibleLines = maxVisible - 2 // Account for border
+	} else if m.viewMode == viewDualPane {
+		// Dual-pane mode calculation must match renderPreview() targetLines exactly!
+		// Layout: header(4) + panes(maxVisible) + footer(4) = m.height
+		// maxVisible = m.height - 8
+		// contentHeight = maxVisible - 2 (borders) = m.height - 10
+		// targetLines = contentHeight - 1 (scroll indicator) = m.height - 11
+		// This fixes the "missing 3 lines" bug where getPreviewVisibleLines() was
+		// returning m.height - 8, but renderPreview() was using m.height - 11.
+		visibleLines = m.height - 11
+		// Reserve one more line if content fits (no scroll indicator needed)
+		if totalLines <= visibleLines+1 {
+			visibleLines++ // No scroll indicator needed, can show one more line
+		}
+	} else {
+		// Single-pane preview mode (shouldn't happen, but default to safe value)
+		visibleLines = m.height - 6
+	}
+
+	if visibleLines < 1 {
+		visibleLines = 1
+	}
+
+	return visibleLines
+}

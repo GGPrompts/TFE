@@ -102,6 +102,20 @@ func (m model) renderListView(maxVisible int) string {
 		// Truncate long filenames to prevent wrapping
 		// In dual-pane mode, use narrower width to fit in left pane
 		displayName := file.name
+
+		// Show parent folder name for ".." entry
+		if file.name == ".." {
+			parentPath := filepath.Dir(m.currentPath)
+			parentName := filepath.Base(parentPath)
+
+			// Handle root directory edge case
+			if parentPath == m.currentPath || parentName == "/" || parentName == "." {
+				parentName = "root"
+			}
+
+			displayName = fmt.Sprintf(".. (%s)", parentName)
+		}
+
 		maxNameLen := 40 // Default for single-pane
 		if m.viewMode == viewDualPane {
 			// Check if using vertical split (narrow terminal) - need to account for box borders
@@ -285,6 +299,10 @@ func (m model) renderDetailView(maxVisible int) string {
 		switch m.sortBy {
 		case "name":
 			nameHeader += sortIndicator
+		case "branch":
+			branchHeader += sortIndicator
+		case "status":
+			statusHeader += sortIndicator
 		case "modified": // Use modified for commit time sorting
 			commitHeader += sortIndicator
 		}
@@ -294,8 +312,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		branchWidth := usableWidth * 15 / 100
 		statusWidth := usableWidth * 20 / 100
 		commitWidth := usableWidth * 30 / 100
-		nameWidth = usableWidth - branchWidth - statusWidth - commitWidth
 
+		// Apply minimum width constraints
 		if branchWidth < 10 {
 			branchWidth = 10
 		}
@@ -305,6 +323,9 @@ func (m model) renderDetailView(maxVisible int) string {
 		if commitWidth < 15 {
 			commitWidth = 15
 		}
+
+		// Recalculate nameWidth after applying minimums
+		nameWidth = usableWidth - branchWidth - statusWidth - commitWidth
 
 		header = fmt.Sprintf("%-*s  %-*s  %-*s  %-*s", nameWidth, nameHeader, branchWidth, branchHeader, statusWidth, statusHeader, commitWidth, commitHeader)
 	} else {
@@ -365,8 +386,8 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 		}
 
-		// Pad to exact width using visual width
-		currentWidth := runewidth.StringWidth(visibleHeader.String())
+		// Pad to exact width using terminal-aware visual width
+		currentWidth := m.visualWidthCompensated(visibleHeader.String())
 		if currentWidth < availableWidth {
 			visibleHeader.WriteString(strings.Repeat(" ", availableWidth-currentWidth))
 		}
@@ -413,6 +434,20 @@ func (m model) renderDetailView(maxVisible int) string {
 
 		// Truncate long names based on dynamic width
 		displayName := file.name
+
+		// Show parent folder name for ".." entry
+		if file.name == ".." {
+			parentPath := filepath.Dir(m.currentPath)
+			parentName := filepath.Base(parentPath)
+
+			// Handle root directory edge case
+			if parentPath == m.currentPath || parentName == "/" || parentName == "." {
+				parentName = "root"
+			}
+
+			displayName = fmt.Sprintf(".. (%s)", parentName)
+		}
+
 		// Use the pre-calculated maxNameTextLen which accounts for icon + star
 		if maxNameTextLen < 10 {
 			maxNameTextLen = 10
@@ -477,7 +512,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := padToVisualWidth(name, nameWidth)
+		paddedName := m.padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, deleted, extraWidth, location)
 		} else if m.showFavoritesOnly {
 			// Favorites mode: Name, Size, Modified, Location
@@ -493,7 +528,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				location = "..." + location[len(location)-(extraWidth-3):]
 			}
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := padToVisualWidth(name, nameWidth)
+		paddedName := m.padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
 		} else if m.showGitReposOnly {
 			// Git repos mode: Name (with path), Branch, Status, Last Commit
@@ -574,7 +609,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := padToVisualWidth(name, nameWidth)
+		paddedName := m.padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, branchWidth, branch, statusWidth, status, commitWidth, lastCommit)
 		} else {
 			// Regular mode: Name, Size, Modified, Type
@@ -591,7 +626,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				}
 			}
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := padToVisualWidth(name, nameWidth)
+		paddedName := m.padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, fileType)
 		}
 
@@ -693,7 +728,7 @@ func (m model) applyHorizontalScroll(content string, viewWidth int) string {
 		// IMPORTANT: Strip the trailing \033[0m, add padding, then re-add reset
 		// This prevents padding from inheriting highlight colors
 		plainVisible := stripANSI(visibleLine)
-		visualLen := runewidth.StringWidth(plainVisible) // Use visual width for emojis
+		visualLen := m.visualWidthCompensated(plainVisible) // Use terminal-aware visual width for emojis
 
 		if visualLen < viewWidth {
 			// Line is too short - add padding
@@ -710,7 +745,7 @@ func (m model) applyHorizontalScroll(content string, viewWidth int) string {
 		} else if visualLen > viewWidth {
 			// Line is too long - truncate to prevent wrapping
 			// Use ANSI-aware truncation that preserves styling
-			visibleLine = truncateToVisualWidth(visibleLine, viewWidth)
+			visibleLine = m.truncateToVisualWidth(visibleLine, viewWidth)
 		}
 
 		result.WriteString(visibleLine)
@@ -772,7 +807,7 @@ func (m model) extractVisiblePortion(line string, viewWidth int) string {
 
 		// Calculate visual width of this character
 		// Most chars are 1 column, emojis/wide chars are 2 columns
-		charWidth := runeWidth(r)
+		charWidth := m.runeWidth(r)
 
 		// Check if this character is in the visible window
 		if visibleCol+charWidth > scrollOffset && visibleCol < scrollOffset+viewWidth {
@@ -810,7 +845,8 @@ func (m model) extractVisiblePortion(line string, viewWidth int) string {
 
 // truncateToVisualWidth truncates a string (with ANSI codes) to a specific visual width
 // Preserves ANSI styling codes while ensuring visual width doesn't exceed target
-func truncateToVisualWidth(s string, targetWidth int) string {
+// Terminal-aware: applies WezTerm emoji compensation
+func (m model) truncateToVisualWidth(s string, targetWidth int) string {
 	var result strings.Builder
 	visualWidth := 0
 	inEscape := false
@@ -840,8 +876,8 @@ func truncateToVisualWidth(s string, targetWidth int) string {
 			continue
 		}
 
-		// Calculate visual width of this character
-		charWidth := runewidth.RuneWidth(r)
+		// Calculate visual width of this character using terminal-aware method
+		charWidth := m.runeWidth(r)
 
 		// Check if adding this character would exceed target width
 		if visualWidth + charWidth > targetWidth {
@@ -859,9 +895,17 @@ func truncateToVisualWidth(s string, targetWidth int) string {
 }
 
 // runeWidth returns the visual width of a rune (1 for most, 2 for emojis/wide chars)
-func runeWidth(r rune) int {
-	// Variation selectors and combining characters have zero width
+// Terminal-aware: Treats variation selectors correctly for Windows Terminal
+// Delegates to runewidth library for consistent width calculations
+func (m model) runeWidth(r rune) int {
+	// Variation selectors have special handling based on terminal
 	if r >= 0xFE00 && r <= 0xFE0F { // Variation selectors
+		// runewidth reports VS as width 1, but Windows Terminal renders emoji+VS as 2 cells total
+		// We return +1 for Windows Terminal to match its 2-cell rendering
+		// WezTerm renders emoji+VS as 1 cell (matches runewidth), return 0
+		if m.terminalType == terminalWindowsTerminal {
+			return 1 // Compensate for Windows Terminal's wider rendering
+		}
 		return 0
 	}
 	if r >= 0x0300 && r <= 0x036F { // Combining diacritical marks
@@ -874,25 +918,10 @@ func runeWidth(r rune) int {
 		return 0
 	}
 
-	// Emojis and wide characters typically occupy 2 columns
-	// This is a simplified check - a full implementation would use unicode/width package
-	if r >= 0x1F300 && r <= 0x1F9FF { // Emoji range
-		return 2
-	}
-	if r >= 0x2600 && r <= 0x26FF { // Misc symbols (many emojis)
-		return 2
-	}
-	if r >= 0x2700 && r <= 0x27BF { // Dingbats
-		return 2
-	}
-	// East Asian Wide characters
-	if r >= 0x3000 && r <= 0x9FFF { // CJK
-		return 2
-	}
-	if r >= 0xAC00 && r <= 0xD7AF { // Hangul
-		return 2
-	}
-	return 1
+	// Delegate to runewidth library for all other characters
+	// This ensures consistency with padToVisualWidth() and visualWidthCompensated()
+	// which also use runewidth for their calculations
+	return runewidth.RuneWidth(r)
 }
 
 // buildTreeItems builds a flattened list of tree items including expanded directories
@@ -1075,9 +1104,24 @@ func (m model) renderTreeView(maxVisible int) string {
 		// Truncate long filenames to prevent wrapping
 		displayName := file.name
 
+		// Show parent folder name for ".." entry
+		if file.name == ".." {
+			parentPath := filepath.Dir(m.currentPath)
+			parentName := filepath.Base(parentPath)
+
+			// Handle root directory edge case
+			if parentPath == m.currentPath || parentName == "/" || parentName == "." {
+				parentName = "root"
+			}
+
+			displayName = fmt.Sprintf(".. (%s)", parentName)
+		}
+
 		// Calculate available width dynamically based on view mode
 		var maxNameLen int
-		indentWidth := 2 + (item.depth * 3) + 3 + 2 + 2 + 5
+		// Calculate icon width dynamically (terminal-aware for variation selector emojis)
+		iconWidth := m.visualWidthCompensated(icon)
+		indentWidth := 2 + (item.depth * 3) + 3 + iconWidth + 2 + 5
 
 		if m.viewMode == viewDualPane {
 			// Check if using vertical split (narrow terminal) - need to account for box borders

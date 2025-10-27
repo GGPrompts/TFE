@@ -64,6 +64,38 @@ const (
 	rightPane
 )
 
+// terminalType represents different terminal emulators with varying emoji rendering
+type terminalType int
+
+const (
+	terminalUnknown terminalType = iota
+	terminalWindowsTerminal
+	terminalWezTerm
+	terminalKitty
+	terminalITerm2
+	terminalXterm
+	terminalTermux
+)
+
+func (t terminalType) String() string {
+	switch t {
+	case terminalWindowsTerminal:
+		return "Windows Terminal"
+	case terminalWezTerm:
+		return "WezTerm"
+	case terminalKitty:
+		return "Kitty"
+	case terminalITerm2:
+		return "iTerm2"
+	case terminalXterm:
+		return "xterm"
+	case terminalTermux:
+		return "Termux"
+	default:
+		return "Unknown"
+	}
+}
+
 // fileItem represents a file or directory in the file browser
 type fileItem struct {
 	name          string
@@ -225,12 +257,13 @@ func (f *promptInputField) hasContent() bool {
 
 // model represents the main application state
 type model struct {
-	currentPath string
-	files       []fileItem
-	cursor      int
-	height      int
-	width       int
-	showHidden  bool
+	currentPath  string
+	files        []fileItem
+	cursor       int
+	height       int
+	width        int
+	showHidden   bool
+	terminalType terminalType // Detected terminal emulator for emoji width compensation
 	displayMode displayMode
 	sortBy      string // "name", "size", "modified" for detail view
 	sortAsc     bool   // Sort ascending or descending

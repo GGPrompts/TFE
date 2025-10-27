@@ -932,6 +932,7 @@ func highlightCode(content, filepath string) (string, bool) {
 
 // visualWidth calculates the visual width of a string, accounting for tabs and ANSI codes
 // This is important for consistent scrollbar alignment and box borders
+// NOTE: This is the non-terminal-aware version - use m.visualWidthCompensated() for layout calculations
 func visualWidth(s string) int {
 	width := 0
 	inAnsi := false
@@ -962,6 +963,23 @@ func visualWidth(s string) int {
 			width += runewidth.RuneWidth(ch)
 		}
 	}
+	return width
+}
+
+// visualWidthCompensated calculates visual width with terminal-specific emoji compensation
+// Use this for layout calculations that need accurate emoji widths
+func (m model) visualWidthCompensated(s string) int {
+	width := runewidth.StringWidth(s)
+
+	// Apply variation selector compensation for Windows Terminal
+	// runewidth reports emoji+VS as 1 cell, but Windows Terminal renders as 2 cells
+	// WezTerm renders as 1 cell (matches runewidth), so no compensation needed there
+	// We ADD 1 per VS for Windows Terminal to match its wider rendering
+	variationSelectorCount := strings.Count(s, "\uFE0F")
+	if m.terminalType == terminalWindowsTerminal && variationSelectorCount > 0 {
+		width += variationSelectorCount  // ADD for Windows Terminal's 2-cell rendering
+	}
+
 	return width
 }
 
@@ -1211,14 +1229,21 @@ func getFileType(item fileItem) string {
 
 // padToVisualWidth pads a string to a specific visual width using spaces
 // This correctly handles emojis and wide characters that take up more than 1 cell
-func padToVisualWidth(s string, targetWidth int) string {
+// Terminal-aware: Variation selector compensation only for WezTerm
+func (m model) padToVisualWidth(s string, targetWidth int) string {
 	visualWidth := runewidth.StringWidth(s)
 
-	// Fix for variation selector emojis (U+FE0F) which runewidth miscalculates
-	// These emojis render as width=2 but runewidth reports width=1
-	// Count variation selectors and add them to the width
+	// Variation selector emoji compensation (terminal-specific)
+	// runewidth reports emoji+VS as 1 cell, but Windows Terminal renders as 2 cells
+	// WezTerm renders as 1 cell (matches runewidth), so no compensation needed there
+	// We ADD 1 per VS for Windows Terminal to match its wider rendering
 	variationSelectorCount := strings.Count(s, "\uFE0F")
-	visualWidth += variationSelectorCount
+	if m.terminalType == terminalWindowsTerminal && variationSelectorCount > 0 {
+		// Windows Terminal needs +1 per variation selector for its 2-cell rendering
+		visualWidth += variationSelectorCount
+	}
+	// For all other terminals (Windows Terminal, Kitty, iTerm2, xterm, Termux, Unknown):
+	// Don't add compensation - they render VS emojis correctly as 2 cells
 
 	if visualWidth >= targetWidth {
 		return s
@@ -1546,6 +1571,12 @@ func (m *model) loadFiles() {
 // When sorting by name: keeps folders grouped before files (traditional behavior)
 // When sorting by other criteria: mixes folders and files
 func (m *model) sortFiles() {
+	// When in git repos mode, sort gitReposList instead of files
+	if m.showGitReposOnly {
+		m.sortGitReposList()
+		return
+	}
+
 	if len(m.files) <= 1 {
 		return
 	}
@@ -1646,6 +1677,29 @@ func (m *model) sortFiles() {
 				less = aType < bType
 			}
 
+		case "branch":
+			// Sort by git branch name (for git repos view)
+			aBranch := a.gitBranch
+			bBranch := b.gitBranch
+			if aBranch == bBranch {
+				// If same branch, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = strings.ToLower(aBranch) < strings.ToLower(bBranch)
+			}
+
+		case "status":
+			// Sort by git status (for git repos view)
+			// Priority: dirty repos first, then ahead/behind status, then clean
+			aStatus := getGitStatusSortValue(a)
+			bStatus := getGitStatusSortValue(b)
+			if aStatus == bStatus {
+				// If same status, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = aStatus < bStatus
+			}
+
 		default:
 			// Fallback to name sorting
 			less = strings.ToLower(a.name) < strings.ToLower(b.name)
@@ -1665,6 +1719,88 @@ func (m *model) sortFiles() {
 		m.files = append(m.files, *parentDir)
 	}
 	m.files = append(m.files, otherFiles...)
+}
+
+// getGitStatusSortValue returns a sort priority for git status
+// Lower values = higher priority (sorted first)
+func getGitStatusSortValue(item fileItem) int {
+	if !item.isGitRepo {
+		return 999 // No git status, sort last
+	}
+
+	// Priority: dirty repos first, then ahead/behind, then clean
+	if item.gitDirty {
+		return 0 // Dirty repos (uncommitted changes) - highest priority
+	}
+
+	if item.gitAhead > 0 || item.gitBehind > 0 {
+		return 1 // Repos with ahead/behind status
+	}
+
+	return 2 // Clean repos with no changes
+}
+
+// sortGitReposList sorts the git repositories list based on sortBy and sortAsc settings
+// This is a specialized version of sortFiles() for the gitReposList array
+func (m *model) sortGitReposList() {
+	if len(m.gitReposList) <= 1 {
+		return
+	}
+
+	// Sort the repos based on sortBy criteria
+	sort.Slice(m.gitReposList, func(i, j int) bool {
+		a, b := m.gitReposList[i], m.gitReposList[j]
+
+		// Determine sort result based on sortBy
+		var less bool
+		switch m.sortBy {
+		case "name":
+			less = strings.ToLower(a.name) < strings.ToLower(b.name)
+
+		case "branch":
+			// Sort by git branch name
+			aBranch := a.gitBranch
+			bBranch := b.gitBranch
+			if aBranch == bBranch {
+				// If same branch, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = strings.ToLower(aBranch) < strings.ToLower(bBranch)
+			}
+
+		case "status":
+			// Sort by git status
+			// Priority: dirty repos first, then ahead/behind status, then clean
+			aStatus := getGitStatusSortValue(a)
+			bStatus := getGitStatusSortValue(b)
+			if aStatus == bStatus {
+				// If same status, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = aStatus < bStatus
+			}
+
+		case "modified":
+			// Sort by last commit time (stored in gitLastCommit)
+			if a.gitLastCommit.Equal(b.gitLastCommit) {
+				// If same time, sort by name as secondary
+				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			} else {
+				less = a.gitLastCommit.Before(b.gitLastCommit)
+			}
+
+		default:
+			// Fallback to name sorting
+			less = strings.ToLower(a.name) < strings.ToLower(b.name)
+		}
+
+		// Apply sort direction (ascending vs descending)
+		if !m.sortAsc {
+			less = !less
+		}
+
+		return less
+	})
 }
 
 // loadPreview loads the content of a file for preview

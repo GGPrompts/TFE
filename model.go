@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -24,7 +25,8 @@ func initialModel() model {
 		height:            24,
 		width:             80,
 		showHidden:        false,
-		displayMode:       modeTree, // Tree view works better on narrow terminals
+		terminalType:      detectTerminalType(), // Detect terminal for emoji width compensation
+		displayMode:       modeTree,             // Tree view works better on narrow terminals
 		sortBy:            "name",
 		sortAsc:           true,
 		viewMode:          viewSinglePane, // Will be set to dual-pane if narrow terminal
@@ -134,4 +136,63 @@ func (m *model) calculateLayout() {
 			}
 		}
 	}
+}
+
+// detectTerminalType determines which terminal emulator is being used
+// This is used for emoji width compensation (variation selector handling)
+func detectTerminalType() terminalType {
+	term := os.Getenv("TERM")
+	termProgram := os.Getenv("TERM_PROGRAM")
+	wtSession := os.Getenv("WT_SESSION")
+	wezterm := os.Getenv("WEZTERM_EXECUTABLE")
+
+	// Manual override for testing/debugging
+	if override := os.Getenv("TFE_TERMINAL_TYPE"); override != "" {
+		switch override {
+		case "windows-terminal", "wt":
+			return terminalWindowsTerminal
+		case "wezterm":
+			return terminalWezTerm
+		case "kitty":
+			return terminalKitty
+		case "iterm2":
+			return terminalITerm2
+		case "xterm":
+			return terminalXterm
+		case "termux":
+			return terminalTermux
+		}
+	}
+
+	// Check for Windows Terminal (most reliable indicator)
+	if wtSession != "" {
+		return terminalWindowsTerminal
+	}
+
+	// Check for WezTerm
+	if wezterm != "" || termProgram == "WezTerm" {
+		return terminalWezTerm
+	}
+
+	// Check for Kitty
+	if strings.Contains(term, "kitty") || os.Getenv("KITTY_WINDOW_ID") != "" {
+		return terminalKitty
+	}
+
+	// Check for iTerm2
+	if termProgram == "iTerm.app" {
+		return terminalITerm2
+	}
+
+	// Check for xterm
+	if term == "xterm" || term == "xterm-256color" {
+		return terminalXterm
+	}
+
+	// Check for Termux (Android)
+	if strings.Contains(os.Getenv("PREFIX"), "com.termux") {
+		return terminalTermux
+	}
+
+	return terminalUnknown
 }

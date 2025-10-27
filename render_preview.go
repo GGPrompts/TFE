@@ -184,13 +184,22 @@ func (m model) renderPreview(maxVisible int) string {
 			if start < 0 {
 				start = 0
 			}
-			if start >= totalLines {
-				start = max(0, totalLines-maxVisible)
+
+			// Reserve last line for scroll indicator in dual-pane mode
+			targetLines := maxVisible
+			if m.viewMode == viewDualPane && totalLines > 0 {
+				targetLines = maxVisible - 1
 			}
 
-			end := start + maxVisible
+			if start >= totalLines {
+				start = max(0, totalLines-targetLines)
+			}
+
+			end := start + targetLines
 			if end > totalLines {
+				// When end exceeds total lines, adjust start backwards to show a full page
 				end = totalLines
+				start = max(0, end-targetLines)
 			}
 
 			// Render visible lines without line numbers for markdown
@@ -204,13 +213,7 @@ func (m model) renderPreview(maxVisible int) string {
 				outputLines++
 			}
 
-			// Reserve last line for scroll indicator in dual-pane mode
-			targetLines := maxVisible
-			if m.viewMode == viewDualPane && totalLines > 0 {
-				targetLines = maxVisible - 1
-			}
-
-			for i := start; i < end && outputLines < targetLines; i++ {
+			for i := start; i < end; i++ {
 				line := renderedLines[i]
 
 				// Add scrollbar indicator for markdown files (since they don't have line numbers)
@@ -227,14 +230,24 @@ func (m model) renderPreview(maxVisible int) string {
 
 			// Add scroll position indicator in dual-pane mode
 			if m.viewMode == viewDualPane && totalLines > 0 {
-				// Calculate scroll percentage
-				scrollPercent := (m.preview.scrollPos * 100) / totalLines
-				if scrollPercent > 100 {
+				// Calculate scroll percentage based on how far through scrollable content we are
+				// maxScrollPos is the last valid scroll position that shows the bottom of content
+				maxScrollPos := totalLines - targetLines
+				var scrollPercent int
+				if maxScrollPos <= 0 {
+					// Content fits in one screen
 					scrollPercent = 100
+				} else {
+					scrollPercent = (m.preview.scrollPos * 100) / maxScrollPos
+					if scrollPercent > 100 {
+						scrollPercent = 100
+					}
 				}
 
-				// Create compact scroll indicator
-				scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", m.preview.scrollPos+1, totalLines, scrollPercent)
+				// Show the last visible line number (not the top line)
+				// end is already correctly clamped, so use it directly
+				lastVisibleLine := end
+				scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", lastVisibleLine, totalLines, scrollPercent)
 				scrollStyle := lipgloss.NewStyle().
 					Foreground(lipgloss.Color("241")).
 					Italic(true)
@@ -290,13 +303,23 @@ func (m model) renderPreview(maxVisible int) string {
 	if start < 0 {
 		start = 0
 	}
-	if start >= totalLines {
-		start = max(0, totalLines-maxVisible)
+
+	// Reserve last line for scroll indicator in dual-pane mode
+	targetLines := maxVisible
+	if m.viewMode == viewDualPane && totalLines > 0 {
+		targetLines = maxVisible - 1
 	}
 
-	end := start + maxVisible
+	if start >= totalLines {
+		start = max(0, totalLines-targetLines)
+	}
+
+	end := start + targetLines
 	if end > totalLines {
+		// When end exceeds total lines, adjust start backwards to show a full page
+		// This ensures we always show targetLines when possible
 		end = totalLines
+		start = max(0, end-targetLines)
 	}
 
 	// Render lines with line numbers and scrollbar
@@ -309,7 +332,7 @@ func (m model) renderPreview(maxVisible int) string {
 		linesRendered++
 	}
 
-	for i := start; i < end && linesRendered < maxVisible; i++ {
+	for i := start; i < end; i++ {
 		// Line number (5 chars)
 		lineNum := fmt.Sprintf("%5d ", i+1)
 		lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
@@ -342,20 +365,26 @@ func (m model) renderPreview(maxVisible int) string {
 
 	// Add scroll position indicator as the last line in dual-pane mode
 	if m.viewMode == viewDualPane && totalLines > 0 {
-		// Calculate scroll percentage
-		scrollPercent := (m.preview.scrollPos * 100) / totalLines
-		if scrollPercent > 100 {
+		// Calculate scroll percentage based on how far through scrollable content we are
+		maxScrollPos := totalLines - targetLines
+		var scrollPercent int
+		if maxScrollPos <= 0 {
+			// Content fits in one screen
 			scrollPercent = 100
+		} else {
+			scrollPercent = (m.preview.scrollPos * 100) / maxScrollPos
+			if scrollPercent > 100 {
+				scrollPercent = 100
+			}
 		}
 
-		// Create compact scroll indicator
-		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", m.preview.scrollPos+1, totalLines, scrollPercent)
+		// Show the last visible line number (not the top line)
+		// end is already correctly clamped, so use it directly
+		lastVisibleLine := end
+		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", lastVisibleLine, totalLines, scrollPercent)
 		scrollStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			Italic(true)
-
-		// Reserve last line for scroll indicator
-		targetLines := maxVisible - 1
 
 		// Pad with empty lines to reach target
 		for linesRendered < targetLines {
@@ -725,7 +754,9 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 	end := start + contentHeight
 	if end > totalLines {
+		// When end exceeds total lines, adjust start backwards to show a full page
 		end = totalLines
+		start = max(0, end-contentHeight)
 	}
 
 	// Collect rendered lines so we can join without trailing newline
@@ -776,14 +807,24 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 	// Add scroll position indicator in dual-pane mode
 	if m.viewMode == viewDualPane && totalLines > 0 {
-		// Calculate scroll percentage
-		scrollPercent := (m.preview.scrollPos * 100) / totalLines
-		if scrollPercent > 100 {
+		// Calculate scroll percentage based on how far through scrollable content we are
+		contentLinesAvailable := targetLines - len(headerLines)
+		maxScrollPos := totalLines - contentLinesAvailable
+		var scrollPercent int
+		if maxScrollPos <= 0 {
+			// Content fits in one screen
 			scrollPercent = 100
+		} else {
+			scrollPercent = (m.preview.scrollPos * 100) / maxScrollPos
+			if scrollPercent > 100 {
+				scrollPercent = 100
+			}
 		}
 
-		// Create compact scroll indicator
-		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", m.preview.scrollPos+1, totalLines, scrollPercent)
+		// Show the last visible line number (not the top line)
+		// Use end instead of totalLines since end is already correctly clamped
+		lastVisibleLine := min(start+contentLinesAvailable, end)
+		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", lastVisibleLine, totalLines, scrollPercent)
 		scrollStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			Italic(true)
@@ -883,12 +924,26 @@ func (m model) renderFullPreview() string {
 
 		// Calculate scroll percentage
 		totalLines := m.getWrappedLineCount()
+		// Calculate how many lines will be visible (need to calculate early for percentage)
+		maxVisible := m.height - 4 - 2 // headerLines = 2 when mouse enabled
+		contentHeight := maxVisible - 2
+
 		var scrollPercent int
+		var lastVisibleLine int
 		if totalLines > 0 {
-			// Calculate percentage based on current scroll position
-			scrollPercent = (m.preview.scrollPos * 100) / totalLines
-			if scrollPercent > 100 {
+			// Calculate percentage based on how far through scrollable content we are
+			maxScrollPos := totalLines - contentHeight
+			if maxScrollPos <= 0 {
+				// Content fits in one screen
 				scrollPercent = 100
+				lastVisibleLine = totalLines
+			} else {
+				scrollPercent = (m.preview.scrollPos * 100) / maxScrollPos
+				if scrollPercent > 100 {
+					scrollPercent = 100
+				}
+				// Show the last visible line number (not the top line)
+				lastVisibleLine = min(m.preview.scrollPos+contentHeight, totalLines)
 			}
 		}
 
@@ -897,7 +952,7 @@ func (m model) renderFullPreview() string {
 			if totalLines > 0 {
 				infoText = fmt.Sprintf("Size: %s | Markdown Rendered | Line %d/%d (%d%%)",
 					formatFileSize(m.preview.fileSize),
-					m.preview.scrollPos+1,
+					lastVisibleLine,
 					totalLines,
 					scrollPercent)
 			} else {
@@ -910,7 +965,7 @@ func (m model) renderFullPreview() string {
 				infoText = fmt.Sprintf("Size: %s | Lines: %d (wrapped) | Line %d/%d (%d%%)",
 					formatFileSize(m.preview.fileSize),
 					len(m.preview.content),
-					m.preview.scrollPos+1,
+					lastVisibleLine,
 					totalLines,
 					scrollPercent)
 			} else {
@@ -1031,8 +1086,8 @@ func (m model) renderDualPane() string {
 	showGitHub := time.Since(m.startupTime) < 5*time.Second
 
 	if showGitHub {
-		// Title with mode indicator (first 5 seconds)
-		titleText := "(T)erminal (F)ile (E)xplorer [Dual-Pane]"
+		// Title with mode indicator (first 5 seconds) + terminal type for debugging
+		titleText := fmt.Sprintf("(T)erminal (F)ile (E)xplorer [Dual-Pane] (%s)", m.terminalType.String())
 		if m.commandFocused {
 			titleText += " [Command Mode]"
 		}

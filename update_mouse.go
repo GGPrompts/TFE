@@ -96,7 +96,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		case tea.MouseButtonWheelDown:
 			totalLines := m.getWrappedLineCount()
-			maxScroll := totalLines - (m.height - 6)
+			visibleLines := m.getPreviewVisibleLines()
+			maxScroll := totalLines - visibleLines
 			if maxScroll < 0 {
 				maxScroll = 0
 			}
@@ -499,6 +500,12 @@ git pull
 			detailHeaderY := 5
 
 			if m.displayMode == modeDetail && msg.Y == detailHeaderY {
+				// Clear search mode when clicking column headers
+				if m.searchMode {
+					m.searchMode = false
+					m.searchQuery = ""
+					m.filteredIndices = nil
+				}
 				// Adjust X for left border (both modes have borders now)
 				adjustedX := msg.X - 2 // Account for left border
 
@@ -507,9 +514,53 @@ git pull
 				// Columns: Name (2-32), Size (34-44), Modified (46-58), Type (60-75)
 				// Header format (favorites): "%-25s  %-10s  %-12s  %-25s" with 2-space left padding
 				// Columns: Name (2-27), Size (29-39), Modified (41-53), Location (55-80)
+				// Header format (git repos): dynamically calculated based on terminal width
+				// Columns: Name (35%), Branch (15%), Status (20%), Last Commit (30%)
 
 				var newSortBy string
-				if m.showFavoritesOnly {
+				if m.showGitReposOnly {
+					// Git repos mode - calculate dynamic column positions
+					usableWidth := m.width - 4 // Account for borders
+					branchWidth := usableWidth * 15 / 100
+					statusWidth := usableWidth * 20 / 100
+					commitWidth := usableWidth * 30 / 100
+					nameWidth := usableWidth - branchWidth - statusWidth - commitWidth
+
+					// Apply minimum width constraints (must match render_file_list.go)
+					if branchWidth < 10 {
+						branchWidth = 10
+					}
+					if statusWidth < 15 {
+						statusWidth = 15
+					}
+					if commitWidth < 15 {
+						commitWidth = 15
+					}
+					// Recalculate nameWidth after applying minimums
+					nameWidth = usableWidth - branchWidth - statusWidth - commitWidth
+
+					// Column positions using msg.X directly (NOT adjustedX)
+					// This matches how regular detail mode works
+					nameStart := 2
+					nameEnd := nameStart + nameWidth
+					branchStart := nameEnd + 2
+					branchEnd := branchStart + branchWidth
+					statusStart := branchEnd + 2
+					statusEnd := statusStart + statusWidth
+					commitStart := statusEnd + 2
+					commitEnd := commitStart + commitWidth
+
+					// Use msg.X directly for comparison (like regular mode does)
+					if msg.X >= nameStart && msg.X < nameEnd {
+						newSortBy = "name"
+					} else if msg.X >= branchStart && msg.X < branchEnd {
+						newSortBy = "branch"
+					} else if msg.X >= statusStart && msg.X < statusEnd {
+						newSortBy = "status"
+					} else if msg.X >= commitStart && msg.X < commitEnd {
+						newSortBy = "modified" // Use 'modified' for commit time sorting
+					}
+				} else if m.showFavoritesOnly {
 					// Favorites mode column ranges
 					if adjustedX >= 2 && adjustedX <= 27 {
 						newSortBy = "name"
@@ -994,7 +1045,7 @@ git pull
 
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 			// Scroll preview down when right pane focused (3 lines per tick)
-			visibleLines := m.height - 7
+			visibleLines := m.getPreviewVisibleLines()
 			totalLines := m.getWrappedLineCount()
 			maxScroll := totalLines - visibleLines
 			if maxScroll < 0 {
