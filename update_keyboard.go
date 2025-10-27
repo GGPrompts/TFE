@@ -1375,11 +1375,6 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.launchFuzzySearch(),
 		)
 
-	case "ctrl+t":
-		// Ctrl+T: Peek at terminal history (main buffer)
-		// Shows scrollback with command output, viewed images, etc.
-		return m, peekTerminalHistory()
-
 	case "/":
 		// /: Enter directory search mode (filter files by name)
 		// Only activate in file list view, not in full preview mode

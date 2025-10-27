@@ -415,31 +415,6 @@ read -n 1 -s -r`, viewer, path)
 	)
 }
 
-// peekTerminalHistory temporarily exits alt screen to show terminal scrollback
-// Useful for reviewing command output, viewed images, or pre-TFE terminal history
-func peekTerminalHistory() tea.Cmd {
-	script := `echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Terminal History (Scrollback Buffer)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "  • Scroll up/down to view command output, images, and terminal history"
-echo "  • Press any key to return to TFE"
-echo ""
-read -n 1 -s -r`
-	c := exec.Command("bash", "-c", script)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-
-	return tea.Sequence(
-		tea.ExitAltScreen, // Exit alt screen to reveal main buffer
-		tea.ExecProcess(c, func(err error) tea.Msg {
-			return editorFinishedMsg{err}
-		}),
-	)
-}
-
 // getAvailableCSVViewer returns the first available CSV/spreadsheet viewer
 func getAvailableCSVViewer() string {
 	viewers := []string{"visidata", "sc-im"}
