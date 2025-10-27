@@ -1,10 +1,24 @@
 # TFE Emoji Width Bug - Root Cause Analysis
 
-**Source:** Codex GPT-5 (2025-10-27) - Deep debugging session
+**⚠️ STATUS: UNVERIFIED THEORY - BUG NOT FIXED**
 
+**Source:** Codex GPT-5 (2025-10-27) - Deep debugging session (3 hours)
 **Problem:** Rows with emojis ⬆️ ⚙️ 🗜️ 🖼️ shift left by 1 space in WezTerm only
+**Resolution:** **Not fixed - abandoned as not worth the effort**
+
+## Why This Bug Was Abandoned
+
+1. **Don't use WezTerm** - Primary terminal is Windows Terminal (works fine)
+2. **WezTerm was only for testing HD image previews**
+3. **HD image previews don't work in WSL anyway** (terminal graphics protocols can't cross WSL→Windows boundary)
+4. **Even Yazi has the same WSL limitation** (not unique to TFE)
+5. **3 hours of debugging with no resolution** (diminishing returns)
+
+**If you DO use WezTerm and want to fix this, the theory below might help. Otherwise, ignore it.**
 
 ---
+
+## Codex's Theory (Unverified)
 
 ## Root Cause: TWO Different Width Engines
 
