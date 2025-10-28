@@ -53,6 +53,48 @@ func getFileFinder() (string, []string) {
 	}
 }
 
+// getSearchRoot determines the root directory for fuzzy search
+// Priority: git root > home directory
+func (m *model) getSearchRoot() (string, string) {
+	// Try to find git repository root
+	gitRoot := m.findGitRoot(m.currentPath)
+	if gitRoot != "" {
+		// Return git root with a friendly display name
+		displayName := filepath.Base(gitRoot)
+		return gitRoot, fmt.Sprintf("Git:%s> ", displayName)
+	}
+
+	// Fall back to home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// If can't get home, use current path (original behavior)
+		return m.currentPath, "File> "
+	}
+
+	return homeDir, "~> "
+}
+
+// findGitRoot walks up the directory tree to find .git directory
+func (m *model) findGitRoot(startPath string) string {
+	currentPath := startPath
+	for {
+		gitPath := filepath.Join(currentPath, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			return currentPath
+		}
+
+		// Move up one directory
+		parentPath := filepath.Dir(currentPath)
+
+		// Reached root without finding .git
+		if parentPath == currentPath {
+			return ""
+		}
+
+		currentPath = parentPath
+	}
+}
+
 // launchFuzzySearch uses external fzf + fd/find for blazing fast search
 func (m *model) launchFuzzySearch() tea.Cmd {
 	return func() tea.Msg {
@@ -68,6 +110,9 @@ func (m *model) launchFuzzySearch() tea.Cmd {
 		// Get the best file finder
 		finder, args := getFileFinder()
 
+		// Determine search root (git root or home directory)
+		searchRoot, promptText := m.getSearchRoot()
+
 		// Build shell command that pipes file finder to fzf
 		// This is simpler and more reliable than trying to coordinate stdin/tty
 		var shellCmd string
@@ -77,16 +122,16 @@ func (m *model) launchFuzzySearch() tea.Cmd {
 		// --no-mouse: Disable mouse for better performance
 		// --cycle: Wrap around when reaching end
 		// --bind '?:toggle-preview': Press '?' to show/hide preview
-		fzfOpts := "--height=100% --layout=reverse --border --prompt='File> ' --no-preview --no-mouse --cycle --bind '?:toggle-preview' --preview='head -50 {}' --preview-window=right:50%:wrap:hidden"
+		fzfOpts := fmt.Sprintf("--height=100%% --layout=reverse --border --prompt='%s' --no-preview --no-mouse --cycle --bind '?:toggle-preview' --preview='head -50 {}' --preview-window=right:50%%:wrap:hidden", promptText)
 
 		if finder == "find" {
 			// find outputs relative paths like "./file.txt", clean them up
 			shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | sed 's|^\\./||' | fzf %s",
-				m.currentPath, finder, strings.Join(args, " "), fzfOpts)
+				searchRoot, finder, strings.Join(args, " "), fzfOpts)
 		} else {
 			// fd/fdfind already outputs clean relative paths
 			shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | fzf %s",
-				m.currentPath, finder, strings.Join(args, " "), fzfOpts)
+				searchRoot, finder, strings.Join(args, " "), fzfOpts)
 		}
 
 		// Run the shell command with proper TTY access
@@ -114,8 +159,9 @@ func (m *model) launchFuzzySearch() tea.Cmd {
 			}
 		}
 
-		// Convert relative path to absolute
-		absPath := filepath.Join(m.currentPath, selectedFile)
+		// Convert relative path to absolute (using search root, not current path)
+		resultSearchRoot, _ := m.getSearchRoot()
+		absPath := filepath.Join(resultSearchRoot, selectedFile)
 
 		return fuzzySearchResultMsg{
 			selected: absPath,

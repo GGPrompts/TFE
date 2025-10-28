@@ -1028,6 +1028,53 @@ func truncateToWidth(s string, targetWidth int) string {
 	return result
 }
 
+// truncateToWidthCompensated truncates a string to fit within a target visual width
+// with terminal-specific emoji width compensation (uses m.runeWidth for accurate widths)
+func (m model) truncateToWidthCompensated(s string, targetWidth int) string {
+	width := 0
+	result := ""
+	inAnsi := false
+
+	for _, ch := range s {
+		// Handle ANSI escape sequences (don't count toward width)
+		if ch == '\033' {
+			inAnsi = true
+			result += string(ch)
+			continue
+		}
+
+		if inAnsi {
+			result += string(ch)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+
+		// Calculate character width using terminal-aware function
+		charWidth := 1
+		if ch == '\t' {
+			charWidth = 8 - (width % 8)
+		} else {
+			// Use terminal-aware runeWidth to properly handle wide characters
+			charWidth = m.runeWidth(ch)
+		}
+
+		if width+charWidth > targetWidth {
+			// Can't fit this character
+			if targetWidth-width >= 3 {
+				return result + "..."
+			}
+			return result
+		}
+
+		width += charWidth
+		result += string(ch)
+	}
+
+	return result
+}
+
 // getFileType returns a descriptive file type string based on file extension
 func getFileType(item fileItem) string {
 	// Check for symlinks first

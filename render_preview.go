@@ -222,8 +222,9 @@ func (m model) renderPreview(maxVisible int) string {
 				// Add scrollbar + space + left padding for better readability
 				paddedLine := scrollbar + " " + line
 				// Truncate after padding to prevent exceeding box bounds (per CLAUDE.md guidance)
-				if visualWidth(paddedLine) > boxContentWidth {
-					paddedLine = truncateToWidth(paddedLine, boxContentWidth)
+				// IMPORTANT: Use terminal-aware functions for emoji width compensation
+				if m.visualWidthCompensated(paddedLine) > boxContentWidth {
+					paddedLine = m.truncateToWidthCompensated(paddedLine, boxContentWidth)
 				}
 				writeLine(paddedLine + "\033[0m")
 			}
@@ -769,8 +770,9 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		}
 		// Truncate to box content width to prevent terminal wrapping
 		// (lipgloss styles and emojis can exceed expected width)
-		if visualWidth(line) > boxContentWidth {
-			line = truncateToWidth(line, boxContentWidth)
+		// IMPORTANT: Use terminal-aware functions for emoji width compensation
+		if m.visualWidthCompensated(line) > boxContentWidth {
+			line = m.truncateToWidthCompensated(line, boxContentWidth)
 		}
 		renderedLines = append(renderedLines, line+"\033[0m")
 	}
@@ -798,8 +800,9 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 		// Truncate to box content width to prevent terminal wrapping
 		// (even though content was wrapped, markdown padding or ANSI codes could push it over)
-		if visualWidth(line) > boxContentWidth {
-			line = truncateToWidth(line, boxContentWidth)
+		// IMPORTANT: Use terminal-aware functions for emoji width compensation
+		if m.visualWidthCompensated(line) > boxContentWidth {
+			line = m.truncateToWidthCompensated(line, boxContentWidth)
 		}
 		renderedLines = append(renderedLines, line+"\033[0m")
 		contentLineIndex++
