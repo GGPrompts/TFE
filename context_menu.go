@@ -112,6 +112,11 @@ func (m model) getContextMenuItems() []contextMenuItem {
 			items = append(items, contextMenuItem{"📊 Monitor (bottom)", "bottom"})
 		}
 
+		// Add separator and Claude Code launch options
+		items = append(items, contextMenuItem{"─────────", "separator"})
+		items = append(items, contextMenuItem{"🤖 Launch Claude", "claude"})
+		items = append(items, contextMenuItem{"🚀 Launch YOLO Claude", "claude_yolo"})
+
 		// Add separator and favorites
 		items = append(items, contextMenuItem{"─────────", "separator"})
 		items = append(items, contextMenuItem{"📋 Copy to...", "copy"})
@@ -409,6 +414,22 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			message:    "Permanently delete ALL items in trash?\nThis CANNOT be undone!",
 		}
 		m.showDialog = true
+		return m, tea.ClearScreen
+
+	case "claude":
+		// Launch Claude Code in the selected directory (with permission prompts)
+		// Note: runCommandAndExit() already cd's to the directory, so no path argument needed
+		if m.contextMenuFile.isDir {
+			return m, runCommandAndExit("claude", m.contextMenuFile.path)
+		}
+		return m, tea.ClearScreen
+
+	case "claude_yolo":
+		// Launch Claude Code in YOLO mode (skip permission prompts)
+		// Note: runCommandAndExit() already cd's to the directory, so no path argument needed
+		if m.contextMenuFile.isDir {
+			return m, runCommandAndExit("claude --dangerously-skip-permissions", m.contextMenuFile.path)
+		}
 		return m, tea.ClearScreen
 
 	case "copy":

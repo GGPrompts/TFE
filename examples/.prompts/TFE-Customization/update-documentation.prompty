@@ -1,0 +1,284 @@
+---
+name: TFE - Update Documentation
+description: Update TFE documentation after code changes to keep modules and architecture docs in sync
+authors:
+  - TFE Team
+---
+
+# Update TFE Documentation
+
+After making code changes, use this prompt to help update the documentation to keep everything in sync.
+
+## What Changed?
+
+**Module:** {{MODULE_NAME}}
+**Type of Change:** {{CHANGE_TYPE}}
+
+Please describe what you changed:
+```
+{{CHANGES_DESCRIPTION}}
+```
+
+## Files to Update
+
+Based on your changes, you may need to update:
+
+### 1. CLAUDE.md
+- **When:** Adding new modules, changing architecture
+- **Location:** Root directory
+- **Update:** Module Quick Reference section
+
+### 2. docs/MODULE_DETAILS.md
+- **When:** Adding/modifying modules
+- **Location:** `docs/MODULE_DETAILS.md`
+- **Update:** Module description and responsibilities
+
+### 3. HOTKEYS.md
+- **When:** Adding/changing keyboard shortcuts
+- **Location:** Root directory
+- **Update:** Keyboard shortcut tables
+
+### 4. PLAN.md
+- **When:** Completing planned features
+- **Location:** Root directory
+- **Update:** Mark completed items, move to CHANGELOG
+
+### 5. CHANGELOG.md
+- **When:** Completing features, fixing bugs
+- **Location:** Root directory
+- **Update:** Add entry under appropriate version
+
+### 6. README.md
+- **When:** Adding major features, changing installation
+- **Location:** Root directory
+- **Update:** Features section or installation instructions
+
+### 7. BACKLOG.md
+- **When:** Adding ideas for future work
+- **Location:** Root directory
+- **Update:** Add to appropriate section
+
+## Instructions for AI
+
+Please help me update the relevant documentation based on my changes. For each file that needs updating:
+
+1. **Read the current content** of the file
+2. **Identify** what sections need to be updated
+3. **Propose specific changes** in this format:
+
+```markdown
+### File: CLAUDE.md
+
+**Section:** Module Quick Reference
+
+**Current text:**
+```
+[paste current text]
+```
+
+**Proposed update:**
+```
+[paste updated text with changes highlighted]
+```
+
+**Reason:** Added new module X which handles Y functionality
+```
+
+4. **Check for consistency** across all documentation
+5. **Verify** that:
+   - Module responsibilities are clear and don't overlap
+   - File line counts are accurate (use actual counts)
+   - Examples reference correct line numbers
+   - Cross-references between docs are valid
+
+## Common Documentation Updates
+
+### Adding a New Module
+
+Update these files:
+1. **CLAUDE.md** - Add to Module Quick Reference with 1-line description
+2. **docs/MODULE_DETAILS.md** - Add full section with:
+   - Purpose
+   - Key responsibilities
+   - Key functions (with line numbers)
+   - Dependencies
+   - Usage examples
+
+Example MODULE_DETAILS.md entry:
+```markdown
+## module_name.go
+
+**Purpose:** Brief description of what this module does
+
+**Key Responsibilities:**
+- Responsibility 1
+- Responsibility 2
+- Responsibility 3
+
+**Key Functions:**
+- `functionName()` (line 50) - What it does
+- `anotherFunction()` (line 120) - What it does
+
+**Dependencies:**
+- `types.go` - Uses X types
+- `helpers.go` - Uses Y helpers
+
+**Usage Example:**
+[Show how other modules use this one]
+```
+
+### Adding a Keyboard Shortcut
+
+Update these files:
+1. **HOTKEYS.md** - Add to appropriate table
+2. **docs/MODULE_DETAILS.md** - Update update_keyboard.go section if needed
+3. **README.md** - Update if it's a major feature shortcut
+
+### Refactoring / Moving Code
+
+Update these files:
+1. **docs/MODULE_DETAILS.md** - Update line numbers and descriptions
+2. **CLAUDE.md** - Update if module responsibilities changed
+3. **docs/DEVELOPMENT_PATTERNS.md** - Update examples if affected
+
+### Completing a Feature
+
+Update these files:
+1. **PLAN.md** - Move from Current Sprint to CHANGELOG
+2. **CHANGELOG.md** - Add under current version
+3. **README.md** - Add to features list if user-facing
+4. **docs/MODULE_DETAILS.md** - Document any new modules
+
+### Fixing a Bug
+
+Update these files:
+1. **CHANGELOG.md** - Add to "Bug Fixes" section
+2. **PLAN.md** - Remove from Known Issues if listed
+
+## Documentation Health Check
+
+After updates, verify:
+
+```bash
+wc -l CLAUDE.md README.md PLAN.md CHANGELOG.md BACKLOG.md docs/*.md
+```
+
+**Target sizes:**
+- `CLAUDE.md`: < 500 lines
+- `PLAN.md`: < 400 lines
+- `CHANGELOG.md`: < 350 lines
+- `BACKLOG.md`: < 300 lines
+- `README.md`: < 500 lines
+- `docs/MODULE_DETAILS.md`: < 1000 lines
+
+If files exceed targets, consider:
+- Moving older changelog entries to archive
+- Moving completed PLAN items to CHANGELOG
+- Moving BACKLOG items to separate files by category
+- Condensing verbose descriptions
+
+## Line Number Accuracy
+
+When updating docs with line numbers:
+
+1. Use actual line numbers from the code
+2. Update them when code changes
+3. Use approximate ranges for sections (e.g., "around line 50-100")
+4. Note when line numbers are approximate: "(around line 50)"
+
+## Cross-Reference Verification
+
+Check that internal links work:
+```markdown
+- [Module Details](docs/MODULE_DETAILS.md) ✓
+- [Development Patterns](docs/DEVELOPMENT_PATTERNS.md) ✓
+- [Lessons Learned](docs/LESSONS_LEARNED.md) ✓
+```
+
+## Output Format
+
+Please provide your documentation updates in this format:
+
+### Summary of Changes
+[Brief overview of what changed in code]
+
+### Documentation Updates Required
+- [ ] CLAUDE.md
+- [ ] docs/MODULE_DETAILS.md
+- [ ] HOTKEYS.md
+- [ ] PLAN.md
+- [ ] CHANGELOG.md
+- [ ] README.md
+- [ ] Other: [specify]
+
+### Proposed Changes
+
+#### File: [filename]
+**Section:** [section name]
+
+**Current:**
+```
+[current text]
+```
+
+**Proposed:**
+```
+[updated text]
+```
+
+**Reason:** [why this change is needed]
+
+---
+
+[Repeat for each file]
+
+### Consistency Checks
+- [x] Module descriptions match responsibilities
+- [x] Line numbers are accurate
+- [x] Cross-references are valid
+- [x] File sizes are within targets
+- [x] No duplicate information across files
+
+## Example Usage
+
+**Scenario:** You just added fuzzy search functionality
+
+**Changes:**
+- Created `fuzzy_search.go` (new module)
+- Added `Ctrl+P` keyboard shortcut in `update_keyboard.go`
+- Added fuzzy search indicator in `menu.go`
+
+**Documentation updates needed:**
+
+1. **CLAUDE.md** - Add to Module Quick Reference:
+   ```
+   - **fuzzy_search.go** - Fuzzy file search with fzf
+   ```
+
+2. **docs/MODULE_DETAILS.md** - Add full section for fuzzy_search.go
+
+3. **HOTKEYS.md** - Add row:
+   ```
+   | `Ctrl+P` | Fuzzy file search |
+   ```
+
+4. **CHANGELOG.md** - Add:
+   ```
+   ### Added
+   - Fuzzy file search with fzf integration (Ctrl+P)
+   ```
+
+5. **README.md** - Add to features:
+   ```
+   - 🔍 **Fuzzy file search** - Quick file finding with fzf (Ctrl+P)
+   ```
+
+## Tips
+
+- Update docs immediately after code changes (while fresh in mind)
+- Keep module descriptions focused and clear
+- Use consistent terminology across all docs
+- Include examples where helpful
+- Verify line numbers are accurate
+- Check that changes flow logically through all docs
+- Run documentation health check periodically

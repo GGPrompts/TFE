@@ -6,11 +6,15 @@ This folder contains guides for customizing TFE (Terminal File Explorer) without
 
 ### Core Customizations
 
+- **add-context-menu-item.prompty** - Add custom right-click menu options (high priority!)
+- **customize-file-preview.prompty** - Add preview support for new file types
+- **add-display-mode.prompty** - Add new display modes (like Timeline, Size groups)
 - **add-tui-tool.prompty** - Add tools like ncdu, ranger, tig to the context menu
 - **customize-toolbar.prompty** - Change emoji toolbar buttons and colors
 - **add-file-icons.prompty** - Add icons for specific file types
 - **change-colors.prompty** - Customize color schemes (Gruvbox, Dracula, Nord, etc.)
 - **add-keyboard-shortcut.prompty** - Add or modify keyboard shortcuts
+- **update-documentation.prompty** - Keep docs in sync after code changes
 
 ## How to Use
 
@@ -35,11 +39,15 @@ Instead of adding YAML config files and complexity, TFE uses its own **Prompts L
 
 | What to Customize | File to Edit | Prompt to Use |
 |-------------------|--------------|---------------|
+| Add context menu item | `context_menu.go` | add-context-menu-item.prompty |
+| Add file preview | `render_preview.go` | customize-file-preview.prompty |
+| Add display mode | `types.go`, `render_file_list.go` | add-display-mode.prompty |
 | Add TUI tool | `context_menu.go` | add-tui-tool.prompty |
 | Change toolbar | `view.go` | customize-toolbar.prompty |
 | Add file icons | `file_operations.go` | add-file-icons.prompty |
 | Change colors | `styles.go` | change-colors.prompty |
 | Add shortcuts | `update_keyboard.go` | add-keyboard-shortcut.prompty |
+| Update docs | Various `*.md` files | update-documentation.prompty |
 
 ## Contributing
 

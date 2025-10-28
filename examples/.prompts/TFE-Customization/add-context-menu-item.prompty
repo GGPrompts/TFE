@@ -1,0 +1,371 @@
+---
+name: TFE - Add Context Menu Item
+description: Guide for adding custom right-click menu options to files or directories
+authors:
+  - TFE Team
+---
+
+# Add Custom Context Menu Items to TFE
+
+This guide shows how to add new right-click menu options for files or directories.
+
+## Location: context_menu.go
+
+All context menu logic is in `context_menu.go`. You'll modify two key functions:
+1. `getContextMenuItems()` - Define menu items (around line 37)
+2. `executeContextMenuAction()` - Handle what happens when clicked (around line 160)
+
+## Example 1: Add "Launch Claude Code" for Directories
+
+This is a real example we just implemented! Perfect pattern to follow.
+
+### Step 1: Add Menu Items
+
+In `getContextMenuItems()`, find the directory section (around line 54):
+
+```go
+if m.contextMenuFile.isDir {
+    // Directory menu items
+    items = append(items, contextMenuItem{"📂 Open", "open"})
+    items = append(items, contextMenuItem{"📂 Quick CD", "quickcd"})
+    // ... more items ...
+
+    // Add separator and your new items
+    items = append(items, contextMenuItem{"─────────", "separator"})
+    items = append(items, contextMenuItem{"🤖 Launch Claude", "claude"})
+    items = append(items, contextMenuItem{"🚀 Launch YOLO Claude", "claude_yolo"})
+
+    // ... rest of menu ...
+}
+```
+
+### Step 2: Add Action Handler
+
+In `executeContextMenuAction()`, add your cases (around line 419):
+
+```go
+case "claude":
+    // Launch Claude Code in the selected directory
+    // Note: runCommandAndExit() already cd's to the directory
+    if m.contextMenuFile.isDir {
+        return m, runCommandAndExit("claude", m.contextMenuFile.path)
+    }
+    return m, tea.ClearScreen
+
+case "claude_yolo":
+    // Launch Claude Code in YOLO mode
+    if m.contextMenuFile.isDir {
+        return m, runCommandAndExit("claude --dangerously-skip-permissions", m.contextMenuFile.path)
+    }
+    return m, tea.ClearScreen
+```
+
+## Example 2: Add "Open in VS Code" for Directories
+
+### Step 1: Add to Menu
+
+```go
+// In getContextMenuItems(), directory section
+items = append(items, contextMenuItem{"─────────", "separator"})
+items = append(items, contextMenuItem{"💻 Open in VS Code", "vscode"})
+```
+
+### Step 2: Add Handler
+
+```go
+case "vscode":
+    // Open directory in VS Code
+    if m.contextMenuFile.isDir {
+        return m, runCommandAndExit("code .", m.contextMenuFile.path)
+    }
+    return m, tea.ClearScreen
+```
+
+## Example 3: Add "Compress" for Files and Directories
+
+### Step 1: Add to Both Sections
+
+```go
+// For directories (around line 54)
+if m.contextMenuFile.isDir {
+    // ... existing items ...
+    items = append(items, contextMenuItem{"📦 Compress to .tar.gz", "compress"})
+}
+
+// For files (around line 125)
+if !m.contextMenuFile.isDir {
+    // ... existing items ...
+    items = append(items, contextMenuItem{"📦 Compress to .tar.gz", "compress"})
+}
+```
+
+### Step 2: Add Handler with Dialog
+
+```go
+case "compress":
+    // Compress file or directory
+    targetName := m.contextMenuFile.name + ".tar.gz"
+
+    // Show confirmation dialog
+    m.dialog = dialogModel{
+        dialogType: dialogConfirm,
+        title:      "Compress",
+        message:    fmt.Sprintf("Compress '%s' to '%s'?", m.contextMenuFile.name, targetName),
+    }
+    m.showDialog = true
+    return m, tea.ClearScreen
+```
+
+Note: You'll also need to handle the dialog confirmation in `update_keyboard.go` when Enter is pressed.
+
+## Example 4: Add "Extract Archive" for .tar.gz/.zip Files
+
+### Step 1: Conditional Menu Item
+
+```go
+// In file section (around line 125)
+if !m.contextMenuFile.isDir {
+    items = append(items, contextMenuItem{"Preview", "preview"})
+
+    // Add extract option for archives
+    ext := strings.ToLower(filepath.Ext(m.contextMenuFile.path))
+    if ext == ".tar.gz" || ext == ".tgz" || ext == ".zip" {
+        items = append(items, contextMenuItem{"📂 Extract Here", "extract"})
+    }
+
+    // ... rest of file menu ...
+}
+```
+
+### Step 2: Add Handler
+
+```go
+case "extract":
+    // Extract archive in place
+    if !m.contextMenuFile.isDir {
+        ext := strings.ToLower(filepath.Ext(m.contextMenuFile.path))
+        var cmd string
+
+        if ext == ".zip" {
+            cmd = fmt.Sprintf("unzip %s", shellQuote(m.contextMenuFile.name))
+        } else if ext == ".tar.gz" || ext == ".tgz" {
+            cmd = fmt.Sprintf("tar -xzf %s", shellQuote(m.contextMenuFile.name))
+        }
+
+        if cmd != "" {
+            return m, runCommandAndExit(cmd, filepath.Dir(m.contextMenuFile.path))
+        }
+    }
+    return m, tea.ClearScreen
+```
+
+## Example 5: Add "Copy Path (Windows)" for WSL Users
+
+### Step 1: Add Conditional Item
+
+```go
+// In both file and directory sections
+if isWSL() {
+    items = append(items, contextMenuItem{"📋 Copy Windows Path", "copywinpath"})
+}
+```
+
+### Step 2: Add Handler
+
+```go
+case "copywinpath":
+    // Convert WSL path to Windows path and copy
+    if isWSL() {
+        cmd := exec.Command("wslpath", "-w", m.contextMenuFile.path)
+        output, err := cmd.Output()
+        if err != nil {
+            m.setStatusMessage(fmt.Sprintf("Failed to convert path: %s", err), true)
+        } else {
+            winPath := strings.TrimSpace(string(output))
+            if err := copyToClipboard(winPath); err != nil {
+                m.setStatusMessage(fmt.Sprintf("Failed to copy: %s", err), true)
+            } else {
+                m.setStatusMessage("Windows path copied to clipboard", false)
+            }
+        }
+    }
+    return m, tea.ClearScreen
+```
+
+## Common Patterns
+
+### 1. Launch External TUI Tool
+
+```go
+// Use runCommandAndExit() for tools that take over terminal
+return m, runCommandAndExit("tool-name", m.contextMenuFile.path)
+```
+
+### 2. Show Input Dialog
+
+```go
+// Prompt user for input
+m.dialog = dialogModel{
+    dialogType: dialogInput,
+    title:      "Dialog Title",
+    message:    "Prompt message:",
+    input:      "",  // Or pre-fill with default
+}
+m.showDialog = true
+return m, tea.ClearScreen
+```
+
+### 3. Show Confirmation Dialog
+
+```go
+// Ask user to confirm action
+m.dialog = dialogModel{
+    dialogType: dialogConfirm,
+    title:      "Confirm Action",
+    message:    fmt.Sprintf("Are you sure you want to do X to '%s'?", m.contextMenuFile.name),
+}
+m.showDialog = true
+return m, tea.ClearScreen
+```
+
+### 4. Execute Command in Background
+
+```go
+// Run command without exiting TFE
+cmd := exec.Command("command", "args")
+cmd.Dir = m.contextMenuFile.path
+if err := cmd.Start(); err != nil {
+    m.setStatusMessage(fmt.Sprintf("Failed: %s", err), true)
+} else {
+    m.setStatusMessage("Command started successfully", false)
+}
+return m, tea.ClearScreen
+```
+
+### 5. Copy to Clipboard
+
+```go
+// Copy text to clipboard
+if err := copyToClipboard("text to copy"); err != nil {
+    m.setStatusMessage(fmt.Sprintf("Failed to copy: %s", err), true)
+} else {
+    m.setStatusMessage("Copied to clipboard", false)
+}
+return m, tea.ClearScreen
+```
+
+### 6. Conditional Menu Items
+
+```go
+// Only show for specific file types
+if strings.HasSuffix(m.contextMenuFile.name, ".md") {
+    items = append(items, contextMenuItem{"📝 Render Markdown", "markdown"})
+}
+
+// Only show if tool is available
+if m.toolsAvailable["docker"] {
+    items = append(items, contextMenuItem{"🐋 Build Image", "dockerbuild"})
+}
+
+// Only show in git repos
+if isGitRepo(m.contextMenuFile.path) {
+    items = append(items, contextMenuItem{"📜 Git Log", "gitlog"})
+}
+```
+
+## Menu Organization Tips
+
+### Use Separators
+
+```go
+items = append(items, contextMenuItem{"─────────", "separator"})
+```
+
+### Group Related Items
+
+```go
+// File operations group
+items = append(items, contextMenuItem{"─────────", "separator"})
+items = append(items, contextMenuItem{"📋 Copy to...", "copy"})
+items = append(items, contextMenuItem{"✏  Rename...", "rename"})
+items = append(items, contextMenuItem{"🗑  Delete", "delete"})
+
+// External tools group
+items = append(items, contextMenuItem{"─────────", "separator"})
+items = append(items, contextMenuItem{"🤖 Launch Claude", "claude"})
+items = append(items, contextMenuItem{"💻 Open in VS Code", "vscode"})
+```
+
+### Section Headers (non-clickable)
+
+```go
+items = append(items, contextMenuItem{"─────────", "separator"})
+items = append(items, contextMenuItem{"Git Operations", "separator"})  // Header
+items = append(items, contextMenuItem{"  ↓ Pull", "git_pull"})
+items = append(items, contextMenuItem{"  ↑ Push", "git_push"})
+```
+
+## Important Functions Reference
+
+### Available Helper Functions
+
+- `runCommandAndExit(cmd, dir)` - Run command in directory and exit TFE
+- `openEditor(editor, path)` - Open file in editor
+- `openInBrowser(path)` - Open file in web browser
+- `copyToClipboard(text)` - Copy text to clipboard
+- `shellQuote(s)` - Safely quote paths for shell commands
+- `isGitRepo(path)` - Check if directory is a git repo
+- `isWSL()` - Check if running in WSL
+- `isImageFile(path)` - Check if file is an image
+- `isHTMLFile(path)` - Check if file is HTML
+- `isExecutableFile(file)` - Check if file is executable
+
+### Available Commands
+
+- `openTUITool(tool, dir)` - Launch TUI tool (lazygit, htop, etc.)
+- `gitPull(path)`, `gitPush(path)`, `gitSync(path)`, `gitFetch(path)` - Git operations
+- `openImageViewer(path)` - View image with viu/timg/chafa
+- `openImageEditor(path)` - Edit image with textual-paint
+- `openInFileExplorer(path)` - Open in Windows Explorer (WSL)
+- `runScript(path)` - Run executable script
+
+## Emoji Usage Rule (CRITICAL!)
+
+**⚠️ NEVER use emoji variation selectors (U+FE0F) in menu items!**
+
+```go
+// ❌ WRONG - Has variation selector
+items = append(items, contextMenuItem{"⚙️ Settings", "settings"})
+
+// ✅ CORRECT - Base emoji only
+items = append(items, contextMenuItem{"⚙ Settings", "settings"})
+```
+
+This prevents width calculation bugs. See `docs/LESSONS_LEARNED.md` for details.
+
+## Files Modified
+
+- `context_menu.go` (add menu items and handlers)
+- Optional: `update_keyboard.go` (if handling dialog confirmations)
+
+Rebuild after changes: `./build.sh`
+
+## Testing Your Changes
+
+1. Rebuild: `./build.sh`
+2. Run TFE: `tfe`
+3. Right-click on a file/directory
+4. Verify your new menu item appears
+5. Select it and verify the action works correctly
+6. Test edge cases (missing tools, invalid paths, etc.)
+
+## Tips
+
+- Keep menu item labels short and clear
+- Use emoji that are visually distinct from existing ones
+- Test on both files and directories
+- Consider adding conditional logic (only show for certain file types)
+- Always use `shellQuote()` for paths in shell commands
+- Add separators to group related actions
+- Status messages should be informative (success/error)
+- Consider showing confirmation dialogs for destructive actions

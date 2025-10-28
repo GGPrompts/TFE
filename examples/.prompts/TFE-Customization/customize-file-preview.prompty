@@ -1,0 +1,466 @@
+---
+name: TFE - Customize File Preview
+description: Guide for adding preview support for new file types
+authors:
+  - TFE Team
+---
+
+# Customize File Preview in TFE
+
+This guide shows how to add preview rendering for new file types or customize existing previews.
+
+## Location: render_preview.go
+
+All preview rendering is in `render_preview.go`. The main function is `renderPreview()` (around line 30).
+
+## How Preview Works
+
+TFE determines how to preview a file based on:
+1. **File extension** (e.g., `.md`, `.json`, `.log`)
+2. **MIME type detection** (for images, PDFs)
+3. **Content analysis** (text vs binary)
+
+The preview is loaded in `model.go` (`loadPreview()` function) and rendered in `render_preview.go`.
+
+## Example 1: Add JSON Pretty-Print Preview
+
+### Step 1: Detect JSON Files
+
+In `render_preview.go`, find the preview type detection (around line 50):
+
+```go
+func (m model) renderPreview() string {
+    // ... existing code ...
+
+    // Detect preview type by extension
+    ext := strings.ToLower(filepath.Ext(m.previewPath))
+
+    switch ext {
+    case ".md", ".markdown":
+        return m.renderMarkdownPreview()
+
+    case ".json":
+        return m.renderJSONPreview()  // NEW!
+
+    case ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp":
+        return m.renderImagePreview()
+
+    // ... rest of cases ...
+    }
+}
+```
+
+### Step 2: Add Rendering Function
+
+```go
+// renderJSONPreview renders JSON with syntax highlighting and pretty-printing
+func (m model) renderJSONPreview() string {
+    if m.previewContent == "" {
+        return styleError.Render("No content to display")
+    }
+
+    // Parse and pretty-print JSON
+    var data interface{}
+    if err := json.Unmarshal([]byte(m.previewContent), &data); err != nil {
+        // If invalid JSON, show as plain text with error
+        return styleDim.Render("⚠ Invalid JSON - showing raw content:\n\n") +
+            m.previewContent
+    }
+
+    // Pretty-print with indentation
+    prettyJSON, err := json.MarshalIndent(data, "", "  ")
+    if err != nil {
+        return m.previewContent // Fallback to raw content
+    }
+
+    // Apply syntax highlighting (basic)
+    highlighted := m.highlightJSON(string(prettyJSON))
+
+    return highlighted
+}
+
+// highlightJSON applies basic syntax highlighting to JSON
+func (m model) highlightJSON(content string) string {
+    lines := strings.Split(content, "\n")
+    var highlighted []string
+
+    keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39"))   // Cyan keys
+    stringStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("76")) // Green strings
+    numberStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208")) // Orange numbers
+    boolStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("141"))  // Purple bools
+
+    for _, line := range lines {
+        // Simple highlighting (can be enhanced with regex)
+        if strings.Contains(line, "\":") {
+            // Highlight keys
+            line = keyStyle.Render(line)
+        } else if strings.Contains(line, "true") || strings.Contains(line, "false") {
+            line = boolStyle.Render(line)
+        } else if strings.Contains(line, "null") {
+            line = styleDim.Render(line)
+        }
+        // Could add more sophisticated parsing here
+
+        highlighted = append(highlighted, line)
+    }
+
+    return strings.Join(highlighted, "\n")
+}
+```
+
+## Example 2: Add YAML Preview
+
+```go
+// In renderPreview() switch:
+case ".yaml", ".yml":
+    return m.renderYAMLPreview()
+
+// Add function:
+func (m model) renderYAMLPreview() string {
+    if m.previewContent == "" {
+        return styleError.Render("No content to display")
+    }
+
+    // YAML is text-based, so just show with light highlighting
+    lines := strings.Split(m.previewContent, "\n")
+    var highlighted []string
+
+    commentStyle := styleDim
+    keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+
+    for _, line := range lines {
+        trimmed := strings.TrimSpace(line)
+
+        if strings.HasPrefix(trimmed, "#") {
+            // Comment
+            highlighted = append(highlighted, commentStyle.Render(line))
+        } else if strings.Contains(line, ":") && !strings.HasPrefix(trimmed, "-") {
+            // Key-value pair
+            parts := strings.SplitN(line, ":", 2)
+            key := keyStyle.Render(parts[0] + ":")
+            if len(parts) > 1 {
+                highlighted = append(highlighted, key+parts[1])
+            } else {
+                highlighted = append(highlighted, key)
+            }
+        } else {
+            // Regular line
+            highlighted = append(highlighted, line)
+        }
+    }
+
+    return strings.Join(highlighted, "\n")
+}
+```
+
+## Example 3: Add CSV Table Preview
+
+```go
+case ".csv":
+    return m.renderCSVPreview()
+
+func (m model) renderCSVPreview() string {
+    if m.previewContent == "" {
+        return styleError.Render("No content to display")
+    }
+
+    // Parse CSV
+    reader := csv.NewReader(strings.NewReader(m.previewContent))
+    records, err := reader.ReadAll()
+    if err != nil {
+        return styleError.Render(fmt.Sprintf("Failed to parse CSV: %s", err))
+    }
+
+    if len(records) == 0 {
+        return styleDim.Render("Empty CSV file")
+    }
+
+    // Build table view
+    var table []string
+
+    // Header row (bold)
+    headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+    if len(records) > 0 {
+        table = append(table, headerStyle.Render(strings.Join(records[0], " | ")))
+        table = append(table, strings.Repeat("─", 80)) // Separator
+    }
+
+    // Data rows (limit to prevent overflow)
+    maxRows := 50
+    for i := 1; i < len(records) && i < maxRows; i++ {
+        table = append(table, strings.Join(records[i], " | "))
+    }
+
+    if len(records) > maxRows {
+        table = append(table, styleDim.Render(fmt.Sprintf("\n... (%d more rows)", len(records)-maxRows)))
+    }
+
+    return strings.Join(table, "\n")
+}
+```
+
+## Example 4: Add PDF Metadata Preview
+
+```go
+case ".pdf":
+    return m.renderPDFPreview()
+
+func (m model) renderPDFPreview() string {
+    // Use pdfinfo command to get metadata
+    cmd := exec.Command("pdfinfo", m.previewPath)
+    output, err := cmd.Output()
+    if err != nil {
+        return styleError.Render("PDF preview requires 'pdfinfo' (install poppler-utils)")
+    }
+
+    // Format the metadata nicely
+    info := string(output)
+    lines := strings.Split(info, "\n")
+    var formatted []string
+
+    keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+
+    for _, line := range lines {
+        if strings.Contains(line, ":") {
+            parts := strings.SplitN(line, ":", 2)
+            formatted = append(formatted,
+                keyStyle.Render(parts[0]+":")+parts[1])
+        } else if line != "" {
+            formatted = append(formatted, line)
+        }
+    }
+
+    header := lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true).
+        Render("📄 PDF Document\n")
+
+    return header + "\n" + strings.Join(formatted, "\n")
+}
+```
+
+## Example 5: Add Audio File Info Preview
+
+```go
+case ".mp3", ".flac", ".wav", ".ogg", ".m4a":
+    return m.renderAudioPreview()
+
+func (m model) renderAudioPreview() string {
+    // Use ffprobe to get audio metadata
+    cmd := exec.Command("ffprobe",
+        "-v", "quiet",
+        "-print_format", "json",
+        "-show_format",
+        "-show_streams",
+        m.previewPath)
+
+    output, err := cmd.Output()
+    if err != nil {
+        return styleError.Render("Audio preview requires 'ffprobe' (install ffmpeg)")
+    }
+
+    // Parse JSON output
+    var metadata map[string]interface{}
+    if err := json.Unmarshal(output, &metadata); err != nil {
+        return styleError.Render(fmt.Sprintf("Failed to parse metadata: %s", err))
+    }
+
+    // Extract key information
+    var info []string
+    header := lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true).
+        Render("🎵 Audio File\n")
+
+    if format, ok := metadata["format"].(map[string]interface{}); ok {
+        if duration, ok := format["duration"].(string); ok {
+            info = append(info, fmt.Sprintf("Duration: %s seconds", duration))
+        }
+        if bitrate, ok := format["bit_rate"].(string); ok {
+            info = append(info, fmt.Sprintf("Bitrate: %s bps", bitrate))
+        }
+        if tags, ok := format["tags"].(map[string]interface{}); ok {
+            if title, ok := tags["title"].(string); ok {
+                info = append(info, fmt.Sprintf("Title: %s", title))
+            }
+            if artist, ok := tags["artist"].(string); ok {
+                info = append(info, fmt.Sprintf("Artist: %s", artist))
+            }
+            if album, ok := tags["album"].(string); ok {
+                info = append(info, fmt.Sprintf("Album: %s", album))
+            }
+        }
+    }
+
+    if len(info) == 0 {
+        info = append(info, "No metadata available")
+    }
+
+    return header + "\n" + strings.Join(info, "\n")
+}
+```
+
+## Example 6: Add Code Syntax Highlighting
+
+For better code preview, integrate with Chroma or similar:
+
+```go
+case ".go", ".py", ".js", ".ts", ".rs", ".c", ".cpp":
+    return m.renderCodePreview()
+
+func (m model) renderCodePreview() string {
+    // Use chroma for syntax highlighting
+    cmd := exec.Command("chroma", "--formatter=terminal256", "--style=monokai", m.previewPath)
+    output, err := cmd.Output()
+    if err != nil {
+        // Fallback to plain text if chroma not available
+        return m.previewContent
+    }
+
+    return string(output)
+}
+```
+
+## Example 7: Customize Markdown Preview
+
+Modify the existing markdown preview:
+
+```go
+func (m model) renderMarkdownPreview() string {
+    if m.previewContent == "" {
+        return styleError.Render("No content to display")
+    }
+
+    // Use glamour for markdown rendering (already in TFE)
+    renderer, err := glamour.NewTermRenderer(
+        glamour.WithAutoStyle(),
+        glamour.WithWordWrap(m.previewWidth-4),
+    )
+    if err != nil {
+        return styleError.Render(fmt.Sprintf("Failed to create renderer: %s", err))
+    }
+
+    rendered, err := renderer.Render(m.previewContent)
+    if err != nil {
+        return styleError.Render(fmt.Sprintf("Failed to render markdown: %s", err))
+    }
+
+    // ADD CUSTOM PROCESSING HERE
+    // Example: Add table of contents, code folding, etc.
+
+    return rendered
+}
+```
+
+## Example 8: Add Binary File Info
+
+```go
+func (m model) renderBinaryPreview() string {
+    // Get file info
+    info, err := os.Stat(m.previewPath)
+    if err != nil {
+        return styleError.Render(fmt.Sprintf("Failed to read file: %s", err))
+    }
+
+    // Run 'file' command to detect type
+    cmd := exec.Command("file", "-b", m.previewPath)
+    output, err := cmd.Output()
+    fileType := "Unknown"
+    if err == nil {
+        fileType = strings.TrimSpace(string(output))
+    }
+
+    // Build info display
+    header := lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true).
+        Render("📦 Binary File\n")
+
+    infoLines := []string{
+        fmt.Sprintf("File Type: %s", fileType),
+        fmt.Sprintf("Size: %s", formatFileSize(info.Size())),
+        fmt.Sprintf("Modified: %s", info.ModTime().Format("2006-01-02 15:04:05")),
+        "",
+        styleDim.Render("Preview not available for binary files"),
+    }
+
+    return header + "\n" + strings.Join(infoLines, "\n")
+}
+```
+
+## Conditional Preview Based on File Size
+
+```go
+func (m model) renderPreview() string {
+    // ... extension detection ...
+
+    // Check file size before rendering
+    info, err := os.Stat(m.previewPath)
+    if err == nil {
+        // If file is too large, show warning instead
+        const maxPreviewSize = 10 * 1024 * 1024 // 10MB
+        if info.Size() > maxPreviewSize {
+            return styleError.Render(fmt.Sprintf(
+                "⚠ File too large for preview (%s)\n\nPress Enter to open in editor",
+                formatFileSize(info.Size())))
+        }
+    }
+
+    // ... rest of preview logic ...
+}
+```
+
+## Available Helper Functions
+
+- `formatFileSize(size)` - Convert bytes to human-readable (e.g., "1.5 MB")
+- `styleError` - Red error style
+- `styleDim` - Dim/gray style
+- `lipgloss.NewStyle()` - Create custom styles
+
+## Preview Width Consideration
+
+Always respect `m.previewWidth` when rendering:
+
+```go
+// Wrap long lines
+if lipgloss.Width(line) > m.previewWidth {
+    line = truncateToWidth(line, m.previewWidth)
+}
+
+// Or use glamour's word wrap:
+glamour.WithWordWrap(m.previewWidth - 4)
+```
+
+## Testing External Commands
+
+Always check if external tools are available:
+
+```go
+// Check if tool is available
+if _, err := exec.LookPath("chroma"); err != nil {
+    // Tool not available, fallback to basic preview
+    return m.previewContent
+}
+```
+
+## Files Modified
+
+- `render_preview.go` (add preview rendering)
+- Optional: `file_operations.go` (add helper functions)
+
+Rebuild after changes: `./build.sh`
+
+## Testing Your Changes
+
+1. Create a test file of the new type
+2. Rebuild: `./build.sh`
+3. Run TFE: `tfe`
+4. Select the file (preview shows in right pane)
+5. Press Enter or F2 for full-screen preview
+6. Verify formatting, colors, and layout
+7. Test edge cases (empty files, invalid content, missing tools)
+
+## Tips
+
+- Keep previews lightweight (avoid processing huge files)
+- Always provide fallback for missing external tools
+- Test with different terminal widths (80 columns, 120 columns, etc.)
+- Use consistent color schemes with existing previews
+- Add size limits to prevent memory issues
+- Consider caching expensive operations
+- Show helpful error messages when tools are missing
+- Respect `m.previewWidth` for proper wrapping

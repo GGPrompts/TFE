@@ -1,0 +1,129 @@
+---
+name: Security Review
+description: Review code for security vulnerabilities and potential exploits
+authors:
+  - TFE Team
+---
+
+# Security Review
+
+Please perform a comprehensive security review of the following code. Focus on identifying potential vulnerabilities and security issues.
+
+## Code to Review
+
+**File:** {{file}}
+**Project:** {{project}}
+
+```{{filename}}
+{{CODE}}
+```
+
+## Review Checklist
+
+Please analyze the code for the following security concerns:
+
+### 1. Input Validation & Sanitization
+- [ ] Are all user inputs properly validated?
+- [ ] Are inputs sanitized before use in commands/queries?
+- [ ] Are file paths validated to prevent directory traversal?
+- [ ] Are there size/length limits on inputs?
+
+### 2. Command Injection
+- [ ] Are shell commands constructed safely?
+- [ ] Is user input properly escaped before shell execution?
+- [ ] Are there alternatives to shell execution (native libraries)?
+- [ ] Is `exec.Command` used correctly (separate args, not shell string)?
+
+### 3. Path Traversal
+- [ ] Are file paths validated before use?
+- [ ] Does the code prevent access outside allowed directories?
+- [ ] Are symbolic links handled safely?
+- [ ] Is `filepath.Clean()` used to normalize paths?
+
+### 4. Code Injection
+- [ ] Is code execution from user input avoided?
+- [ ] Are templates/scripts properly sanitized?
+- [ ] Is `eval()` or similar avoided?
+- [ ] Are environment variables validated?
+
+### 5. Authentication & Authorization
+- [ ] Are operations properly authorized?
+- [ ] Are credentials stored securely?
+- [ ] Is sensitive data protected?
+- [ ] Are there appropriate access controls?
+
+### 6. Error Handling
+- [ ] Do errors leak sensitive information?
+- [ ] Are errors logged without exposing secrets?
+- [ ] Is error handling comprehensive?
+- [ ] Are panic/crash scenarios handled?
+
+### 7. Resource Limits
+- [ ] Are there protections against resource exhaustion?
+- [ ] Are file sizes limited?
+- [ ] Are there timeouts on operations?
+- [ ] Is memory usage bounded?
+
+### 8. Cryptography (if applicable)
+- [ ] Are cryptographic libraries used correctly?
+- [ ] Are secure random number generators used?
+- [ ] Are keys/secrets properly managed?
+- [ ] Are deprecated algorithms avoided?
+
+### 9. Race Conditions & Concurrency
+- [ ] Are shared resources properly synchronized?
+- [ ] Are TOCTOU (Time-Of-Check-Time-Of-Use) issues avoided?
+- [ ] Is concurrent access handled safely?
+
+### 10. Dependencies & Libraries
+- [ ] Are third-party libraries from trusted sources?
+- [ ] Are dependencies up-to-date?
+- [ ] Are known vulnerabilities addressed?
+
+## Output Format
+
+Please provide your findings in this format:
+
+### 🔴 Critical Issues (immediate fix required)
+- **Issue:** [Description]
+- **Location:** [Line numbers or function name]
+- **Risk:** [What could happen]
+- **Recommendation:** [How to fix]
+
+### 🟡 Medium Priority Issues (should be addressed)
+- **Issue:** [Description]
+- **Location:** [Line numbers or function name]
+- **Risk:** [Potential impact]
+- **Recommendation:** [How to improve]
+
+### 🟢 Low Priority / Best Practices
+- **Suggestion:** [Description]
+- **Benefit:** [Why this helps]
+
+### ✅ Security Strengths
+- [List things the code does well from a security perspective]
+
+### 📋 Recommended Actions
+1. [Priority order of fixes]
+2. [Additional security measures to consider]
+3. [Testing recommendations]
+
+## Example Concerns for File Operations (TFE-specific)
+
+When reviewing file operation code, pay special attention to:
+
+- **Path traversal:** `../../etc/passwd` attempts
+- **Command injection:** filenames with `; rm -rf /`
+- **Symlink attacks:** following links outside safe directories
+- **Resource exhaustion:** opening huge files or many files
+- **Clipboard security:** sensitive data exposure
+- **External command safety:** proper argument escaping
+- **Permission checks:** respecting file system permissions
+
+## Notes
+
+- Consider the threat model: Who is the attacker? What access do they have?
+- Balance security with usability (don't over-engineer)
+- Provide specific, actionable recommendations
+- Include code examples when suggesting fixes
+- Consider both local and remote attack scenarios

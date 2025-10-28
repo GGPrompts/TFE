@@ -1,0 +1,422 @@
+---
+name: TFE - Add Display Mode
+description: Guide for adding a new display mode to TFE (like List, Detail, Tree, Grid)
+authors:
+  - TFE Team
+---
+
+# Add New Display Mode to TFE
+
+This guide shows how to add a new display mode to TFE. Currently there are 4 modes:
+1. **List** - Compact list with icons
+2. **Detail** - List with size, date, permissions
+3. **Tree** - Hierarchical tree view
+4. **Grid** - Grid layout with large icons
+
+Let's add a new mode as an example!
+
+## Files Modified
+
+- `types.go` - Add enum constant
+- `render_file_list.go` - Add rendering function
+- `update_keyboard.go` - Add keyboard shortcut
+- `menu.go` - Update mode indicator
+- `HOTKEYS.md` - Document the new mode
+
+## Example: Add "Timeline" View (Files Sorted by Date)
+
+This mode shows files in a timeline, grouped by date (Today, Yesterday, This Week, etc.).
+
+### Step 1: Add Enum to types.go
+
+Find the `displayMode` constants (around line 30):
+
+```go
+const (
+    modeList displayMode = iota
+    modeDetail
+    modeTree
+    modeGrid
+    modeTimeline  // NEW!
+)
+```
+
+Update the cycle count in `update_keyboard.go` (where F9 cycles modes):
+
+```go
+case "F9":
+    // Cycle display modes
+    m.displayMode = (m.displayMode + 1) % 5  // Changed from 4 to 5!
+    m.cursor = 0
+    return m, nil
+```
+
+### Step 2: Add Rendering Function to render_file_list.go
+
+Add your new rendering function (around line 200+):
+
+```go
+// renderTimelineView renders files grouped by modification date
+func (m model) renderTimelineView() string {
+    if len(m.files) == 0 {
+        return styleDim.Render("No files in this directory")
+    }
+
+    // Group files by date
+    groups := m.groupFilesByDate()
+
+    var output []string
+    visibleStart := m.cursor - m.cursor%m.itemsPerPage
+    visibleEnd := visibleStart + m.itemsPerPage
+
+    currentIndex := 0
+    dateHeaderStyle := lipgloss.NewStyle().
+        Foreground(lipgloss.Color("39")).
+        Bold(true)
+
+    for _, group := range groups {
+        // Render date header
+        output = append(output, "")
+        output = append(output, dateHeaderStyle.Render(group.label))
+        output = append(output, strings.Repeat("─", 40))
+
+        // Render files in this group
+        for _, file := range group.files {
+            if currentIndex >= visibleStart && currentIndex < visibleEnd {
+                line := m.renderTimelineItem(file, currentIndex)
+                output = append(output, line)
+            }
+            currentIndex++
+        }
+    }
+
+    return strings.Join(output, "\n")
+}
+
+// timelineGroup represents a date group
+type timelineGroup struct {
+    label string
+    files []fileItem
+}
+
+// groupFilesByDate groups files by their modification date
+func (m model) groupFilesByDate() []timelineGroup {
+    now := time.Now()
+    today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+    yesterday := today.AddDate(0, 0, -1)
+    thisWeek := today.AddDate(0, 0, -int(today.Weekday()))
+    lastWeek := thisWeek.AddDate(0, 0, -7)
+
+    groups := []timelineGroup{
+        {label: "📅 Today", files: []fileItem{}},
+        {label: "📅 Yesterday", files: []fileItem{}},
+        {label: "📅 This Week", files: []fileItem{}},
+        {label: "📅 Last Week", files: []fileItem{}},
+        {label: "📅 Older", files: []fileItem{}},
+    }
+
+    for _, file := range m.files {
+        if file.modTime.After(today) {
+            groups[0].files = append(groups[0].files, file)
+        } else if file.modTime.After(yesterday) {
+            groups[1].files = append(groups[1].files, file)
+        } else if file.modTime.After(thisWeek) {
+            groups[2].files = append(groups[2].files, file)
+        } else if file.modTime.After(lastWeek) {
+            groups[3].files = append(groups[3].files, file)
+        } else {
+            groups[4].files = append(groups[4].files, file)
+        }
+    }
+
+    // Filter out empty groups
+    var result []timelineGroup
+    for _, group := range groups {
+        if len(group.files) > 0 {
+            result = append(result, group)
+        }
+    }
+
+    return result
+}
+
+// renderTimelineItem renders a single file in timeline view
+func (m model) renderTimelineItem(file fileItem, index int) string {
+    icon := getFileIcon(file)
+    isSelected := index == m.cursor
+
+    // Format: "  [icon] filename (HH:MM)"
+    timeStr := file.modTime.Format("15:04")
+    line := fmt.Sprintf("  %s %s %s",
+        icon,
+        file.name,
+        styleDim.Render(fmt.Sprintf("(%s)", timeStr)))
+
+    if isSelected {
+        // Highlight selected item
+        return styleSelected.Render(line)
+    }
+
+    return line
+}
+```
+
+### Step 3: Update render_file_list.go Dispatcher
+
+Find the main rendering dispatcher (around line 30):
+
+```go
+func (m model) renderFileList() string {
+    switch m.displayMode {
+    case modeList:
+        return m.renderListView()
+    case modeDetail:
+        return m.renderDetailView()
+    case modeTree:
+        return m.renderTreeView()
+    case modeGrid:
+        return m.renderGridView()
+    case modeTimeline:
+        return m.renderTimelineView()  // NEW!
+    default:
+        return m.renderListView()
+    }
+}
+```
+
+### Step 4: Update Mode Indicator in menu.go
+
+Find the mode display (around line 100):
+
+```go
+// Display mode indicator
+var modeStr string
+switch m.displayMode {
+case modeList:
+    modeStr = "📋 List"
+case modeDetail:
+    modeStr = "📊 Detail"
+case modeTree:
+    modeStr = "🌳 Tree"
+case modeGrid:
+    modeStr = "🎨 Grid"
+case modeTimeline:
+    modeStr = "📅 Timeline"  // NEW!
+}
+```
+
+### Step 5: Add Keyboard Shortcut (Optional)
+
+In `update_keyboard.go`, you can add a direct shortcut:
+
+```go
+case "5":
+    // Switch to Timeline view
+    m.displayMode = modeTimeline
+    m.cursor = 0
+    return m, nil
+```
+
+### Step 6: Update HOTKEYS.md
+
+Add documentation for the new mode:
+
+```markdown
+### Display Modes
+
+| Key | Action |
+|-----|--------|
+| `F9` | Cycle through display modes |
+| `1` | List view - Compact list with icons |
+| `2` | Detail view - List with size, date, permissions |
+| `3` | Tree view - Hierarchical tree structure |
+| `4` | Grid view - Grid layout with large icons |
+| `5` | Timeline view - Files grouped by date |
+```
+
+## Example 2: Add "Size" View (Files Grouped by Size)
+
+```go
+// In types.go:
+const (
+    modeList displayMode = iota
+    modeDetail
+    modeTree
+    modeGrid
+    modeSize  // NEW!
+)
+
+// In render_file_list.go:
+func (m model) renderSizeView() string {
+    // Group files by size: Tiny (<1KB), Small (<1MB), Medium (<10MB), Large (>10MB)
+    groups := []struct {
+        label string
+        min   int64
+        max   int64
+        files []fileItem
+    }{
+        {label: "📦 Tiny (< 1 KB)", min: 0, max: 1024, files: []fileItem{}},
+        {label: "📦 Small (< 1 MB)", min: 1024, max: 1024 * 1024, files: []fileItem{}},
+        {label: "📦 Medium (< 10 MB)", min: 1024 * 1024, max: 10 * 1024 * 1024, files: []fileItem{}},
+        {label: "📦 Large (> 10 MB)", min: 10 * 1024 * 1024, max: math.MaxInt64, files: []fileItem{}},
+    }
+
+    // Sort files into groups
+    for _, file := range m.files {
+        for i := range groups {
+            if file.size >= groups[i].min && file.size < groups[i].max {
+                groups[i].files = append(groups[i].files, file)
+                break
+            }
+        }
+    }
+
+    // Render groups
+    var output []string
+    for _, group := range groups {
+        if len(group.files) > 0 {
+            output = append(output, "")
+            output = append(output, styleTitle.Render(group.label))
+            for _, file := range group.files {
+                line := fmt.Sprintf("  %s %s (%s)",
+                    getFileIcon(file),
+                    file.name,
+                    formatFileSize(file.size))
+                output = append(output, line)
+            }
+        }
+    }
+
+    return strings.Join(output, "\n")
+}
+```
+
+## Example 3: Add "Type" View (Files Grouped by Extension)
+
+```go
+func (m model) renderTypeView() string {
+    // Group files by extension
+    groups := make(map[string][]fileItem)
+
+    for _, file := range m.files {
+        ext := strings.ToLower(filepath.Ext(file.name))
+        if ext == "" {
+            ext = "(no extension)"
+        }
+        groups[ext] = append(groups[ext], file)
+    }
+
+    // Sort group keys
+    var extensions []string
+    for ext := range groups {
+        extensions = append(extensions, ext)
+    }
+    sort.Strings(extensions)
+
+    // Render
+    var output []string
+    for _, ext := range extensions {
+        files := groups[ext]
+        output = append(output, "")
+        output = append(output, styleTitle.Render(fmt.Sprintf("📁 %s (%d files)", ext, len(files))))
+
+        for _, file := range files {
+            line := fmt.Sprintf("  %s %s", getFileIcon(file), file.name)
+            output = append(output, line)
+        }
+    }
+
+    return strings.Join(output, "\n")
+}
+```
+
+## Design Considerations
+
+### 1. Cursor Navigation
+Your new mode must handle cursor navigation properly:
+```go
+// Make sure cursor stays within bounds
+if m.cursor >= len(m.files) {
+    m.cursor = len(m.files) - 1
+}
+if m.cursor < 0 {
+    m.cursor = 0
+}
+```
+
+### 2. Pagination
+Consider implementing pagination for large file lists:
+```go
+visibleStart := m.cursor - m.cursor%m.itemsPerPage
+visibleEnd := visibleStart + m.itemsPerPage
+```
+
+### 3. Width Calculations
+Respect terminal width using `visualWidth()` and `truncateToWidth()`:
+```go
+if visualWidth(line) > m.fileListWidth {
+    line = truncateToWidth(line, m.fileListWidth)
+}
+```
+
+### 4. Performance
+For large directories, consider caching or lazy loading:
+```go
+// Only render visible items
+for i := visibleStart; i < visibleEnd && i < len(m.files); i++ {
+    // Render item i
+}
+```
+
+### 5. Empty States
+Always handle empty directories gracefully:
+```go
+if len(m.files) == 0 {
+    return styleDim.Render("No files in this directory")
+}
+```
+
+## Available Helper Functions
+
+- `getFileIcon(file)` - Get appropriate icon for file
+- `formatFileSize(size)` - Human-readable file size
+- `formatDate(time)` - Human-readable date
+- `visualWidth(str)` - Calculate display width
+- `truncateToWidth(str, width)` - Truncate to width
+- `styleSelected` - Highlight style for selected items
+- `styleTitle` - Bold style for section headers
+- `styleDim` - Dim/gray style for secondary text
+
+## Files Modified Summary
+
+1. **types.go** - Add enum constant
+2. **render_file_list.go** - Add rendering function and dispatcher case
+3. **update_keyboard.go** - Update cycle count and add direct shortcut
+4. **menu.go** - Add mode indicator label
+5. **HOTKEYS.md** - Document the new mode
+
+Rebuild after changes: `./build.sh`
+
+## Testing Your New Mode
+
+1. Rebuild: `./build.sh`
+2. Run TFE: `tfe`
+3. Press F9 to cycle through modes (your new mode should appear)
+4. Or press the direct key (e.g., `5`) if you added one
+5. Test with:
+   - Empty directories
+   - Large directories (100+ files)
+   - Various file types
+   - Narrow terminal widths (80 columns)
+   - Cursor navigation (up/down/page up/page down)
+
+## Tips
+
+- Keep rendering fast (avoid expensive operations)
+- Use consistent styling with existing modes
+- Test with various directory sizes
+- Consider sort order within groups
+- Make headers visually distinct
+- Handle edge cases (no files, all same group, etc.)
+- Update the cycle count in F9 handler!
+- Document in HOTKEYS.md
