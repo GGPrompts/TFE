@@ -859,6 +859,11 @@ func (m model) renderPromptPreview(maxVisible int) string {
 // renderScrollbar renders a scrollbar indicator for the current line
 // Now renders in place of the separator between line numbers and content
 func (m model) renderScrollbar(lineIndex, visibleLines, totalLines int) string {
+	// Hide scrollbar in text selection mode (prevents it being copied)
+	if !m.previewMouseEnabled {
+		return " " // Return space to maintain spacing
+	}
+
 	// Calculate scrollbar position
 	// The scrollbar thumb should represent the visible portion of the content
 	scrollbarHeight := visibleLines
