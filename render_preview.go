@@ -1022,19 +1022,19 @@ func (m model) renderFullPreview() string {
 		f5Text = "copy rendered prompt"
 	}
 
-	// Mouse toggle indicator - compact format with just emoji
-	var modeEmoji, helpText string
+	// Mouse toggle indicator - show what 'm' key does
+	var modeText, helpText string
 	if m.previewMouseEnabled {
-		modeEmoji = "🖱"
+		modeText = "🖱 text select"  // Press m to enable text selection
 	} else {
-		modeEmoji = "⌨"
+		modeText = "⌨ mouse scroll"  // Press m to enable mouse scrolling
 	}
 
 	// Build help text
 	if m.preview.isBinary && isImageFile(m.preview.filePath) {
-		helpText = fmt.Sprintf("F1: help • V: view image • m: %s mode • F4: edit • Esc: close", modeEmoji)
+		helpText = fmt.Sprintf("F1: help • V: view image • m: %s • F4: edit • Esc: close", modeText)
 	} else {
-		helpText = fmt.Sprintf("F1: help • ↑/↓: scroll • m: %s mode • F4: edit • F5: %s • Esc: close", modeEmoji, f5Text)
+		helpText = fmt.Sprintf("F1: help • ↑/↓: scroll • m: %s • F4: edit • F5: %s • Esc: close", modeText, f5Text)
 	}
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes

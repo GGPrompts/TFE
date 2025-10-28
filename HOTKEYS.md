@@ -81,13 +81,17 @@
 | **↓** / **j** | Scroll preview down (in full-screen or dual-pane right) |
 | **PgUp** | Page up in preview |
 | **PgDn** | Page down in preview |
-| **m** / **M** | Toggle mouse & border (FULL PREVIEW ONLY - removes border for clean text selection) |
+| **m** / **M** | Toggle text selection mode (removes border, enables mouse text selection) |
 | **Ctrl+F** | Search within file preview |
 | **n** | Next search match (when searching) |
 | **Shift+N** | Previous search match (when searching) |
-| **Mouse Wheel** | Scroll preview (when mouse is enabled) |
+| **Mouse Wheel** | Scroll preview (when mouse scrolling enabled) |
 
-**Note:** To copy text from files, the best method is to press **F4** to open the file in Micro editor, where you can select and copy text normally. The **m** key (mouse toggle) works in full-screen preview mode only - when you press **m**, the decorative border disappears and mouse is disabled, giving you clean terminal text selection. Press **m** again to restore the border and mouse scrolling.
+**💡 Copying Text from Previews:**
+1. **Quick copy:** Press **F10** for full preview → Press **m** to enable text selection → Select text with mouse → **Ctrl+Shift+C** to copy
+2. **Edit mode:** Press **F4** to open in Micro editor (full text editing)
+
+**How 'm' works:** Toggles between mouse scrolling (with border) and text selection mode (borderless). Help bar shows current mode.
 
 ## Prompt Templates & Fillable Fields
 

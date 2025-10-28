@@ -642,10 +642,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.previewMouseEnabled = !m.previewMouseEnabled
 
 			if m.previewMouseEnabled {
-				m.setStatusMessage("🖱️  Mouse ON - Border visible, wheel scrolling works", false)
+				m.setStatusMessage("🖱️  Mouse scrolling enabled (press 'm' to enable text selection)", false)
 				return m, tea.Batch(tea.EnableMouseCellMotion, statusTimeoutCmd())
 			} else {
-				m.setStatusMessage("⌨️  Mouse OFF - Border removed, text selection enabled", false)
+				m.setStatusMessage("📄 Text selection enabled - Use mouse to select & copy text (Ctrl+Shift+C)", false)
 				return m, tea.Batch(tea.DisableMouse, statusTimeoutCmd())
 			}
 
