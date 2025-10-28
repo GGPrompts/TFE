@@ -69,6 +69,9 @@ line = fmt.Sprintf("%s", paddedName)
 | **WezTerm** | Total width (borders included) | 1 cell | Width() includes borders |
 | **Termux** | Total width (borders included) | 1 cell | Same behavior as WezTerm |
 | **Kitty** | Total width (borders included) | 1 cell | Same behavior as WezTerm |
+| **xterm** | Total width (borders included) | 1 cell | Native xterm, narrow emoji rendering |
+| **xterm.js (default)** | Total width (borders included) | Inconsistent (1-2 cells) | ⚠️ Requires Unicode11 addon! |
+| **xterm.js + Unicode11** | Total width (borders included) | 2 cells | ✅ Works like Windows Terminal |
 
 ### The Solution
 **Use `m.terminalType` to apply terminal-specific adjustments:**
@@ -99,6 +102,78 @@ TFE automatically detects terminal type in `model.go`:
 - Emoji width calculations (variation selectors)
 - Any hardcoded width/padding values
 - Terminal graphics protocol selection
+
+### xterm.js Emoji Alignment
+
+**Special Case: Web-Based Terminals Using xterm.js**
+
+If you're embedding TFE in applications using xterm.js (VS Code terminal, web IDEs, custom terminal apps), emoji alignment requires special attention.
+
+#### The Problem
+
+xterm.js **without Unicode11 addon** renders emojis inconsistently:
+- Base emojis (📦 🖼 🐹): ~2 cells (varies by emoji)
+- Symbol emojis (⚙ ⬆): ~1 cell
+- Result: Alignment off by 1 space per emoji
+
+**Symptoms:**
+- File list box borders misaligned
+- Emojis stick out of menu bar brackets `[🔍]`
+- Everything after emojis shifts 1 space left
+- Favorite stars (⭐) overlap file icons
+
+#### The Solution
+
+**Install the Unicode11 addon** in your xterm.js application:
+
+```typescript
+import { Unicode11Addon } from '@xterm/addon-unicode11';
+
+const unicode11Addon = new Unicode11Addon();
+term.loadAddon(unicode11Addon);
+term.unicode.activeVersion = '11';
+```
+
+**Why This Works:**
+- Unicode11 addon makes ALL emojis render consistently as 2 cells
+- Matches Windows Terminal, WezTerm, Termux behavior
+- TFE's `runewidth` calculations align perfectly
+- No special TFE configuration needed
+
+**Result:**
+- ✅ TFE detects as Windows Terminal (via `WT_SESSION`)
+- ✅ Expects 2-cell emoji widths
+- ✅ xterm.js renders 2-cell emoji widths
+- ✅ Perfect alignment!
+
+#### Alternative (Not Recommended)
+
+If you **cannot** install Unicode11 addon, you can:
+1. Filter `WT_SESSION` from PTY environment
+2. TFE will detect as `xterm` instead
+3. TFE will apply narrow emoji compensation
+
+However, this approach is:
+- Less reliable (xterm.js emoji width still inconsistent)
+- Requires maintaining terminal-specific workarounds
+- May break in future xterm.js versions
+
+**Always prefer the Unicode11 addon approach for production use.**
+
+#### Testing
+
+After adding Unicode11 addon:
+1. Restart your terminal application
+2. Spawn a new terminal
+3. Run `tfe`
+4. Title bar should show `[Windows Terminal]`
+5. Check emoji alignment in file list
+6. Verify menu bar brackets properly contain emojis
+
+#### Resources
+- [xterm.js Unicode11 Addon](https://github.com/xtermjs/xterm.js/tree/master/addons/addon-unicode11)
+- [Unicode East Asian Width](https://www.unicode.org/reports/tr11/)
+- Real-world fix: [Opustrator project investigation](https://github.com/GGPrompts/TFE/issues/)
 
 ---
 

@@ -626,7 +626,7 @@ func getFileIcon(item fileItem) string {
 		case "public", "static", "assets":
 			return "🌐" // Globe
 		case "config", "configs", ".config":
-			return "⚙️" // Gear
+			return "⚙" // Gear
 		case "scripts":
 			return "📜" // Scroll
 		default:
@@ -970,12 +970,14 @@ func (m model) visualWidthCompensated(s string) int {
 
 	// Apply variation selector compensation for Windows Terminal ONLY
 	// runewidth reports emoji+VS as 1 cell, but Windows Terminal renders as 2 cells
-	// WezTerm/Kitty/iTerm2/xterm/Termux render as 1 cell (matches runewidth), so no compensation needed
 	// We ADD 1 per VS for Windows Terminal to match its wider rendering
 	variationSelectorCount := strings.Count(s, "\uFE0F")
 	if m.terminalType == terminalWindowsTerminal && variationSelectorCount > 0 {
-		width += variationSelectorCount  // ADD for Windows Terminal's 2-cell rendering
+		width += variationSelectorCount
 	}
+
+	// NOTE: xterm.js actually renders emojis as 2 cells (same as runewidth)
+	// Do NOT compensate for xterm - trust runewidth's 2-cell calculation
 
 	return width
 }

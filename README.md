@@ -131,6 +131,10 @@ TFE combines the power of traditional file managers with modern features designe
   - **WSL (Windows)**: Use Windows Terminal with WSL/Ubuntu - works perfectly with Claude Code
   - **Termux (Android)**: Works out of the box, no configuration needed
   - **macOS/Linux**: Most modern terminal emulators (iTerm2, Alacritty, GNOME Terminal, etc.)
+  - **xterm.js (Web-based terminals)**: Requires Unicode11 addon for proper emoji width
+    - Install: `npm install @xterm/addon-unicode11`
+    - Load addon: See [xterm.js Emoji Support](#xtermjs-emoji-support) below for setup instructions
+    - Without this addon, emoji alignment may be off by 1 space per emoji
 - **fzf** (required for Ctrl+P fuzzy search)
   - **Linux/WSL**: `sudo apt install fzf`
   - **macOS**: `brew install fzf`
@@ -410,6 +414,57 @@ tfe    # Launch from any directory with Quick CD support
 - Want to control exactly where TFE is installed
 
 **Note:** You can always start with Option 2 and upgrade to Option 1 later if you want Quick CD!
+
+## xterm.js Emoji Support
+
+If you're embedding TFE in a web-based terminal using **xterm.js** (e.g., VS Code terminal, web IDEs, custom terminal apps), you'll need to install the Unicode11 addon for proper emoji rendering. Without it, emoji alignment will be off by 1 space per emoji.
+
+### The Problem
+
+xterm.js by default renders emojis inconsistently:
+- Some emojis render as 1 cell
+- Some emojis render as 2 cells
+- This causes misalignment in TFE's box-drawing and file list
+
+### The Solution
+
+Install and configure the `@xterm/addon-unicode11` addon:
+
+**1. Install the addon:**
+```bash
+npm install @xterm/addon-unicode11
+```
+
+**2. Load the addon in your terminal code:**
+```typescript
+import { Terminal } from '@xterm/xterm';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
+
+// After creating your terminal instance
+const term = new Terminal(options);
+
+// Load Unicode11 addon
+const unicode11Addon = new Unicode11Addon();
+term.loadAddon(unicode11Addon);
+term.unicode.activeVersion = '11';  // Use Unicode 11 for consistent emoji width
+```
+
+**3. Result:**
+- ✅ Emojis render consistently as 2 cells (like Windows Terminal, WezTerm, Termux)
+- ✅ Perfect box-drawing alignment
+- ✅ No special TFE configuration needed
+
+### Why This Works
+
+The Unicode11 addon provides Unicode 11 width tables that make East Asian Width properties consistent. All emojis render as fullwidth (2 cells), matching modern terminal emulator standards and TFE's expectations.
+
+### Alternative (Not Recommended)
+
+If you cannot install the addon, you can filter the `WT_SESSION` environment variable before spawning the PTY, and TFE will detect as `xterm` with narrow emoji compensation. However, this is less reliable and requires custom TFE builds.
+
+**Resources:**
+- [xterm.js Unicode11 Addon Documentation](https://github.com/xtermjs/xterm.js/tree/master/addons/addon-unicode11)
+- [TFE docs/LESSONS_LEARNED.md](docs/LESSONS_LEARNED.md) for technical details
 
 ## Usage
 

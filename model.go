@@ -171,9 +171,17 @@ func detectTerminalType() terminalType {
 		}
 	}
 
-	// Check for Windows Terminal (most reliable indicator)
-	if wtSession != "" {
-		return terminalWindowsTerminal
+	// Check for Termux (Android) FIRST - it sets TERM=xterm-256color
+	// So we need to detect it before the xterm check
+	if strings.Contains(os.Getenv("PREFIX"), "com.termux") {
+		return terminalTermux
+	}
+
+	// Check for xterm BEFORE Windows Terminal
+	// When xterm PTY runs inside Windows Terminal, TERM=xterm-256color but WT_SESSION is also set
+	// Prioritize TERM to detect the actual rendering terminal, not the wrapper
+	if term == "xterm" || term == "xterm-256color" {
+		return terminalXterm
 	}
 
 	// Check for WezTerm
@@ -191,15 +199,10 @@ func detectTerminalType() terminalType {
 		return terminalITerm2
 	}
 
-	// Check for Termux (Android) - BEFORE xterm check
-	// Termux sets TERM=xterm-256color, so check PREFIX first
-	if strings.Contains(os.Getenv("PREFIX"), "com.termux") {
-		return terminalTermux
-	}
-
-	// Check for xterm
-	if term == "xterm" || term == "xterm-256color" {
-		return terminalXterm
+	// Check for Windows Terminal LAST (as a fallback)
+	// This catches native Windows Terminal when no other terminal is detected
+	if wtSession != "" {
+		return terminalWindowsTerminal
 	}
 
 	return terminalUnknown
