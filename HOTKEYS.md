@@ -8,7 +8,7 @@
 | **F2** | Open context menu (keyboard alternative to right-click) |
 | **F3** | Open images/HTML in browser OR view/preview file OR file picker (in input fields) |
 | **F4** | Open file (context-aware: CSV→VisiData, video→mpv, audio→mpv, PDF→timg, DB→harlequin, binary→hexyl, text→editor) |
-| **F5** | Copy file path to clipboard (or rendered prompt in prompts mode) |
+| **F5** | Copy file content to clipboard (prompts→rendered prompt, text files→full content, binary→path) |
 | **F6** | Toggle favorites filter (show only favorites) |
 | **F7** | Create new directory (prompts for name) |
 | **F8** | Delete file/folder (moves to trash - use F12 to view/restore) |
@@ -132,7 +132,7 @@ When selecting a file for a prompt variable:
 |-----|--------|
 | **F4** | Open file with appropriate viewer (CSV→VisiData, video/audio→mpv, PDF→timg, DB→harlequin, binary→hexyl, text→editor) |
 | **n** / **N** | Edit file in nano specifically (text files only) |
-| **F5** | Copy file path to clipboard (or rendered prompt in F11 mode) |
+| **F5** | Copy file content to clipboard (prompts→rendered, text→full content, binary→path) |
 | **F7** | Create new directory (prompts for name) |
 | **F8** | Delete selected file/folder (prompts for confirmation) |
 
@@ -378,7 +378,7 @@ TFE uses emoji icons to indicate file types:
 3. **Browser Support:** Press **F3** on images (.png, .jpg, .gif, .svg, etc.) or HTML files to open them in your default browser
 4. **Command Execution:** Press **:** to enter command mode, type any shell command, and press Enter - TFE pauses, runs it, and returns
 5. **Fast Editing:** Press **F4** on any file to jump straight into Micro/nano editor
-6. **Copy Paths:** Press **F5** to copy file paths for pasting elsewhere
+6. **Copy Content:** Press **F5** to copy file content (full text for text files, rendered for prompts, path for binary files)
 7. **Command History:** Press **:** to enter command mode, then use ↑/↓ arrows to recall previous commands
 8. **Context Menu:** Press **F2** or right-click for quick access to common actions (including TUI tools like lazygit!)
 9. **Favorites:** Use the context menu (F2/right-click) to bookmark files/folders, then **F6** to filter by favorites

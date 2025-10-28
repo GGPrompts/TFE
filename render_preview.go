@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -52,7 +51,16 @@ func (m model) getWrappedLineCount() int {
 		rendered, err := m.renderMarkdownWithTimeout(markdownContent, availableWidth, 5*time.Second)
 		if err == nil {
 			renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
-			return len(renderedLines)
+			contentLineCount := len(renderedLines)
+
+			// If this is a prompt file, add the header height to total line count
+			// This ensures scroll calculations account for the space taken by the prompt header
+			if m.preview.isPrompt && m.preview.promptTemplate != nil {
+				headerHeight := m.getPromptHeaderHeight(boxContentWidth)
+				return contentLineCount + headerHeight
+			}
+
+			return contentLineCount
 		}
 		// Fallback if glamour fails or times out
 	}
@@ -63,7 +71,67 @@ func (m model) getWrappedLineCount() int {
 		wrapped := wrapLine(line, availableWidth)
 		totalLines += len(wrapped)
 	}
+
+	// If this is a prompt file, add the header height to total line count
+	// This ensures scroll calculations account for the space taken by the prompt header
+	if m.preview.isPrompt && m.preview.promptTemplate != nil {
+		headerHeight := m.getPromptHeaderHeight(boxContentWidth)
+		return totalLines + headerHeight
+	}
+
 	return totalLines
+}
+
+// getPromptHeaderHeight calculates how many lines the prompt header takes up
+// This matches the logic in renderPromptPreview() to ensure consistent calculations
+func (m model) getPromptHeaderHeight(boxContentWidth int) int {
+	if !m.preview.isPrompt || m.preview.promptTemplate == nil {
+		return 0
+	}
+
+	tmpl := m.preview.promptTemplate
+	headerWrapWidth := boxContentWidth - 2 // Leave room for padding
+	if headerWrapWidth < 20 {
+		headerWrapWidth = 20
+	}
+
+	headerLineCount := 0
+
+	// Prompt name (if available)
+	if tmpl.name != "" {
+		nameLine := "📝 " + tmpl.name
+		if visualWidth(nameLine) > headerWrapWidth {
+			wrapped := wrapLine(nameLine, headerWrapWidth)
+			headerLineCount += len(wrapped)
+		} else {
+			headerLineCount++ // One line
+		}
+		headerLineCount++ // Blank line after name
+	}
+
+	// Description (if available)
+	if tmpl.description != "" {
+		if visualWidth(tmpl.description) > headerWrapWidth {
+			wrapped := wrapLine(tmpl.description, headerWrapWidth)
+			headerLineCount += len(wrapped)
+		} else {
+			headerLineCount++ // One line
+		}
+		headerLineCount++ // Blank line after description
+	}
+
+	// Source indicator (always one line)
+	headerLineCount++
+
+	// Variables line (if any)
+	if len(tmpl.variables) > 0 {
+		headerLineCount++ // Variables line
+	}
+
+	// Separator line
+	headerLineCount++
+
+	return headerLineCount
 }
 
 // wrapLine wraps a line of text to fit within the specified width
@@ -1021,10 +1089,12 @@ func (m model) renderFullPreview() string {
 	s.WriteString("\n")
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
 
-	// Show different F5 text if viewing a prompt
+	// Show different F5 text based on file type
 	f5Text := "copy path"
 	if m.preview.isPrompt {
 		f5Text = "copy rendered prompt"
+	} else if !m.preview.isBinary && len(m.preview.content) > 0 {
+		f5Text = "copy content"
 	}
 
 	// Mouse toggle indicator - show what 'm' key does
@@ -1142,148 +1212,8 @@ func (m model) renderDualPane() string {
 		s.WriteString("\n")
 	}
 
-	// Toolbar buttons
-	// Home button - highlight with gray background when in home directory
-	homeDir, _ := os.UserHomeDir()
-	// Home button
-	homeIcon := "🏠"
-	if homeDir != "" && m.currentPath == homeDir {
-		// Active: gray background (in home directory)
-		homeButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(homeButtonStyle.Render("[" + homeIcon + "]"))
-	} else {
-		// Inactive: normal styling
-		homeButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(homeButtonStyle.Render("[" + homeIcon + "]"))
-	}
-	s.WriteString(" ")
-
-	// Favorites filter toggle button
-	starIcon := "⭐"
-	if m.showFavoritesOnly {
-		starIcon = "✨" // Different icon when filter is active
-	}
-	favButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(favButtonStyle.Render("[" + starIcon + "]"))
-	s.WriteString(" ")
-
-	// View mode toggle button (cycles List → Detail → Tree)
-	// Show different emoji based on current display mode
-	viewIcon := "📊" // Detail view (default)
-	switch m.displayMode {
-	case modeList:
-		viewIcon = "📄" // Document icon for simple list view
-	case modeDetail:
-		viewIcon = "📊" // Bar chart icon for detailed columns
-	case modeTree:
-		viewIcon = "🌲" // Tree icon for hierarchical view
-	}
-	viewButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(viewButtonStyle.Render("[" + viewIcon + "]"))
-	s.WriteString(" ")
-
-	// Pane toggle button (toggles single ↔ dual-pane)
-	paneIcon := "⬜"
-	if m.viewMode == viewDualPane {
-		paneIcon = "⬌"
-	}
-	paneButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(paneButtonStyle.Render("[" + paneIcon + "]"))
-	s.WriteString(" ")
-
-	// Command mode toggle button with green >_ and blue brackets
-	if m.commandFocused {
-		// Active: gray background
-		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Background(lipgloss.Color("237"))
-		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true).Background(lipgloss.Color("237"))
-		s.WriteString(bracketStyle.Render("["))
-		s.WriteString(termStyle.Render(">_"))
-		s.WriteString(bracketStyle.Render("]"))
-	} else {
-		// Inactive: normal styling
-		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true)
-		s.WriteString(bracketStyle.Render("["))
-		s.WriteString(termStyle.Render(">_"))
-		s.WriteString(bracketStyle.Render("]"))
-	}
-	s.WriteString(" ")
-
-	// Context-aware search button (in-file search when viewing, directory filter when browsing)
-	// Highlight when search is active (either in-file or directory filter)
-	searchIcon := "🔍"
-	if m.preview.searchActive || m.searchMode {
-		// Active: gray background
-		activeSearchStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeSearchStyle.Render("[" + searchIcon + "]"))
-	} else {
-		// Inactive: normal styling
-		searchButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(searchButtonStyle.Render("[" + searchIcon + "]"))
-	}
-	s.WriteString(" ")
-
-	// Prompts filter toggle button
-	promptIcon := "📝"
-	if m.showPromptsOnly {
-		// Active: gray background (like command mode)
-		activeStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[" + promptIcon + "]"))
-	} else {
-		// Inactive: normal styling
-		promptButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(promptButtonStyle.Render("[" + promptIcon + "]"))
-	}
-	s.WriteString(" ")
-
-	// Git repositories toggle button
-	gitIcon := "🔀"
-	if m.showGitReposOnly {
-		// Active: gray background (like other active toggles)
-		activeStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[" + gitIcon + "]"))
-	} else {
-		// Inactive: normal styling
-		gitButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(gitButtonStyle.Render("[" + gitIcon + "]"))
-	}
-	s.WriteString(" ")
-
-	// Trash/Recycle bin button
-	trashIcon := "🗑"
-	if m.showTrashOnly {
-		trashIcon = "♻" // Recycle icon when viewing trash
-	}
-	trashButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(trashButtonStyle.Render("[" + trashIcon + "]"))
+	// Toolbar buttons row
+	s.WriteString(m.renderToolbarRow())
 
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")

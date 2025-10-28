@@ -136,7 +136,7 @@ TFE is a **well-architected, high-quality terminal file manager** with excellent
 - **Effort:** Quick Win (30-60 minutes)
 
 **Quick Wins:**
-- Extract duplicate header rendering to shared function
+- ✅ ~~Extract duplicate header rendering to shared function~~ (COMPLETED - `renderToolbarRow()` in helpers.go)
 - Add file size guidelines to DEVELOPMENT_PATTERNS.md (e.g., "Files > 500 lines should be considered for splitting")
 
 ---
@@ -881,10 +881,10 @@ TFE is a **well-architected, high-quality terminal file manager** with excellent
    - Extract keyboard handlers from `update_keyboard.go`
    - Improve code navigability
 
-6. **Extract Duplicate Header** - [Architecture] - [Why: DRY principle] - [Effort: 30-60 minutes]
-   - Create shared `renderHeader()` function
-   - Use in both single-pane and dual-pane
-   - Reduce maintenance burden
+6. ✅ ~~**Extract Duplicate Header**~~ - COMPLETED
+   - ✅ Created shared `renderToolbarRow()` function in helpers.go
+   - ✅ Used in both single-pane and dual-pane
+   - ✅ Reduced code by 116 lines
 
 7. **Add Syntax Highlighting Timeout** - [Performance] - [Why: Prevents UI blocking] - [Effort: 4-6 hours]
    - 200ms timeout for syntax highlighting
@@ -968,7 +968,7 @@ TFE is a **well-architected, high-quality terminal file manager** with excellent
 1. Fix broken tests (1-2 hours)
 2. Set up GitHub Actions CI (1-2 hours)
 3. Extract magic numbers to constants (30 minutes)
-4. Extract duplicate header rendering (30 minutes)
+4. ✅ ~~Extract duplicate header rendering (30 minutes)~~ - COMPLETED
 5. Add pre-commit hook for tests/vet (15 minutes)
 
 ### Long-Term Vision

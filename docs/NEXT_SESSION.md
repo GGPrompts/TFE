@@ -1,308 +1,293 @@
-# Next Session - Horizontal Scrolling Bug in Detail View
+# TFE Next Session - Quick Wins & Testing
 
-**Priority:** Medium
-**Added:** After implementing horizontal scrolling for Termux narrow screen support
-**Status:** ✅ RESOLVED (2025-10-27)
-
----
-
-## ✅ RESOLUTION SUMMARY
-
-**All issues fixed!** Horizontal scrolling in Detail view now works perfectly on narrow terminals.
-
-**Root causes identified and fixed:**
-1. **Inconsistent width calculation** - Headers used `runewidth.RuneWidth()`, data rows used `m.runeWidth()`
-2. **Missing "  " prefix** - Headers lacked 2-space prefix that data rows had
-3. **Byte-based padding** - Headers used `%-*s`, data rows used `m.padToVisualWidth()`
-4. **Double-scrolling** - Headers scrolled manually + by `applyHorizontalScroll()`
-5. **No scroll bounds** - Infinite scrolling through empty space
-6. **Box width mismatch** - Single-pane content width didn't match lipgloss box width
-7. **Terminal-specific rendering** - WezTerm/Termux interpret lipgloss `Width()` differently than Windows Terminal
-
-**Files modified:**
-- `render_file_list.go` - Header alignment, visual-width padding, terminal-specific box width
-- `update_keyboard.go` - Scroll bounds checking, terminal-specific width calculation
-
-**Testing:** Verified working in WezTerm, Windows Terminal, and Termux (narrow terminals <100 cols).
+**Created:** Oct 28, 2025, 14:35
+**Priority Order:** Quick Win First (30 min), Then Testing (20+ hours)
 
 ---
 
-## Original Problem Description
+## Prompt 1: Quick Win - Extract Shared Header Function (30-60 minutes) ⚡
 
----
-
-## The Issue
-
-When horizontally scrolling in Detail view on narrow screens (Termux), the display becomes corrupted:
-
-### Symptoms:
-1. **Start scrolling right** → Works well initially
-2. **Middle of scroll range** → Text expands and corrupts the display
-   - Characters appear to have extra spaces between them
-   - Columns misalign
-   - Visual corruption/garbled text
-3. **Near end of scroll** → Display looks normal again
-4. **Extra empty space** → Can scroll through large amounts of empty space after the last column
-
-### Environment:
-- **Termux** (narrow terminal width)
-- **Detail view** (F2)
-- **Horizontal scroll** (Left/Right arrow keys when content exceeds screen width)
-
----
-
-## Investigation Steps
-
-### 1. Find the Horizontal Scroll Implementation
-
-**Files to check:**
-- `render_file_list.go` - Detail view rendering (look for horizontal scroll logic)
-- `update_keyboard.go` - Left/Right arrow key handling in Detail view
-- `types.go` - Check for horizontal scroll offset variable (e.g., `horizontalScrollOffset`)
-
-**Questions:**
-- When was horizontal scrolling added to Detail view?
-- Is there a `git log` commit related to "horizontal scroll" or "Termux narrow"?
-- How is the scroll offset calculated and applied?
-
-### 2. Identify the Corruption Cause
-
-**Likely culprits:**
-
-#### A. **ANSI Code Splitting**
-- Is the horizontal offset being applied to byte positions instead of visual positions?
-- Are ANSI escape codes (colors) being split mid-sequence?
-- Does `truncateToWidth()` or similar functions handle ANSI properly?
-
-Example bug:
-```go
-// WRONG - Splits ANSI codes
-line := coloredText[scrollOffset:]
-
-// RIGHT - Use visual width functions
-line := truncateToVisualWidth(coloredText, scrollOffset, visibleWidth)
 ```
+I need to implement a quick win from the TFE audit: extract the duplicated header
+rendering code into a shared function.
 
-#### B. **Emoji/Wide Character Handling**
-- Is the offset calculation accounting for emoji width (1 or 2 cells)?
-- Does scrolling use `visualWidth()` or raw string length?
-- Are emojis being split (showing half an emoji)?
+**Current Issue:**
+The toolbar row (emoji buttons: 🏠 ⭐ V ⬜ >_ 🔍 📝 🔀 🗑) is duplicated in two locations:
+- view.go: renderSinglePane() (~line 231-235 for trash icon)
+- render_preview.go: renderDualPane() (~line 1279-1281 for trash icon)
 
-#### C. **Box Border Calculation**
-- Is the available width calculation wrong when scrolling?
-- Does Lipgloss box width change during scroll?
-- Are padding/margins being recalculated incorrectly?
+This duplication means:
+- Changes must be made in two places (error-prone)
+- Recently had to update trash icon (🗑/♻) in both locations
+- ~50 lines of duplicated code
 
-#### D. **Column Separator Spacing**
-- Are column separators (e.g., "  ") being counted inconsistently?
-- Does the scroll offset skip separators or include them?
+**Goal:**
+Create a shared function that renders the toolbar row and replace both duplicates.
 
-### 3. Reproduce and Debug
+**Implementation Steps:**
 
-**Test cases:**
-```bash
-# Narrow terminal (Termux or resize WezTerm to ~60 cols)
-cd /some/directory/with/files
-./tfe
-
-# Press F2 (Detail view)
-# Press Right arrow repeatedly
-# Observe at which column/offset corruption starts
-# Note when it returns to normal
-```
-
-**Add debug output:**
+1. Extract to helpers.go:
 ```go
-// In render_file_list.go detail view rendering
-fmt.Fprintf(os.Stderr, "DEBUG: scrollOffset=%d visibleWidth=%d lineWidth=%d\n",
-    m.horizontalScrollOffset, visibleWidth, visualWidth(line))
-```
+// renderToolbarRow renders the emoji button toolbar row
+// Shows: [🏠] [⭐/✨] [V] [⬜/⬌] [>_] [🔍] [📝] [🔀] [🗑/♻]
+func renderToolbarRow(m model) string {
+    var s strings.Builder
 
-### 4. Check the Extra Space Issue
+    // Home button [🏠]
+    homeButtonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+    s.WriteString(homeButtonStyle.Render("[🏠]"))
+    s.WriteString(" ")
 
-**Why does empty space exist after last column?**
-- Is `maxScrollOffset` calculated correctly?
-- Should scroll be limited to: `max(0, totalContentWidth - visibleWidth)`?
-- Is padding being added unnecessarily during scroll?
+    // Star button [⭐/✨] - shows ✨ when favorites filter is active
+    starIcon := "⭐"
+    if m.showFavoritesOnly {
+        starIcon = "✨"
+    }
+    s.WriteString(homeButtonStyle.Render("[" + starIcon + "]"))
+    s.WriteString(" ")
 
-**Code to check:**
-```go
-// Look for horizontal scroll bounds checking
-if m.horizontalScrollOffset > maxOffset {
-    m.horizontalScrollOffset = maxOffset
+    // View mode button - shows different emoji for each mode
+    viewIcon := "📊" // Detail view (default)
+    switch m.displayMode {
+    case modeList:
+        viewIcon = "📄" // Document icon for simple list view
+    case modeDetail:
+        viewIcon = "📊" // Bar chart icon for detailed columns
+    case modeTree:
+        viewIcon = "🌲" // Tree icon for hierarchical view
+    }
+    s.WriteString(homeButtonStyle.Render("[" + viewIcon + "]"))
+    s.WriteString(" ")
+
+    // ... (continue with all buttons through trash icon)
+
+    // Trash/Recycle bin button
+    trashIcon := "🗑"
+    if m.showTrashOnly {
+        trashIcon = "♻" // Recycle icon when viewing trash
+    }
+    s.WriteString(homeButtonStyle.Render("[" + trashIcon + "]"))
+
+    return s.String()
 }
 ```
 
----
+2. Update view.go (renderSinglePane):
+   - Find toolbar rendering code (~lines 195-235)
+   - Replace with: `s.WriteString(renderToolbarRow(m))`
 
-## Potential Fixes
+3. Update render_preview.go (renderDualPane):
+   - Find toolbar rendering code (~lines 1245-1285)
+   - Replace with: `s.WriteString(renderToolbarRow(m))`
 
-### Option A: Fix the Scrolling Logic ✅ Recommended
+4. Test both modes work correctly:
+   - Single-pane view
+   - Dual-pane view
+   - All emoji buttons appear correctly
+   - Trash icon switches between 🗑 and ♻
 
-**If fixable, implement:**
-
-1. **Use visual width functions everywhere:**
-   ```go
-   // Don't use: line[scrollOffset:]
-   // Use: visualSlice(line, scrollOffset, visibleWidth)
-   ```
-
-2. **Strip ANSI before slicing, re-apply after:**
-   ```go
-   stripped := stripANSI(line)
-   sliced := stripped[scrollOffset : scrollOffset+visibleWidth]
-   recolored := reapplyColors(sliced, originalLine)
-   ```
-
-3. **Limit scroll offset to actual content:**
-   ```go
-   maxOffset := max(0, visualWidth(line) - visibleWidth)
-   if m.horizontalScrollOffset > maxOffset {
-       m.horizontalScrollOffset = maxOffset
-   }
-   ```
-
-4. **Handle emoji boundaries:**
-   - Don't split emoji in the middle
-   - Round scroll offset to nearest safe character boundary
-
-### Option B: Remove Horizontal Scrolling ❌ Last Resort
-
-**If unfixable or too complex:**
-
-1. Revert the horizontal scrolling commits for Detail view
-2. Document limitation: "Detail view requires minimum terminal width"
-3. Suggest alternatives:
-   - Use List view (F1) for narrow terminals
-   - Use Tree view (F3) for narrow terminals
-   - Rotate phone to landscape in Termux
-
-**Trade-off:** Lose Termux narrow-screen support for Detail view, but maintain stability.
-
----
-
-## Decision Criteria
-
-### Keep & Fix If:
-- ✅ Fix is straightforward (visual width functions)
-- ✅ Corruption is limited to specific edge cases
-- ✅ Detail view is frequently used in Termux
-- ✅ Horizontal scroll adds significant value
-
-### Remove If:
-- ❌ Fix requires extensive refactoring
-- ❌ Corruption affects core functionality
-- ❌ Detail view rarely used in Termux anyway
-- ❌ Alternative views (List/Tree) work well on narrow screens
-
----
-
-## Questions to Answer
-
-1. **When was horizontal scrolling added?**
+5. Build and verify:
    ```bash
-   git log --all --grep="horizontal" --oneline
-   git log --all --grep="scroll" --oneline
-   git log --all --grep="Termux" --oneline
+   go build
+   ./tfe  # Test single-pane
+   # Press Tab to test dual-pane
+   # Press F12 to verify trash icon changes
    ```
 
-2. **What's the current implementation?**
-   - Where is `horizontalScrollOffset` defined?
-   - How is it applied in rendering?
-   - What are the Left/Right arrow key handlers doing?
+**Files to Modify:**
+- helpers.go (add renderToolbarRow function)
+- view.go (replace toolbar code in renderSinglePane)
+- render_preview.go (replace toolbar code in renderDualPane)
 
-3. **Can it be fixed easily?**
-   - Does TFE already have visual width slicing functions?
-   - Can we reuse `visualWidth()` and `truncateToWidth()`?
-   - How much code needs to change?
+**Success Criteria:**
+- ✅ Toolbar renders identically in both modes
+- ✅ All emoji buttons work (home, favorites, view mode, etc.)
+- ✅ Trash icon switches correctly (🗑 → ♻)
+- ✅ Code reduced by ~50 lines
+- ✅ Future changes only need one location
 
-4. **How important is this feature?**
-   - Do users actually use Detail view in Termux?
-   - Are List/Tree views sufficient for narrow screens?
-   - Is the complexity worth the benefit?
-
----
-
-## Recommended Approach
-
-**Session Plan:**
-
-1. **Investigate (15 min)** - Find the code, understand the implementation
-2. **Reproduce (10 min)** - Confirm the bug in narrow terminal
-3. **Debug (20 min)** - Add logging, identify root cause
-4. **Decide (5 min)** - Fix or remove?
-5. **Implement (30 min)** - Either fix the visual width handling OR revert the feature
-6. **Test (10 min)** - Verify fix works or removal doesn't break anything
-
-**Total time estimate:** 90 minutes
-
----
-
-## Files to Focus On
-
-**Primary:**
-- `render_file_list.go` - Detail view rendering with horizontal scroll
-- `update_keyboard.go` - Left/Right arrow key handling
-- `types.go` - Horizontal scroll offset variable
-
-**Supporting:**
-- `file_operations.go` - Visual width functions (`visualWidth`, `truncateToWidth`)
-- `helpers.go` - Any scroll-related helper functions
-
-**Reference:**
-- `docs/EMOJI_DEBUG_SESSION_2.md` - Similar visual width debugging session
-- `CHANGELOG.md` - Look for when horizontal scroll was added
-
----
-
-## Success Criteria
-
-### If Fixing:
-- ✅ No text corruption when scrolling right
-- ✅ Smooth scrolling throughout entire range
-- ✅ No extra empty space after last column
-- ✅ Emoji and ANSI codes remain intact
-- ✅ Works in both Termux and narrow WezTerm
-
-### If Removing:
-- ✅ Detail view rendering restored to pre-scroll version
-- ✅ No horizontal scroll keys active in Detail view
-- ✅ Clear documentation of narrow-screen alternatives
-- ✅ No regression in List/Tree views
-
----
-
-## Related Issues to Check
-
-- Any open issues about "horizontal scroll" or "text corruption"?
-- Any TODOs in code comments related to scrolling?
-- Any PLAN.md or BACKLOG.md items about this feature?
-
----
-
-**Session Started:** [To be filled in next session]
-**Branch:** Create `fix-horizontal-scroll` or `remove-horizontal-scroll` branch
-**Status:** ✅ RESOLVED (2025-10-27)
-
----
-
-## Quick Start Commands
-
-```bash
-# Start investigation
-cd ~/projects/TFE
-git log --all --grep="horizontal" --oneline
-git log --all --grep="Detail.*scroll" --oneline
-
-# Find the code
-grep -rn "horizontalScrollOffset" .
-grep -rn "horizontal.*scroll" render_file_list.go
-
-# Create debug branch
-git checkout -b fix-horizontal-scroll
-
-# Test in narrow terminal
-# (Resize WezTerm to ~60 columns or use Termux)
-./tfe
-# Press F2, then Right arrow repeatedly
+**Audit Reference:** AUDIT_REPORT_2025.md, Section 1.2 "Quick Wins"
+**Estimated Time:** 30-60 minutes
 ```
+
+---
+
+## Prompt 2: Fix Broken Test Suite & Expand Coverage (20-32 hours) 🔥
+
+```
+I need to fix TFE's broken test suite and expand test coverage. Here's the context:
+
+**Immediate Priority (MUST DO FIRST):**
+1. Fix broken tests in favorites_test.go (undefined: directoryContainsPrompts)
+2. Fix broken tests in file_operations_test.go (undefined: renderMarkdownWithTimeout)
+3. Fix scripts/ build issue (duplicate main functions)
+4. Verify all tests pass: go test ./...
+
+**Current Test Failures:**
+
+Run this to see failures:
+```bash
+cd ~/projects/TFE
+go test ./...
+```
+
+Expected output:
+```
+./favorites_test.go:218:6: undefined: directoryContainsPrompts
+./favorites_test.go:228:5: undefined: directoryContainsPrompts
+./favorites_test.go:233:5: undefined: directoryContainsPrompts
+./favorites_test.go:254:5: undefined: directoryContainsPrompts
+./favorites_test.go:268:6: undefined: directoryContainsPrompts
+./favorites_test.go:289:5: undefined: directoryContainsPrompts
+./favorites_test.go:302:6: undefined: directoryContainsPrompts
+./file_operations_test.go:544:21: undefined: renderMarkdownWithTimeout
+./file_operations_test.go:565:12: undefined: renderMarkdownWithTimeout
+scripts/emoji_audit_targeted.go:14:6: main redeclared in this block
+```
+
+**Investigation Steps:**
+
+1. Search for missing functions in git history:
+```bash
+git log --all --full-history --source -- "*directoryContainsPrompts*"
+git log --all --full-history --source -- "*renderMarkdownWithTimeout*"
+```
+
+2. Search for current implementations:
+```bash
+grep -r "ContainsPrompts" .
+grep -r "renderMarkdown" .
+```
+
+3. Determine fix approach:
+   - Option A: Remove tests that reference deleted functions
+   - Option B: Re-implement functions if still needed
+   - Option C: Update tests to use new function names if renamed
+
+**After Tests Pass:**
+4. Expand test coverage for recently refactored trash navigation feature
+5. Add tests for helpers.go: navigateToPath(), visualWidth(), truncateToWidth()
+6. Create tests for menu.go trash auto-exit behavior
+7. Add tests for update_keyboard.go key state transitions
+8. Target 50% overall test coverage on critical paths
+
+**Testing Best Practices:**
+
+Use table-driven tests:
+```go
+func TestNavigateToPath(t *testing.T) {
+    tests := []struct {
+        name           string
+        currentPath    string
+        newPath        string
+        inTrash        bool
+        expectTrashExit bool
+    }{
+        {"navigate while in trash", "/home/user", "/tmp", true, true},
+        {"navigate when not in trash", "/home/user", "/tmp", false, false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Test implementation
+        })
+    }
+}
+```
+
+**Reference Documents:**
+- Full audit report: AUDIT_REPORT_2025.md
+- Detailed testing plan: docs/NEXT_SESSION_TESTING.md
+- Architecture guide: CLAUDE.md
+- Module details: docs/MODULE_DETAILS.md
+
+**Success Criteria - Phase 1 (Fix Tests):**
+- ✅ All `go test ./...` pass without errors
+- ✅ No undefined function references
+- ✅ Scripts build issue resolved
+
+**Success Criteria - Phase 2 (Expand Coverage):**
+- ✅ helpers.go coverage expanded (navigateToPath, visualWidth, truncateToWidth)
+- ✅ file_loading tests created
+- ✅ menu.go tests created (trash auto-exit)
+- ✅ update_keyboard.go tests created (key state transitions)
+- ✅ types.go tests created
+- ✅ Overall coverage reaches 50%
+
+**Useful Commands:**
+```bash
+# Run all tests
+go test ./...
+
+# Run with verbose output
+go test -v ./...
+
+# Run specific test
+go test -v -run TestNavigateToPath
+
+# Check for race conditions
+go test -race ./...
+
+# Generate coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# Run benchmarks
+go test -bench=. ./...
+```
+
+**Goal:** Get test suite passing, then expand to 50% coverage on critical paths.
+
+**Estimated Time:**
+- Phase 1 (Fix tests): 1-2 hours
+- Phase 2 (Expand coverage): 16-24 hours
+- Phase 3 (CI/CD setup): 2-4 hours
+- Total: 20-32 hours (spread across multiple sessions)
+
+Please start by investigating the missing functions and recommend the best fix approach.
+```
+
+---
+
+## Additional Context
+
+### Why Testing is Priority #1
+
+From the audit (AUDIT_REPORT_2025.md):
+- **Overall Code Health:** 8.5/10 ⭐⭐⭐⭐⭐⭐⭐⭐⭐
+- **Testing Rating:** 4/10 ⭐⭐⭐⭐ (pulls down overall score)
+- **Top Issue:** "Broken Test Suite - Tests exist but currently fail"
+
+**Impact of No Tests:**
+- Cannot verify code correctness
+- Refactoring is risky without tests
+- Regression detection is impossible
+- CI/CD pipeline cannot validate changes
+- Recent trash refactor had zero test protection
+
+### Current Test Files
+- ✅ command_test.go (6.9KB) - Command execution
+- ✅ editor_test.go (11KB) - External editor integration
+- ❌ favorites_test.go (12KB) - BROKEN: directoryContainsPrompts
+- ❌ file_operations_test.go (24KB) - BROKEN: renderMarkdownWithTimeout
+- ✅ helpers_test.go (12KB) - Helper functions
+- ✅ trash_test.go (20KB) - Trash/recycle bin
+
+### Session Order Recommendation
+
+**Session 1: Quick Win (30-60 min)**
+- Extract shared header function
+- Simple, low-risk refactor
+- Immediate code quality improvement
+- Good warm-up before diving into testing
+
+**Session 2+: Testing (20-32 hours)**
+- Fix broken tests (1-2 hours) - CRITICAL
+- Expand coverage (16-24 hours) - HIGH PRIORITY
+- Add CI/CD (2-4 hours) - AFTER TESTS PASS
+- Performance testing (4-8 hours) - LONG-TERM
+
+---
+
+**Last Updated:** Oct 28, 2025, 14:35
+**Auto-compact at:** ~4% remaining context

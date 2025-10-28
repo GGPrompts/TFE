@@ -657,14 +657,14 @@ func getFileIcon(item fileItem) string {
 
 	// Check for prompt files - differentiate templates with variables from plain prompts
 	// Uses cached value from loadFiles() to avoid per-frame file reads (performance optimization)
-	if ext == ".prompty" || ext == ".md" || ext == ".txt" {
+	if ext == ".prompty" || ext == ".md" || ext == ".txt" || ext == ".yaml" || ext == ".yml" {
 		// Use cached value if available (populated when showPromptsOnly is true)
 		if item.hasVariables != nil {
 			if *item.hasVariables {
 				return "📝" // Memo with pencil = editable template
 			}
 			// Has been checked and has no variables
-			if ext == ".prompty" || isInPromptsDirectory(item.path) {
+			if ext == ".prompty" || ext == ".yaml" || ext == ".yml" || isInPromptsDirectory(item.path) {
 				return "📄" // Document = plain prompt without variables
 			}
 			// Otherwise fall through to default .md/.txt icons

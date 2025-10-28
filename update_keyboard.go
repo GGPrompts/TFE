@@ -602,7 +602,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 		case "f5":
-			// Copy rendered prompt (if prompt) or file path (regular file)
+			// Copy rendered prompt (if prompt), full content (text files), or file path (binary files)
 			if m.preview.loaded && m.preview.filePath != "" {
 				// If this is a prompt, copy the rendered template
 				if m.preview.isPrompt && m.preview.promptTemplate != nil {
@@ -625,8 +625,16 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					} else {
 						m.setStatusMessage("✓ Prompt copied to clipboard", false)
 					}
+				} else if !m.preview.isBinary && len(m.preview.content) > 0 {
+					// Text file: copy full content
+					fullContent := strings.Join(m.preview.content, "\n")
+					if err := copyToClipboard(fullContent); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Failed to copy content: %s", err), true)
+					} else {
+						m.setStatusMessage("✓ File content copied to clipboard", false)
+					}
 				} else {
-					// Regular file: copy path
+					// Binary file or empty: copy path
 					if err := copyToClipboard(m.preview.filePath); err != nil {
 						m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
 					} else {
@@ -742,9 +750,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		case "f1":
 			// F1: Show hotkeys reference from preview mode
-			hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")
-			// Try to find HOTKEYS.md in the TFE directory
 			// First check if it exists in current directory
+			hotkeysPath := filepath.Join(m.currentPath, "HOTKEYS.md")
 			if _, err := os.Stat(hotkeysPath); os.IsNotExist(err) {
 				// Try executable directory
 				if exePath, err := os.Executable(); err == nil {
@@ -2064,7 +2071,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "f5":
-		// F5: Copy rendered prompt (in prompts mode) or file path (regular mode)
+		// F5: Copy rendered prompt (prompts), full content (text files), or file path (binary/not previewed)
 		if currentFile := m.getCurrentFile(); currentFile != nil {
 			// Special handling for prompts mode: copy rendered prompt
 			if m.showPromptsOnly && !currentFile.isDir && isPromptFile(*currentFile) {
@@ -2084,11 +2091,21 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			// Regular mode: copy file path
-			if err := copyToClipboard(currentFile.path); err != nil {
-				m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
+			// If preview is loaded and it's a text file: copy full content
+			if m.preview.loaded && !m.preview.isBinary && len(m.preview.content) > 0 {
+				fullContent := strings.Join(m.preview.content, "\n")
+				if err := copyToClipboard(fullContent); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to copy content: %s", err), true)
+				} else {
+					m.setStatusMessage("✓ File content copied to clipboard", false)
+				}
 			} else {
-				m.setStatusMessage("Path copied to clipboard", false)
+				// Binary file or not previewed: copy file path
+				if err := copyToClipboard(currentFile.path); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
+				} else {
+					m.setStatusMessage("Path copied to clipboard", false)
+				}
 			}
 		}
 
@@ -2173,9 +2190,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.preview.scrollPos = sectionLine
 			}
 
-			m.viewMode = viewFullPreview
+			// Stay in dual-pane mode if already there, otherwise go full-screen
+			if m.viewMode != viewDualPane {
+				m.viewMode = viewFullPreview
+			}
 			m.searchMode = false // Disable search mode in preview
-			m.calculateLayout() // Update widths for full-screen
+			m.calculateLayout() // Update widths for appropriate view mode
 			m.populatePreviewCache() // Repopulate cache with correct width
 			// Clear screen for clean rendering
 			return m, tea.ClearScreen

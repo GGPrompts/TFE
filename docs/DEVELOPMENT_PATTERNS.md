@@ -89,17 +89,19 @@ Don't create a new module when:
 
 ## Common Patterns
 
-### Pattern 1: Modifying the Header/Title Bar
+### Pattern 1: Modifying the Toolbar
 
-**⚠️ IMPORTANT: Headers exist in TWO locations!**
+**✅ Toolbar is now a shared function!**
 
-When modifying the header/title bar (GitHub link, menu bar, mode indicators), you must update BOTH:
-- **Single-Pane:** `view.go` → `renderSinglePane()` (~line 64)
-- **Dual-Pane:** `render_preview.go` → `renderDualPane()` (~line 816)
+The emoji button toolbar (🏠 ⭐ 📄 ⬜ >_ 🔍 📝 🔀 🗑) is rendered by a single shared function:
+- **Location:** `helpers.go` → `renderToolbarRow()`
+- **Used by:** Both `view.go` (single-pane) and `render_preview.go` (dual-pane)
 
-**Note:** `renderFullPreview()` has a different header intentionally (shows filename, not menu bar).
+**To modify toolbar buttons:**
+1. Edit `helpers.go` → `renderToolbarRow()`
+2. Changes automatically apply to both single-pane and dual-pane modes
 
-**Why this matters:** Forgetting to update both locations leads to inconsistent UI between view modes. Extract shared header rendering to fix this duplication (see PLAN.md issue #14).
+**Note:** The title bar (GitHub link, menu bar) is separate and still exists in both view files. `renderFullPreview()` has a different header intentionally (shows filename, not menu bar).
 
 ---
 
