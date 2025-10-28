@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mattn/go-runewidth"
 )
 
 func (m model) View() string {
@@ -498,10 +497,10 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 	menuLines := strings.Split(strings.TrimSpace(menuContent), "\n")
 	menuHeight := len(menuLines)
 
-	// Calculate menu width for horizontal bounds checking
+	// Calculate menu width for horizontal bounds checking using terminal-aware width
 	menuWidth := 25 // Default estimate
 	if len(menuLines) > 0 {
-		menuWidth = lipgloss.Width(menuLines[0])
+		menuWidth = m.visualWidthCompensated(menuLines[0])
 	}
 
 	// Ensure menu stays on screen with proper margins
@@ -561,7 +560,7 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 		baseRunes := []rune(baseLine)
 
 		// Scan through base line until we reach visual position x
-		// Use runewidth to properly handle wide characters (emoji like ⭐)
+		// Use terminal-aware runewidth to properly handle emoji in different terminals
 		for bytePos < len(baseRunes) && visualPos < x {
 			if baseRunes[bytePos] == '\033' {
 				inAnsi = true
@@ -571,8 +570,8 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 					inAnsi = false
 				}
 			} else {
-				// Use RuneWidth to get actual visual width (handles wide emoji)
-				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
+				// Use terminal-aware rune width for proper emoji handling
+				visualPos += m.runeWidth(baseRunes[bytePos])
 			}
 			bytePos++
 		}
@@ -593,7 +592,8 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 		newLine.WriteString(menuLine)
 
 		// Now preserve the right side of the base line (after the menu)
-		menuWidth := lipgloss.Width(menuLine)
+		// Use terminal-aware visual width for consistent emoji handling
+		menuWidth := m.visualWidthCompensated(menuLine)
 		endVisualPos := x + menuWidth
 
 		// Continue from where we left off and skip to the end position
@@ -606,8 +606,8 @@ func (m model) overlayContextMenu(baseView, menuContent string) string {
 					inAnsi = false
 				}
 			} else {
-				// Use RuneWidth to get actual visual width (handles wide emoji)
-				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
+				// Use terminal-aware rune width for proper emoji handling
+				visualPos += m.runeWidth(baseRunes[bytePos])
 			}
 			bytePos++
 		}
@@ -656,7 +656,7 @@ func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 		baseRunes := []rune(baseLine)
 
 		// Scan through base line until we reach visual position x
-		// Use runewidth to properly handle wide characters
+		// Use terminal-aware runewidth to properly handle emoji in different terminals
 		for bytePos < len(baseRunes) && visualPos < x {
 			if baseRunes[bytePos] == '\033' {
 				inAnsi = true
@@ -666,8 +666,8 @@ func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 					inAnsi = false
 				}
 			} else {
-				// Use RuneWidth to get actual visual width
-				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
+				// Use terminal-aware rune width for proper emoji handling
+				visualPos += m.runeWidth(baseRunes[bytePos])
 			}
 			bytePos++
 		}
@@ -687,7 +687,8 @@ func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 		newLine.WriteString(dropdownLine)
 
 		// Now preserve the right side of the base line (after the dropdown)
-		dropdownWidth := lipgloss.Width(dropdownLine)
+		// Use terminal-aware visual width for consistent emoji handling
+		dropdownWidth := m.visualWidthCompensated(dropdownLine)
 		endVisualPos := x + dropdownWidth
 
 		// Continue from where we left off and skip to the end position
@@ -700,7 +701,8 @@ func (m model) overlayDropdown(baseView, dropdown string, x, y int) string {
 					inAnsi = false
 				}
 			} else {
-				visualPos += runewidth.RuneWidth(baseRunes[bytePos])
+				// Use terminal-aware rune width for proper emoji handling
+				visualPos += m.runeWidth(baseRunes[bytePos])
 			}
 			bytePos++
 		}

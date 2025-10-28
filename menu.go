@@ -321,17 +321,17 @@ func (m model) renderActiveDropdown() string {
 	var lines []string
 	maxWidth := 0
 
-	// First pass: calculate max width
+	// First pass: calculate max width using terminal-aware width
 	for _, item := range menu.Items {
 		if item.IsSeparator {
 			continue
 		}
-		width := lipgloss.Width(item.Label) // Use lipgloss.Width for accurate emoji/unicode width
+		width := m.visualWidthCompensated(item.Label) // Use terminal-aware width for emoji
 		if item.IsCheckable {
-			width += lipgloss.Width("✓ ") // Use actual width of checkmark + space
+			width += m.visualWidthCompensated("✓ ") // Use terminal-aware width of checkmark + space
 		}
 		if item.Shortcut != "" {
-			width += lipgloss.Width(item.Shortcut) + 3 // Use lipgloss.Width for shortcut too
+			width += m.visualWidthCompensated(item.Shortcut) + 3 // Use terminal-aware width for shortcut
 		}
 		if width > maxWidth {
 			maxWidth = width
@@ -375,10 +375,10 @@ func (m model) renderActiveDropdown() string {
 		// Pad label
 		labelWidth := maxWidth - 4
 		if shortcut != "" {
-			labelWidth -= lipgloss.Width(shortcut) + 1 // Use lipgloss.Width for accurate width
+			labelWidth -= m.visualWidthCompensated(shortcut) + 1 // Use terminal-aware width
 		}
 
-		line := " " + padRight(label, labelWidth)
+		line := " " + m.padRight(label, labelWidth)
 		if shortcut != "" {
 			line += " " + shortcut
 		}
@@ -914,9 +914,8 @@ Additional context: {{variable2}}
 	// Help menu
 	case "show-hotkeys":
 		// F1 functionality: Show hotkeys reference with context-aware navigation
-		hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")
-		// Try to find HOTKEYS.md in the TFE directory
 		// First check if it exists in current directory
+		hotkeysPath := filepath.Join(m.currentPath, "HOTKEYS.md")
 		if _, err := os.Stat(hotkeysPath); os.IsNotExist(err) {
 			// Try executable directory
 			if exePath, err := os.Executable(); err == nil {
@@ -965,9 +964,9 @@ Additional context: {{variable2}}
 	return m, nil
 }
 
-// padRight pads a string with spaces to reach the desired width
-func padRight(s string, width int) string {
-	currentWidth := lipgloss.Width(s)
+// padRight pads a string with spaces to reach the desired width using terminal-aware width
+func (m model) padRight(s string, width int) string {
+	currentWidth := m.visualWidthCompensated(s)
 	if currentWidth >= width {
 		return s
 	}
