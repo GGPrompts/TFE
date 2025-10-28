@@ -282,9 +282,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 				if selectedFile.isDir {
 					// It's a directory - navigate into it (consistent across all views)
-					m.currentPath = selectedFile.path
-					m.cursor = 0
-					m.loadFiles()
+					m.navigateToPath(selectedFile.path)
 					return m, nil
 				} else {
 					// It's a file - insert path into focused variable
@@ -670,6 +668,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 					if targetInfo.IsDir() {
 						// Target is a directory - navigate to it
+						if m.showTrashOnly {
+							m.showTrashOnly = false
+							m.trashRestorePath = ""
+						}
 						m.currentPath = m.preview.filePath
 						m.cursor = 0
 						m.viewMode = viewSinglePane
@@ -1203,6 +1205,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Clean the path and verify it exists
 				newPath = filepath.Clean(newPath)
 				if info, err := os.Stat(newPath); err == nil && info.IsDir() {
+					// Auto-exit trash mode when using cd command (goes to new path, not restore)
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
 					m.currentPath = newPath
 					m.cursor = 0
 					m.loadFiles()
@@ -1413,9 +1420,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.populatePreviewCache() // Refresh cache with new width
 		} else if m.currentPath != "/" {
 			// Go up one level
-			m.currentPath = filepath.Dir(m.currentPath)
-			m.cursor = 0
-			m.loadFiles()
+			m.navigateToPath(filepath.Dir(m.currentPath))
 		}
 
 	case "up":
@@ -1539,12 +1544,20 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				fileDir := filepath.Dir(currentFile.path)
 				if currentFile.isDir {
 					// Navigate to the favorited directory
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
 					m.currentPath = currentFile.path
 					m.cursor = 0
 					m.showFavoritesOnly = false // Exit favorites mode
 					m.loadFiles()
 				} else if fileDir != m.currentPath {
 					// Navigate to the file's parent directory and select it
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
 					m.currentPath = fileDir
 					m.showFavoritesOnly = false // Exit favorites mode
 					m.loadFiles()
@@ -1568,6 +1581,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else if m.showGitReposOnly {
 				if currentFile.name == ".." {
 					// Navigating up while git filter is active - rescan from parent
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
 					m.currentPath = currentFile.path
 					m.cursor = 0
 					m.setStatusMessage("🔍 Re-scanning from parent directory...", false)
@@ -1578,6 +1595,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.loadFiles()
 				} else if currentFile.isDir {
 					// Navigate to the repo and exit filter mode
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
 					m.currentPath = currentFile.path
 					m.cursor = 0
 					m.showGitReposOnly = false // Exit git repos mode
@@ -1586,9 +1607,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else if currentFile.isDir {
 				// Navigate into directory (consistent across all views)
 				// Arrow keys (←/→) handle tree expansion/collapse
-				m.currentPath = currentFile.path
-				m.cursor = 0
-				m.loadFiles()
+				m.navigateToPath(currentFile.path)
 			} else {
 				// Enter full-screen preview (regardless of current mode)
 				m.loadPreview(currentFile.path)
@@ -1703,14 +1722,35 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.commandFocused {
 			return m, nil
 		}
-		// Page up in dual-pane mode (only works when right pane focused)
-		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
-			visibleLines := m.height - 7
-			m.preview.scrollPos -= visibleLines
-			if m.preview.scrollPos < 0 {
-				m.preview.scrollPos = 0
+		if m.viewMode == viewDualPane {
+			// In dual-pane mode, check which pane is focused
+			if m.focusedPane == leftPane {
+				// Page up in file list
+				visibleLines := m.getFileListVisibleLines()
+				m.cursor -= visibleLines
+				if m.cursor < 0 {
+					m.cursor = 0
+				}
+				// Update preview if file selected
+				if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+					m.loadPreview(currentFile.path)
+					m.populatePreviewCache() // Populate cache with dual-pane width
+				}
+			} else {
+				// Page up in preview pane
+				visibleLines := m.getPreviewVisibleLines()
+				m.preview.scrollPos -= visibleLines
+				if m.preview.scrollPos < 0 {
+					m.preview.scrollPos = 0
+				}
 			}
-			return m, nil
+		} else if m.viewMode != viewFullPreview {
+			// Single-pane mode: page up in file list
+			visibleLines := m.getFileListVisibleLines()
+			m.cursor -= visibleLines
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
 		}
 
 	case "pagedown", "pgdn", "pgdown":
@@ -1718,19 +1758,46 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.commandFocused {
 			return m, nil
 		}
-		// Page down in dual-pane mode (only works when right pane focused)
-		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
-			visibleLines := m.getPreviewVisibleLines()
-			totalLines := m.getWrappedLineCount()
-			maxScroll := totalLines - visibleLines
-			if maxScroll < 0 {
-				maxScroll = 0
+		if m.viewMode == viewDualPane {
+			// In dual-pane mode, check which pane is focused
+			if m.focusedPane == leftPane {
+				// Page down in file list
+				visibleLines := m.getFileListVisibleLines()
+				m.cursor += visibleLines
+				if m.cursor >= len(m.files) {
+					m.cursor = len(m.files) - 1
+				}
+				if m.cursor < 0 {
+					m.cursor = 0
+				}
+				// Update preview if file selected
+				if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+					m.loadPreview(currentFile.path)
+					m.populatePreviewCache() // Populate cache with dual-pane width
+				}
+			} else {
+				// Page down in preview pane
+				visibleLines := m.getPreviewVisibleLines()
+				totalLines := m.getWrappedLineCount()
+				maxScroll := totalLines - visibleLines
+				if maxScroll < 0 {
+					maxScroll = 0
+				}
+				m.preview.scrollPos += visibleLines
+				if m.preview.scrollPos > maxScroll {
+					m.preview.scrollPos = maxScroll
+				}
 			}
-			m.preview.scrollPos += visibleLines
-			if m.preview.scrollPos > maxScroll {
-				m.preview.scrollPos = maxScroll
+		} else if m.viewMode != viewFullPreview {
+			// Single-pane mode: page down in file list
+			visibleLines := m.getFileListVisibleLines()
+			m.cursor += visibleLines
+			if m.cursor >= len(m.files) {
+				m.cursor = len(m.files) - 1
 			}
-			return m, nil
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
 		}
 
 	case "left":
@@ -1764,26 +1831,20 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					} else {
 						// Already collapsed, go to parent
 						if m.currentPath != "/" {
-							m.currentPath = filepath.Dir(m.currentPath)
-							m.cursor = 0
-							m.loadFiles()
+							m.navigateToPath(filepath.Dir(m.currentPath))
 						}
 					}
 				} else {
 					// Not a directory or is "..", go to parent
 					if m.currentPath != "/" {
-						m.currentPath = filepath.Dir(m.currentPath)
-						m.cursor = 0
-						m.loadFiles()
+						m.navigateToPath(filepath.Dir(m.currentPath))
 					}
 				}
 			}
 		} else {
 			// Non-tree modes: go to parent directory
 			if m.currentPath != "/" {
-				m.currentPath = filepath.Dir(m.currentPath)
-				m.cursor = 0
-				m.loadFiles()
+				m.navigateToPath(filepath.Dir(m.currentPath))
 			}
 		}
 
@@ -1858,24 +1919,18 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.expandedDirs[currentFile.path] = true
 				} else {
 					// Already expanded, navigate into it
-					m.currentPath = currentFile.path
-					m.cursor = 0
-					m.loadFiles()
+					m.navigateToPath(currentFile.path)
 				}
 			} else {
 				// Non-tree modes: navigate into directory
-				m.currentPath = currentFile.path
-				m.cursor = 0
-				m.loadFiles()
+				m.navigateToPath(currentFile.path)
 			}
 		}
 
 	case "l":
 		// 'l' always navigates into directory (vim-style)
 		if currentFile := m.getCurrentFile(); currentFile != nil && currentFile.isDir {
-			m.currentPath = currentFile.path
-			m.cursor = 0
-			m.loadFiles()
+			m.navigateToPath(currentFile.path)
 		}
 
 	case ".", "ctrl+h":
@@ -2042,10 +2097,20 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "f6":
 		// F6: Toggle favorites filter (replaces b/B)
+		// Auto-exit trash mode when toggling favorites
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
 		m.showFavoritesOnly = !m.showFavoritesOnly
 
 	case "f11":
 		// F11: Toggle prompts filter (show only .yaml, .md, .txt files)
+		// Auto-exit trash mode when toggling prompts filter
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
 		m.showPromptsOnly = !m.showPromptsOnly
 
 		// Auto-expand ~/.prompts when filter is turned on
@@ -2065,16 +2130,27 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 
 	case "f12":
-		// F12: Toggle trash/recycle bin view
-		m.showTrashOnly = !m.showTrashOnly
-		m.showFavoritesOnly = false // Disable favorites filter
-		m.showPromptsOnly = false   // Disable prompts filter
-		m.cursor = 0
-
+		// F12: Navigate to trash view (or exit if already in trash)
 		if m.showTrashOnly {
+			// Already in trash - exit and restore previous path
+			m.showTrashOnly = false
+			if m.trashRestorePath != "" {
+				m.currentPath = m.trashRestorePath
+				m.trashRestorePath = ""
+			}
+			m.cursor = 0
+			m.loadFiles()
+		} else {
+			// Enter trash view - save current path
+			m.trashRestorePath = m.currentPath
+			m.showTrashOnly = true
+			m.showFavoritesOnly = false // Disable favorites filter
+			m.showPromptsOnly = false   // Disable prompts filter
+			m.cursor = 0
 			// Default to detail view for trash
 			m.displayMode = modeDetail
 			m.calculateLayout() // Recalculate widths for detail view
+			m.loadFiles()
 		}
 
 	case "f1":

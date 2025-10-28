@@ -31,7 +31,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
 - **Double-Click Support**: Double-click to navigate folders or preview files
 - **Prompts Library**: F11 mode for AI prompt templates with fillable input fields, file picker (F3), clipboard copy, and quick template creation via File menu
-- **Trash/Recycle Bin**: F12 to view deleted items, restore or permanently delete (F8 moves to trash)
+- **Trash/Recycle Bin**: F12 to navigate to trash (auto-exits when you navigate elsewhere), restore or permanently delete items (F8 moves to trash)
 - **HD Image Previews**: Inline HD image rendering via Kitty/iTerm2/Sixel protocols in preview pane
 - **Image Support**: View images with viu/timg/chafa and edit with textual-paint (MS Paint in terminal!)
 - **File Operations**: Copy files/folders with interactive file picker, rename, create new prompts via File menu
@@ -484,7 +484,7 @@ If you cannot install the addon, you can filter the `WT_SESSION` environment var
 | `F9` | Cycle through display modes |
 | `F10` | Quit application |
 | `F11` | Toggle Prompts Library mode |
-| `F12` | Toggle Trash/Recycle Bin view |
+| `F12` | Navigate to Trash/Recycle Bin (auto-exits on navigation) |
 
 #### Navigation
 | Key | Action |

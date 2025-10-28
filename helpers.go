@@ -412,6 +412,49 @@ func (m *model) scrollToFocusedVariable() {
 	}
 }
 
+// navigateToPath changes the current path and automatically exits special modes (trash, favorites, etc)
+// This ensures users don't get stuck in filter modes when navigating
+func (m *model) navigateToPath(newPath string) {
+	// If we're in trash mode and navigating away, auto-exit and restore
+	if m.showTrashOnly {
+		m.showTrashOnly = false
+		// Don't change path if user is still in trash view
+		// Only exit trash mode, stay in current directory
+		if m.trashRestorePath != "" {
+			m.currentPath = m.trashRestorePath
+			m.trashRestorePath = ""
+		}
+		m.cursor = 0
+		m.loadFiles()
+		return
+	}
+
+	// Normal navigation
+	m.currentPath = newPath
+	m.cursor = 0
+	m.loadFiles()
+}
+
+// getFileListVisibleLines returns the number of file items visible in the file list
+// This accounts for header, footer, and borders
+func (m model) getFileListVisibleLines() int {
+	var visibleLines int
+
+	if m.viewMode == viewDualPane {
+		// Dual-pane mode: account for header, borders, footer
+		visibleLines = m.height - 8  // Conservative estimate
+	} else {
+		// Single-pane mode: header (4) + footer (2-3)
+		visibleLines = m.height - 6
+	}
+
+	if visibleLines < 1 {
+		visibleLines = 1
+	}
+
+	return visibleLines
+}
+
 // getPreviewVisibleLines returns the number of content lines visible in the preview pane
 // This accounts for headers, borders, and the scroll indicator line reservation in dual-pane mode
 func (m model) getPreviewVisibleLines() int {

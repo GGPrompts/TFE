@@ -286,6 +286,12 @@ git pull
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
 				if msg.X >= 0 && msg.X <= 4 {
+					// Auto-exit trash mode when navigating to home
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
+
 					// Navigate to home directory
 					homeDir, err := os.UserHomeDir()
 					if err == nil {
@@ -307,6 +313,12 @@ git pull
 				}
 				// Star button [⭐/✨] (X=5-9: [ + emoji(2) + ] + space)
 				if msg.X >= 5 && msg.X <= 9 {
+					// Auto-exit trash mode when toggling favorites
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
+
 					// Toggle favorites filter (like F6)
 					m.showFavoritesOnly = !m.showFavoritesOnly
 					m.cursor = 0
@@ -394,6 +406,12 @@ git pull
 				}
 				// Prompts filter button [📝] (X=28-32: [ + emoji(2) + ] + space)
 				if msg.X >= 28 && msg.X <= 32 {
+					// Auto-exit trash mode when toggling prompts filter
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
+
 					// Toggle prompts filter
 					m.showPromptsOnly = !m.showPromptsOnly
 
@@ -412,6 +430,12 @@ git pull
 				}
 				// Git repositories toggle button [🔀] (X=33-37: [ + emoji(2) + ] + space)
 				if msg.X >= 33 && msg.X <= 37 {
+					// Auto-exit trash mode when toggling git repos filter
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
+
 					m.showGitReposOnly = !m.showGitReposOnly
 
 					if m.showGitReposOnly {
@@ -436,21 +460,27 @@ git pull
 				}
 				// Trash button [🗑] or [♻] (X=38-42: [ + emoji(2) + ] + space)
 				if msg.X >= 38 && msg.X <= 42 {
-					// Toggle trash view
-					m.showTrashOnly = !m.showTrashOnly
-					m.showFavoritesOnly = false // Disable favorites filter
-					m.showPromptsOnly = false   // Disable prompts filter
-					m.cursor = 0
-
+					// Navigate to trash view (or exit if already in trash)
 					if m.showTrashOnly {
-						// Load trash items and convert to fileItems for display
-						// Default to detail view for trash (supports horizontal scrolling on narrow terminals)
-						m.displayMode = modeDetail
-						m.detailScrollX = 0 // Reset scroll
-						m.calculateLayout() // Recalculate widths for detail view
+						// Already in trash - exit and restore previous path
+						m.showTrashOnly = false
+						if m.trashRestorePath != "" {
+							m.currentPath = m.trashRestorePath
+							m.trashRestorePath = ""
+						}
+						m.cursor = 0
 						m.loadFiles()
 					} else {
-						// Exit trash view, reload normal files
+						// Enter trash view - save current path
+						m.trashRestorePath = m.currentPath
+						m.showTrashOnly = true
+						m.showFavoritesOnly = false
+						m.showPromptsOnly = false
+						m.cursor = 0
+						// Default to detail view for trash
+						m.displayMode = modeDetail
+						m.detailScrollX = 0
+						m.calculateLayout()
 						m.loadFiles()
 					}
 					return m, nil

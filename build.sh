@@ -35,11 +35,19 @@ mkdir -p "$INSTALL_DIR"
 
 echo -e "${BLUE}📋 Installing to ${INSTALL_PATH}...${NC}"
 
-# Copy binary
+# Copy binary to ~/.local/bin
 cp ./tfe "$INSTALL_PATH"
-
-# Make it executable (should already be, but just in case)
 chmod +x "$INSTALL_PATH"
+
+# Also copy to ~/bin/tfe if it exists (keep both in sync)
+if [ -f "$HOME/bin/tfe" ]; then
+    echo -e "${BLUE}📋 Also installing to ~/bin/tfe...${NC}"
+    if cp ./tfe "$HOME/bin/tfe" 2>/dev/null; then
+        chmod +x "$HOME/bin/tfe"
+    else
+        echo -e "${RED}⚠️  ~/bin/tfe is in use - will update after you close TFE${NC}"
+    fi
+fi
 
 # Copy HOTKEYS.md so F1 help works from anywhere
 if [ -f "./HOTKEYS.md" ]; then

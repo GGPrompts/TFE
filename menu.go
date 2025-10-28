@@ -722,6 +722,11 @@ Additional context: {{variable2}}
 
 	// Edit menu
 	case "toggle-favorites":
+		// Auto-exit trash mode when toggling favorites
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
 		m.showFavoritesOnly = !m.showFavoritesOnly
 		m.cursor = 0
 		if m.showFavoritesOnly {
@@ -862,6 +867,11 @@ Additional context: {{variable2}}
 		return m, openTUITool("pyradio", m.currentPath)
 
 	case "toggle-prompts":
+		// Auto-exit trash mode when toggling prompts filter
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
 		m.showPromptsOnly = !m.showPromptsOnly
 		m.cursor = 0
 		m.loadFiles()
@@ -887,6 +897,12 @@ Additional context: {{variable2}}
 		}
 
 	case "toggle-git-repos":
+		// Auto-exit trash mode when toggling git repos filter
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
+
 		m.showGitReposOnly = !m.showGitReposOnly
 
 		// If turning ON, scan for repos recursively from current directory
@@ -907,9 +923,25 @@ Additional context: {{variable2}}
 		m.loadFiles()
 
 	case "toggle-trash":
-		m.showTrashOnly = !m.showTrashOnly
-		m.cursor = 0
-		m.loadFiles()
+		// Navigate to trash view (or exit if already in trash)
+		if m.showTrashOnly {
+			// Already in trash - exit and restore previous path
+			m.showTrashOnly = false
+			if m.trashRestorePath != "" {
+				m.currentPath = m.trashRestorePath
+				m.trashRestorePath = ""
+			}
+			m.cursor = 0
+			m.loadFiles()
+		} else {
+			// Enter trash view - save current path
+			m.trashRestorePath = m.currentPath
+			m.showTrashOnly = true
+			m.showFavoritesOnly = false
+			m.showPromptsOnly = false
+			m.cursor = 0
+			m.loadFiles()
+		}
 
 	// Help menu
 	case "show-hotkeys":

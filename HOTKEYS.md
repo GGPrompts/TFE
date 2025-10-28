@@ -15,7 +15,7 @@
 | **F9** / **Alt** | Enter menu bar navigation mode (keyboard access to File/Edit/View/Tools/Help menus) |
 | **F10** | Quit TFE |
 | **F11** | Toggle prompts filter (show only .yaml, .md, .txt files + ~/.prompts & ~/.claude) |
-| **F12** | Toggle trash/recycle bin view (restore/permanently delete items) |
+| **F12** | Navigate to trash/recycle bin (press F12 again or navigate elsewhere to exit) |
 
 ## Navigation
 
@@ -228,8 +228,19 @@ When viewing a prompt with `{{VARIABLES}}`:
 
 | Key | Action |
 |-----|--------|
-| **F12** | Toggle trash view on/off |
+| **F12** | Navigate to trash (press F12 again to exit) |
 | **F8** (in normal mode) | Move file/folder to trash (safe deletion) |
+
+**How trash works:**
+- Press **F12** to navigate to trash view (like visiting a special location)
+- Your current path is saved and restored when you exit
+- **Auto-exit**: Any navigation action automatically exits trash:
+  - Navigating to a directory (Enter, arrows, 'l')
+  - Going to parent (Backspace, Left)
+  - Using cd command
+  - Clicking Home, Favorites, Prompts, or Git Repos buttons
+  - Using F6 (favorites), F11 (prompts), or other filter toggles
+- **Manual exit**: Press F12 again to return to your previous location
 
 When in trash view:
 - Shows all deleted items with deletion timestamps
@@ -243,7 +254,7 @@ When in trash view:
 **Safety features:**
 - F8 moves to trash instead of permanent deletion
 - Original paths are tracked for restoration
-- Trash can be browsed like a normal directory
+- Auto-exit prevents getting stuck in trash mode
 - Empty trash requires confirmation
 
 ## Command Prompt (Vim-Style)

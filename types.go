@@ -305,8 +305,9 @@ type model struct {
 	gitReposScanRoot  string      // Root directory of last scan
 	gitReposScanDepth int         // Max depth to scan (default: 5)
 	// Trash/Recycle bin system
-	showTrashOnly bool        // Filter to show trash contents
-	trashItems    []trashItem // Cached trash items when viewing trash
+	showTrashOnly     bool        // Filter to show trash contents
+	trashItems        []trashItem // Cached trash items when viewing trash
+	trashRestorePath  string      // Path to restore when exiting trash view
 	// Prompt inline editing (fillable variables)
 	promptEditMode         bool              // Whether prompt edit mode is active (Tab to activate)
 	focusedVariableIndex   int               // Index of currently focused variable in template

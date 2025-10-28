@@ -5,6 +5,19 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Changed
+- **Trash Bin Behavior - Navigation Instead of Toggle**
+  - F12 now navigates TO trash view (like visiting a special location) instead of toggling a filter
+  - Your current path is saved and automatically restored when you exit trash
+  - **Auto-exit trash**: Any navigation action automatically exits trash mode:
+    - Navigating into directories (Enter, Right arrow, 'l')
+    - Going to parent (Backspace, Left arrow)
+    - Using cd command
+    - Clicking navigation buttons (Home, Favorites, Prompts, Git Repos)
+    - Using filter toggles (F6, F11)
+  - **Manual exit**: Press F12 again to explicitly exit and restore previous location
+  - Prevents confusion from accidentally staying in trash mode when navigating
+  - Files modified: `types.go`, `helpers.go`, `update_keyboard.go`, `update_mouse.go`, `menu.go`
+
 - **Automatic View Mode Selection Based on Terminal Width**
   - Narrow terminals (width < 100) now default to single-pane mode on startup
   - Wide terminals (width >= 100) default to dual-pane mode

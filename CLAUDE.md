@@ -17,7 +17,7 @@ This document is a **concise index** to TFE's architecture and development docum
 - 🏗️ **Want architectural history?** → Read [`docs/REFACTORING_HISTORY.md`](docs/REFACTORING_HISTORY.md)
 
 **After rebuilding:**
-- ⚠️ **ALWAYS run:** `cp ./tfe /home/matt/.local/bin/tfe` (see [Building and Installing](#building-and-installing))
+- ⚠️ **ALWAYS run:** `./build.sh` OR manually update both `~/bin/tfe` and `~/.local/bin/tfe` (see [Building and Installing](#building-and-installing))
 
 ---
 
@@ -213,16 +213,22 @@ func main() {
 
 ## Building and Installing
 
-**⚠️ IMPORTANT: After rebuilding TFE, always update the installed binary!**
+**⚠️ IMPORTANT: After rebuilding TFE, always update the installed binaries!**
 
 ```bash
-# After go build completes successfully
+# Option 1: Use build script (RECOMMENDED - updates both locations automatically)
+./build.sh
+
+# Option 2: Manual build and install (must update BOTH locations)
+go build
 cp ./tfe /home/matt/.local/bin/tfe
+cp ./tfe /home/matt/bin/tfe
 ```
 
 **Why this matters:**
-- User tests with `./tfe` in project folder during development
-- But uses `tfe` (from PATH) in normal usage
+- User has TFE installed in **TWO** locations: `~/bin/tfe` and `~/.local/bin/tfe`
+- Both must be updated or user will run old version
+- The `build.sh` script now updates both automatically
 - Forgetting to update means user won't have latest fixes
 
 **When to do this:**
