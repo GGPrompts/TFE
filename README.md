@@ -989,8 +989,16 @@ go run .
 
 ### Building
 
+**Quick build and install (recommended):**
+```bash
+./build.sh
+```
+This builds the binary and automatically installs it to `~/.local/bin/tfe`.
+
+**Manual build:**
 ```bash
 go build -o tfe
+cp ./tfe ~/.local/bin/tfe  # Install to PATH
 ```
 
 ### Dependencies
