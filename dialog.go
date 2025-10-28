@@ -179,7 +179,8 @@ func (m model) overlayDialog(baseView, dialogContent string) string {
 					inAnsi = false
 				}
 			} else {
-				visualPos++
+				// Use terminal-aware rune width for proper emoji handling
+				visualPos += m.runeWidth(baseRunes[bytePos])
 			}
 			bytePos++
 		}
@@ -199,7 +200,8 @@ func (m model) overlayDialog(baseView, dialogContent string) string {
 		newLine.WriteString(dialogLine)
 
 		// Calculate where the dialog ends visually
-		dialogWidth := visualWidth(dialogLine)
+		// Use terminal-aware visual width for consistent emoji handling
+		dialogWidth := m.visualWidthCompensated(dialogLine)
 		endPos := x + dialogWidth
 
 		// Preserve the rest of the base line after the dialog
@@ -215,7 +217,8 @@ func (m model) overlayDialog(baseView, dialogContent string) string {
 					inAnsi = false
 				}
 			} else {
-				visualPos++
+				// Use terminal-aware rune width for proper emoji handling
+				visualPos += m.runeWidth(baseRunes[bytePos])
 			}
 			bytePos++
 		}

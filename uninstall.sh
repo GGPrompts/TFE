@@ -30,6 +30,14 @@ else
     echo -e "${YELLOW}⚠${NC}  TFE binary not found at $TFE_BINARY"
 fi
 
+# Remove HOTKEYS.md help documentation
+HOTKEYS_FILE="$HOME/go/bin/HOTKEYS.md"
+if [ -f "$HOTKEYS_FILE" ]; then
+    echo -e "${BLUE}Removing help documentation...${NC}"
+    rm -f "$HOTKEYS_FILE"
+    echo -e "${GREEN}✓${NC} Removed HOTKEYS.md"
+fi
+
 # Remove wrapper script
 WRAPPER_PATH="$HOME/.config/tfe/tfe-wrapper.sh"
 if [ -f "$WRAPPER_PATH" ]; then

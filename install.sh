@@ -100,6 +100,18 @@ else
     exit 1
 fi
 
+# Download HOTKEYS.md for F1 help functionality
+echo ""
+echo -e "${BLUE}Installing help documentation...${NC}"
+HOTKEYS_PATH="$HOME/go/bin/HOTKEYS.md"
+if curl -sSL https://raw.githubusercontent.com/GGPrompts/TFE/main/HOTKEYS.md -o "$HOTKEYS_PATH"; then
+    echo -e "${GREEN}✓${NC} Help documentation installed (F1 in TFE)"
+else
+    echo -e "${YELLOW}⚠${NC}  Failed to download HOTKEYS.md - F1 help may not work"
+    echo "   You can manually download it from:"
+    echo "   https://github.com/GGPrompts/TFE/blob/main/HOTKEYS.md"
+fi
+
 # Detect shell first (needed for PATH setup)
 SHELL_NAME=$(basename "$SHELL")
 SHELL_RC=""

@@ -41,6 +41,12 @@ cp ./tfe "$INSTALL_PATH"
 # Make it executable (should already be, but just in case)
 chmod +x "$INSTALL_PATH"
 
+# Copy HOTKEYS.md so F1 help works from anywhere
+if [ -f "./HOTKEYS.md" ]; then
+    cp ./HOTKEYS.md "$INSTALL_DIR/HOTKEYS.md"
+    echo -e "${BLUE}📖 Copied HOTKEYS.md for F1 help${NC}"
+fi
+
 # Verify installation
 if [ -f "$INSTALL_PATH" ]; then
     INSTALLED_SIZE=$(ls -lh "$INSTALL_PATH" | awk '{print $5}')

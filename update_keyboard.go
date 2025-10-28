@@ -2079,9 +2079,8 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "f1":
 		// F1: Show hotkeys reference (replaces ?)
-		hotkeysPath := filepath.Join(filepath.Dir(m.currentPath), "HOTKEYS.md")
-		// Try to find HOTKEYS.md in the TFE directory
 		// First check if it exists in current directory
+		hotkeysPath := filepath.Join(m.currentPath, "HOTKEYS.md")
 		if _, err := os.Stat(hotkeysPath); os.IsNotExist(err) {
 			// Try executable directory
 			if exePath, err := os.Executable(); err == nil {
