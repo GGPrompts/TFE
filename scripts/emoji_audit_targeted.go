@@ -1,5 +1,10 @@
 // emoji_audit_targeted.go - Test the specific problematic emojis
 // Run in both Windows Terminal and WezTerm to see the difference
+//
+// Usage: go run emoji_audit_targeted.go
+
+//go:build ignore
+// +build ignore
 
 package main
 

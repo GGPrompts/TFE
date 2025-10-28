@@ -16,7 +16,8 @@ This document is a **concise index** to TFE's architecture and development docum
 - 📚 **Managing documentation?** → Read [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md)
 - 🏗️ **Want architectural history?** → Read [`docs/REFACTORING_HISTORY.md`](docs/REFACTORING_HISTORY.md)
 
-**After rebuilding:**
+**After making code changes:**
+- ⚠️ **ALWAYS run:** `go test ./...` to verify tests pass (see [Testing Strategy](#testing-strategy))
 - ⚠️ **ALWAYS run:** `./build.sh` OR manually update both `~/bin/tfe` and `~/.local/bin/tfe` (see [Building and Installing](#building-and-installing))
 
 ---
@@ -171,19 +172,7 @@ Quick rules:
 
 ---
 
-### 3. Header Duplication Rule
-
-**⚠️ Headers exist in TWO locations!**
-
-When modifying the header/title bar, update BOTH:
-- **Single-Pane:** `view.go` → `renderSinglePane()` (~line 64)
-- **Dual-Pane:** `render_preview.go` → `renderDualPane()` (~line 816)
-
-**Note:** `renderFullPreview()` has a different header intentionally.
-
----
-
-### 4. Keep main.go Minimal
+### 3. Keep main.go Minimal
 
 **NEVER add business logic to `main.go`**
 
@@ -199,7 +188,7 @@ func main() {
 
 ---
 
-### 5. Code Organization Principles
+### 4. Code Organization Principles
 
 1. **Single Responsibility** - Each file has one clear purpose
 2. **DRY** - Extract common logic to helpers
@@ -236,6 +225,15 @@ cp ./tfe /home/matt/bin/tfe
 - After fixing bugs that need testing
 - After implementing new features
 - Before asking user to test installed version
+
+**Best practice workflow:**
+```bash
+# 1. Run tests to verify changes
+go test ./...
+
+# 2. Build and install if tests pass
+./build.sh
+```
 
 ---
 
@@ -306,10 +304,46 @@ Quick links to common tasks:
 
 ## Testing Strategy
 
-When adding tests (future):
+### Running Tests
+
+**⚠️ ALWAYS run tests after making code changes!**
+
+```bash
+# Run all tests (recommended)
+go test ./...
+
+# Run with verbose output (shows all test names)
+go test -v ./...
+
+# Run specific test
+go test -v -run TestAddToHistory
+
+# Run tests with coverage report
+go test -cover ./...
+
+# Quick validation: test + build
+go test ./... && go build
+```
+
+### When to Run Tests
+
+**Claude should run tests:**
+1. ✅ **After fixing bugs** - Verify the fix didn't break anything
+2. ✅ **After refactoring** - Confirm behavior hasn't changed
+3. ✅ **After adding features** - Check integration with existing code
+4. ✅ **Before completing a task** - Ensure all tests pass before reporting success
+
+**Do NOT run tests:**
+- ❌ For simple documentation changes
+- ❌ For non-code file edits (README, CHANGELOG, etc.)
+
+### Writing Tests
+
+When adding tests:
 - Create corresponding `*_test.go` files alongside each module
 - Test files should mirror structure: `file_operations_test.go`, etc.
 - Keep test files focused on their corresponding module
+- Initialize model fields properly (see existing tests for patterns)
 
 ---
 
@@ -323,7 +357,8 @@ Do NOT add complex logic to `main.go`. Instead:
 3. Keep files focused and organized
 4. Update [`docs/MODULE_DETAILS.md`](docs/MODULE_DETAILS.md) when creating new modules
 5. Read [`docs/LESSONS_LEARNED.md`](docs/LESSONS_LEARNED.md) before touching UI code
-6. **Always copy binary after building:** `cp ./tfe /home/matt/.local/bin/tfe`
+6. **Always run tests after changes:** `go test ./...`
+7. **Always rebuild and install:** `./build.sh` (or manually copy to both locations)
 
 ---
 

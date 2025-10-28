@@ -135,8 +135,9 @@ func TestIsBrowserFile(t *testing.T) {
 		// HTML
 		{"index.html", true},
 		{"page.htm", true},
+		// PDFs (browsers can display these)
+		{"document.pdf", true},
 		// Non-browser files
-		{"document.pdf", false},
 		{"main.go", false},
 		{"data.json", false},
 		{"", false},

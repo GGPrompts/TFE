@@ -203,6 +203,11 @@ func TestDirectoryContainsPrompts(t *testing.T) {
 	tmpDir, cleanup := setupTestDir(t)
 	defer cleanup()
 
+	// Create a minimal model for testing
+	m := &model{
+		promptDirsCache: make(map[string]bool),
+	}
+
 	// Create a directory with a .claude subfolder containing prompt files
 	claudeDir := filepath.Join(tmpDir, "project", ".claude", "commands")
 	if err := os.MkdirAll(claudeDir, 0755); err != nil {
@@ -215,7 +220,7 @@ func TestDirectoryContainsPrompts(t *testing.T) {
 
 	// Test directory containing prompts
 	projectDir := filepath.Join(tmpDir, "project")
-	if !directoryContainsPrompts(projectDir) {
+	if !m.directoryContainsPrompts(projectDir) {
 		t.Error("Directory should contain prompts")
 	}
 
@@ -225,12 +230,12 @@ func TestDirectoryContainsPrompts(t *testing.T) {
 		t.Fatalf("Failed to create empty directory: %v", err)
 	}
 
-	if directoryContainsPrompts(emptyDir) {
+	if m.directoryContainsPrompts(emptyDir) {
 		t.Error("Empty directory should not contain prompts")
 	}
 
 	// Test with non-existent directory
-	if directoryContainsPrompts(filepath.Join(tmpDir, "nonexistent")) {
+	if m.directoryContainsPrompts(filepath.Join(tmpDir, "nonexistent")) {
 		t.Error("Non-existent directory should not contain prompts")
 	}
 }
@@ -239,6 +244,11 @@ func TestDirectoryContainsPrompts(t *testing.T) {
 func TestDirectoryContainsPrompts_Depth(t *testing.T) {
 	tmpDir, cleanup := setupTestDir(t)
 	defer cleanup()
+
+	// Create a minimal model for testing
+	m := &model{
+		promptDirsCache: make(map[string]bool),
+	}
 
 	// Create nested directories beyond max depth (2)
 	deepDir := filepath.Join(tmpDir, "level1", "level2", "level3", ".claude")
@@ -251,7 +261,7 @@ func TestDirectoryContainsPrompts_Depth(t *testing.T) {
 	createTestFileWithContent(t, promptFile, []byte("# Command"))
 
 	// Should not find it (beyond max depth of 2)
-	if directoryContainsPrompts(tmpDir) {
+	if m.directoryContainsPrompts(tmpDir) {
 		t.Error("Should not find prompts beyond max depth")
 	}
 
@@ -264,8 +274,11 @@ func TestDirectoryContainsPrompts_Depth(t *testing.T) {
 	promptFile2 := filepath.Join(level1Dir, "cmd.md")
 	createTestFileWithContent(t, promptFile2, []byte("# Cmd"))
 
+	// Clear cache so it re-scans after we added new files
+	m.promptDirsCache = make(map[string]bool)
+
 	// Should find it (within depth limit)
-	if !directoryContainsPrompts(tmpDir) {
+	if !m.directoryContainsPrompts(tmpDir) {
 		t.Error("Should find prompts within max depth")
 	}
 }
@@ -274,6 +287,11 @@ func TestDirectoryContainsPrompts_Depth(t *testing.T) {
 func TestDirectoryContainsPrompts_HiddenFiles(t *testing.T) {
 	tmpDir, cleanup := setupTestDir(t)
 	defer cleanup()
+
+	// Create a minimal model for testing
+	m := &model{
+		promptDirsCache: make(map[string]bool),
+	}
 
 	// Create .hidden directory (not in important list)
 	hiddenDir := filepath.Join(tmpDir, ".hidden")
@@ -286,7 +304,7 @@ func TestDirectoryContainsPrompts_HiddenFiles(t *testing.T) {
 	createTestFileWithContent(t, hiddenFile, []byte("# Test"))
 
 	// Should not find prompts in hidden directories (unless it's .claude or .prompts)
-	if directoryContainsPrompts(tmpDir) {
+	if m.directoryContainsPrompts(tmpDir) {
 		t.Error("Should not search in hidden directories")
 	}
 
@@ -298,8 +316,11 @@ func TestDirectoryContainsPrompts_HiddenFiles(t *testing.T) {
 	claudeFile := filepath.Join(claudeDir, "cmd.md")
 	createTestFileWithContent(t, claudeFile, []byte("# Cmd"))
 
+	// Clear cache so it re-scans after we added new files
+	m.promptDirsCache = make(map[string]bool)
+
 	// Should find prompts in .claude
-	if !directoryContainsPrompts(tmpDir) {
+	if !m.directoryContainsPrompts(tmpDir) {
 		t.Error("Should search in .claude directory")
 	}
 }

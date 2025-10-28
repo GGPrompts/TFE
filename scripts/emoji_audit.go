@@ -8,6 +8,9 @@
 // Run this in multiple terminals (Windows Terminal, WezTerm, Termux, xterm)
 // and compare the results to build an emoji width compensation table.
 
+//go:build ignore
+// +build ignore
+
 package main
 
 import (

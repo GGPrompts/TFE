@@ -68,7 +68,9 @@ func TestAddToHistory(t *testing.T) {
 	// Create a fresh model for testing
 	m := &model{
 		commandHistory:       []string{},
-		historyPos:  0,
+		commandHistoryByDir:  make(map[string][]string),
+		currentPath:          "/test",
+		historyPos:           0,
 	}
 
 	// Test adding commands
@@ -100,8 +102,10 @@ func TestAddToHistory(t *testing.T) {
 // TestAddToHistory_Empty tests that empty commands are not added
 func TestAddToHistory_Empty(t *testing.T) {
 	m := &model{
-		commandHistory:      []string{},
-		historyPos: 0,
+		commandHistory:       []string{},
+		commandHistoryByDir:  make(map[string][]string),
+		currentPath:          "/test",
+		historyPos:           0,
 	}
 
 	m.addToHistory("")
@@ -119,8 +123,10 @@ func TestAddToHistory_Empty(t *testing.T) {
 // TestAddToHistory_MaxSize tests history limit (100 commands)
 func TestAddToHistory_MaxSize(t *testing.T) {
 	m := &model{
-		commandHistory:      []string{},
-		historyPos: 0,
+		commandHistory:       []string{},
+		commandHistoryByDir:  make(map[string][]string),
+		currentPath:          "/test",
+		historyPos:           0,
 	}
 
 	// Add 110 commands

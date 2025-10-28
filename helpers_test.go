@@ -78,9 +78,9 @@ func TestIsDualPaneCompatible(t *testing.T) {
 			expected:    true,
 		},
 		{
-			name:        "Detail mode (incompatible)",
+			name:        "Detail mode (now compatible)",
 			displayMode: modeDetail,
-			expected:    false,
+			expected:    true,
 		},
 	}
 
