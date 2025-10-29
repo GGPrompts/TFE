@@ -417,11 +417,22 @@ func (m *model) scrollToFocusedVariable() {
 // navigateToPath changes the current path and automatically exits special modes (trash, favorites, etc)
 // This ensures users don't get stuck in filter modes when navigating
 func (m *model) navigateToPath(newPath string) {
-	// If we're in trash mode and navigating away, auto-exit and restore
+	// If we're in trash mode and navigating away, check if staying within trash
 	if m.showTrashOnly {
+		trashDir, err := getTrashDir()
+		if err == nil {
+			// Check if the new path is within the trash directory
+			if strings.HasPrefix(newPath, trashDir) {
+				// Still within trash - allow navigation
+				m.currentPath = newPath
+				m.cursor = 0
+				m.loadFiles()
+				return
+			}
+		}
+
+		// Navigating outside trash - exit trash mode
 		m.showTrashOnly = false
-		// Don't change path if user is still in trash view
-		// Only exit trash mode, stay in current directory
 		if m.trashRestorePath != "" {
 			m.currentPath = m.trashRestorePath
 			m.trashRestorePath = ""
@@ -638,15 +649,98 @@ func (m model) renderToolbarRow() string {
 	}
 	s.WriteString(" ")
 
-	// Trash/Recycle bin button
+	// Trash/Recycle bin button - render brackets separately for better spacing
 	trashIcon := "🗑"
 	if m.showTrashOnly {
 		trashIcon = "♻" // Recycle icon when viewing trash
 	}
-	trashButtonStyle := lipgloss.NewStyle().
+	bracketStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
-	s.WriteString(trashButtonStyle.Render("[" + trashIcon + "]"))
+	trashIconStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(bracketStyle.Render("["))
+	s.WriteString(trashIconStyle.Render(trashIcon))
+	s.WriteString(bracketStyle.Render("]"))
+	s.WriteString(" ")
 
 	return s.String()
+}
+
+// findTFERepository attempts to locate the TFE git repository
+// It tries multiple strategies:
+// 1. Walk up from the current executable path
+// 2. Check common development directories
+// 3. Check go workspace locations
+func findTFERepository() string {
+	// Strategy 1: Find from current executable location
+	if exePath, err := os.Executable(); err == nil {
+		// Resolve symlinks
+		if realPath, err := filepath.EvalSymlinks(exePath); err == nil {
+			exePath = realPath
+		}
+
+		// Walk up the directory tree looking for TFE repo
+		dir := filepath.Dir(exePath)
+		for i := 0; i < 5; i++ { // Check up to 5 levels up
+			// Check if this directory is a TFE git repo
+			if isTFERepo(dir) {
+				return dir
+			}
+			// Move up one directory
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break // Reached root
+			}
+			dir = parent
+		}
+	}
+
+	// Strategy 2: Check common locations
+	home := os.Getenv("HOME")
+	possiblePaths := []string{
+		filepath.Join(home, "TFE"),
+		filepath.Join(home, "tfe"),
+		filepath.Join(home, "projects", "TFE"),
+		filepath.Join(home, "projects", "tfe"),
+		filepath.Join(home, "Projects", "TFE"),
+		filepath.Join(home, "Projects", "tfe"),
+		filepath.Join(home, "dev", "TFE"),
+		filepath.Join(home, "dev", "tfe"),
+		filepath.Join(home, "Development", "TFE"),
+		filepath.Join(home, "Development", "tfe"),
+		filepath.Join(home, "code", "TFE"),
+		filepath.Join(home, "code", "tfe"),
+		filepath.Join(home, "go", "src", "github.com", "GGPrompts", "tfe"),
+		filepath.Join(home, "go", "src", "github.com", "GGPrompts", "TFE"),
+	}
+
+	for _, path := range possiblePaths {
+		if isTFERepo(path) {
+			return path
+		}
+	}
+
+	return ""
+}
+
+// isTFERepo checks if a directory is a TFE git repository
+func isTFERepo(path string) bool {
+	// Must have build.sh
+	if _, err := os.Stat(filepath.Join(path, "build.sh")); err != nil {
+		return false
+	}
+
+	// Must be a git repository
+	if _, err := os.Stat(filepath.Join(path, ".git")); err != nil {
+		return false
+	}
+
+	// Optional: Check for main.go to confirm it's the TFE project
+	if _, err := os.Stat(filepath.Join(path, "main.go")); err != nil {
+		return false
+	}
+
+	return true
 }

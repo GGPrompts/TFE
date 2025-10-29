@@ -12,30 +12,72 @@ tfe() {
     local TFE_BIN=""
     local CD_TARGET="$HOME/.tfe_cd_target"
 
-    # Check common locations in order of preference
-    # NOTE: Check specific paths first to avoid finding this wrapper function
-    if [ -f "$HOME/go/bin/tfe" ]; then
-        # Go install default location (preferred)
-        TFE_BIN="$HOME/go/bin/tfe"
-    elif [ -f "$HOME/bin/tfe" ] && [ -x "$HOME/bin/tfe" ]; then
-        # Termux/user bin directory
-        TFE_BIN="$HOME/bin/tfe"
-    elif [ -f "$HOME/.local/bin/tfe" ] && [ -x "$HOME/.local/bin/tfe" ]; then
-        # Local installation
-        TFE_BIN="$HOME/.local/bin/tfe"
-    elif [ -f "$HOME/.config/tfe/tfe" ]; then
-        # Alternative local installation
-        TFE_BIN="$HOME/.config/tfe/tfe"
-    elif [ -f "/usr/local/bin/tfe" ]; then
-        # System-wide installation
-        TFE_BIN="/usr/local/bin/tfe"
-    elif command -v tfe &> /dev/null; then
-        # Fallback: search PATH (but may find wrapper itself)
-        TFE_BIN="$(command -v tfe)"
+    # Check common locations and find the most recent version
+    local TFE_LOCATIONS=(
+        "$HOME/go/bin/tfe"
+        "$HOME/bin/tfe"
+        "$HOME/.local/bin/tfe"
+        "$HOME/.config/tfe/tfe"
+        "/usr/local/bin/tfe"
+    )
+
+    local NEWEST_TFE=""
+    local NEWEST_TIME=0
+    local VERSION_MISMATCH=false
+    local FOUND_COUNT=0
+    local FIRST_MD5=""
+
+    # Find all TFE installations and check for version mismatches
+    for location in "${TFE_LOCATIONS[@]}"; do
+        if [ -f "$location" ] && [ -x "$location" ]; then
+            FOUND_COUNT=$((FOUND_COUNT + 1))
+
+            # Get modification time
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                # macOS
+                MODTIME=$(stat -f %m "$location" 2>/dev/null || echo 0)
+            else
+                # Linux
+                MODTIME=$(stat -c %Y "$location" 2>/dev/null || echo 0)
+            fi
+
+            # Track newest binary
+            if [ "$MODTIME" -gt "$NEWEST_TIME" ]; then
+                NEWEST_TIME=$MODTIME
+                NEWEST_TFE=$location
+            fi
+
+            # Check for version mismatches using md5sum
+            if command -v md5sum &> /dev/null; then
+                CURRENT_MD5=$(md5sum "$location" 2>/dev/null | awk '{print $1}')
+                if [ -z "$FIRST_MD5" ]; then
+                    FIRST_MD5=$CURRENT_MD5
+                elif [ "$CURRENT_MD5" != "$FIRST_MD5" ]; then
+                    VERSION_MISMATCH=true
+                fi
+            fi
+        fi
+    done
+
+    # Fallback: search PATH if no specific location found
+    if [ -z "$NEWEST_TFE" ]; then
+        if command -v tfe &> /dev/null; then
+            TFE_BIN="$(command -v tfe)"
+        else
+            echo "Error: TFE binary not found"
+            echo "Please ensure TFE is installed and in your PATH"
+            return 1
+        fi
     else
-        echo "Error: TFE binary not found"
-        echo "Please ensure TFE is installed and in your PATH"
-        return 1
+        TFE_BIN=$NEWEST_TFE
+    fi
+
+    # Warn about version mismatches
+    if [ "$VERSION_MISMATCH" = true ] && [ "$FOUND_COUNT" -gt 1 ]; then
+        echo "⚠️  Warning: Multiple different versions of TFE found!"
+        echo "   Run './build.sh' in your TFE directory to sync all installations"
+        echo "   Using: $TFE_BIN"
+        echo ""
     fi
 
     # Clear any previous cd target

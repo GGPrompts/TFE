@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -1033,6 +1034,58 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 								}
 							}
 						}
+					}
+				} else if m.dialog.title == "Pull & Rebuild TFE" {
+					// Find TFE repository
+					tfeRepoPath := findTFERepository()
+
+					if tfeRepoPath == "" {
+						m.setStatusMessage("❌ TFE repository not found", true)
+					} else {
+						// Use tea.ExecProcess like the ! command does - it handles terminal properly
+						updateScript := fmt.Sprintf(`
+clear
+echo "🔄 Updating TFE..."
+echo "   Repository: %s"
+echo ""
+
+# Run git pull and build
+cd '%s' && git pull && echo "" && ./build.sh
+
+# Check if update succeeded
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✓ TFE updated successfully!"
+    echo ""
+    read -p "Restart TFE now? [Y/n]: " response
+    response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+
+    if [ -z "$response" ] || [ "$response" = "y" ] || [ "$response" = "yes" ]; then
+        echo ""
+        echo "🔄 Restarting TFE..."
+        exec tfe
+    fi
+else
+    echo ""
+    echo "❌ Update failed"
+    echo ""
+    read -p "Press Enter to exit..."
+fi
+`, tfeRepoPath, tfeRepoPath)
+
+						cmd := exec.Command("bash", "-c", updateScript)
+						cmd.Stdin = os.Stdin
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+
+						// Use tea.ExecProcess to properly handle terminal state
+						return m, tea.Sequence(
+							tea.ClearScreen,
+							tea.ExecProcess(cmd, func(err error) tea.Msg {
+								// After script exits, quit TFE
+								return tea.Quit()
+							}),
+						)
 					}
 				}
 				m.showDialog = false

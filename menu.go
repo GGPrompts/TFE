@@ -70,7 +70,7 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "🔀 Git Repositories", Action: "toggle-git-repos", IsCheckable: true, IsChecked: m.showGitReposOnly},
 				{Label: "🗑  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
 				{IsSeparator: true},
-				{Label: "🔄 Refresh", Action: "refresh", Shortcut: "F5"},
+				{Label: "🔄 Pull & Rebuild TFE", Action: "pull-rebuild", Shortcut: ""},
 			},
 		},
 		"tools": {
@@ -783,18 +783,24 @@ Additional context: {{variable2}}
 		m.showHidden = !m.showHidden
 		m.loadFiles()
 
-	case "refresh":
-		// If git repos filter is active, re-scan for repos
-		if m.showGitReposOnly {
-			m.setStatusMessage("🔍 Re-scanning for git repositories...", false)
-			m.gitReposList = m.scanGitReposRecursive(m.gitReposScanRoot, m.gitReposScanDepth, 50)
-			m.gitReposLastScan = time.Now()
-			m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+	case "pull-rebuild":
+		// Pull latest TFE code, rebuild, and exit (so user can restart with new version)
+
+		// Find TFE repository using smart discovery
+		tfeRepoPath := findTFERepository()
+
+		if tfeRepoPath == "" {
+			m.setStatusMessage("❌ TFE git repository not found. Checked common locations and current binary path.", true)
+			return m, nil
 		}
-		m.loadFiles()
-		if !m.showGitReposOnly {
-			m.setStatusMessage("Refreshed", false)
+
+		// Show confirmation dialog
+		m.dialog = dialogModel{
+			dialogType: dialogConfirm,
+			title:      "Pull & Rebuild TFE",
+			message:    fmt.Sprintf("This will:\n• Run 'git pull' in %s\n• Rebuild and install TFE\n• Exit TFE (you'll need to restart)\n\nContinue?", tfeRepoPath),
 		}
+		m.showDialog = true
 
 	// Tools menu
 	case "toggle-command":
