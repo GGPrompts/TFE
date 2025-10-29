@@ -649,7 +649,7 @@ func (m model) renderToolbarRow() string {
 	}
 	s.WriteString(" ")
 
-	// Trash/Recycle bin button - render brackets separately for better spacing
+	// Trash/Recycle bin button - add space after icon for proper alignment
 	trashIcon := "🗑"
 	if m.showTrashOnly {
 		trashIcon = "♻" // Recycle icon when viewing trash
@@ -662,6 +662,7 @@ func (m model) renderToolbarRow() string {
 		Bold(true)
 	s.WriteString(bracketStyle.Render("["))
 	s.WriteString(trashIconStyle.Render(trashIcon))
+	s.WriteString(" ") // Extra space before closing bracket to prevent overlap
 	s.WriteString(bracketStyle.Render("]"))
 	s.WriteString(" ")
 
