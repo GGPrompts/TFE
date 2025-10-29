@@ -140,12 +140,14 @@ func (m model) getMenus() map[string]Menu {
 		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "📻 Radio (pyradio)", Action: "pyradio"})
 	}
 
-	// Add Games Launcher
-	if hasTools {
-		// Only add separator if we added TUI tools above
-		toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+	// Add Games Launcher (only if TUIClassics is installed)
+	if m.tuiClassicsPath != "" {
+		if hasTools {
+			// Only add separator if we added TUI tools above
+			toolsMenu.Items = append(toolsMenu.Items, MenuItem{IsSeparator: true})
+		}
+		toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🎮 Games Launcher", Action: "launch-games"})
 	}
-	toolsMenu.Items = append(toolsMenu.Items, MenuItem{Label: "🎮 Games Launcher", Action: "launch-games"})
 
 	menus["tools"] = toolsMenu
 
@@ -884,23 +886,16 @@ Additional context: {{variable2}}
 
 	case "launch-games":
 		// Launch TUIClassics game launcher
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			m.setStatusMessage("Error: Could not find home directory", true)
-		} else {
-			launcherPath := filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics")
-
-			// Check if launcher exists
-			if _, err := os.Stat(launcherPath); err == nil {
-				// Close menu and launch
-				m.menuOpen = false
-				m.activeMenu = ""
-				m.selectedMenuItem = -1
-				return m, openTUITool(launcherPath, filepath.Dir(launcherPath))
-			}
-
-			m.setStatusMessage("TUIClassics launcher not found at ~/projects/TUIClassics/bin/classics", true)
+		if m.tuiClassicsPath != "" {
+			// Close menu and launch
+			m.menuOpen = false
+			m.activeMenu = ""
+			m.selectedMenuItem = -1
+			return m, openTUITool(m.tuiClassicsPath, filepath.Dir(m.tuiClassicsPath))
 		}
+
+		// Not found - show helpful message
+		m.setStatusMessage("TUIClassics not found. Install: git clone https://github.com/GGPrompts/TUIClassics ~/TUIClassics && cd ~/TUIClassics && make build", true)
 
 	case "toggle-git-repos":
 		// Auto-exit trash mode when toggling git repos filter

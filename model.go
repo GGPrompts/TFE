@@ -69,7 +69,8 @@ func initialModel() model {
 			"micro":         editorAvailable("micro"), // Used in context menu edit action
 			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
 		},
-		cachedMenus: nil, // Will be built on first access
+		tuiClassicsPath: getTUIClassicsPath(), // Cache TUIClassics path (checks multiple locations)
+		cachedMenus:     nil,                   // Will be built on first access
 		// Performance caching
 		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
 	}

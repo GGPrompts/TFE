@@ -27,6 +27,39 @@ func getAvailableEditor() string {
 	return ""
 }
 
+// getTUIClassicsPath returns the path to TUIClassics launcher if found
+// Checks multiple common installation locations in order:
+// 1. In PATH (globally installed)
+// 2. ~/TUIClassics/bin/classics
+// 3. ~/projects/TUIClassics/bin/classics
+// 4. ~/go/src/github.com/GGPrompts/TUIClassics/bin/classics
+func getTUIClassicsPath() string {
+	// First check if it's in PATH (user may have installed globally)
+	if path, err := exec.LookPath("classics"); err == nil {
+		return path
+	}
+
+	// Then check common installation directories
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	commonPaths := []string{
+		filepath.Join(homeDir, "TUIClassics", "bin", "classics"),
+		filepath.Join(homeDir, "projects", "TUIClassics", "bin", "classics"),
+		filepath.Join(homeDir, "go", "src", "github.com", "GGPrompts", "TUIClassics", "bin", "classics"),
+	}
+
+	for _, path := range commonPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
+}
+
 // openEditor opens a file in an external editor
 func openEditor(editor, path string) tea.Cmd {
 	// SECURITY: Validate filename to prevent argument injection
