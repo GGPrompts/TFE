@@ -69,8 +69,6 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
 				{Label: "🔀 Git Repositories", Action: "toggle-git-repos", IsCheckable: true, IsChecked: m.showGitReposOnly},
 				{Label: "🗑  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
-				{IsSeparator: true},
-				{Label: "🔄 Pull & Rebuild TFE", Action: "pull-rebuild", Shortcut: ""},
 			},
 		},
 		"tools": {
@@ -79,6 +77,8 @@ func (m model) getMenus() map[string]Menu {
 				{Label: ">_ Command Prompt", Action: "toggle-command", Shortcut: ":", IsCheckable: true, IsChecked: m.commandFocused},
 				{Label: "🔍 Search in Folder", Action: "toggle-search", Shortcut: "/"},
 				{Label: "🎯 Fuzzy Search", Action: "fuzzy-search", Shortcut: "Ctrl+P"},
+				{IsSeparator: true},
+				{Label: "🔄 Pull & Rebuild TFE", Action: "pull-rebuild", Shortcut: ""},
 			},
 		},
 		"help": {
