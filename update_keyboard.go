@@ -1042,8 +1042,16 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					if tfeRepoPath == "" {
 						m.setStatusMessage("❌ TFE repository not found", true)
 					} else {
-						// Use tea.ExecProcess like the ! command does - it handles terminal properly
-						updateScript := fmt.Sprintf(`
+						// Create a temporary script that runs AFTER TFE exits
+						// This allows build.sh to properly update all binary locations
+						updateScript := fmt.Sprintf(`#!/bin/bash
+
+# Wait a moment for TFE to fully exit and terminal to settle
+sleep 0.5
+
+# Reset terminal to sane state (TFE leaves it in raw mode)
+stty sane 2>/dev/null || true
+
 clear
 echo "🔄 Updating TFE..."
 echo "   Repository: %s"
@@ -1057,35 +1065,53 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "✓ TFE updated successfully!"
     echo ""
-    read -p "Restart TFE now? [Y/n]: " response
-    response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
-
-    if [ -z "$response" ] || [ "$response" = "y" ] || [ "$response" = "yes" ]; then
-        echo ""
-        echo "🔄 Restarting TFE..."
-        exec tfe
-    fi
+    echo "Type 'tfe' to restart."
 else
     echo ""
     echo "❌ Update failed"
-    echo ""
-    read -p "Press Enter to exit..."
 fi
+
+echo ""
+
+# Clean up temp script and return to interactive shell
+rm -f "$0"
+exec bash
 `, tfeRepoPath, tfeRepoPath)
 
-						cmd := exec.Command("bash", "-c", updateScript)
-						cmd.Stdin = os.Stdin
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
+						// Write to temp file
+						tmpScript := filepath.Join(os.TempDir(), fmt.Sprintf("tfe-update-%d.sh", os.Getpid()))
+						err := os.WriteFile(tmpScript, []byte(updateScript), 0755)
+						if err != nil {
+							m.setStatusMessage(fmt.Sprintf("❌ Failed to create update script: %s", err), true)
+						} else {
+							// Launch script in completely detached manner
+							// This allows build.sh to update all binary locations properly
+							// We use setsid to create a new session and detach from TFE's terminal
+							cmd := exec.Command("setsid", "bash", tmpScript)
 
-						// Use tea.ExecProcess to properly handle terminal state
-						return m, tea.Sequence(
-							tea.ClearScreen,
-							tea.ExecProcess(cmd, func(err error) tea.Msg {
-								// After script exits, quit TFE
-								return tea.Quit()
-							}),
-						)
+							// Don't inherit TFE's file descriptors - open new ones to /dev/tty
+							// This prevents I/O errors when TFE exits
+							tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+							if err == nil {
+								cmd.Stdin = tty
+								cmd.Stdout = tty
+								cmd.Stderr = tty
+							}
+
+							// Start the script but don't wait for it
+							err = cmd.Start()
+							if err != nil {
+								m.setStatusMessage(fmt.Sprintf("❌ Failed to launch update script: %s", err), true)
+								os.Remove(tmpScript)
+								if tty != nil {
+									tty.Close()
+								}
+							} else {
+								// Exit TFE immediately so the script can update the binary
+								// Note: tty will be closed when the script exits
+								return m, tea.Quit
+							}
+						}
 					}
 				}
 				m.showDialog = false

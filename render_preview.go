@@ -22,7 +22,7 @@ func (m model) getWrappedLineCount() int {
 	if m.viewMode == viewFullPreview {
 		boxContentWidth = m.width - 6 // Box content width in full preview
 	} else {
-		boxContentWidth = m.rightWidth - 2 // Box content width in dual-pane
+		boxContentWidth = m.rightWidth - 6 // Box content width in dual-pane (match full preview)
 	}
 
 	if m.preview.isMarkdown {
@@ -53,13 +53,9 @@ func (m model) getWrappedLineCount() int {
 			renderedLines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
 			contentLineCount := len(renderedLines)
 
-			// If this is a prompt file, add the header height to total line count
-			// This ensures scroll calculations account for the space taken by the prompt header
-			if m.preview.isPrompt && m.preview.promptTemplate != nil {
-				headerHeight := m.getPromptHeaderHeight(boxContentWidth)
-				return contentLineCount + headerHeight
-			}
-
+			// For prompt files, return only content line count
+			// The header is fixed and doesn't scroll, so it shouldn't be included
+			// in scroll calculations
 			return contentLineCount
 		}
 		// Fallback if glamour fails or times out
@@ -72,13 +68,9 @@ func (m model) getWrappedLineCount() int {
 		totalLines += len(wrapped)
 	}
 
-	// If this is a prompt file, add the header height to total line count
-	// This ensures scroll calculations account for the space taken by the prompt header
-	if m.preview.isPrompt && m.preview.promptTemplate != nil {
-		headerHeight := m.getPromptHeaderHeight(boxContentWidth)
-		return totalLines + headerHeight
-	}
-
+	// For prompt files, return only content line count
+	// The header is fixed and doesn't scroll, so it shouldn't be included
+	// in scroll calculations
 	return totalLines
 }
 
@@ -120,15 +112,48 @@ func (m model) getPromptHeaderHeight(boxContentWidth int) int {
 		headerLineCount++ // Blank line after description
 	}
 
-	// Source indicator (always one line)
-	headerLineCount++
-
-	// Variables line (if any)
-	if len(tmpl.variables) > 0 {
-		headerLineCount++ // Variables line
+	// Source indicator - account for wrapping
+	sourceIcon := ""
+	sourceLabel := ""
+	switch tmpl.source {
+	case "global":
+		sourceIcon = "🌐"
+		sourceLabel = "Global Prompt (~/.prompts/)"
+	case "command":
+		sourceIcon = "⚙"
+		sourceLabel = "Project Command (.claude/commands/)"
+	case "agent":
+		sourceIcon = "🤖"
+		sourceLabel = "Project Agent (.claude/agents/)"
+	case "skill":
+		sourceIcon = "🎯"
+		sourceLabel = "Project Skill (.claude/skills/)"
+	case "local":
+		sourceIcon = "📁"
+		sourceLabel = "Local Prompt"
+	}
+	sourceLine := sourceIcon + " " + sourceLabel
+	if visualWidth(sourceLine) > headerWrapWidth {
+		wrapped := wrapLine(sourceLine, headerWrapWidth)
+		headerLineCount += len(wrapped)
+	} else {
+		headerLineCount++ // One line
 	}
 
-	// Separator line
+	// Variables line (if any) - account for wrapping
+	if len(tmpl.variables) > 0 {
+		// Build the plain variables line to calculate wrapping
+		plainVarsLine := fmt.Sprintf("Variables: %s", strings.Join(tmpl.variables, ", "))
+		if visualWidth(plainVarsLine) > headerWrapWidth {
+			wrapped := wrapLine(plainVarsLine, headerWrapWidth)
+			headerLineCount += len(wrapped)
+		} else {
+			headerLineCount++ // One line
+		}
+	}
+
+	// Separator line - always one line since it's exactly headerWrapWidth characters
+	// Each '─' has visual width 1, so total width equals headerWrapWidth
 	headerLineCount++
 
 	return headerLineCount
@@ -604,7 +629,9 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	if m.viewMode == viewFullPreview {
 		boxContentWidth = m.width - 6
 	} else {
-		boxContentWidth = m.rightWidth - 2
+		// In dual-pane mode, use consistent width calculation
+		// Subtract 6 to match full preview mode (accounts for borders and padding)
+		boxContentWidth = m.rightWidth - 6
 	}
 
 	// Calculate wrapping width for header elements (leave room for padding)
@@ -716,17 +743,25 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		}
 
 		// Build the variables line with proper label
-		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-		varsLine := labelStyle.Render("Variables: ") + strings.Join(varDisplays, labelStyle.Render(", "))
-
-		// Wrap the variables line if it's too long (use visual width, not byte length)
-		// Note: visualWidth doesn't account for ANSI codes, so this is approximate
+		// Check if wrapping is needed based on plain text (without ANSI codes)
 		plainVarsLine := fmt.Sprintf("Variables: %s", strings.Join(tmpl.variables, ", "))
+
 		if visualWidth(plainVarsLine) > headerWrapWidth {
-			// For simplicity, just add the line (wrapping styled text is complex)
-			// The visual width check prevents most overflow cases
-			headerLines = append(headerLines, varsLine)
+			// Variables line needs wrapping - wrap the plain text first
+			wrappedPlainLines := wrapLine(plainVarsLine, headerWrapWidth)
+
+			// For each wrapped line, apply the appropriate styling
+			labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+			for _, plainLine := range wrappedPlainLines {
+				// Simple approach: style the entire line uniformly for wrapped content
+				// This avoids complex ANSI code handling across line breaks
+				styledLine := labelStyle.Render(plainLine)
+				headerLines = append(headerLines, styledLine)
+			}
 		} else {
+			// Variables line fits in one line - use original styling with colors
+			labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+			varsLine := labelStyle.Render("Variables: ") + strings.Join(varDisplays, labelStyle.Render(", "))
 			headerLines = append(headerLines, varsLine)
 		}
 	}

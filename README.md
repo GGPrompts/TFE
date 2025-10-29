@@ -26,6 +26,7 @@ A powerful and clean terminal-based file explorer built with Go and Bubbletea. T
 - **Clipboard Integration**: Copy file paths to system clipboard
 - **Multiple Display Modes**: List, Detail, and Tree views
 - **Emoji Icons**: Visual file/folder indicators using file type detection
+- **Obsidian Vault Detection**: Folders with `.obsidian/` config display 🧠 brain emoji instead of folder icon
 - **Smart Sorting**: Directories first, then files (alphabetically sorted)
 - **Scrolling Support**: Handles large directories with auto-scrolling
 - **Hidden File Filtering**: Automatically hides dotfiles for cleaner views
@@ -161,6 +162,10 @@ TFE works great without these, but install them for additional features:
 - Images render at full resolution directly in the preview pane (dual-pane or full-screen)
 - Falls back to helpful message in unsupported terminals
 - **Note:** For the best experience, use WezTerm or Kitty terminal
+- **WSL Users:** Windows Terminal doesn't support graphics protocols yet. Workarounds:
+  - Press **V** key for terminal preview with viu (suspends TFE, shows low-res preview)
+  - Use **Open in Browser** from context menu for full quality viewing
+  - Right-click folder → Open in Windows Explorer to view multiple images at once
 
 **For Image Viewing (External Viewers - Press V key):**
 - **viu** (recommended) - View images in terminal with best quality
@@ -283,6 +288,14 @@ TFE works great without these, but install them for additional features:
 - **pyradio** - Terminal radio player
   ```bash
   pip3 install pyradio
+  ```
+- **lnav** - Advanced log file viewer with filtering and syntax highlighting
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install lnav
+
+  # Termux
+  pkg install lnav
   ```
 
 **Notes:**
@@ -853,7 +866,8 @@ The command prompt is always visible at the top of the screen (3rd row, below th
 - `mkdir testdir` - Create a new directory
 - `git status` - Check git repository status
 - `vim file.txt` - Open file in vim and return to TFE
-- `:!claude --dangerously-skip-permissions` - Launch Claude Code and exit TFE
+- `:!claude` - Launch Claude Code in current directory and exit TFE
+- `:!claude --dangerously-skip-permissions` - Launch Claude Code in YOLO mode (skips all permission prompts)
 
 #### Key Interface Elements
 

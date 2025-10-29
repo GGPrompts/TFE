@@ -487,21 +487,65 @@ func (m model) getPreviewVisibleLines() int {
 		maxVisible := m.height - 4 - headerLines
 		visibleLines = maxVisible - 2 // Account for border
 	} else if m.viewMode == viewDualPane {
-		// Dual-pane mode calculation must match renderPreview() targetLines exactly!
-		// Layout: header(4) + panes(maxVisible) + footer(4) = m.height
-		// maxVisible = m.height - 8
-		// contentHeight = maxVisible - 2 (borders) = m.height - 10
-		// targetLines = contentHeight - 1 (scroll indicator) = m.height - 11
-		// This fixes the "missing 3 lines" bug where getPreviewVisibleLines() was
-		// returning m.height - 8, but renderPreview() was using m.height - 11.
-		visibleLines = m.height - 11
-		// Reserve one more line if content fits (no scroll indicator needed)
-		if totalLines <= visibleLines+1 {
-			visibleLines++ // No scroll indicator needed, can show one more line
+		// Dual-pane mode has different layouts:
+		// 1. Horizontal split (tree/list on wide terminals): side-by-side panes
+		// 2. Vertical split (detail mode or narrow terminals): stacked panes with accordion
+
+		// Check if using vertical stacking (detail mode or narrow terminal)
+		useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+
+		if useVerticalSplit {
+			// VERTICAL SPLIT: Preview shares height with file list
+			// Layout: header(4) + panes(maxVisible) + footer(4) = m.height
+			headerLines := 4
+			footerLines := 4
+			maxVisible := m.height - headerLines - footerLines
+			if maxVisible < 5 {
+				maxVisible = 5
+			}
+
+			// Accordion: Focused pane gets 2/3, unfocused gets 1/3
+			var bottomHeight int
+			if m.focusedPane == leftPane {
+				// File list focused, preview gets 1/3
+				topHeight := (maxVisible * 2) / 3
+				bottomHeight = maxVisible - topHeight
+			} else {
+				// Preview focused, gets 2/3
+				bottomHeight = (maxVisible * 2) / 3
+			}
+
+			// Account for borders and scroll indicator
+			bottomContentHeight := bottomHeight - 2
+			visibleLines = bottomContentHeight - 1 // Subtract 1 for scroll indicator line
+			// Note: Scroll indicator is ALWAYS shown in dual-pane mode, so always reserve the line
+		} else {
+			// HORIZONTAL SPLIT: Preview uses full height, side-by-side
+			// Layout: header(4) + panes(maxVisible) + footer(4) = m.height
+			// maxVisible = m.height - 8
+			// contentHeight = maxVisible - 2 (borders) = m.height - 10
+			// targetLines = contentHeight - 1 (scroll indicator) = m.height - 11
+			visibleLines = m.height - 11
+			// Reserve one more line if content fits (no scroll indicator needed)
+			if totalLines <= visibleLines+1 {
+				visibleLines++ // No scroll indicator needed, can show one more line
+			}
 		}
 	} else {
 		// Single-pane preview mode (shouldn't happen, but default to safe value)
 		visibleLines = m.height - 6
+	}
+
+	// For prompt files, subtract the header height since it doesn't scroll
+	if m.preview.isPrompt && m.preview.promptTemplate != nil {
+		var boxContentWidth int
+		if m.viewMode == viewFullPreview {
+			boxContentWidth = m.width - 6
+		} else {
+			boxContentWidth = m.rightWidth - 6 // Match full preview calculation
+		}
+		promptHeaderHeight := m.getPromptHeaderHeight(boxContentWidth)
+		visibleLines -= promptHeaderHeight
 	}
 
 	if visibleLines < 1 {
