@@ -420,7 +420,8 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Launch Claude Code in the selected directory (with permission prompts)
 		// Note: runCommandAndExit() already cd's to the directory, so no path argument needed
 		if m.contextMenuFile.isDir {
-			return m, runCommandAndExit("claude", m.contextMenuFile.path)
+			claudePath := getClaudeCodePath()
+			return m, runCommandAndExit(claudePath, m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 
@@ -428,7 +429,8 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Launch Claude Code in YOLO mode (skip permission prompts)
 		// Note: runCommandAndExit() already cd's to the directory, so no path argument needed
 		if m.contextMenuFile.isDir {
-			return m, runCommandAndExit("claude --dangerously-skip-permissions", m.contextMenuFile.path)
+			claudePath := getClaudeCodePath()
+			return m, runCommandAndExit(claudePath+" --dangerously-skip-permissions", m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 

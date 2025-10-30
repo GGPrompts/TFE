@@ -536,14 +536,11 @@ git pull
 					m.searchQuery = ""
 					m.filteredIndices = nil
 				}
-				// Adjust X for left border (both modes have borders now)
-				adjustedX := msg.X - 2 // Account for left border
 
 				// Calculate which column was clicked based on X position
+				// All modes use msg.X directly (no adjustment needed - border is part of the box)
 				// Header format (regular): "%-30s  %-10s  %-12s  %-15s" with 2-space left padding
-				// Columns: Name (2-32), Size (34-44), Modified (46-58), Type (60-75)
 				// Header format (favorites): "%-25s  %-10s  %-12s  %-25s" with 2-space left padding
-				// Columns: Name (2-27), Size (29-39), Modified (41-53), Location (55-80)
 				// Header format (git repos): dynamically calculated based on terminal width
 				// Columns: Name (35%), Branch (15%), Status (20%), Last Commit (30%)
 
@@ -569,8 +566,7 @@ git pull
 					// Recalculate nameWidth after applying minimums
 					nameWidth = usableWidth - branchWidth - statusWidth - commitWidth
 
-					// Column positions using msg.X directly (NOT adjustedX)
-					// This matches how regular detail mode works
+					// Column positions using msg.X directly (git repos mode was correct!)
 					nameStart := 2
 					nameEnd := nameStart + nameWidth
 					branchStart := nameEnd + 2
@@ -580,7 +576,7 @@ git pull
 					commitStart := statusEnd + 2
 					commitEnd := commitStart + commitWidth
 
-					// Use msg.X directly for comparison (like regular mode does)
+					// Use msg.X directly for comparison (git repos mode is correct)
 					if msg.X >= nameStart && msg.X < nameEnd {
 						newSortBy = "name"
 					} else if msg.X >= branchStart && msg.X < branchEnd {
@@ -591,26 +587,108 @@ git pull
 						newSortBy = "modified" // Use 'modified' for commit time sorting
 					}
 				} else if m.showFavoritesOnly {
-					// Favorites mode column ranges
-					if adjustedX >= 2 && adjustedX <= 27 {
+					// Favorites mode - calculate dynamic column positions (matches render_file_list.go)
+					// Calculate usableWidth (same as render_file_list.go)
+					availableWidth := m.width
+					if m.viewMode == viewDualPane {
+						availableWidth = m.leftWidth - 6
+					} else {
+						if m.terminalType == terminalWezTerm {
+							availableWidth = m.width - 8
+						} else {
+							availableWidth = m.width - 6
+						}
+					}
+					renderWidth := availableWidth
+					if m.isNarrowTerminal() && availableWidth < 120 {
+						renderWidth = 120
+					} else if availableWidth < 60 {
+						renderWidth = 60
+					}
+					usableWidth := renderWidth - 17
+
+					// Favorites: 35% name, fixed size/modified, remainder for location
+					nameWidth := usableWidth * 35 / 100
+					sizeWidth := 10
+					modifiedWidth := 12
+					extraWidth := usableWidth - nameWidth - sizeWidth - modifiedWidth
+					if extraWidth < 15 {
+						extraWidth = 15
+					}
+					if nameWidth < 15 {
+						nameWidth = 15
+					}
+
+					// Column positions: "  " + paddedName + "  " + size + "  " + modified + "  " + location
+					nameStart := 2
+					nameEnd := nameStart + nameWidth
+					sizeStart := nameEnd + 2
+					sizeEnd := sizeStart + sizeWidth
+					modifiedStart := sizeEnd + 2
+					modifiedEnd := modifiedStart + modifiedWidth
+					locationStart := modifiedEnd + 2
+					locationEnd := locationStart + extraWidth
+
+					if msg.X >= nameStart && msg.X < nameEnd {
 						newSortBy = "name"
-					} else if adjustedX >= 29 && adjustedX <= 39 {
+					} else if msg.X >= sizeStart && msg.X < sizeEnd {
 						newSortBy = "size"
-					} else if adjustedX >= 41 && adjustedX <= 53 {
+					} else if msg.X >= modifiedStart && msg.X < modifiedEnd {
 						newSortBy = "modified"
-					} else if adjustedX >= 55 && adjustedX <= 80 {
+					} else if msg.X >= locationStart && msg.X < locationEnd {
 						// Location column - not sortable yet, ignore
 						break
 					}
 				} else {
-					// Regular mode column ranges
-					if adjustedX >= 2 && adjustedX <= 32 {
+					// Regular mode - calculate dynamic column positions (matches render_file_list.go)
+					// Calculate usableWidth (same as render_file_list.go)
+					availableWidth := m.width
+					if m.viewMode == viewDualPane {
+						availableWidth = m.leftWidth - 6
+					} else {
+						if m.terminalType == terminalWezTerm {
+							availableWidth = m.width - 8
+						} else {
+							availableWidth = m.width - 6
+						}
+					}
+					renderWidth := availableWidth
+					if m.isNarrowTerminal() && availableWidth < 120 {
+						renderWidth = 120
+					} else if availableWidth < 60 {
+						renderWidth = 60
+					}
+					usableWidth := renderWidth - 17
+
+					// Regular: 40% name, fixed size/modified, remainder for type
+					nameWidth := usableWidth * 40 / 100
+					sizeWidth := 10
+					modifiedWidth := 12
+					extraWidth := usableWidth - nameWidth - sizeWidth - modifiedWidth
+					if extraWidth < 15 {
+						extraWidth = 15
+					}
+					if nameWidth < 15 {
+						nameWidth = 15
+					}
+
+					// Column positions: "  " + paddedName + "  " + size + "  " + modified + "  " + type
+					nameStart := 2
+					nameEnd := nameStart + nameWidth
+					sizeStart := nameEnd + 2
+					sizeEnd := sizeStart + sizeWidth
+					modifiedStart := sizeEnd + 2
+					modifiedEnd := modifiedStart + modifiedWidth
+					typeStart := modifiedEnd + 2
+					typeEnd := typeStart + extraWidth
+
+					if msg.X >= nameStart && msg.X < nameEnd {
 						newSortBy = "name"
-					} else if adjustedX >= 34 && adjustedX <= 44 {
+					} else if msg.X >= sizeStart && msg.X < sizeEnd {
 						newSortBy = "size"
-					} else if adjustedX >= 46 && adjustedX <= 58 {
+					} else if msg.X >= modifiedStart && msg.X < modifiedEnd {
 						newSortBy = "modified"
-					} else if adjustedX >= 60 && adjustedX <= 75 {
+					} else if msg.X >= typeStart && msg.X < typeEnd {
 						newSortBy = "type"
 					}
 				}

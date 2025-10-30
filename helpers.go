@@ -789,3 +789,17 @@ func isTFERepo(path string) bool {
 
 	return true
 }
+
+// getClaudeCodePath returns the best available Claude Code executable path
+// Tries local development version first, then falls back to system version
+func getClaudeCodePath() string {
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		localClaudePath := filepath.Join(homeDir, ".claude", "local", "claude")
+		if _, err := os.Stat(localClaudePath); err == nil {
+			return localClaudePath
+		}
+	}
+	// Fall back to system version (assumes 'claude' is in PATH)
+	return "claude"
+}
