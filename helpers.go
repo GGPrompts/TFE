@@ -710,7 +710,15 @@ func (m model) renderToolbarRow() string {
 	s.WriteString(bracketStyle.Render("]"))
 	s.WriteString(" ")
 
-	return s.String()
+	// Pad to full terminal width to prevent ANSI escape sequence leakage into adjacent tmux panes
+	// This matches the behavior of renderMenuBar() and prevents visual corruption
+	toolbarContent := s.String()
+	padding := m.width - lipgloss.Width(toolbarContent)
+	if padding < 0 {
+		padding = 0
+	}
+
+	return toolbarContent + strings.Repeat(" ", padding)
 }
 
 // findTFERepository attempts to locate the TFE git repository

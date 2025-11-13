@@ -1073,9 +1073,8 @@ fi
 
 echo ""
 
-# Clean up temp script and return to interactive shell
+# Clean up temp script
 rm -f "$0"
-exec bash
 `, tfeRepoPath, tfeRepoPath)
 
 						// Write to temp file
