@@ -68,6 +68,11 @@ func initialModel() model {
 			"pyradio":       editorAvailable("pyradio"),
 			"micro":         editorAvailable("micro"), // Used in context menu edit action
 			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
+			// AI tools (claude, codex, gemini, opencode)
+			"claude":        editorAvailable("claude"),
+			"codex":         editorAvailable("codex"),
+			"gemini":        editorAvailable("gemini"),
+			"opencode":      editorAvailable("opencode"),
 		},
 		tuiClassicsPath: getTUIClassicsPath(), // Cache TUIClassics path (checks multiple locations)
 		cachedMenus:     nil,                   // Will be built on first access

@@ -48,11 +48,9 @@ func (m model) getMenus() map[string]Menu {
 			Label: "File",
 			Items: fileMenuItems,
 		},
-		"edit": {
-			Label: "Edit",
-			Items: []MenuItem{
-				{Label: "🗑  Delete", Action: "delete", Shortcut: "F8"},
-			},
+		"ai": {
+			Label: "AI",
+			Items: []MenuItem{},
 		},
 		"view": {
 			Label: "View",
@@ -151,14 +149,52 @@ func (m model) getMenus() map[string]Menu {
 
 	menus["tools"] = toolsMenu
 
+	// Add AI tools to AI menu if available (using cached availability)
+	aiMenu := menus["ai"]
+	hasAITools := false
+
+	// Use cached tool availability instead of filesystem lookups (performance optimization)
+	if m.toolsAvailable["claude"] {
+		if !hasAITools {
+			hasAITools = true
+		}
+		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "🤖 Claude", Action: "claude"})
+	}
+	if m.toolsAvailable["claude"] { // Check again for YOLO Claude (uses same binary)
+		if !hasAITools {
+			hasAITools = true
+		}
+		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "⚡ YOLO Claude", Action: "yolo-claude"})
+	}
+	if m.toolsAvailable["codex"] {
+		if !hasAITools {
+			hasAITools = true
+		}
+		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "🔧 Codex", Action: "codex"})
+	}
+	if m.toolsAvailable["gemini"] {
+		if !hasAITools {
+			hasAITools = true
+		}
+		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "💎 Gemini", Action: "gemini"})
+	}
+	if m.toolsAvailable["opencode"] {
+		if !hasAITools {
+			hasAITools = true
+		}
+		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "🔓 OpenCode", Action: "opencode"})
+	}
+
+	menus["ai"] = aiMenu
+
 	// The performance win comes from using m.toolsAvailable instead of editorAvailable()
-	// which eliminates 5 filesystem lookups per render (was causing dropdown lag)
+	// which eliminates filesystem lookups per render (was causing dropdown lag)
 	return menus
 }
 
 // getMenuOrder returns the order of menus in the menu bar
 func getMenuOrder() []string {
-	return []string{"file", "edit", "view", "tools", "help"}
+	return []string{"file", "ai", "view", "tools", "help"}
 }
 
 // getPreviousMenu returns the menu key to the left of the current menu (with wrapping)
@@ -266,7 +302,7 @@ func (m model) renderMenuBar() string {
 		}
 
 		// Render menu label with underlined first letter (hotkey indicator)
-		// F for File, E for Edit, V for View, T for Tools, H for Help
+		// F for File, A for AI, V for View, T for Tools, H for Help
 		label := menu.Label
 		if len(label) > 0 {
 			// Create underline style based on current style (without padding)
@@ -722,7 +758,7 @@ Additional context: {{variable2}}
 	case "quit":
 		return m, tea.Quit
 
-	// Edit menu
+	// View menu
 	case "toggle-favorites":
 		// Auto-exit trash mode when toggling favorites
 		if m.showTrashOnly {
@@ -873,6 +909,44 @@ Additional context: {{variable2}}
 		m.activeMenu = ""
 		m.selectedMenuItem = -1
 		return m, openTUITool("pyradio", m.currentPath)
+
+	// AI menu
+	case "claude":
+		// Launch Claude Code in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("claude", m.currentPath)
+
+	case "yolo-claude":
+		// Launch Claude Code with --dangerously-skip-permissions flag in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		// For YOLO Claude, we need to pass flags, so we need a special command
+		// Use openTUIToolWithArgs instead of openTUITool
+		return m, openTUIToolWithArgs("claude", []string{"--dangerously-skip-permissions"}, m.currentPath)
+
+	case "codex":
+		// Launch Codex in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("codex", m.currentPath)
+
+	case "gemini":
+		// Launch Gemini in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("gemini", m.currentPath)
+
+	case "opencode":
+		// Launch OpenCode in current directory
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		return m, openTUITool("opencode", m.currentPath)
 
 	case "toggle-prompts":
 		// Auto-exit trash mode when toggling prompts filter

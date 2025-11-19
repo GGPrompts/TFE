@@ -104,6 +104,18 @@ func openTUITool(tool, dir string) tea.Cmd {
 	)
 }
 
+// openTUIToolWithArgs opens a TUI application with command-line arguments in the specified directory
+func openTUIToolWithArgs(tool string, args []string, dir string) tea.Cmd {
+	c := exec.Command(tool, args...)
+	c.Dir = dir // Set working directory
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		}),
+	)
+}
+
 // copyToClipboard copies text to the system clipboard
 func copyToClipboard(text string) error {
 	var cmd *exec.Cmd

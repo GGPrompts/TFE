@@ -231,7 +231,12 @@ func (m model) renderSinglePane() string {
 			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
 		}
 
-		s.WriteString(msgStyle.Render(m.statusMessage))
+		// Truncate status message to terminal width to prevent wrapping/corruption
+		statusMsg := m.statusMessage
+		if m.visualWidthCompensated(statusMsg) > m.width-4 {
+			statusMsg = m.truncateToWidthCompensated(statusMsg, m.width-4)
+		}
+		s.WriteString(msgStyle.Render(statusMsg))
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n") // Add blank line to maintain 2-line height
 		s.WriteString(" ") // Empty second line for consistent layout
@@ -258,6 +263,10 @@ func (m model) renderSinglePane() string {
 			searchStatus = fmt.Sprintf("Filtered: %s (%d matches)", m.searchQuery, matchCount)
 		}
 
+		// Truncate search status to terminal width to prevent wrapping/corruption
+		if m.visualWidthCompensated(searchStatus) > m.width-4 {
+			searchStatus = m.truncateToWidthCompensated(searchStatus, m.width-4)
+		}
 		s.WriteString(searchStyle.Render(searchStatus))
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n") // Add blank line to maintain 2-line height
@@ -355,12 +364,20 @@ func (m model) renderSinglePane() string {
 		// Split status into two lines to prevent truncation
 		// Line 1: Counts, indicators, view mode, help
 		statusLine1 := fmt.Sprintf("%s%s%s%s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, viewModeText, helpHint)
+		// Truncate to terminal width to prevent wrapping/corruption on narrow terminals
+		if m.visualWidthCompensated(statusLine1) > m.width-4 {
+			statusLine1 = m.truncateToWidthCompensated(statusLine1, m.width-4)
+		}
 		s.WriteString(statusStyle.Render(statusLine1))
 		s.WriteString("\033[0m") // Reset ANSI codes
 		s.WriteString("\n")
 
 		// Line 2: Selected file info
 		statusLine2 := selectedInfo
+		// Truncate to terminal width to prevent wrapping/corruption on narrow terminals
+		if m.visualWidthCompensated(statusLine2) > m.width-4 {
+			statusLine2 = m.truncateToWidthCompensated(statusLine2, m.width-4)
+		}
 		s.WriteString(statusStyle.Render(statusLine2))
 		s.WriteString("\033[0m") // Reset ANSI codes
 	}

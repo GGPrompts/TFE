@@ -161,6 +161,10 @@ func (m model) renderFullPreview() string {
 	} else {
 		helpText = fmt.Sprintf("F1: help • ↑/↓: scroll • m: %s • F4: edit • F5: %s • Esc: close", modeText, f5Text)
 	}
+	// Truncate help text to terminal width to prevent wrapping/corruption
+	if m.visualWidthCompensated(helpText) > m.width-4 {
+		helpText = m.truncateToWidthCompensated(helpText, m.width-4)
+	}
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
@@ -184,6 +188,10 @@ func (m model) renderFullPreview() string {
 			searchText = fmt.Sprintf("🔍 Search: %s█ (no matches)", m.preview.searchQuery)
 		}
 
+		// Truncate search text to terminal width to prevent wrapping/corruption
+		if m.visualWidthCompensated(searchText) > m.width-4 {
+			searchText = m.truncateToWidthCompensated(searchText, m.width-4)
+		}
 		s.WriteString(searchStyle.Render(searchText))
 		s.WriteString("\033[0m") // Reset ANSI codes
 	} else if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
@@ -199,7 +207,12 @@ func (m model) renderFullPreview() string {
 			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
 		}
 
-		s.WriteString(msgStyle.Render(m.statusMessage))
+		// Truncate status message to terminal width to prevent wrapping/corruption
+		statusMsg := m.statusMessage
+		if m.visualWidthCompensated(statusMsg) > m.width-4 {
+			statusMsg = m.truncateToWidthCompensated(statusMsg, m.width-4)
+		}
+		s.WriteString(msgStyle.Render(statusMsg))
 		s.WriteString("\033[0m") // Reset ANSI codes
 	}
 
@@ -629,12 +642,20 @@ func (m model) renderDualPane() string {
 	// Split status into two lines to prevent truncation
 	// Line 1: Counts, indicators, view mode, focus, help
 	statusLine1 := fmt.Sprintf("%s%s%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, gitReposIndicator, m.displayMode.String(), focusInfo, helpHint)
+	// Truncate to terminal width to prevent wrapping/corruption on narrow terminals
+	if m.visualWidthCompensated(statusLine1) > m.width-4 {
+		statusLine1 = m.truncateToWidthCompensated(statusLine1, m.width-4)
+	}
 	s.WriteString(statusStyle.Render(statusLine1))
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Line 2: Selected file info
 	statusLine2 := selectedInfo
+	// Truncate to terminal width to prevent wrapping/corruption on narrow terminals
+	if m.visualWidthCompensated(statusLine2) > m.width-4 {
+		statusLine2 = m.truncateToWidthCompensated(statusLine2, m.width-4)
+	}
 	s.WriteString(statusStyle.Render(statusLine2))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
@@ -651,7 +672,12 @@ func (m model) renderDualPane() string {
 			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
 		}
 
-		s.WriteString(msgStyle.Render(m.statusMessage))
+		// Truncate status message to terminal width to prevent wrapping/corruption
+		statusMsg := m.statusMessage
+		if m.visualWidthCompensated(statusMsg) > m.width-4 {
+			statusMsg = m.truncateToWidthCompensated(statusMsg, m.width-4)
+		}
+		s.WriteString(msgStyle.Render(statusMsg))
 		s.WriteString("\033[0m") // Reset ANSI codes
 	} else if m.searchMode || m.searchQuery != "" {
 		// Show search status
@@ -677,6 +703,10 @@ func (m model) renderDualPane() string {
 			searchStatus = fmt.Sprintf("Filtered: %s (%d matches)", m.searchQuery, matchCount)
 		}
 
+		// Truncate search status to terminal width to prevent wrapping/corruption
+		if m.visualWidthCompensated(searchStatus) > m.width-4 {
+			searchStatus = m.truncateToWidthCompensated(searchStatus, m.width-4)
+		}
 		s.WriteString(searchStyle.Render(searchStatus))
 		s.WriteString("\033[0m") // Reset ANSI codes
 	}
