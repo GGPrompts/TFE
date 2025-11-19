@@ -845,14 +845,18 @@ func (m model) renderScrollingFooter(text string, availableWidth int) string {
 		indicator := "⏵ " // Indicates scrolling is active
 		paddedText := indicator + text + "   •   " + indicator + text
 
-		// Calculate scroll position with wrapping
-		scrollPos := m.footerOffset % len(paddedText)
+		// Convert to runes to handle multi-byte unicode characters (↑, ↓, •, etc.)
+		runes := []rune(paddedText)
+		runeCount := len(runes)
 
-		// Extract visible portion
+		// Calculate scroll position with wrapping
+		scrollPos := m.footerOffset % runeCount
+
+		// Extract visible portion (by rune, not byte)
 		var result strings.Builder
-		for i := 0; i < availableWidth && i < len(paddedText); i++ {
-			charPos := (scrollPos + i) % len(paddedText)
-			result.WriteByte(paddedText[charPos])
+		for i := 0; i < availableWidth && i < runeCount; i++ {
+			charPos := (scrollPos + i) % runeCount
+			result.WriteRune(runes[charPos])
 		}
 
 		return result.String()
