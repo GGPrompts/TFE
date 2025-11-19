@@ -161,10 +161,8 @@ func (m model) renderFullPreview() string {
 	} else {
 		helpText = fmt.Sprintf("F1: help • ↑/↓: scroll • m: %s • F4: edit • F5: %s • Esc: close", modeText, f5Text)
 	}
-	// Truncate help text to terminal width to prevent wrapping/corruption
-	if m.visualWidthCompensated(helpText) > m.width-4 {
-		helpText = m.truncateToWidthCompensated(helpText, m.width-4)
-	}
+	// Use scrolling footer (click to activate) or truncate if too long
+	helpText = m.renderScrollingFooter(helpText, m.width-4)
 	s.WriteString(helpStyle.Render(helpText))
 	s.WriteString("\033[0m") // Reset ANSI codes
 
@@ -642,20 +640,16 @@ func (m model) renderDualPane() string {
 	// Split status into two lines to prevent truncation
 	// Line 1: Counts, indicators, view mode, focus, help
 	statusLine1 := fmt.Sprintf("%s%s%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, gitReposIndicator, m.displayMode.String(), focusInfo, helpHint)
-	// Truncate to terminal width to prevent wrapping/corruption on narrow terminals
-	if m.visualWidthCompensated(statusLine1) > m.width-4 {
-		statusLine1 = m.truncateToWidthCompensated(statusLine1, m.width-4)
-	}
+	// Use scrolling footer (click to activate) or truncate if too long
+	statusLine1 = m.renderScrollingFooter(statusLine1, m.width-4)
 	s.WriteString(statusStyle.Render(statusLine1))
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
 	// Line 2: Selected file info
 	statusLine2 := selectedInfo
-	// Truncate to terminal width to prevent wrapping/corruption on narrow terminals
-	if m.visualWidthCompensated(statusLine2) > m.width-4 {
-		statusLine2 = m.truncateToWidthCompensated(statusLine2, m.width-4)
-	}
+	// Use scrolling footer (click to activate) or truncate if too long
+	statusLine2 = m.renderScrollingFooter(statusLine2, m.width-4)
 	s.WriteString(statusStyle.Render(statusLine2))
 	s.WriteString("\033[0m") // Reset ANSI codes
 

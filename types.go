@@ -355,6 +355,9 @@ type model struct {
 	updateVersion   string // Version string of available update (e.g., "v0.6.1")
 	updateChangelog string // Changelog/release notes from GitHub
 	updateURL       string // URL to the release page
+	// Footer scrolling (click to activate)
+	footerScrolling bool // Whether footer is currently scrolling
+	footerOffset    int  // Horizontal scroll offset for footer text
 }
 
 // treeItem represents an item in the tree view with depth information
@@ -367,6 +370,9 @@ type treeItem struct {
 
 // editorFinishedMsg is sent when external editor exits
 type editorFinishedMsg struct{ err error }
+
+// footerTickMsg is sent periodically to animate footer scrolling
+type footerTickMsg struct{}
 
 // markdownRenderedMsg is sent when markdown rendering completes
 type markdownRenderedMsg struct{}

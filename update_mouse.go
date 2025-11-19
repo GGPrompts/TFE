@@ -162,6 +162,21 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionRelease {
+			// Check for footer click (toggle scrolling)
+			// Footer is in the last few lines of the screen
+			footerStartY := m.height - 4 // Footer typically starts 4 lines from bottom
+			if msg.Y >= footerStartY {
+				// Toggle footer scrolling
+				m.footerScrolling = !m.footerScrolling
+				if m.footerScrolling {
+					// Start scrolling animation
+					m.footerOffset = 0 // Reset offset when starting
+					return m, footerTick()
+				}
+				// If stopping, just return without scheduling tick
+				return m, nil
+			}
+
 			// Check for update notification click (Y=0, first 5 seconds)
 			if time.Since(m.startupTime) < 5*time.Second && m.updateAvailable {
 				if msg.Y == 0 {

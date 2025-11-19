@@ -827,3 +827,37 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// renderScrollingFooter renders footer text with horizontal scrolling if enabled
+// If text fits within width, returns as-is. If scrolling is enabled and text is too long,
+// creates a looping marquee effect. Otherwise truncates with "..."
+func (m model) renderScrollingFooter(text string, availableWidth int) string {
+	textLen := m.visualWidthCompensated(text)
+
+	// If text fits, no modification needed
+	if textLen <= availableWidth {
+		return text
+	}
+
+	// If scrolling is active, create looping marquee
+	if m.footerScrolling {
+		// Add visual indicator and separator for smooth loop
+		indicator := "⏵ " // Indicates scrolling is active
+		paddedText := indicator + text + "   •   " + indicator + text
+
+		// Calculate scroll position with wrapping
+		scrollPos := m.footerOffset % len(paddedText)
+
+		// Extract visible portion
+		var result strings.Builder
+		for i := 0; i < availableWidth && i < len(paddedText); i++ {
+			charPos := (scrollPos + i) % len(paddedText)
+			result.WriteByte(paddedText[charPos])
+		}
+
+		return result.String()
+	}
+
+	// Not scrolling - truncate with "..."
+	return m.truncateToWidthCompensated(text, availableWidth)
+}

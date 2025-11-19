@@ -42,6 +42,13 @@ func tickCmd() tea.Cmd {
 	})
 }
 
+// footerTick sends periodic messages to animate footer scrolling
+func footerTick() tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+		return footerTickMsg{}
+	})
+}
+
 // checkForUpdates queries GitHub API for the latest release
 // Only checks once per day to respect rate limits
 func checkForUpdates() tea.Cmd {
@@ -199,6 +206,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return m, tickCmd() // Continue animation
+
+	case footerTickMsg:
+		// Animate footer scrolling if active
+		if m.footerScrolling {
+			m.footerOffset++
+			return m, footerTick() // Continue scrolling
+		}
+		// If scrolling was stopped, don't schedule next tick
 
 	case spinner.TickMsg:
 		// Update spinner animation
