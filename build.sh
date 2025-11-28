@@ -13,7 +13,9 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}🔨 Building TFE...${NC}"
 
 # Build the binary
-go build
+# CGO_ENABLED=0 is needed on Termux (Android) where the CGO toolchain is often broken
+# It also produces a fully static binary which is more portable
+CGO_ENABLED=0 go build
 
 if [ ! -f "./tfe" ]; then
     echo -e "${RED}❌ Build failed - binary not created${NC}"

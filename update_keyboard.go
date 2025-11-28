@@ -1077,8 +1077,10 @@ echo ""
 rm -f "$0"
 `, tfeRepoPath, tfeRepoPath)
 
-						// Write to temp file
-						tmpScript := filepath.Join(os.TempDir(), fmt.Sprintf("tfe-update-%d.sh", os.Getpid()))
+						// Write to temp file in the TFE repo directory
+						// Note: We use the repo directory instead of os.TempDir() because
+						// on Termux (Android), /tmp has restrictions that prevent script execution
+						tmpScript := filepath.Join(tfeRepoPath, fmt.Sprintf(".tfe-update-%d.sh", os.Getpid()))
 						err := os.WriteFile(tmpScript, []byte(updateScript), 0755)
 						if err != nil {
 							m.setStatusMessage(fmt.Sprintf("❌ Failed to create update script: %s", err), true)
