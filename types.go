@@ -282,6 +282,7 @@ type model struct {
 	// Double-click detection
 	lastClickTime  time.Time
 	lastClickIndex int
+	lastClickY     int // Screen Y position for scroll-aware double-click detection
 	// Command prompt (always visible)
 	commandInput         string
 	commandCursorPos     int                       // Cursor position in command input (0 = start, len = end)

@@ -845,9 +845,12 @@ git pull
 				now := time.Now()
 
 				// Check for double-click: same item clicked within 500ms
+				// We check BOTH index AND screen Y position because after the first click,
+				// the view may scroll to center the cursor, making the same visual position
+				// map to a different index. Checking screen Y handles this case.
 				const doubleClickThreshold = 500 * time.Millisecond
-				isDoubleClick := clickedIndex == m.lastClickIndex &&
-					now.Sub(m.lastClickTime) < doubleClickThreshold
+				isDoubleClick := now.Sub(m.lastClickTime) < doubleClickThreshold &&
+					(clickedIndex == m.lastClickIndex || msg.Y == m.lastClickY)
 
 				// Get the file item based on display mode
 				var clickedFile fileItem
@@ -900,6 +903,7 @@ git pull
 						}
 
 						m.lastClickIndex = -1
+						m.lastClickY = -1
 						m.lastClickTime = time.Time{}
 						return m, tea.ClearScreen
 					}
@@ -938,17 +942,20 @@ git pull
 						m.populatePreviewCache() // Repopulate cache with correct width
 						// Reset click tracking after double-click
 						m.lastClickIndex = -1
+						m.lastClickY = -1
 						m.lastClickTime = time.Time{}
 						// Clear screen for clean rendering
 						return m, tea.ClearScreen
 					}
 					// Reset click tracking after double-click (for directory navigation)
 					m.lastClickIndex = -1
+					m.lastClickY = -1
 					m.lastClickTime = time.Time{}
 				} else {
 					// Single-click: just select and update preview in dual-pane
 					m.cursor = clickedIndex
 					m.lastClickIndex = clickedIndex
+					m.lastClickY = msg.Y // Track screen Y for scroll-aware double-click
 					m.lastClickTime = now
 
 					// Update preview in dual-pane mode
@@ -1089,11 +1096,16 @@ git pull
 				m.commandInput = ""
 
 				// Get the file item based on display mode
+				// We explicitly allocate on heap to ensure the pointer remains valid
+				// after this handler returns (the context menu is processed in a later event)
 				if m.displayMode == modeTree {
 					file := m.treeItems[clickedIndex].file
-					m.contextMenuFile = &file
+					m.contextMenuFile = new(fileItem)
+					*m.contextMenuFile = file
 				} else {
-					m.contextMenuFile = &displayedFiles[clickedIndex]
+					file := displayedFiles[clickedIndex]
+					m.contextMenuFile = new(fileItem)
+					*m.contextMenuFile = file
 				}
 				m.contextMenuCursor = 0
 			}
