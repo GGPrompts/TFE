@@ -157,6 +157,9 @@ stty sane 2>/dev/null || true
 
 clear
 
+# Change to target directory first so pane 0 inherits it
+cd '%s'
+
 # Check if session already exists
 if tmux has-session -t '%s' 2>/dev/null; then
     echo "Attaching to existing tmux session: %s"
@@ -184,7 +187,7 @@ fi
 
 # Clean up temp script
 rm -f "$0"
-`, sessionName, sessionName, sessionName, sessionName, dir, sessionName, dir, dir, dir, dir)
+`, dir, sessionName, sessionName, sessionName, sessionName, dir, sessionName, dir, dir, dir, dir)
 
 	// Write script to temp file
 	tmpScript := filepath.Join(os.TempDir(), fmt.Sprintf("tfe-tmux-%d.sh", os.Getpid()))
