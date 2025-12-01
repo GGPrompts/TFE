@@ -916,7 +916,7 @@ Additional context: {{variable2}}
 		m.menuOpen = false
 		m.activeMenu = ""
 		m.selectedMenuItem = -1
-		return m, openTUITool("claude", m.currentPath)
+		return m, openTUITool(getClaudePath(), m.currentPath)
 
 	case "yolo-claude":
 		// Launch Claude Code with --dangerously-skip-permissions flag in current directory
@@ -925,7 +925,7 @@ Additional context: {{variable2}}
 		m.selectedMenuItem = -1
 		// For YOLO Claude, we need to pass flags, so we need a special command
 		// Use openTUIToolWithArgs instead of openTUITool
-		return m, openTUIToolWithArgs("claude", []string{"--dangerously-skip-permissions"}, m.currentPath)
+		return m, openTUIToolWithArgs(getClaudePath(), []string{"--dangerously-skip-permissions"}, m.currentPath)
 
 	case "codex":
 		// Launch Codex in current directory
