@@ -55,6 +55,9 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		// Directory menu items
 		items = append(items, contextMenuItem{"📂 Open", "open"})
 		items = append(items, contextMenuItem{"📂 Quick CD", "quickcd"})
+		if m.toolsAvailable["tmux"] {
+			items = append(items, contextMenuItem{"🖥  Tmux Quad", "tmux_quad"})
+		}
 		items = append(items, contextMenuItem{"📁 New Folder...", "newfolder"})
 		items = append(items, contextMenuItem{"📄 New File...", "newfile"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
@@ -199,6 +202,13 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 				return m, tea.ClearScreen
 			}
 			return m, tea.Quit
+		}
+		return m, tea.ClearScreen
+
+	case "tmux_quad":
+		// Tmux Quad: exit TFE and launch tmux with 4 panes in this directory
+		if m.contextMenuFile.isDir {
+			return m, launchTmuxQuad(m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 

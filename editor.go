@@ -116,6 +116,77 @@ func openTUIToolWithArgs(tool string, args []string, dir string) tea.Cmd {
 	)
 }
 
+// launchTmuxQuad exits TFE and launches tmux with 4 equal panes in the specified directory
+// Session name is derived from directory name for easy reattachment
+func launchTmuxQuad(dir string) tea.Cmd {
+	// Derive session name from directory (sanitize for tmux)
+	sessionName := filepath.Base(dir)
+	// Replace characters that tmux doesn't like in session names
+	sessionName = strings.ReplaceAll(sessionName, ".", "_")
+	sessionName = strings.ReplaceAll(sessionName, ":", "_")
+
+	// Create script that launches tmux with quad split after TFE exits
+	tmuxScript := fmt.Sprintf(`#!/bin/bash
+
+# Wait for TFE to exit and terminal to settle
+sleep 0.3
+
+# Reset terminal to sane state
+stty sane 2>/dev/null || true
+
+clear
+
+# Check if session already exists
+if tmux has-session -t '%s' 2>/dev/null; then
+    echo "Attaching to existing tmux session: %s"
+    sleep 0.5
+    tmux attach-session -t '%s'
+else
+    echo "Creating tmux quad session: %s"
+    echo "Directory: %s"
+    sleep 0.5
+    # Create new session with quad layout (2x2 grid)
+    # Pane layout:
+    # +-------+-------+
+    # |   0   |   1   |
+    # +-------+-------+
+    # |   2   |   3   |
+    # +-------+-------+
+    tmux new-session -d -s '%s' -c '%s' \; \
+        split-window -h -c '%s' \; \
+        split-window -v -c '%s' \; \
+        select-pane -t 0 \; \
+        split-window -v -c '%s' \; \
+        select-pane -t 0 \; \
+        attach-session
+fi
+
+# Clean up temp script
+rm -f "$0"
+`, sessionName, sessionName, sessionName, sessionName, dir, sessionName, dir, dir, dir, dir)
+
+	// Write script to temp file
+	tmpScript := filepath.Join(os.TempDir(), fmt.Sprintf("tfe-tmux-%d.sh", os.Getpid()))
+	if err := os.WriteFile(tmpScript, []byte(tmuxScript), 0755); err != nil {
+		// If we can't write the script, just return without doing anything
+		return nil
+	}
+
+	// Launch script detached using setsid
+	cmd := exec.Command("setsid", "-f", "bash", tmpScript)
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	if err := cmd.Start(); err != nil {
+		os.Remove(tmpScript)
+		return nil
+	}
+
+	// Exit TFE so tmux can take over the terminal
+	return tea.Quit
+}
+
 // copyToClipboard copies text to the system clipboard
 func copyToClipboard(text string) error {
 	var cmd *exec.Cmd

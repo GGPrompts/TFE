@@ -68,6 +68,7 @@ func initialModel() model {
 			"pyradio":       editorAvailable("pyradio"),
 			"micro":         editorAvailable("micro"), // Used in context menu edit action
 			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
+			"tmux":          editorAvailable("tmux"),          // Used for tmux quad split
 			// AI tools (claude, codex, gemini, opencode)
 			"claude":        editorAvailable("claude"),
 			"codex":         editorAvailable("codex"),
