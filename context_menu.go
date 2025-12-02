@@ -195,8 +195,16 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case "quickcd":
-		// Quick CD: write directory to file and exit TFE so shell can cd
+		// Quick CD: change to directory after exiting TFE
 		if m.contextMenuFile.isDir {
+			// In Termux, spawn a new terminal session in the target directory
+			// This works even when launched from a widget (no parent shell)
+			if isTermux() {
+				// Use -l (login shell) so it sources profile scripts and has proper PATH
+				// Without this, tools like 'claude' won't be found in the new shell
+				return m, termuxNewSession("exec bash -l", m.contextMenuFile.path)
+			}
+			// Standard behavior: write target to file for wrapper script to read
 			if err := writeCDTarget(m.contextMenuFile.path); err != nil {
 				m.setStatusMessage(fmt.Sprintf("Failed to save directory for quick CD: %s", err), true)
 				return m, tea.ClearScreen
@@ -428,19 +436,32 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 
 	case "claude":
 		// Launch Claude Code in the selected directory (with permission prompts)
-		// Note: runCommandAndExit() already cd's to the directory, so no path argument needed
 		if m.contextMenuFile.isDir {
-			claudePath := getClaudeCodePath()
-			return m, runCommandAndExit(claudePath, m.contextMenuFile.path)
+			// In Termux, spawn a new terminal session for Claude
+			// Use getClaudeCodePathForTermux() because the standard 'claude' script
+			// has shebang #!/usr/bin/env node which fails (no /usr/bin/env in Termux)
+			if isTermux() {
+				claudePath := getClaudeCodePathForTermux()
+				return m, termuxNewSession(claudePath, m.contextMenuFile.path)
+			}
+			return m, runCommandAndExit(getClaudeCodePath(), m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 
 	case "claude_yolo":
 		// Launch Claude Code in YOLO mode (skip permission prompts)
-		// Note: runCommandAndExit() already cd's to the directory, so no path argument needed
 		if m.contextMenuFile.isDir {
+			// In Termux, spawn a new terminal session for Claude
+			// Use getClaudeCodePathForTermux() because the standard 'claude' script
+			// has shebang #!/usr/bin/env node which fails (no /usr/bin/env in Termux)
+			if isTermux() {
+				claudePath := getClaudeCodePathForTermux()
+				yoloCmd := claudePath + " --dangerously-skip-permissions"
+				return m, termuxNewSession(yoloCmd, m.contextMenuFile.path)
+			}
 			claudePath := getClaudeCodePath()
-			return m, runCommandAndExit(claudePath+" --dangerously-skip-permissions", m.contextMenuFile.path)
+			yoloCmd := claudePath + " --dangerously-skip-permissions"
+			return m, runCommandAndExit(yoloCmd, m.contextMenuFile.path)
 		}
 		return m, tea.ClearScreen
 

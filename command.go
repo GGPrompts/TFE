@@ -229,6 +229,30 @@ exit $exitCode
 	}
 }
 
+// termuxNewSession launches a command in a new Termux terminal session
+// This is useful when TFE is launched from a widget (no parent shell)
+// For Quick CD: command is "exec bash" to get an interactive shell in the target dir
+// For Claude: command is "claude" to launch Claude Code
+// Requires allow-external-apps = true in ~/.termux/termux.properties
+func termuxNewSession(command string, workDir string) tea.Cmd {
+	return func() tea.Msg {
+		amCmd := termuxNewSessionCmd(command, workDir)
+
+		c := exec.Command("bash", "-c", amCmd)
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+
+		err := c.Run()
+		if err != nil {
+			// Return error message that can be displayed
+			return commandFinishedMsg{err: fmt.Errorf("failed to start Termux session: %v (ensure allow-external-apps=true in ~/.termux/termux.properties)", err)}
+		}
+
+		// After launching the new session, quit TFE
+		return tea.Quit()
+	}
+}
+
 // shellQuote quotes a string for safe use in shell commands
 // Simple version that escapes single quotes
 func shellQuote(s string) string {

@@ -812,6 +812,56 @@ func getClaudeCodePath() string {
 	return "claude"
 }
 
+// getClaudeCodePathForTermux returns a command to run Claude Code in Termux
+// The standard 'claude' script has shebang #!/usr/bin/env node which fails
+// in Termux because /usr/bin/env doesn't exist. We run node directly instead.
+func getClaudeCodePathForTermux() string {
+	// Try the npm global install location first
+	cliPath := "/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"
+	if _, err := os.Stat(cliPath); err == nil {
+		return "node " + cliPath
+	}
+	// Fall back to just 'claude' and hope for the best
+	return "claude"
+}
+
+// isTermux returns true if running in Termux environment
+func isTermux() bool {
+	// Check for Termux-specific path
+	_, err := os.Stat("/data/data/com.termux/files/usr")
+	return err == nil
+}
+
+// termuxNewSessionCmd returns the am startservice command to launch a new Termux session
+// This enables features like Quick CD and Claude launch when TFE is started from a widget
+// Requires: allow-external-apps = true in ~/.termux/termux.properties
+func termuxNewSessionCmd(command string, workDir string) string {
+	// Build the bash command to run in the new session
+	// IMPORTANT: We must set up the environment properly:
+	// 1. LD_PRELOAD for libtermux-exec - fixes shebangs like #!/usr/bin/env node
+	// 2. Source .bashrc for PATH and other environment variables
+	// 3. Use login shell (-l) so profile scripts are sourced
+	ldPreload := "export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so"
+	var bashCmd string
+	if workDir != "" {
+		bashCmd = fmt.Sprintf("%s; source ~/.bashrc 2>/dev/null; cd '%s' && %s", ldPreload, workDir, command)
+	} else {
+		bashCmd = fmt.Sprintf("%s; source ~/.bashrc 2>/dev/null; %s", ldPreload, command)
+	}
+
+	// Use am startservice with RUN_COMMAND intent
+	// --ez com.termux.RUN_COMMAND_BACKGROUND false = run in foreground terminal
+	return fmt.Sprintf(
+		"am startservice --user 0 "+
+			"-n com.termux/com.termux.app.RunCommandService "+
+			"-a com.termux.RUN_COMMAND "+
+			"--es com.termux.RUN_COMMAND_PATH '/data/data/com.termux/files/usr/bin/bash' "+
+			"--esa com.termux.RUN_COMMAND_ARGUMENTS '-c,%s' "+
+			"--ez com.termux.RUN_COMMAND_BACKGROUND false",
+		bashCmd,
+	)
+}
+
 // max returns the maximum of two integers
 func max(a, b int) int {
 	if a > b {
