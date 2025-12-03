@@ -9,11 +9,32 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// Global theme flag (set before model initialization)
+var forceLightTheme bool
+
 func main() {
-	// Handle version flag
-	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
-		fmt.Printf("TFE (Terminal File Explorer) v%s\n", Version)
-		os.Exit(0)
+	// Handle command-line flags
+	for _, arg := range os.Args[1:] {
+		switch arg {
+		case "--version", "-v":
+			fmt.Printf("TFE (Terminal File Explorer) v%s\n", Version)
+			os.Exit(0)
+		case "--light":
+			forceLightTheme = true
+		case "--dark":
+			forceLightTheme = false // Explicit dark mode (default)
+		case "--help", "-h":
+			fmt.Println("TFE (Terminal File Explorer)")
+			fmt.Println()
+			fmt.Println("Usage: tfe [options] [directory]")
+			fmt.Println()
+			fmt.Println("Options:")
+			fmt.Println("  --light      Use light theme (for light terminal backgrounds)")
+			fmt.Println("  --dark       Use dark theme (default)")
+			fmt.Println("  --version    Show version information")
+			fmt.Println("  --help       Show this help message")
+			os.Exit(0)
+		}
 	}
 
 	// Ensure terminal cleanup on exit (defer runs even if panic/interrupt)

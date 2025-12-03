@@ -263,8 +263,9 @@ type model struct {
 	height       int
 	width        int
 	showHidden   bool
-	terminalType terminalType // Detected terminal emulator for emoji width compensation
-	displayMode displayMode
+	terminalType    terminalType // Detected terminal emulator for emoji width compensation
+	forceLightTheme bool         // Force light theme (--light flag) for glamour and menu colors
+	displayMode     displayMode
 	sortBy      string // "name", "size", "modified" for detail view
 	sortAsc     bool   // Sort ascending or descending
 	detailScrollX int  // Horizontal scroll offset for detail view (narrow terminals)

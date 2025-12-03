@@ -252,21 +252,21 @@ func (m model) renderMenuBar() string {
 
 	var renderedMenus []string
 
-	// Menu bar styles
+	// Menu bar styles - use adaptive colors for light/dark theme support
 	menuActiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
+		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Bold(true).
 		Padding(0, 1)
 
 	menuHighlightedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color("240")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}).
+		Background(lipgloss.AdaptiveColor{Light: "#CCCCCC", Dark: "#404040"}).
 		Bold(true).
 		Padding(0, 1)
 
 	menuInactiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Bold(true).
 		Padding(0, 1)
 
@@ -341,19 +341,19 @@ func (m model) renderActiveDropdown() string {
 		return ""
 	}
 
-	// Menu item styles
+	// Menu item styles - use adaptive colors for light/dark theme support
 	menuItemStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
-		Background(lipgloss.Color("236")) // Add background to prevent transparency issues
+		Foreground(lipgloss.AdaptiveColor{Light: "#333333", Dark: "#DDDDDD"}).
+		Background(lipgloss.AdaptiveColor{Light: "#F0F0F0", Dark: "#303030"})
 
 	menuItemSelectedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
+		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Bold(true)
 
 	menuItemDisabledStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Background(lipgloss.Color("236")) // Add background to prevent transparency issues
+		Foreground(lipgloss.AdaptiveColor{Light: "#999999", Dark: "#666666"}).
+		Background(lipgloss.AdaptiveColor{Light: "#F0F0F0", Dark: "#303030"})
 
 	// Build dropdown panel
 	var lines []string
@@ -428,7 +428,7 @@ func (m model) renderActiveDropdown() string {
 	// Create dropdown panel
 	dropdown := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(lipgloss.AdaptiveColor{Light: "#999999", Dark: "#666666"}).
 		Width(maxWidth).
 		Render(strings.Join(lines, "\n"))
 
@@ -441,13 +441,13 @@ func (m model) getMenuXPosition(menuKey string) int {
 	menuOrder := getMenuOrder()
 
 	menuActiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
+		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Bold(true).
 		Padding(0, 1)
 
 	menuInactiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Bold(true).
 		Padding(0, 1)
 
@@ -506,13 +506,13 @@ func (m model) getMenuAtPosition(x int) string {
 	menuOrder := getMenuOrder()
 
 	menuActiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
+		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Bold(true).
 		Padding(0, 1)
 
 	menuInactiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
+		Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
 		Bold(true).
 		Padding(0, 1)
 

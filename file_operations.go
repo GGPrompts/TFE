@@ -2424,10 +2424,14 @@ func (m *model) renderMarkdownWithTimeout(content string, width int, timeout tim
 					glamour.WithWordWrap(width),
 				)
 			} else {
-				// Use fixed "dark" style instead of WithAutoStyle()
-				// This avoids slow terminal probing in WezTerm/Termux (like yazi does)
+				// Use fixed style based on CLI flag (avoids slow terminal probing in WezTerm/Termux)
+				// --light flag uses "light" style, otherwise "dark" (default)
+				glamourStyle := "dark"
+				if m.forceLightTheme {
+					glamourStyle = "light"
+				}
 				renderer, err = glamour.NewTermRenderer(
-					glamour.WithStandardStyle("dark"),
+					glamour.WithStandardStyle(glamourStyle),
 					glamour.WithWordWrap(width),
 				)
 			}
