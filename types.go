@@ -10,7 +10,7 @@ import (
 )
 
 // Version is the current version of TFE
-const Version = "1.0.2"
+const Version = "1.0.3"
 
 // displayMode represents different view modes for displaying files
 type displayMode int
