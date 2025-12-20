@@ -101,6 +101,10 @@ func initialModel() model {
 		for i, f := range m.files {
 			if f.name == selectFile {
 				m.cursor = i
+				// Load preview for the selected file if --preview flag is set
+				if autoPreview && !f.isDir {
+					m.loadPreview(f.path)
+				}
 				break
 			}
 		}
