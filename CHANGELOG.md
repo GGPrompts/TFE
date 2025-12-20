@@ -4,6 +4,43 @@ All notable changes to the Terminal File Explorer (TFE) project.
 
 ## [Unreleased]
 
+### Added
+- **CLI File/Directory Arguments**
+  - Open TFE to a specific directory: `tfe ~/projects`
+  - Open with a file pre-selected: `tfe ~/projects/main.go`
+  - Supports `~` expansion and validates paths exist
+  - Shows helpful error messages for invalid paths
+  - Files modified: `main.go`, `model.go`
+
+- **--preview Flag for Auto-Opening Preview Pane**
+  - New `--preview` or `-p` flag opens preview pane automatically
+  - Preview pane is focused (60% width) when using this flag
+  - File content is loaded immediately
+  - Perfect for integration with other tools: `tmux split-window "tfe --preview file.go"`
+  - Files modified: `main.go`, `model.go`
+
+- **Cross-Platform Compatibility Improvements**
+  - **setsid fallback**: Uses `nohup` on macOS/Termux where `setsid` isn't available (tmux quad feature)
+  - **Dynamic Termux paths**: Uses PREFIX env var instead of hardcoded `/data/data/com.termux/...` paths
+  - **wl-copy clipboard support**: Added Wayland clipboard support (checked before xclip/xsel)
+  - **Better HOME detection**: Uses `os.UserHomeDir()` with fallback to HOME env var
+  - **Improved Termux detection**: Added TERMUX_VERSION and TERMUX_APP_PID checks
+  - **Better wslpath handling**: Validates converted Windows paths, helpful error messages
+  - **Multi-drive WezTerm detection**: Checks C:, D:, E: drives for WezTerm in WSL
+  - Files modified: `editor.go`, `helpers.go`, `model.go`, `terminal_graphics.go`
+
+### Fixed
+- **Terminal Resize Ghost Content**
+  - Added `tea.ClearScreen` to WindowSizeMsg handler
+  - Prevents duplicate footer text when resizing terminal
+  - Files modified: `update.go`
+
+- **Git Operations Display**
+  - Fixed git operations (pull, push, sync, fetch) rendering underneath TFE
+  - Now properly exits alt screen like other terminal operations
+  - Uses `tea.ExecProcess` instead of raw `exec.Command().Run()`
+  - Files modified: `git_operations.go`
+
 ### Changed
 - **Trash Bin Behavior - Navigation Instead of Toggle**
   - F12 now navigates TO trash view (like visiting a special location) instead of toggling a filter

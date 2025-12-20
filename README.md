@@ -481,6 +481,40 @@ If you cannot install the addon, you can filter the `WT_SESSION` environment var
 
 ## Usage
 
+### Command Line Options
+
+TFE supports command-line arguments for integration with other tools and scripts:
+
+```bash
+# Basic usage
+tfe                              # Open current directory
+tfe ~/projects                   # Open specific directory
+tfe ~/projects/main.go           # Open directory with file selected
+tfe --preview src/app.ts         # Open with file selected and preview pane focused
+
+# All options
+tfe [options] [path]
+
+Options:
+  --preview, -p    Auto-open preview pane (useful with file path)
+  --light          Use light theme (for light terminal backgrounds)
+  --dark           Use dark theme (default)
+  --version, -v    Show version information
+  --help, -h       Show help message
+```
+
+**Integration Examples:**
+```bash
+# Launch TFE from another tool showing a specific file
+tmux split-window "tfe --preview /path/to/file.go"
+
+# Open with preview pane focused (60% width for file content)
+tfe --preview ~/projects/README.md
+
+# Scripting: open directory containing a file
+tfe "$(dirname /path/to/file.txt)"
+```
+
 ### Keyboard Controls
 
 #### F-Keys (Midnight Commander Style)
