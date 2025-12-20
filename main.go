@@ -4,36 +4,89 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Global theme flag (set before model initialization)
-var forceLightTheme bool
+// Global flags (set before model initialization)
+var (
+	forceLightTheme bool
+	startPath       string // Directory to open
+	selectFile      string // File to select (basename)
+	autoPreview     bool   // Auto-open preview pane
+)
 
 func main() {
 	// Handle command-line flags
 	for _, arg := range os.Args[1:] {
-		switch arg {
-		case "--version", "-v":
+		switch {
+		case arg == "--version" || arg == "-v":
 			fmt.Printf("TFE (Terminal File Explorer) v%s\n", Version)
 			os.Exit(0)
-		case "--light":
+		case arg == "--light":
 			forceLightTheme = true
-		case "--dark":
+		case arg == "--dark":
 			forceLightTheme = false // Explicit dark mode (default)
-		case "--help", "-h":
+		case arg == "--preview" || arg == "-p":
+			autoPreview = true
+		case arg == "--help" || arg == "-h":
 			fmt.Println("TFE (Terminal File Explorer)")
 			fmt.Println()
-			fmt.Println("Usage: tfe [options] [directory]")
+			fmt.Println("Usage: tfe [options] [path]")
+			fmt.Println()
+			fmt.Println("Arguments:")
+			fmt.Println("  path         Directory to open, or file to select")
 			fmt.Println()
 			fmt.Println("Options:")
+			fmt.Println("  --preview    Auto-open preview pane (useful with file path)")
 			fmt.Println("  --light      Use light theme (for light terminal backgrounds)")
 			fmt.Println("  --dark       Use dark theme (default)")
 			fmt.Println("  --version    Show version information")
 			fmt.Println("  --help       Show this help message")
+			fmt.Println()
+			fmt.Println("Examples:")
+			fmt.Println("  tfe                        Open current directory")
+			fmt.Println("  tfe ~/projects             Open ~/projects directory")
+			fmt.Println("  tfe ~/projects/main.go     Open ~/projects with main.go selected")
+			fmt.Println("  tfe --preview src/app.ts   Open with app.ts selected and previewed")
 			os.Exit(0)
+		case !strings.HasPrefix(arg, "-"):
+			// Non-flag argument is the path
+			targetPath := arg
+
+			// Expand ~ to home directory
+			if strings.HasPrefix(targetPath, "~") {
+				home, err := os.UserHomeDir()
+				if err == nil {
+					targetPath = filepath.Join(home, targetPath[1:])
+				}
+			}
+
+			// Make absolute
+			absPath, err := filepath.Abs(targetPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: invalid path %q: %v\n", arg, err)
+				os.Exit(1)
+			}
+
+			// Check if path exists
+			info, err := os.Stat(absPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: path not found %q: %v\n", arg, err)
+				os.Exit(1)
+			}
+
+			if info.IsDir() {
+				// It's a directory - open it directly
+				startPath = absPath
+			} else {
+				// It's a file - open parent dir and select the file
+				startPath = filepath.Dir(absPath)
+				selectFile = filepath.Base(absPath)
+			}
 		}
 	}
 

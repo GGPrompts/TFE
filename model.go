@@ -10,9 +10,14 @@ import (
 )
 
 func initialModel() model {
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
+	// Use startPath from CLI if provided, otherwise use current working directory
+	initialPath := startPath
+	if initialPath == "" {
+		var err error
+		initialPath, err = os.Getwd()
+		if err != nil {
+			initialPath = "."
+		}
 	}
 
 	s := spinner.New()
@@ -20,7 +25,7 @@ func initialModel() model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#5fd7ff"})
 
 	m := model{
-		currentPath:     cwd,
+		currentPath:     initialPath,
 		cursor:          0,
 		height:          24,
 		width:           80,
@@ -91,6 +96,16 @@ func initialModel() model {
 
 	m.loadFiles()
 
+	// If a file was specified on CLI, find and select it
+	if selectFile != "" {
+		for i, f := range m.files {
+			if f.name == selectFile {
+				m.cursor = i
+				break
+			}
+		}
+	}
+
 	// Auto-enable dual-pane mode on WIDE terminals only
 	// Narrow terminals (Termux, phones, small windows) stay in single-pane mode
 	// Rationale:
@@ -103,6 +118,11 @@ func initialModel() model {
 		m.viewMode = viewDualPane
 	}
 	// else: keep viewSinglePane (default from line 32)
+
+	// If --preview flag was set, enable dual-pane to show preview
+	if autoPreview {
+		m.viewMode = viewDualPane
+	}
 
 	m.calculateLayout()
 	return m
