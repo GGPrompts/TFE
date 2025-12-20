@@ -9,7 +9,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,9 +23,7 @@ type gitOperationFinishedMsg struct {
 
 // gitPull executes git pull in the specified directory
 func gitPull(repoPath string) tea.Cmd {
-	return func() tea.Msg {
-		// Execute git pull command
-		script := fmt.Sprintf(`
+	script := fmt.Sprintf(`
 echo "$ git pull"
 cd %s || exit 1
 git pull
@@ -43,25 +40,18 @@ read -n 1 -s -r
 exit $exitCode
 `, shellQuote(repoPath))
 
-		c := exec.Command("bash", "-c", script)
-		c.Stdin = os.Stdin
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-
-		err := c.Run()
-
-		return gitOperationFinishedMsg{
-			operation: "pull",
-			err:       err,
-		}
-	}
+	c := exec.Command("bash", "-c", script)
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return gitOperationFinishedMsg{operation: "pull", err: err}
+		}),
+	)
 }
 
 // gitPush executes git push in the specified directory
 func gitPush(repoPath string) tea.Cmd {
-	return func() tea.Msg {
-		// Execute git push command
-		script := fmt.Sprintf(`
+	script := fmt.Sprintf(`
 echo "$ git push"
 cd %s || exit 1
 git push
@@ -78,25 +68,18 @@ read -n 1 -s -r
 exit $exitCode
 `, shellQuote(repoPath))
 
-		c := exec.Command("bash", "-c", script)
-		c.Stdin = os.Stdin
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-
-		err := c.Run()
-
-		return gitOperationFinishedMsg{
-			operation: "push",
-			err:       err,
-		}
-	}
+	c := exec.Command("bash", "-c", script)
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return gitOperationFinishedMsg{operation: "push", err: err}
+		}),
+	)
 }
 
 // gitSync executes git pull followed by git push (smart sync)
 func gitSync(repoPath string) tea.Cmd {
-	return func() tea.Msg {
-		// Execute git pull && git push
-		script := fmt.Sprintf(`
+	script := fmt.Sprintf(`
 echo "$ git sync (pull + push)"
 cd %s || exit 1
 
@@ -134,25 +117,18 @@ read -n 1 -s -r
 exit $pushCode
 `, shellQuote(repoPath))
 
-		c := exec.Command("bash", "-c", script)
-		c.Stdin = os.Stdin
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-
-		err := c.Run()
-
-		return gitOperationFinishedMsg{
-			operation: "sync",
-			err:       err,
-		}
-	}
+	c := exec.Command("bash", "-c", script)
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return gitOperationFinishedMsg{operation: "sync", err: err}
+		}),
+	)
 }
 
 // gitFetch executes git fetch to update remote tracking branches
 func gitFetch(repoPath string) tea.Cmd {
-	return func() tea.Msg {
-		// Execute git fetch command
-		script := fmt.Sprintf(`
+	script := fmt.Sprintf(`
 echo "$ git fetch"
 cd %s || exit 1
 git fetch
@@ -172,16 +148,11 @@ read -n 1 -s -r
 exit $exitCode
 `, shellQuote(repoPath))
 
-		c := exec.Command("bash", "-c", script)
-		c.Stdin = os.Stdin
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-
-		err := c.Run()
-
-		return gitOperationFinishedMsg{
-			operation: "fetch",
-			err:       err,
-		}
-	}
+	c := exec.Command("bash", "-c", script)
+	return tea.Sequence(
+		tea.ClearScreen,
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return gitOperationFinishedMsg{operation: "fetch", err: err}
+		}),
+	)
 }
