@@ -194,6 +194,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reset horizontal scroll on window resize
 		m.detailScrollX = 0
 
+		// Clear screen to prevent ghost content from previous render
+		// (old content can persist if new view is shorter than old view)
+		return m, tea.ClearScreen
+
 	case tickMsg:
 		// Background refresh for git repos (every 60 seconds)
 		if m.showGitReposOnly && !m.gitReposLastScan.IsZero() {
