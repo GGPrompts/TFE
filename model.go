@@ -124,8 +124,10 @@ func initialModel() model {
 	// else: keep viewSinglePane (default from line 32)
 
 	// If --preview flag was set, enable dual-pane to show preview
+	// and focus the preview pane (gives it 60% width in accordion layout)
 	if autoPreview {
 		m.viewMode = viewDualPane
+		m.focusedPane = rightPane
 	}
 
 	m.calculateLayout()
