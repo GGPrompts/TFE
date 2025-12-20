@@ -751,7 +751,15 @@ func findTFERepository() string {
 	}
 
 	// Strategy 2: Check common locations
-	home := os.Getenv("HOME")
+	// Use os.UserHomeDir() for cross-platform compatibility, with fallback to HOME env var
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.Getenv("HOME")
+	}
+	if home == "" {
+		// No home directory available, skip home-based path checks
+		return ""
+	}
 	possiblePaths := []string{
 		filepath.Join(home, "TFE"),
 		filepath.Join(home, "tfe"),
@@ -841,7 +849,17 @@ func termuxNewSessionCmd(command string, workDir string) string {
 	// 1. LD_PRELOAD for libtermux-exec - fixes shebangs like #!/usr/bin/env node
 	// 2. Source .bashrc for PATH and other environment variables
 	// 3. Use login shell (-l) so profile scripts are sourced
-	ldPreload := "export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so"
+
+	// Dynamically detect Termux installation directory from PREFIX env var
+	// Fall back to standard Termux path if PREFIX is not set
+	prefix := os.Getenv("PREFIX")
+	if prefix == "" {
+		prefix = "/data/data/com.termux/files/usr"
+	}
+
+	ldPreload := fmt.Sprintf("export LD_PRELOAD=%s/lib/libtermux-exec.so", prefix)
+	bashPath := fmt.Sprintf("%s/bin/bash", prefix)
+
 	var bashCmd string
 	if workDir != "" {
 		bashCmd = fmt.Sprintf("%s; source ~/.bashrc 2>/dev/null; cd '%s' && %s", ldPreload, workDir, command)
@@ -855,10 +873,10 @@ func termuxNewSessionCmd(command string, workDir string) string {
 		"am startservice --user 0 "+
 			"-n com.termux/com.termux.app.RunCommandService "+
 			"-a com.termux.RUN_COMMAND "+
-			"--es com.termux.RUN_COMMAND_PATH '/data/data/com.termux/files/usr/bin/bash' "+
+			"--es com.termux.RUN_COMMAND_PATH '%s' "+
 			"--esa com.termux.RUN_COMMAND_ARGUMENTS '-c,%s' "+
 			"--ez com.termux.RUN_COMMAND_BACKGROUND false",
-		bashCmd,
+		bashPath, bashCmd,
 	)
 }
 

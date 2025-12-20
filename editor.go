@@ -196,8 +196,18 @@ rm -f "$0"
 		return nil
 	}
 
-	// Launch script detached using setsid
-	cmd := exec.Command("setsid", "-f", "bash", tmpScript)
+	// Launch script detached - use platform-appropriate method
+	var cmd *exec.Cmd
+
+	if editorAvailable("setsid") {
+		// Linux: Use setsid to fully detach the process
+		cmd = exec.Command("setsid", "-f", "bash", tmpScript)
+	} else {
+		// macOS/Termux: Use nohup with background execution
+		// The script runs in background (&) and nohup ensures it survives TFE exit
+		cmd = exec.Command("bash", "-c", fmt.Sprintf("nohup bash '%s' &", tmpScript))
+	}
+
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -221,6 +231,9 @@ func copyToClipboard(text string) error {
 		// fails with exit status 2 when using StdinPipe directly
 		cmd = exec.Command("bash", "-c", fmt.Sprintf("termux-clipboard-set <<'CLIPBOARD_EOF'\n%s\nCLIPBOARD_EOF", text))
 		return cmd.Run()
+	} else if editorAvailable("wl-copy") {
+		// Wayland - wl-copy reads from stdin
+		cmd = exec.Command("wl-copy")
 	} else if editorAvailable("xclip") {
 		cmd = exec.Command("xclip", "-selection", "clipboard")
 	} else if editorAvailable("xsel") {
@@ -232,7 +245,7 @@ func copyToClipboard(text string) error {
 		// Windows/WSL
 		cmd = exec.Command("clip.exe")
 	} else {
-		return fmt.Errorf("no clipboard utility found (install termux-api, xclip, xsel, or use WSL)")
+		return fmt.Errorf("no clipboard utility found (install wl-copy, xclip, xsel, or use WSL)")
 	}
 
 	// For non-Termux platforms, use the standard StdinPipe approach
@@ -465,10 +478,30 @@ func openInBrowser(path string) tea.Cmd {
 			// Use wslpath to convert WSL path to Windows path
 			cmd := exec.Command("wslpath", "-w", path)
 			output, err := cmd.Output()
-			if err == nil {
-				browserPath = strings.TrimSpace(string(output))
+			if err != nil {
+				// wslpath failed - can't open with Windows browser
+				return browserOpenedMsg{
+					success: false,
+					err:     fmt.Errorf("failed to convert path for Windows browser: %w", err),
+				}
 			}
-			// If conversion fails, fall back to original path
+			browserPath = strings.TrimSpace(string(output))
+			// Validate it looks like a Windows path (e.g., C:\path or \\wsl.localhost\...)
+			if len(browserPath) < 3 {
+				return browserOpenedMsg{
+					success: false,
+					err:     fmt.Errorf("wslpath produced invalid Windows path: %q", browserPath),
+				}
+			}
+			// Check for drive letter (C:\) or UNC path (\\)
+			hasDriveLetter := len(browserPath) >= 3 && browserPath[1] == ':' && (browserPath[2] == '\\' || browserPath[2] == '/')
+			hasUNCPath := len(browserPath) >= 2 && browserPath[0] == '\\' && browserPath[1] == '\\'
+			if !hasDriveLetter && !hasUNCPath {
+				return browserOpenedMsg{
+					success: false,
+					err:     fmt.Errorf("wslpath produced invalid Windows path (expected drive letter or UNC): %q", browserPath),
+				}
+			}
 		}
 
 		if browser == "cmd.exe" {
@@ -848,12 +881,29 @@ func openInFileExplorer(path string) tea.Cmd {
 			// Convert Linux path to Windows path for better compatibility
 			cmd := exec.Command("wslpath", "-w", path)
 			output, err := cmd.Output()
-			var winPath string
-			if err == nil {
-				winPath = strings.TrimSpace(string(output))
-			} else {
-				// If conversion fails, use the Linux path (explorer.exe can handle some WSL paths)
-				winPath = path
+			if err != nil {
+				// wslpath failed - can't open with Windows Explorer
+				return fileExplorerOpenedMsg{
+					success: false,
+					err:     fmt.Errorf("failed to convert path for Windows Explorer: %w", err),
+				}
+			}
+			winPath := strings.TrimSpace(string(output))
+			// Validate it looks like a Windows path (e.g., C:\path or \\wsl.localhost\...)
+			if len(winPath) < 3 {
+				return fileExplorerOpenedMsg{
+					success: false,
+					err:     fmt.Errorf("wslpath produced invalid Windows path: %q", winPath),
+				}
+			}
+			// Check for drive letter (C:\) or UNC path (\\)
+			hasDriveLetter := len(winPath) >= 3 && winPath[1] == ':' && (winPath[2] == '\\' || winPath[2] == '/')
+			hasUNCPath := len(winPath) >= 2 && winPath[0] == '\\' && winPath[1] == '\\'
+			if !hasDriveLetter && !hasUNCPath {
+				return fileExplorerOpenedMsg{
+					success: false,
+					err:     fmt.Errorf("wslpath produced invalid Windows path (expected drive letter or UNC): %q", winPath),
+				}
 			}
 			c = exec.Command("explorer.exe", winPath)
 		} else if editorAvailable("xdg-open") {

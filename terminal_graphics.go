@@ -92,15 +92,18 @@ func detectTerminalProtocol() TerminalProtocol {
 // isWezTermInPath checks if WezTerm is available in the PATH
 // This is useful for WSL where WezTerm is installed on Windows
 func isWezTermInPath() bool {
-	// Check common Windows mount points in WSL
-	wezTermPaths := []string{
-		"/mnt/c/Program Files/WezTerm/wezterm.exe",
-		"/mnt/c/Program Files (x86)/WezTerm/wezterm.exe",
-	}
-
-	for _, path := range wezTermPaths {
-		if _, err := os.Stat(path); err == nil {
-			return true
+	// Check common Windows drive letters for WezTerm in WSL
+	// Users may have Windows installed on drives other than C:
+	driveLetters := []string{"c", "d", "e"}
+	for _, drive := range driveLetters {
+		paths := []string{
+			fmt.Sprintf("/mnt/%s/Program Files/WezTerm/wezterm.exe", drive),
+			fmt.Sprintf("/mnt/%s/Program Files (x86)/WezTerm/wezterm.exe", drive),
+		}
+		for _, path := range paths {
+			if _, err := os.Stat(path); err == nil {
+				return true
+			}
 		}
 	}
 
