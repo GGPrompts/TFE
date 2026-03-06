@@ -111,7 +111,8 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// In dual-pane mode, detect which pane was clicked to switch focus
-	if m.viewMode == viewDualPane && msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+	// Skip when menu is open - dropdown clicks should not change pane focus
+	if m.viewMode == viewDualPane && msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft && !m.menuOpen {
 		// Check if click is in panes (not in header or status bar)
 		// Header is 4 lines total (title, toolbar, command, separator)
 		headerLines := 4
