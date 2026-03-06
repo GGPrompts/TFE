@@ -4,7 +4,7 @@ This document provides detailed descriptions of all TFE modules, their responsib
 
 ## Overview
 
-TFE follows a modular architecture with 19 specialized modules, each handling a specific aspect of the application. This document serves as the comprehensive reference for understanding what each module does.
+TFE follows a modular architecture with 21 specialized modules, each handling a specific aspect of the application. This document serves as the comprehensive reference for understanding what each module does.
 
 ---
 
@@ -177,20 +177,56 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 ## File System & Operations Modules
 
 ### 9. `file_operations.go` - File Operations
-**Purpose**: All file system operations and formatting
+**Purpose**: File loading, preview, and CRUD operations
 
 **Contents**:
 - `loadFiles()` - reads directory contents
 - `loadSubdirFiles()` - loads subdirectory for tree view expansion
 - `loadPreview()` - loads file for preview
-- Icon mapping functions (`getFileIcon()`, `getIconForExtension()`)
-- Formatting functions (`formatFileSize()`, `formatModTime()`)
-- File type detection (`isBinaryFile()`, `isClaudeContextFile()`)
+- File classification helpers (`isClaudeContextFile()`, `isInPromptsDirectory()`)
+- File sorting and filtering
 
 **When to extend**:
 - Add new file operations (copy, move, delete) here
-- Add new file type detection logic
-- Add new formatting utilities
+- Add new file loading or preview logic
+
+---
+
+### 9a. `file_icons.go` - File Type Detection & Icons
+**Purpose**: File type classification, icons, and metadata utilities
+
+**Contents**:
+- `isPromptFile()` - prompt file detection
+- `isObsidianVault()` - vault detection
+- File type checks (`isTextFile()`, `isImageFile()`, `isVideoFile()`, `isAudioFile()`, etc.)
+- `getFileIcon()` - icon assignment based on file type/extension
+- `getFileType()` - file type string based on extension
+- `formatFileSize()`, `formatModTime()` - metadata formatting
+- `isDirEmpty()`, `getDirItemCount()` - directory utilities
+- `isMarkdownFile()`, `isBinaryFile()` - format detection
+- `highlightCode()` - syntax highlighting support
+
+**When to extend**:
+- Add new file type detection or classification
+- Add new icon mappings
+- Add file metadata formatting utilities
+
+---
+
+### 9b. `text_wrapping.go` - Width Calculations & Text Wrapping
+**Purpose**: Visual width calculations, text wrapping, and truncation
+
+**Contents**:
+- `visualWidth()` - accurate visual width using go-runewidth
+- `visualWidthCompensated()` - width with emoji compensation
+- `truncateToWidth()` - safe text truncation preserving ANSI codes
+- `truncateToWidthCompensated()` - truncation with compensation
+- `padIconToWidth()`, `padToVisualWidth()` - padding utilities
+- `wrapLine()`, `getWrappedLineCount()` - line wrapping
+
+**When to extend**:
+- Add new width-aware text utilities
+- Modify wrapping or truncation behavior
 
 ---
 
@@ -256,9 +292,14 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 ---
 
 ### 12. `git_operations.go` - Git Repository Operations
-**Purpose**: Git workspace management with visual triage and quick operations
+**Purpose**: Git status queries and workspace management operations
 
 **Contents**:
+- **Git status queries:**
+  - `isGitRepo()`, `getGitBranch()`, `hasUncommittedChanges()`
+  - `getGitStatus()`, `getAheadBehindCounts()`, `checkPackedRefs()`
+  - `getLastCommitInfo()`, `formatGitStatus()`, `formatLastCommitTime()`
+  - `scanGitReposRecursive()`, `getGitStatusSortValue()`, `sortGitReposList()`
 - **Git operations:**
   - `gitPull()` - Execute git pull with feedback
   - `gitPush()` - Execute git push with error handling
@@ -266,14 +307,8 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
   - `gitFetch()` - Update remote tracking branches
 - **Message types:**
   - `gitOperationFinishedMsg` - Operation completion notification
-- **Integration:**
-  - Context menu integration for git repositories
-  - Auto-refresh after operations complete
-  - Status message display for success/failure
 
 **When to extend**: Add more git operations (stash, branch, merge, etc.), implement conflict resolution UI.
-
-**Recent additions**: Full git workspace management system with visual status indicators in git repos view.
 
 ---
 
@@ -365,6 +400,6 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 
 **Rendering chain**: `view.go` → `render_preview.go`, `render_file_list.go`, `menu.go`
 
-**Data operations**: All modules use `file_operations.go` for file system access
+**Data operations**: Modules use `file_operations.go` for file loading, `file_icons.go` for type detection, `text_wrapping.go` for width calculations
 
 **Cross-cutting**: `types.go` and `styles.go` are used by all modules

@@ -47,10 +47,12 @@ tfe/
 ├── menu.go                    # Menu bar rendering
 ├── render_preview.go          # Preview rendering
 ├── render_file_list.go        # File list views
-├── file_operations.go         # File operations
+├── file_operations.go         # File operations (load, preview, CRUD)
+├── file_icons.go              # File type detection & icons
+├── text_wrapping.go           # Width calculations & text wrapping
 ├── editor.go                  # External tool integration
 ├── command.go                 # Command execution
-├── git_operations.go          # Git operations
+├── git_operations.go          # Git operations & status queries
 ├── dialog.go                  # Dialog system
 ├── context_menu.go            # Context menu
 ├── favorites.go               # Favorites/bookmarks
@@ -85,14 +87,18 @@ tfe/
 - **`menu.go`** - Menu bar rendering
 
 ### File System
-- **`file_operations.go`** - File operations & formatting
+- **`file_operations.go`** - File loading, preview, CRUD operations
+- **`file_icons.go`** - File type detection, icons, metadata formatting
 - **`favorites.go`** - Bookmarks system
 - **`trash.go`** - Trash/recycle bin
+
+### Text & Layout
+- **`text_wrapping.go`** - Width calculations, text wrapping, truncation
 
 ### External Integration
 - **`editor.go`** - Editors, browsers, clipboard
 - **`command.go`** - Command execution & history
-- **`git_operations.go`** - Git pull/push/sync/fetch
+- **`git_operations.go`** - Git operations & status queries
 
 ### UI Components
 - **`dialog.go`** - Input/confirmation dialogs
