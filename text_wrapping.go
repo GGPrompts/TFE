@@ -10,6 +10,8 @@ package main
 import (
 	"strings"
 	"time"
+
+	"github.com/mattn/go-runewidth"
 )
 
 // wrapLine wraps a line of text to fit within the specified width
@@ -143,6 +145,172 @@ func (m model) getWrappedLineCount() int {
 	// The header is fixed and doesn't scroll, so it shouldn't be included
 	// in scroll calculations
 	return totalLines
+}
+
+// visualWidth calculates the visual width of a string, accounting for tabs and ANSI codes
+// This is important for consistent scrollbar alignment and box borders
+// NOTE: This is the non-terminal-aware version - use m.visualWidthCompensated() for layout calculations
+func visualWidth(s string) int {
+	// Strip ANSI codes first
+	stripped := ""
+	inAnsi := false
+
+	for _, ch := range s {
+		// Detect start of ANSI escape sequence
+		if ch == '\033' {
+			inAnsi = true
+			continue
+		}
+
+		// Skip characters inside ANSI sequences
+		if inAnsi {
+			// ANSI sequences end with a letter (A-Z, a-z)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+
+		// Keep visible characters
+		stripped += string(ch)
+	}
+
+	return runewidth.StringWidth(stripped)
+}
+
+// visualWidthCompensated calculates visual width with terminal-specific emoji compensation
+// Use this for layout calculations that need accurate emoji widths
+// STRIPS ANSI escape codes before calculating width
+func (m model) visualWidthCompensated(s string) int {
+	// Use visualWidth() which strips ANSI codes, not runewidth.StringWidth()
+	width := visualWidth(s)
+
+	// Apply variation selector compensation for Windows Terminal ONLY
+	// runewidth reports emoji+VS as 1 cell, but Windows Terminal renders as 2 cells
+	// We ADD 1 per VS for Windows Terminal to match its wider rendering
+	variationSelectorCount := strings.Count(s, "\uFE0F")
+	if m.terminalType == terminalWindowsTerminal && variationSelectorCount > 0 {
+		width += variationSelectorCount
+	}
+
+	// NOTE: xterm.js actually renders emojis as 2 cells (same as runewidth)
+	// Do NOT compensate for xterm - trust runewidth's 2-cell calculation
+
+	return width
+}
+
+// truncateToWidth truncates a string to fit within a target visual width
+func truncateToWidth(s string, targetWidth int) string {
+	width := 0
+	result := ""
+	inAnsi := false
+
+	for _, ch := range s {
+		// Handle ANSI escape sequences (don't count toward width)
+		if ch == '\033' {
+			inAnsi = true
+			result += string(ch)
+			continue
+		}
+
+		if inAnsi {
+			result += string(ch)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+
+		// Calculate character width
+		charWidth := 1
+		if ch == '\t' {
+			charWidth = 8 - (width % 8)
+		} else {
+			// Use runewidth to properly handle wide characters (emojis, CJK)
+			charWidth = runewidth.RuneWidth(ch)
+		}
+
+		if width+charWidth > targetWidth {
+			// Can't fit this character
+			if targetWidth-width >= 3 {
+				return result + "..."
+			}
+			return result
+		}
+
+		width += charWidth
+		result += string(ch)
+	}
+
+	return result
+}
+
+// truncateToWidthCompensated truncates a string to fit within a target visual width
+// with terminal-specific emoji width compensation (uses m.runeWidth for accurate widths)
+func (m model) truncateToWidthCompensated(s string, targetWidth int) string {
+	width := 0
+	result := ""
+	inAnsi := false
+
+	for _, ch := range s {
+		// Handle ANSI escape sequences (don't count toward width)
+		if ch == '\033' {
+			inAnsi = true
+			result += string(ch)
+			continue
+		}
+
+		if inAnsi {
+			result += string(ch)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+
+		// Calculate character width using terminal-aware function
+		charWidth := 1
+		if ch == '\t' {
+			charWidth = 8 - (width % 8)
+		} else {
+			// Use terminal-aware runeWidth to properly handle wide characters
+			charWidth = m.runeWidth(ch)
+		}
+
+		if width+charWidth > targetWidth {
+			// Can't fit this character
+			if targetWidth-width >= 3 {
+				return result + "..."
+			}
+			return result
+		}
+
+		width += charWidth
+		result += string(ch)
+	}
+
+	return result
+}
+
+// padIconToWidth pads an icon emoji to a fixed width (2 cells) for consistent alignment
+// Some terminals render certain emojis as 1 cell, so we pad them to 2 cells
+func (m model) padIconToWidth(icon string) string {
+	return m.padToVisualWidth(icon, 2)
+}
+
+// padToVisualWidth pads a string to a specific visual width using spaces
+// This correctly handles emojis, wide characters, AND ANSI escape codes
+// Terminal-aware: Variation selector compensation only for WezTerm
+func (m model) padToVisualWidth(s string, targetWidth int) string {
+	// Use visualWidthCompensated which already handles ANSI codes via m.visualWidthCompensated
+	// which delegates to visualWidth for ANSI stripping
+	calculatedWidth := m.visualWidthCompensated(s)
+
+	if calculatedWidth >= targetWidth {
+		return s
+	}
+	padding := targetWidth - calculatedWidth
+	return s + strings.Repeat(" ", padding)
 }
 
 // getPromptHeaderHeight calculates how many lines the prompt header takes up
