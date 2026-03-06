@@ -544,6 +544,7 @@ tfe "$(dirname /path/to/file.txt)"
 | `Enter` | Open folder or preview file |
 | `Space` | Toggle dual-pane mode on/off |
 | `Tab` | Toggle dual-pane mode / switch between panes |
+| `Ctrl+L` | Lock/unlock panel widths (prevents resize on focus change) |
 
 #### View Modes
 | Key | Action |

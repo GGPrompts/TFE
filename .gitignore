@@ -45,6 +45,9 @@ games/
 # Note: examples/.prompts is tracked and shared with users
 .prompts/
 
+# Beads issue tracker
+.beads/
+
 # Temporary files
 *.prompty.tmp
 new-prompt-*.prompty

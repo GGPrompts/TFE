@@ -5,6 +5,14 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added
+- **Panel Width Lock for Dual-Pane Mode**
+  - `Ctrl+L` or View menu toggle to lock panel widths
+  - Prevents accordion 60/40 resize when switching focus between panes
+  - Useful on wider terminals where file tree is already readable
+  - Panels scale proportionally on terminal resize while locked
+  - Lock auto-resets when exiting dual-pane mode
+  - Files modified: `types.go`, `model.go`, `update_keyboard.go`, `menu.go`, `update_mouse.go`
+
 - **CLI File/Directory Arguments**
   - Open TFE to a specific directory: `tfe ~/projects`
   - Open with a file pre-selected: `tfe ~/projects/main.go`
