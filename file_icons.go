@@ -22,6 +22,43 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 )
 
+// isPromptFile checks if a file is a prompt file (.prompty, .yaml, .md, .txt)
+// Only files in special directories (.claude/, ~/.prompts/) are considered prompts
+// Exception: .prompty files are always prompts (Microsoft Prompty format)
+func isPromptFile(item fileItem) bool {
+	if item.isDir {
+		return false
+	}
+
+	ext := strings.ToLower(filepath.Ext(item.name))
+
+	// .prompty is always a prompt file (Microsoft Prompty format)
+	if ext == ".prompty" {
+		return true
+	}
+
+	// For other extensions, only consider them prompts if in special directories
+	if ext == ".md" || ext == ".yaml" || ext == ".yml" || ext == ".txt" {
+		// Exclude .claude/agents/ - those are documentation files, not prompt templates
+		if strings.Contains(item.path, "/.claude/agents/") {
+			return false
+		}
+
+		// Check if in .claude/ or any subfolder
+		if strings.Contains(item.path, "/.claude/") || strings.HasSuffix(item.path, "/.claude") {
+			return true
+		}
+		// Check if in ~/.prompts/ or any subfolder
+		homeDir, _ := os.UserHomeDir()
+		promptsDir := filepath.Join(homeDir, ".prompts")
+		if strings.HasPrefix(item.path, promptsDir) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // isObsidianVault checks if a directory is an Obsidian vault (contains .obsidian folder)
 func isObsidianVault(path string) bool {
 	obsidianPath := filepath.Join(path, ".obsidian")
