@@ -2109,6 +2109,21 @@ rm -f "$0"
 			m.setStatusMessage("Collapse all only works in tree view (press 3)", false)
 		}
 
+	case "ctrl+l":
+		// Ctrl+L: Toggle panel lock (disable accordion resizing in dual-pane)
+		if m.viewMode == viewDualPane {
+			m.panelsLocked = !m.panelsLocked
+			if m.panelsLocked {
+				m.setStatusMessage("Panels locked (widths won't change with focus)", false)
+			} else {
+				m.setStatusMessage("Panels unlocked (accordion mode)", false)
+				m.calculateLayout()
+				m.populatePreviewCache()
+			}
+		} else {
+			m.setStatusMessage("Panel lock only works in dual-pane mode (Tab/Space)", false)
+		}
+
 	case "f4":
 		// F4: Open file with appropriate viewer/editor
 		if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {

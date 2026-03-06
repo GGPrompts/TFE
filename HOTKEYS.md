@@ -313,6 +313,7 @@ When in trash view:
 |-----|--------|
 | **Tab** | Switch focus between left pane (file list) and right pane (preview) |
 | **Space** | Toggle dual-pane mode on/off |
+| **Ctrl+L** | Lock/unlock panel widths (prevents accordion resizing on focus change) |
 | **↑/↓** or **k/j** | Navigate file list (left focus) or scroll preview (right focus) |
 | **PgUp/PgDn** | Page up/down in preview (when right pane focused) |
 | **Mouse Click** | Click on pane to switch focus |

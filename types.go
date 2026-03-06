@@ -274,7 +274,8 @@ type model struct {
 	preview     previewModel
 	leftWidth   int // Width of left pane in dual-pane mode
 	rightWidth  int // Width of right pane in dual-pane mode
-	focusedPane paneType // Which pane has focus in dual-pane mode
+	focusedPane    paneType // Which pane has focus in dual-pane mode
+	panelsLocked   bool     // When true, panel widths don't change with focus (disables accordion)
 	// Glamour renderer cache (avoid recreating on every render)
 	glamourRenderer      interface{} // *glamour.TermRenderer
 	glamourRendererWidth int         // Width renderer was created for

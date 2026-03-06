@@ -61,6 +61,7 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "  └─ Collapse All", Action: "collapse-all-tree", Shortcut: "Ctrl+W"},
 				{IsSeparator: true},
 				{Label: "⬌ Preview Pane", Action: "toggle-dual-pane", Shortcut: "Tab/Space", IsCheckable: true, IsChecked: m.viewMode == viewDualPane},
+				{Label: "🔒 Lock Panel Widths", Action: "toggle-panel-lock", Shortcut: "Ctrl+L", IsCheckable: true, IsChecked: m.panelsLocked},
 				{Label: "👁  Show Hidden Files", Action: "toggle-hidden", Shortcut: "H or .", IsCheckable: true, IsChecked: m.showHidden},
 				{IsSeparator: true},
 				{Label: "📝 Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly},
@@ -816,6 +817,17 @@ Additional context: {{variable2}}
 		}
 		m.calculateLayout()
 		m.populatePreviewCache()
+
+	case "toggle-panel-lock":
+		if m.viewMode == viewDualPane {
+			m.panelsLocked = !m.panelsLocked
+			if !m.panelsLocked {
+				m.calculateLayout()
+				m.populatePreviewCache()
+			}
+		} else {
+			m.setStatusMessage("Panel lock only works in dual-pane mode", false)
+		}
 
 	case "toggle-hidden":
 		m.showHidden = !m.showHidden
