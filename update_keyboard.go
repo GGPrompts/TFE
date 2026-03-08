@@ -2165,6 +2165,28 @@ rm -f "$0"
 			}
 		}
 
+	case "w":
+		// Tmux split: open terminal at selected dir (or current dir)
+		if m.inTmux && !m.menuOpen && !m.showDialog && !m.commandFocused && !m.contextMenuOpen && m.viewMode != viewFullPreview {
+			dir := m.currentPath
+			if f := m.getCurrentFile(); f != nil && f.isDir {
+				dir = f.path
+			}
+			return m, tmuxSmartSplit("", dir)
+		}
+
+	case "W":
+		// Tmux split: open file in editor
+		if m.inTmux && !m.menuOpen && !m.showDialog && !m.commandFocused && !m.contextMenuOpen && m.viewMode != viewFullPreview {
+			if f := m.getCurrentFile(); f != nil && !f.isDir {
+				editor := os.Getenv("EDITOR")
+				if editor == "" {
+					editor = "micro"
+				}
+				return m, tmuxSmartSplit(fmt.Sprintf("%s %s", editor, shellQuote(f.path)), filepath.Dir(f.path))
+			}
+		}
+
 	case "f5":
 		// F5: Copy rendered prompt (prompts), full content (text files), or file path (binary/not previewed)
 		if currentFile := m.getCurrentFile(); currentFile != nil {

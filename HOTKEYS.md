@@ -318,6 +318,13 @@ When in trash view:
 | **PgUp/PgDn** | Page up/down in preview (when right pane focused) |
 | **Mouse Click** | Click on pane to switch focus |
 
+## Tmux (when inside tmux)
+
+| Key | Action |
+|-----|--------|
+| **w** | Open terminal in split (at selected dir or current dir) |
+| **W** | Open file in editor in split |
+
 ## Background Processes & Shell Access
 
 | Key | Action |
