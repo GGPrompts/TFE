@@ -58,6 +58,18 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		if m.toolsAvailable["tmux"] {
 			items = append(items, contextMenuItem{"🖥  Tmux Quad", "tmux_quad"})
 		}
+		if m.inTmux {
+			items = append(items, contextMenuItem{"🖥 Terminal here", "tmux_terminal"})
+			if m.toolsAvailable["claude"] {
+				items = append(items, contextMenuItem{"🤖 Claude here", "tmux_claude_dir"})
+			}
+			if m.toolsAvailable["codex"] {
+				items = append(items, contextMenuItem{"🤖 Codex here", "tmux_codex_dir"})
+			}
+			if m.toolsAvailable["lazygit"] {
+				items = append(items, contextMenuItem{"📊 Lazygit here", "tmux_lazygit"})
+			}
+		}
 		items = append(items, contextMenuItem{"📁 New Folder...", "newfolder"})
 		items = append(items, contextMenuItem{"📄 New File...", "newfile"})
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
@@ -159,6 +171,18 @@ func (m model) getContextMenuItems() []contextMenuItem {
 			items = append(items, contextMenuItem{"⭐ Unfavorite", "togglefav"})
 		} else {
 			items = append(items, contextMenuItem{"☆ Add Favorite", "togglefav"})
+		}
+
+		// Tmux file actions (split pane)
+		if m.inTmux {
+			items = append(items, contextMenuItem{"─────────", "separator"})
+			items = append(items, contextMenuItem{"✂ Edit in split", "tmux_edit"})
+			if m.toolsAvailable["claude"] {
+				items = append(items, contextMenuItem{"🤖 Claude here", "tmux_claude"})
+			}
+			if m.toolsAvailable["codex"] {
+				items = append(items, contextMenuItem{"🤖 Codex here", "tmux_codex"})
+			}
 		}
 	}
 
@@ -495,6 +519,37 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		}
 		m.showDialog = true
 		return m, tea.ClearScreen
+
+	// Tmux file actions
+	case "tmux_edit":
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "micro"
+		}
+		path := m.contextMenuFile.path
+		dir := filepath.Dir(path)
+		return m, tmuxSmartSplit(fmt.Sprintf("%s %s", editor, shellQuote(path)), dir)
+
+	case "tmux_claude":
+		dir := filepath.Dir(m.contextMenuFile.path)
+		return m, tmuxSmartSplit("claude", dir)
+
+	case "tmux_codex":
+		dir := filepath.Dir(m.contextMenuFile.path)
+		return m, tmuxSmartSplit("codex", dir)
+
+	// Tmux directory actions
+	case "tmux_terminal":
+		return m, tmuxSmartSplit("", m.contextMenuFile.path)
+
+	case "tmux_claude_dir":
+		return m, tmuxSmartSplit("claude", m.contextMenuFile.path)
+
+	case "tmux_codex_dir":
+		return m, tmuxSmartSplit("codex", m.contextMenuFile.path)
+
+	case "tmux_lazygit":
+		return m, tmuxSmartSplit("lazygit", m.contextMenuFile.path)
 	}
 
 	return m, tea.ClearScreen
