@@ -322,6 +322,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Failed to open file explorer: "+msg.err.Error(), true)
 		}
 		return m, statusTimeoutCmd()
+
+	case tmuxSplitMsg:
+		// Tmux split/window operation completed
+		if msg.err != nil {
+			m.setStatusMessage(fmt.Sprintf("Tmux split failed: %v", msg.err), true)
+		} else {
+			m.setStatusMessage("Opened in tmux split", false)
+		}
+		return m, statusTimeoutCmd()
 	}
 
 	return m, nil

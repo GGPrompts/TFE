@@ -30,6 +30,7 @@ func initialModel() model {
 		height:          24,
 		width:           80,
 		showHidden:      false,
+		inTmux:          isInsideTmux(),       // Detect if running inside tmux
 		terminalType:    detectTerminalType(), // Detect terminal for emoji width compensation
 		forceLightTheme: forceLightTheme,      // Set from CLI flag (--light / --dark)
 		displayMode:       modeTree,             // Tree view works better on narrow terminals

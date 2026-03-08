@@ -264,6 +264,7 @@ type model struct {
 	width        int
 	showHidden   bool
 	terminalType    terminalType // Detected terminal emulator for emoji width compensation
+	inTmux          bool         // Whether TFE is running inside a tmux session
 	forceLightTheme bool         // Force light theme (--light flag) for glamour and menu colors
 	displayMode     displayMode
 	sortBy      string // "name", "size", "modified" for detail view
