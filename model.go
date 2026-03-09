@@ -124,6 +124,17 @@ func initialModel() model {
 	}
 	// else: keep viewSinglePane (default from line 32)
 
+	// If standalone preview file was specified (tfe --preview /path/to/file),
+	// enter preview-only mode: minimal UI showing just the file content
+	if previewFile != "" {
+		m.previewOnly = true
+		m.viewMode = viewFullPreview
+		m.loadPreview(previewFile)
+		m.calculateLayout()
+		m.populatePreviewCache()
+		return m
+	}
+
 	// If --preview flag was set, enable dual-pane to show preview
 	// and focus the preview pane (gives it 60% width in accordion layout)
 	if autoPreview {

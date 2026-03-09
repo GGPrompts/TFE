@@ -17,11 +17,14 @@ var (
 	startPath       string // Directory to open
 	selectFile      string // File to select (basename)
 	autoPreview     bool   // Auto-open preview pane
+	previewFile     string // Standalone preview file path (viewer-only mode)
 )
 
 func main() {
 	// Handle command-line flags
-	for _, arg := range os.Args[1:] {
+	args := os.Args[1:]
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
 		switch {
 		case arg == "--version" || arg == "-v":
 			fmt.Printf("TFE (Terminal File Explorer) v%s\n", Version)
@@ -32,6 +35,33 @@ func main() {
 			forceLightTheme = false // Explicit dark mode (default)
 		case arg == "--preview" || arg == "-p":
 			autoPreview = true
+			// Check if next arg is a file path (not a flag) for standalone viewer mode
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				targetPath := args[i+1]
+				// Expand ~ to home directory
+				if strings.HasPrefix(targetPath, "~") {
+					home, err := os.UserHomeDir()
+					if err == nil {
+						targetPath = filepath.Join(home, targetPath[1:])
+					}
+				}
+				// Make absolute
+				absPath, err := filepath.Abs(targetPath)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: invalid path %q: %v\n", args[i+1], err)
+					os.Exit(1)
+				}
+				// Check if path exists and is a file
+				info, err := os.Stat(absPath)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: file not found %q: %v\n", args[i+1], err)
+					os.Exit(1)
+				}
+				if !info.IsDir() {
+					previewFile = absPath
+				}
+				i++ // skip next arg (consumed as file path)
+			}
 		case arg == "--help" || arg == "-h":
 			fmt.Println("TFE (Terminal File Explorer)")
 			fmt.Println()
@@ -42,6 +72,7 @@ func main() {
 			fmt.Println()
 			fmt.Println("Options:")
 			fmt.Println("  --preview    Auto-open preview pane (useful with file path)")
+			fmt.Println("               --preview <file>  Standalone file viewer mode")
 			fmt.Println("  --light      Use light theme (for light terminal backgrounds)")
 			fmt.Println("  --dark       Use dark theme (default)")
 			fmt.Println("  --version    Show version information")
@@ -51,7 +82,8 @@ func main() {
 			fmt.Println("  tfe                        Open current directory")
 			fmt.Println("  tfe ~/projects             Open ~/projects directory")
 			fmt.Println("  tfe ~/projects/main.go     Open ~/projects with main.go selected")
-			fmt.Println("  tfe --preview src/app.ts   Open with app.ts selected and previewed")
+			fmt.Println("  tfe --preview src/app.ts   Standalone file viewer (for tmux splits)")
+			fmt.Println("  tfe -p README.md           Standalone file viewer (short form)")
 			os.Exit(0)
 		case !strings.HasPrefix(arg, "-"):
 			// Non-flag argument is the path

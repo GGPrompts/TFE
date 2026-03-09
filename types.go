@@ -362,6 +362,8 @@ type model struct {
 	// Footer scrolling (click to activate)
 	footerScrolling bool // Whether footer is currently scrolling
 	footerOffset    int  // Horizontal scroll offset for footer text
+	// Standalone preview mode (tfe --preview /path/to/file)
+	previewOnly bool // When true, only show file preview with minimal UI (for tmux splits)
 }
 
 // treeItem represents an item in the tree view with depth information

@@ -441,7 +441,13 @@ func (m model) getPreviewVisibleLines() int {
 
 	var visibleLines int
 
-	if m.viewMode == viewFullPreview {
+	if m.previewOnly {
+		// Standalone preview mode: title(1) + help(1) + borders(2) = 4 lines overhead
+		visibleLines = m.height - 4
+		if visibleLines < 3 {
+			visibleLines = 3
+		}
+	} else if m.viewMode == viewFullPreview {
 		// Full preview mode: m.height - 4 (borders/help) - headerLines (title/info when mouse enabled)
 		headerLines := 0
 		if m.previewMouseEnabled {

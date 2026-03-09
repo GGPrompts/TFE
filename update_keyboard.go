@@ -41,6 +41,10 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Standalone preview mode: minimal keybindings only
+	if m.previewOnly {
+		return m.handlePreviewOnlyKeyEvent(msg)
+	}
 
 	// Handle menu bar navigation (when menu bar is focused but dropdown not open)
 	if m.menuBarFocused && !m.menuOpen {
@@ -2383,6 +2387,123 @@ rm -f "$0"
 
 	// Default case removed - command input is now focus-based (press : to enter command mode)
 	// This prevents stray characters (including terminal response sequences) from leaking into command prompt
+	}
+
+	return m, nil
+}
+
+// handlePreviewOnlyKeyEvent handles keyboard input in standalone preview mode
+// Only minimal keybindings are supported: quit, scroll, and search
+func (m model) handlePreviewOnlyKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle search mode input first
+	if m.preview.searchActive {
+		switch msg.String() {
+		case "esc":
+			m.preview.searchActive = false
+			m.preview.searchQuery = ""
+			m.preview.searchMatches = nil
+			m.preview.currentMatch = -1
+			return m, nil
+		case "enter":
+			// Accept search and exit search input mode
+			m.preview.searchActive = false
+			return m, nil
+		case "backspace":
+			if len(m.preview.searchQuery) > 0 {
+				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-1]
+				m.performPreviewSearch()
+			}
+			return m, nil
+		default:
+			// Add character to search query
+			if len(msg.Runes) > 0 && msg.Type == tea.KeyRunes {
+				m.preview.searchQuery += string(msg.Runes)
+				m.performPreviewSearch()
+			}
+			return m, nil
+		}
+	}
+
+	switch msg.String() {
+	case "q", "esc", "ctrl+c":
+		return m, tea.Quit
+
+	case "up", "k":
+		// Scroll preview up
+		if m.preview.scrollPos > 0 {
+			m.preview.scrollPos--
+		}
+
+	case "down", "j":
+		// Scroll preview down
+		totalLines := m.getWrappedLineCount()
+		visibleLines := m.getPreviewVisibleLines()
+		maxScroll := totalLines - visibleLines
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		if m.preview.scrollPos < maxScroll {
+			m.preview.scrollPos++
+		}
+
+	case "pageup", "pgup":
+		visibleLines := m.getPreviewVisibleLines()
+		m.preview.scrollPos -= visibleLines
+		if m.preview.scrollPos < 0 {
+			m.preview.scrollPos = 0
+		}
+
+	case "pagedown", "pgdn", "pgdown":
+		totalLines := m.getWrappedLineCount()
+		visibleLines := m.getPreviewVisibleLines()
+		maxScroll := totalLines - visibleLines
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		m.preview.scrollPos += visibleLines
+		if m.preview.scrollPos > maxScroll {
+			m.preview.scrollPos = maxScroll
+		}
+
+	case "home", "g":
+		// Scroll to top
+		m.preview.scrollPos = 0
+
+	case "end", "G":
+		// Scroll to bottom
+		totalLines := m.getWrappedLineCount()
+		visibleLines := m.getPreviewVisibleLines()
+		maxScroll := totalLines - visibleLines
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		m.preview.scrollPos = maxScroll
+
+	case "ctrl+f", "/":
+		// Activate search mode in preview
+		if !m.preview.searchActive {
+			m.preview.searchActive = true
+			m.preview.searchQuery = ""
+			m.preview.searchMatches = nil
+			m.preview.currentMatch = -1
+		}
+
+	case "n":
+		// Next search match
+		if len(m.preview.searchMatches) > 0 {
+			m.preview.currentMatch = (m.preview.currentMatch + 1) % len(m.preview.searchMatches)
+			m.preview.scrollPos = m.preview.searchMatches[m.preview.currentMatch]
+		}
+
+	case "N":
+		// Previous search match
+		if len(m.preview.searchMatches) > 0 {
+			m.preview.currentMatch--
+			if m.preview.currentMatch < 0 {
+				m.preview.currentMatch = len(m.preview.searchMatches) - 1
+			}
+			m.preview.scrollPos = m.preview.searchMatches[m.preview.currentMatch]
+		}
 	}
 
 	return m, nil

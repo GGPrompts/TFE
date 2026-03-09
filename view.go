@@ -16,6 +16,11 @@ func (m model) View() string {
 		return ""
 	}
 
+	// Standalone preview mode: minimal UI with just the file content
+	if m.previewOnly {
+		return m.renderPreviewOnly()
+	}
+
 	var baseView string
 
 	// Dispatch to appropriate view based on viewMode

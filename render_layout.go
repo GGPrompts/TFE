@@ -17,6 +17,101 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// renderPreviewOnly renders a standalone file viewer with minimal UI
+// Used when TFE is launched with --preview /path/to/file for tmux splits
+func (m model) renderPreviewOnly() string {
+	var s strings.Builder
+
+	if !m.preview.loaded {
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Padding(1, 2)
+		s.WriteString(errorStyle.Render("Error: Could not load file preview"))
+		return s.String()
+	}
+
+	// Title bar with file name (single line, minimal)
+	previewTitleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
+		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Width(m.width).
+		Padding(0, 1)
+
+	titleText := m.preview.fileName
+	if m.preview.tooLarge || m.preview.isBinary {
+		titleText += " [Cannot Preview]"
+	} else if m.preview.isMarkdown {
+		titleText += " [Markdown]"
+	}
+	s.WriteString(previewTitleStyle.Render(titleText))
+	s.WriteString("\033[0m")
+	s.WriteString("\n")
+
+	// Content area: full terminal minus title (1) + help line (1) + border (2)
+	headerLines := 1 // title bar
+	footerLines := 1 // help line
+	maxVisible := m.height - headerLines - footerLines - 2 // -2 for borders
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+	contentHeight := maxVisible
+
+	previewContent := m.renderPreview(contentHeight)
+
+	// Wrap preview in bordered box
+	previewBoxStyle := lipgloss.NewStyle().
+		Width(m.width - 6).
+		Height(contentHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.AdaptiveColor{
+			Light: "#00af87",
+			Dark:  "#5faf87",
+		})
+
+	s.WriteString(previewBoxStyle.Render(previewContent))
+	s.WriteString("\n")
+
+	// Minimal help line
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
+	helpText := "q/Esc: quit | j/k: scroll | Ctrl+F: search"
+	if m.visualWidthCompensated(helpText) > m.width-4 {
+		helpText = m.truncateToWidthCompensated(helpText, m.width-4)
+	}
+	s.WriteString(helpStyle.Render(helpText))
+	s.WriteString("\033[0m")
+
+	// Show search input if search is active
+	if m.preview.searchActive {
+		s.WriteString("\n")
+		searchStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("33")).
+			Foreground(lipgloss.Color("0")).
+			Bold(true).
+			Padding(0, 1)
+
+		matchCount := len(m.preview.searchMatches)
+		var searchText string
+		if matchCount > 0 {
+			currentPos := m.preview.currentMatch + 1
+			searchText = fmt.Sprintf("Search: %s (match %d/%d)", m.preview.searchQuery, currentPos, matchCount)
+		} else if m.preview.searchQuery == "" {
+			searchText = "Search: (type to search, n/N: navigate, Esc: close)"
+		} else {
+			searchText = fmt.Sprintf("Search: %s (no matches)", m.preview.searchQuery)
+		}
+
+		if m.visualWidthCompensated(searchText) > m.width-4 {
+			searchText = m.truncateToWidthCompensated(searchText, m.width-4)
+		}
+		s.WriteString(searchStyle.Render(searchText))
+		s.WriteString("\033[0m")
+	}
+
+	return s.String()
+}
+
 // renderFullPreview renders the full-screen preview mode
 func (m model) renderFullPreview() string {
 	var s strings.Builder
