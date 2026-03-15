@@ -663,7 +663,7 @@ func (m model) renderToolbarRow() string {
 	s.WriteString(" ")
 
 	// Trash/Recycle bin button - add space after icon for proper alignment
-	trashIcon := "🗑"
+	trashIcon := "󰩺"
 	if m.showTrashOnly {
 		trashIcon = "♻" // Recycle icon when viewing trash
 	}

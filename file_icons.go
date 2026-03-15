@@ -249,13 +249,13 @@ func getFileIcon(item fileItem) string {
 		".rar": "🗜", // RAR compression
 
 		// Images
-		".png": "🖼", // PNG frame
-		".jpg": "🖼", // JPG frame
-		".jpeg": "🖼", // JPEG frame
+		".png": "󰋩", // PNG frame
+		".jpg": "󰋩", // JPG frame
+		".jpeg": "󰋩", // JPEG frame
 		".gif": "🎞", // GIF film
 		".svg": "🎨", // SVG palette
-		".ico": "🖼", // ICO frame
-		".webp": "🖼", // WebP frame
+		".ico": "󰋩", // ICO frame
+		".webp": "󰋩", // WebP frame
 
 		// Audio/Video
 		".mp3": "🎵", // MP3 music
