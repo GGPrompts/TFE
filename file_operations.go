@@ -633,6 +633,10 @@ func (m *model) loadPreview(path string) {
 	m.preview.tooLarge = false
 	m.preview.isMarkdown = false
 	m.preview.isSyntaxHighlighted = false
+	// Clear any existing kitty graphics from the terminal before loading new preview
+	if m.preview.hasGraphicsProtocol {
+		fmt.Print(clearKittyGraphics())
+	}
 	m.preview.hasGraphicsProtocol = false
 	m.preview.isPrompt = false
 	m.preview.promptTemplate = nil

@@ -263,6 +263,15 @@ func encodeSixelImage(img image.Image) (string, error) {
 	return buf.String(), nil
 }
 
+// clearKittyGraphics returns the Kitty graphics protocol delete-all command.
+// This APC sequence tells the terminal to remove all images placed via the
+// Kitty graphics protocol. It should be sent before loading a new preview
+// (to clear the previous image) and during terminal cleanup on exit.
+// Sequence: ESC _ G a=d ESC \
+func clearKittyGraphics() string {
+	return "\033_Ga=d\033\\"
+}
+
 // getProtocolName returns a human-readable name for the detected protocol
 func getProtocolName() string {
 	protocol := detectTerminalProtocol()

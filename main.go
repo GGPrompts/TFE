@@ -158,6 +158,9 @@ func cleanupTerminal() {
 	fmt.Print("\033[?1003l") // Disable all motion mouse tracking
 	fmt.Print("\033[?1006l") // Disable SGR mouse mode
 
+	// Clear any kitty graphics protocol images left on screen
+	fmt.Print(clearKittyGraphics())
+
 	// Reset all ANSI formatting
 	fmt.Print("\033[0m")
 
