@@ -1,5 +1,6 @@
 # Binaries
 tfe
+tfe-arm64
 
 # Go build artifacts
 *.exe
