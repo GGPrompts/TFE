@@ -100,6 +100,42 @@ func resizeTFESidebar(tfePaneID string) {
 	exec.Command("tmux", "resize-pane", "-t", tfePaneID, "-x", strconv.Itoa(tmuxSidebarWidth)).Run()
 }
 
+// rebalanceNonTFEPanes evenly distributes remaining width across all non-TFE panes
+// after the TFE sidebar has been resized. This prevents uneven sizing when splitting
+// the largest pane at 50% and then shrinking TFE back to sidebar width.
+func rebalanceNonTFEPanes(tfePaneID string) {
+	panes, err := listTmuxPanes()
+	if err != nil {
+		return
+	}
+
+	// Find total window width from sum of all pane widths + separators
+	totalWidth := 0
+	var nonTFE []tmuxPane
+	for _, p := range panes {
+		totalWidth += p.width
+		if p.id != tfePaneID {
+			nonTFE = append(nonTFE, p)
+		}
+	}
+
+	if len(nonTFE) == 0 {
+		return
+	}
+
+	// Account for tmux pane borders (1 col per separator between panes)
+	separators := len(panes) - 1
+	availableWidth := totalWidth + separators - tmuxSidebarWidth - 1 // -1 for TFE's separator
+	if availableWidth < len(nonTFE) {
+		return
+	}
+
+	perPane := availableWidth / len(nonTFE)
+	for _, p := range nonTFE {
+		exec.Command("tmux", "resize-pane", "-t", p.id, "-x", strconv.Itoa(perPane)).Run()
+	}
+}
+
 // tmuxSmartSplit spawns a new tmux pane using sidebar-aware split strategy.
 //
 // Behavior:
@@ -139,6 +175,7 @@ func tmuxSmartSplit(cmd, cwd string) tea.Cmd {
 		// Resize TFE back to sidebar width after splitting
 		if result.err == nil {
 			resizeTFESidebar(tfePaneID)
+			rebalanceNonTFEPanes(tfePaneID)
 		}
 
 		return result
@@ -152,6 +189,7 @@ func tmuxSplitRight(cmd, cwd string) tea.Cmd {
 		result := runTmuxSplit("-h", "", cmd, cwd)
 		if result.err == nil {
 			resizeTFESidebar(tfePaneID)
+			rebalanceNonTFEPanes(tfePaneID)
 		}
 		return result
 	}
@@ -164,6 +202,7 @@ func tmuxSplitBelow(cmd, cwd string) tea.Cmd {
 		result := runTmuxSplit("-v", "", cmd, cwd)
 		if result.err == nil {
 			resizeTFESidebar(tfePaneID)
+			rebalanceNonTFEPanes(tfePaneID)
 		}
 		return result
 	}
