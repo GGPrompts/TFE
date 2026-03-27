@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/fsnotify/fsnotify"
 )
 
 // Module: update.go
@@ -25,11 +26,29 @@ import (
 // - Helper function: isSpecialKey() for detecting non-printable keys
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		m.spinner.Tick,
 		tickCmd(),          // Start landing page animation
 		checkForUpdates(),  // Check for new releases on GitHub
-	)
+	}
+
+	// Start file watcher for the initial directory
+	if watchCmd := m.startWatcher(m.currentPath); watchCmd != nil {
+		cmds = append(cmds, watchCmd)
+	}
+
+	// Start agent session polling if auto-watch is enabled (TFE_AUTO_CHANGES=1)
+	if m.agentAutoWatch {
+		// Seed initial agent session state so we don't trigger on startup
+		for _, s := range getAgentSessions() {
+			if s.ParentSessionID == "" { // Only track top-level sessions
+				m.lastKnownAgentSessions[s.SessionID] = s.Status
+			}
+		}
+		cmds = append(cmds, agentCheckTick())
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // tickMsg for landing page animation
@@ -46,6 +65,13 @@ func tickCmd() tea.Cmd {
 func footerTick() tea.Cmd {
 	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
 		return footerTickMsg{}
+	})
+}
+
+// agentCheckTick sends a periodic tick to poll agent session state (every 5s)
+func agentCheckTick() tea.Cmd {
+	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+		return agentCheckTickMsg{}
 	})
 }
 
@@ -259,8 +285,71 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Refresh file list to update git status
 		m.loadFiles()
 
-		// If in git repos mode, rescan to update git status indicators
-		if m.showGitReposOnly {
+		// Refresh changedFiles after any git operation (push, pull, sync, etc.)
+		// so the changes view stays current
+		if m.showChangesOnly {
+			oldCount := len(m.changedFiles)
+
+			if changed, err := m.getChangedFiles(); err == nil {
+				// Build a set of paths still changed for fast lookup
+				newChangedPaths := make(map[string]bool, len(changed))
+				for _, f := range changed {
+					newChangedPaths[f.path] = true
+				}
+
+				// Close tabs for files no longer in the changed list
+				closedTabs := 0
+				for i := len(m.tabs) - 1; i >= 0; i-- {
+					if !newChangedPaths[m.tabs[i].path] {
+						m.tabs = append(m.tabs[:i], m.tabs[i+1:]...)
+						closedTabs++
+					}
+				}
+
+				// Reset activeTab if needed
+				if len(m.tabs) == 0 {
+					m.activeTab = 0
+				} else if m.activeTab >= len(m.tabs) {
+					m.activeTab = len(m.tabs) - 1
+				}
+
+				// Load the new active tab's content, or clear preview
+				if len(m.tabs) > 0 {
+					tab := m.tabs[m.activeTab]
+					m.loadPreview(tab.path)
+					m.populatePreviewCache()
+				} else if closedTabs > 0 {
+					m.preview.loaded = false
+					m.preview.filePath = ""
+					m.preview.fileName = ""
+					m.preview.content = nil
+					m.preview.cacheValid = false
+				}
+
+				m.changedFiles = changed
+
+				// Show contextual status message for push/sync operations
+				cleared := oldCount - len(changed)
+				if msg.err == nil && (msg.operation == "push" || msg.operation == "sync") && cleared > 0 {
+					if len(changed) == 0 {
+						m.setStatusMessage(fmt.Sprintf("Pushed -- %d files cleared. All changes pushed", cleared), false)
+					} else {
+						m.setStatusMessage(fmt.Sprintf("Pushed -- %d files cleared (%d remaining)", cleared, len(changed)), false)
+					}
+				} else if msg.err == nil {
+					m.setStatusMessage(fmt.Sprintf("✓ Git %s completed successfully", msg.operation), false)
+				} else {
+					m.setStatusMessage(fmt.Sprintf("✗ Git %s failed", msg.operation), true)
+				}
+			} else {
+				// getChangedFiles failed, fall back to default status
+				if msg.err == nil {
+					m.setStatusMessage(fmt.Sprintf("✓ Git %s completed successfully", msg.operation), false)
+				} else {
+					m.setStatusMessage(fmt.Sprintf("✗ Git %s failed", msg.operation), true)
+				}
+			}
+		} else if m.showGitReposOnly {
 			m.setStatusMessage("🔍 Refreshing git repository status...", false)
 			m.gitReposList = m.scanGitReposRecursive(m.gitReposScanRoot, 3, 50)
 			m.setStatusMessage(fmt.Sprintf("✓ %s completed - Found %d repositories", msg.operation, len(m.gitReposList)), false)
@@ -331,6 +420,59 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Opened in tmux split", false)
 		}
 		return m, statusTimeoutCmd()
+
+	case agentCheckTickMsg:
+		// Periodic poll: detect agent session completions
+		if m.agentAutoWatch {
+			if cmd := m.checkAgentCompletions(); cmd != nil {
+				return m, tea.Batch(cmd, agentCheckTick())
+			}
+		}
+		return m, agentCheckTick() // Re-schedule next check
+
+	case fileChangedMsg:
+		// File system change detected by fsnotify watcher
+		// Refresh the file list to reflect changes (new/deleted/modified files)
+		m.loadFiles()
+
+		// Auto-refresh git changes list when in changes mode
+		if m.showChangesOnly {
+			if changed, err := m.getChangedFiles(); err == nil {
+				// Prune stale tabs (files no longer changed)
+				if len(m.tabs) > 0 {
+					newChangedPaths := make(map[string]bool, len(changed))
+					for _, f := range changed {
+						newChangedPaths[f.path] = true
+					}
+					for i := len(m.tabs) - 1; i >= 0; i-- {
+						if !newChangedPaths[m.tabs[i].path] {
+							m.tabs = append(m.tabs[:i], m.tabs[i+1:]...)
+						}
+					}
+					if len(m.tabs) == 0 {
+						m.activeTab = 0
+					} else if m.activeTab >= len(m.tabs) {
+						m.activeTab = len(m.tabs) - 1
+					}
+				}
+				m.changedFiles = changed
+			}
+		}
+
+		// If preview is active, refresh it too (file content may have changed)
+		if m.preview.loaded && m.preview.filePath != "" {
+			// Check if the changed file is the one being previewed
+			if msg.path == m.preview.filePath || msg.op&fsnotify.Create != 0 || msg.op&fsnotify.Remove != 0 {
+				m.loadPreview(m.preview.filePath)
+				m.populatePreviewCache()
+			}
+		}
+
+		// Re-subscribe to the watcher channel for the next event
+		if m.watcherChan != nil {
+			return m, waitForWatcherEvent(m.watcherChan)
+		}
+		return m, nil
 	}
 
 	return m, nil

@@ -181,6 +181,11 @@ func (m *model) getFilteredFiles() []fileItem {
 		return filtered
 	}
 
+	// Apply git changes filtering (show modified/untracked files across entire project)
+	if m.showChangesOnly {
+		return m.changedFiles
+	}
+
 	// Apply git repositories filtering (show ALL discovered repos from recursive scan)
 	if m.showGitReposOnly {
 		// Return cached list of git repos with ".." for navigation

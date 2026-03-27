@@ -202,6 +202,51 @@ To add or remove favorites, use the context menu (F2 or right-click) and select 
 
 When in favorites mode, press Enter on a favorite to navigate to its location.
 
+## Git Changes Mode (Ctrl+G)
+
+| Key | Action |
+|-----|--------|
+| **Ctrl+G** | Toggle git changes filter (show modified/untracked files) |
+
+When git changes filter is active:
+- Shows a flat list of all modified, added, deleted, and untracked files across the entire git project
+- Each file is prefixed with its git status indicator (e.g., [M ], [??], [ D], [A ])
+- Auto-switches to Detail view with Name, Size, Modified, and Location columns
+- Press **Enter** or **t** on a file to open it as a review tab
+- Press **T** (capital) to open all changed files as tabs at once
+- Press **y** to copy the selected file's diff to clipboard (markdown formatted)
+- Press **Y** (capital) to copy ALL changed files' diffs to clipboard
+- Auto-refreshes when file changes are detected (via file watcher)
+- Only works inside a git repository
+
+**Status indicators:**
+- `M` = Modified (staged or unstaged)
+- `A` = Added (new file staged)
+- `D` = Deleted
+- `?` = Untracked (new file not yet staged)
+- `R` = Renamed
+
+## Tab-Based Review (Changes Mode)
+
+| Key | Action |
+|-----|--------|
+| **Enter** / **t** | Open selected changed file as a review tab |
+| **T** | Open all changed files as tabs at once |
+| **y** | Copy selected file's diff to clipboard (markdown) |
+| **Y** | Copy ALL changed files' diffs to clipboard (markdown) |
+| **Alt+Right** | Switch to next tab |
+| **Alt+Left** | Switch to previous tab |
+| **Ctrl+W** | Close active tab |
+
+When tabs are open:
+- A tab bar appears above the preview pane showing all open tabs
+- Each tab shows the file name with its git status indicator (M, +, -, ?, R)
+- The active tab is highlighted; inactive tabs are dimmed
+- Tabs persist while switching between changes mode and normal mode
+- Navigate between tabs with Alt+Left/Alt+Right
+- Close individual tabs with Ctrl+W
+- Works in dual-pane and full preview modes
+
 ## Prompts Mode (F11)
 
 | Key | Action |

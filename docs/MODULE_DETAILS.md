@@ -4,7 +4,7 @@ This document provides detailed descriptions of all TFE modules, their responsib
 
 ## Overview
 
-TFE follows a modular architecture with 21 specialized modules, each handling a specific aspect of the application. This document serves as the comprehensive reference for understanding what each module does.
+TFE follows a modular architecture with 27+ specialized modules, each handling a specific aspect of the application. This document serves as the comprehensive reference for understanding what each module does.
 
 ---
 
@@ -392,14 +392,86 @@ To keep dual-pane boxes vertically aligned, ALL content must fit exactly within 
 
 ---
 
+### 22. `file_watcher.go` - Live File System Watching
+**Purpose**: fsnotify-based file watching with debounce pipeline
+
+**Contents**:
+- `initWatcher()` / `startWatcher()` / `stopWatcher()` / `closeWatcher()` - watcher lifecycle
+- `runWatcherBridge()` - bridge goroutine with 3-layer debounce (per-file dedup, timer batching, max delay cap)
+- `waitForWatcherEvent()` - idiomatic Bubbletea blocking command pattern
+- Atomic write detection (editors delete+recreate files within 100ms)
+
+**When to extend**: Add new debounce strategies, watch additional paths (e.g., config files), or add filtering for specific file types.
+
+---
+
+### 23. `theme.go` - Configurable Theme System
+**Purpose**: TOML-based theme loading and style initialization
+
+**Contents**:
+- `Theme` struct with 15 color fields (defined in types.go)
+- `defaultTheme()` - returns original hardcoded colors as fallback
+- `loadTheme()` - reads `~/.config/tfe/theme.toml`
+- `initTheme()` / `initStyles()` - loads theme and rebuilds all lipgloss styles
+
+**When to extend**: Add new color fields for new UI elements, add theme hot-reload, add theme switching at runtime.
+
+---
+
+### 24. `agent_awareness.go` - AI Agent Session Detection
+**Purpose**: Detect and display which AI agent modified files
+
+**Contents**:
+- `AgentSession` struct matching `/tmp/claude-code-state/*.json` schema
+- `getAgentSessions()` - reads and parses agent state files (graceful fallback)
+- `buildAgentFileMap()` - pre-computes path-to-agent-label lookup
+- `checkAgentCompletions()` - detects agent active→idle transitions for auto-open
+- `agentLabel()` - returns short labels ("CC", "CC:Explore", etc.)
+
+**When to extend**: Add support for other agent state file formats, add agent activity timeline, add per-agent change grouping.
+
+---
+
+### 25. `render_layout.go` - Pane Layout & Tab Bar Rendering
+**Purpose**: Layout calculations for dual-pane mode, tab bar rendering
+
+**Contents**:
+- Pane border rendering with theme colors
+- `renderTabBar()` - styled tab bar with git status indicators and overflow handling
+- Dual-pane horizontal/vertical split layout logic
+
+**When to extend**: Add new layout modes, customize tab bar appearance, add split-pane resizing.
+
+---
+
+### 26. `render_prompts.go` - Prompt Template Rendering
+**Purpose**: Rendering prompt templates in the preview pane
+
+**When to extend**: Add new prompt template formats or rendering options.
+
+---
+
+### 27. `tmux.go` - Tmux Integration
+**Purpose**: Tmux session management and pane splitting
+
+**When to extend**: Add new tmux commands, improve pane layout strategies.
+
+---
+
 ## Module Dependencies
 
 **Core chain**: `main.go` → `model.go` → `update.go` → `view.go`
 
 **Event handling**: `update.go` dispatches to `update_keyboard.go` and `update_mouse.go`
 
-**Rendering chain**: `view.go` → `render_preview.go`, `render_file_list.go`, `menu.go`
+**Rendering chain**: `view.go` → `render_preview.go`, `render_file_list.go`, `render_layout.go`, `menu.go`
 
 **Data operations**: Modules use `file_operations.go` for file loading, `file_icons.go` for type detection, `text_wrapping.go` for width calculations
+
+**File watching**: `file_watcher.go` → `update.go` (fileChangedMsg) → `file_operations.go` (loadFiles)
+
+**Agent review pipeline**: `file_watcher.go` → `agent_awareness.go` → `git_operations.go` (getChangedFiles/getFileDiff) → `render_preview.go` (diff rendering)
+
+**Theming**: `theme.go` → `styles.go` (all styles rebuilt from theme)
 
 **Cross-cutting**: `types.go` and `styles.go` are used by all modules

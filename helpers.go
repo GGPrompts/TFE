@@ -377,6 +377,105 @@ func (m *model) scrollToFocusedVariable() {
 	}
 }
 
+// openFileAsTab opens a file as a new tab (or switches to it if already open)
+// Returns true if a new tab was created, false if switched to existing
+func (m *model) openFileAsTab(path, name, gitStatus string) bool {
+	// Check if tab already exists
+	for i, tab := range m.tabs {
+		if tab.path == path {
+			m.activeTab = i
+			m.loadPreview(tab.path)
+			m.populatePreviewCache()
+			return false
+		}
+	}
+
+	// Add new tab
+	m.tabs = append(m.tabs, openTab{
+		path:      path,
+		name:      name,
+		gitStatus: gitStatus,
+	})
+	m.activeTab = len(m.tabs) - 1
+
+	// Load preview for the new tab
+	m.loadPreview(path)
+	m.populatePreviewCache()
+	return true
+}
+
+// closeActiveTab closes the currently active tab
+func (m *model) closeActiveTab() {
+	if len(m.tabs) == 0 {
+		return
+	}
+
+	// Remove the active tab
+	m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
+
+	// Adjust active tab index
+	if m.activeTab >= len(m.tabs) {
+		m.activeTab = len(m.tabs) - 1
+	}
+
+	// Load the new active tab's content, or clear preview if no tabs remain
+	if len(m.tabs) > 0 {
+		tab := m.tabs[m.activeTab]
+		m.loadPreview(tab.path)
+		m.populatePreviewCache()
+	} else {
+		m.preview.loaded = false
+		m.preview.filePath = ""
+		m.preview.fileName = ""
+		m.preview.content = nil
+		m.preview.cacheValid = false
+	}
+}
+
+// nextTab switches to the next tab (wraps around)
+func (m *model) nextTab() {
+	if len(m.tabs) <= 1 {
+		return
+	}
+	m.activeTab = (m.activeTab + 1) % len(m.tabs)
+	tab := m.tabs[m.activeTab]
+	m.loadPreview(tab.path)
+	m.populatePreviewCache()
+}
+
+// prevTab switches to the previous tab (wraps around)
+func (m *model) prevTab() {
+	if len(m.tabs) <= 1 {
+		return
+	}
+	m.activeTab--
+	if m.activeTab < 0 {
+		m.activeTab = len(m.tabs) - 1
+	}
+	tab := m.tabs[m.activeTab]
+	m.loadPreview(tab.path)
+	m.populatePreviewCache()
+}
+
+// parseGitStatusFromName extracts the git status code from a changed file name
+// Changed file names are formatted as "[XY] relative/path"
+func parseGitStatusFromName(name string) string {
+	if len(name) >= 4 && name[0] == '[' && name[3] == ']' {
+		return name[1:3]
+	}
+	return ""
+}
+
+// cleanNameFromChangedFile extracts just the filename from a changed file name
+// Changed file names are formatted as "[XY] relative/path"
+func cleanNameFromChangedFile(name string) string {
+	if len(name) >= 5 && name[0] == '[' && name[3] == ']' {
+		relPath := strings.TrimSpace(name[4:])
+		return filepath.Base(relPath)
+	}
+	return filepath.Base(name)
+}
+
 // navigateToPath changes the current path and automatically exits special modes (trash, favorites, etc)
 // This ensures users don't get stuck in filter modes when navigating
 func (m *model) navigateToPath(newPath string) {
@@ -403,6 +502,12 @@ func (m *model) navigateToPath(newPath string) {
 		m.cursor = 0
 		m.loadFiles()
 		return
+	}
+
+	// Auto-exit changes mode when navigating to a different directory
+	if m.showChangesOnly {
+		m.showChangesOnly = false
+		m.showDiffPreview = false
 	}
 
 	// Normal navigation
@@ -659,6 +764,23 @@ func (m model) renderToolbarRow() string {
 			Foreground(lipgloss.Color("39")).
 			Bold(true)
 		s.WriteString(gitButtonStyle.Render("[" + gitIcon + "]"))
+	}
+	s.WriteString(" ")
+
+	// Git changes toggle button
+	changesIcon := "⚡"
+	if m.showChangesOnly {
+		// Active: gray background
+		activeChangesStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeChangesStyle.Render("[" + changesIcon + "]"))
+	} else {
+		changesButtonStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true)
+		s.WriteString(changesButtonStyle.Render("[" + changesIcon + "]"))
 	}
 	s.WriteString(" ")
 

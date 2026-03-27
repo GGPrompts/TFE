@@ -297,7 +297,7 @@ git pull
 
 			// Check for toolbar button clicks (Y=1)
 			// Toolbar: [🏠] [⭐/✨] [V] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑]
-			// Layout:  0-4   5-9    10-12 13-17 18-22 23-27 28-32 33-37 38-42
+			// Layout:  0-4   5-9    10-12 13-17 18-22 23-27 28-32 33-37 38-42 43-47
 			// Note: Most buttons are 5 chars ([ + emoji(2) + ] + space), [V] is 3 chars
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
@@ -474,8 +474,44 @@ git pull
 
 					return m, tea.ClearScreen
 				}
-				// Trash button [🗑] or [♻] (X=38-42: [ + emoji(2) + ] + space)
+				// Git changes toggle button [] (X=38-42: [ + icon(2) + ] + space)
 				if msg.X >= 38 && msg.X <= 42 {
+					// Auto-exit trash mode
+					if m.showTrashOnly {
+						m.showTrashOnly = false
+						m.trashRestorePath = ""
+					}
+
+					m.showChangesOnly = !m.showChangesOnly
+
+					if m.showChangesOnly {
+						changed, err := m.getChangedFiles()
+						if err != nil {
+							m.setStatusMessage(err.Error(), true)
+							m.showChangesOnly = false
+						} else {
+							m.changedFiles = changed
+							// Load agent sessions and build file-to-agent map
+							m.agentSessions = getAgentSessions()
+							m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
+							m.displayMode = modeDetail
+							m.detailScrollX = 0
+							m.showDiffPreview = true
+							m.calculateLayout()
+							m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
+						}
+					} else {
+						m.showDiffPreview = false
+						m.agentSessions = nil
+						m.agentFileMap = nil
+					}
+
+					m.cursor = 0
+					m.loadFiles()
+					return m, tea.ClearScreen
+				}
+				// Trash button [🗑] or [♻] (X=43-47: [ + emoji(2) + ] + space)
+				if msg.X >= 43 && msg.X <= 47 {
 					// Navigate to trash view (or exit if already in trash)
 					if m.showTrashOnly {
 						// Already in trash - exit and restore previous path

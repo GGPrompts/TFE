@@ -555,6 +555,162 @@ func getGitStatusSortValue(item fileItem) int {
 	return 2 // Clean repos with no changes
 }
 
+// getFileDiff returns the git diff output for a specific file.
+// It tries multiple strategies based on the file's git status:
+//   - For untracked files (status "??"), returns the full file content with a NEW FILE header
+//   - For deleted files (status " D" or "D "), shows content from HEAD via git show
+//   - For staged files, uses "git diff --cached -- <path>"
+//   - For unstaged modifications, uses "git diff -- <path>"
+//   - Falls back to "git diff HEAD -- <path>" to catch both staged and unstaged
+func (m *model) getFileDiff(path string, gitStatusCode string) (string, error) {
+	gitRoot := m.findGitRoot(m.currentPath)
+	if gitRoot == "" {
+		return "", fmt.Errorf("not inside a git repository")
+	}
+
+	// Get the relative path from git root
+	relPath, err := filepath.Rel(gitRoot, path)
+	if err != nil {
+		relPath = path
+	}
+
+	statusCode := strings.TrimSpace(gitStatusCode)
+
+	// Untracked files: show full content with NEW FILE header
+	if statusCode == "??" {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("cannot read untracked file: %w", err)
+		}
+		lines := strings.Split(string(content), "\n")
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("new file: %s\n", relPath))
+		sb.WriteString("--- /dev/null\n")
+		sb.WriteString(fmt.Sprintf("+++ b/%s\n", relPath))
+		sb.WriteString(fmt.Sprintf("@@ -0,0 +1,%d @@\n", len(lines)))
+		for _, line := range lines {
+			sb.WriteString("+" + line + "\n")
+		}
+		return sb.String(), nil
+	}
+
+	// Deleted files: show content from HEAD
+	if statusCode == "D" || strings.HasPrefix(gitStatusCode, "D") || strings.HasSuffix(gitStatusCode, "D") {
+		cmd := exec.Command("git", "-C", gitRoot, "show", "HEAD:"+relPath)
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("cannot show deleted file: %w", err)
+		}
+		lines := strings.Split(string(output), "\n")
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("deleted file: %s\n", relPath))
+		sb.WriteString(fmt.Sprintf("--- a/%s\n", relPath))
+		sb.WriteString("+++ /dev/null\n")
+		sb.WriteString(fmt.Sprintf("@@ -1,%d +0,0 @@\n", len(lines)))
+		for _, line := range lines {
+			sb.WriteString("-" + line + "\n")
+		}
+		return sb.String(), nil
+	}
+
+	// Try git diff HEAD -- <path> (catches both staged and unstaged changes)
+	cmd := exec.Command("git", "-C", gitRoot, "diff", "HEAD", "--", relPath)
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		return string(output), nil
+	}
+
+	// Fallback: try git diff --cached (staged only)
+	cmd = exec.Command("git", "-C", gitRoot, "diff", "--cached", "--", relPath)
+	output, err = cmd.Output()
+	if err == nil && len(output) > 0 {
+		return string(output), nil
+	}
+
+	// Fallback: try git diff (unstaged only)
+	cmd = exec.Command("git", "-C", gitRoot, "diff", "--", relPath)
+	output, err = cmd.Output()
+	if err == nil && len(output) > 0 {
+		return string(output), nil
+	}
+
+	return "", fmt.Errorf("no diff available for %s", relPath)
+}
+
+// extractGitStatusCode extracts the two-character git status code from a changedFiles item name.
+// The name format is "[XX] relative/path" where XX is the git status code.
+func extractGitStatusCode(itemName string) string {
+	if len(itemName) >= 4 && itemName[0] == '[' && itemName[3] == ']' {
+		return itemName[1:3]
+	}
+	return ""
+}
+
+// getChangedFiles runs `git status --porcelain` from the git root and returns
+// fileItems for every modified, added, deleted, or untracked file.  Each item's
+// name is prefixed with the two-character git status indicator (e.g. " M", "??").
+// Returns an error if the current directory is not inside a git repository.
+func (m *model) getChangedFiles() ([]fileItem, error) {
+	// Find git root from current path
+	gitRoot := m.findGitRoot(m.currentPath)
+	if gitRoot == "" {
+		return nil, fmt.Errorf("not inside a git repository")
+	}
+
+	cmd := exec.Command("git", "-C", gitRoot, "status", "--porcelain")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git status failed: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(output), "\n"), "\n")
+	items := make([]fileItem, 0, len(lines))
+
+	for _, line := range lines {
+		if len(line) < 4 {
+			continue // malformed line
+		}
+
+		// git status --porcelain format: XY <path>
+		// X = index status, Y = working tree status
+		statusCode := line[:2]
+		relPath := strings.TrimSpace(line[3:])
+
+		// Handle renames: "R  old -> new"
+		if strings.Contains(relPath, " -> ") {
+			parts := strings.SplitN(relPath, " -> ", 2)
+			relPath = parts[1]
+		}
+
+		fullPath := filepath.Join(gitRoot, relPath)
+
+		// Stat the file to get info (may fail for deleted files)
+		info, statErr := os.Stat(fullPath)
+
+		item := fileItem{
+			name: fmt.Sprintf("[%s] %s", statusCode, relPath),
+			path: fullPath,
+		}
+
+		if statErr == nil {
+			item.isDir = info.IsDir()
+			item.size = info.Size()
+			item.modTime = info.ModTime()
+			item.mode = info.Mode()
+		} else {
+			// File was deleted — mark with zero time, keep path for display
+			item.isDir = false
+			item.size = 0
+			item.modTime = time.Time{}
+			item.mode = 0
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
 // sortGitReposList sorts the git repositories list based on sortBy and sortAsc settings
 // This is a specialized version of sortFiles() for the gitReposList array
 func (m *model) sortGitReposList() {

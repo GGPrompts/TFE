@@ -555,6 +555,38 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.previewMouseEnabled = true
 			return m, tea.EnableMouseCellMotion
 
+		case "ctrl+w":
+			// Close active tab in full preview mode
+			if len(m.tabs) > 0 {
+				closedName := m.tabs[m.activeTab].name
+				m.closeActiveTab()
+				if len(m.tabs) == 0 {
+					// No tabs left, exit full preview
+					m.viewMode = viewSinglePane
+					m.calculateLayout()
+					m.populatePreviewCache()
+					m.previewMouseEnabled = true
+					m.setStatusMessage(fmt.Sprintf("Closed tab: %s", closedName), false)
+					return m, tea.EnableMouseCellMotion
+				}
+				m.setStatusMessage(fmt.Sprintf("Closed tab: %s (%d remaining)", closedName, len(m.tabs)), false)
+				return m, nil
+			}
+
+		case "alt+right":
+			// Next tab in full preview mode
+			if len(m.tabs) > 1 {
+				m.nextTab()
+				return m, nil
+			}
+
+		case "alt+left":
+			// Previous tab in full preview mode
+			if len(m.tabs) > 1 {
+				m.prevTab()
+				return m, nil
+			}
+
 		case "tab":
 			// Inline editing: Enter edit mode on first Tab press
 			// (Navigation within edit mode is handled by the priority section above)
@@ -1486,6 +1518,7 @@ rm -f "$0"
 	case "f10", "ctrl+c":
 		// F10: Quit (replaces q)
 		m.saveCommandHistory() // Save before quitting
+		m.closeWatcher()       // Stop file watcher
 		return m, tea.Quit
 
 	case "ctrl+z":
@@ -1500,6 +1533,20 @@ rm -f "$0"
 		// Linux: Opens in default file manager (via xdg-open)
 		// macOS: Opens in Finder
 		return m, openInFileExplorer(m.currentPath)
+
+	case "alt+right":
+		// Alt+Right: Next tab (when tabs are open and command not focused)
+		if !m.commandFocused && len(m.tabs) > 1 {
+			m.nextTab()
+			return m, nil
+		}
+
+	case "alt+left":
+		// Alt+Left: Previous tab (when tabs are open and command not focused)
+		if !m.commandFocused && len(m.tabs) > 1 {
+			m.prevTab()
+			return m, nil
+		}
 
 	case "esc":
 		// Context-aware ESC behavior:
@@ -1667,6 +1714,27 @@ rm -f "$0"
 					m.calculateLayout() // Update widths for full-screen
 					// Populate cache synchronously for full preview (user expects instant display)
 					m.populatePreviewCache()
+					return m, nil
+				}
+			} else if m.showChangesOnly {
+				// Changes mode: open file as a tab for review
+				if currentFile.isDir {
+					m.currentPath = currentFile.path
+					m.cursor = 0
+					m.showChangesOnly = false // Exit changes mode
+					m.showDiffPreview = false
+					m.loadFiles()
+				} else {
+					// Open as tab
+					gitStatus := parseGitStatusFromName(currentFile.name)
+					cleanName := cleanNameFromChangedFile(currentFile.name)
+					m.openFileAsTab(currentFile.path, cleanName, gitStatus)
+					// Ensure dual-pane or full preview mode
+					if m.viewMode == viewSinglePane {
+						m.viewMode = viewDualPane
+						m.focusedPane = rightPane
+						m.calculateLayout()
+					}
 					return m, nil
 				}
 			} else if m.showGitReposOnly {
@@ -2069,8 +2137,54 @@ rm -f "$0"
 			return m, nil
 		}
 
-	case "t", "T":
-		// T: Open Tools menu
+	case "t":
+		// t: In changes mode, open current file as tab; otherwise open Tools menu
+		if m.showChangesOnly {
+			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+				gitStatus := parseGitStatusFromName(currentFile.name)
+				cleanName := cleanNameFromChangedFile(currentFile.name)
+				m.openFileAsTab(currentFile.path, cleanName, gitStatus)
+				if m.viewMode == viewSinglePane {
+					m.viewMode = viewDualPane
+					m.focusedPane = rightPane
+					m.calculateLayout()
+				}
+				return m, nil
+			}
+		}
+		// Fall through to open Tools menu
+		if !m.menuBarFocused && !m.menuOpen {
+			m.menuBarFocused = true
+			m.menuOpen = true
+			m.activeMenu = "tools"
+			m.highlightedMenu = "tools"
+			m.selectedMenuItem = m.getFirstSelectableMenuItem("tools")
+			return m, nil
+		}
+
+	case "T":
+		// T: In changes mode, open ALL changed files as tabs; otherwise open Tools menu
+		if m.showChangesOnly && len(m.changedFiles) > 0 {
+			opened := 0
+			for _, f := range m.changedFiles {
+				if !f.isDir {
+					gitStatus := parseGitStatusFromName(f.name)
+					cleanName := cleanNameFromChangedFile(f.name)
+					m.openFileAsTab(f.path, cleanName, gitStatus)
+					opened++
+				}
+			}
+			if opened > 0 {
+				if m.viewMode == viewSinglePane {
+					m.viewMode = viewDualPane
+					m.focusedPane = rightPane
+					m.calculateLayout()
+				}
+				m.setStatusMessage(fmt.Sprintf("Opened %d files as tabs", opened), false)
+			}
+			return m, nil
+		}
+		// Fall through to open Tools menu
 		if !m.menuBarFocused && !m.menuOpen {
 			m.menuBarFocused = true
 			m.menuOpen = true
@@ -2103,13 +2217,21 @@ rm -f "$0"
 		m.displayMode = modeTree
 
 	case "ctrl+w":
-		// Ctrl+W: Collapse all expanded folders in tree view
-		if m.displayMode == modeTree {
+		// Ctrl+W: Close active tab (if tabs open), or collapse all in tree view
+		if len(m.tabs) > 0 {
+			closedName := m.tabs[m.activeTab].name
+			m.closeActiveTab()
+			if len(m.tabs) == 0 {
+				m.setStatusMessage(fmt.Sprintf("Closed tab: %s (no tabs remaining)", closedName), false)
+			} else {
+				m.setStatusMessage(fmt.Sprintf("Closed tab: %s (%d remaining)", closedName, len(m.tabs)), false)
+			}
+		} else if m.displayMode == modeTree {
 			// Clear all expanded directories to reset tree view
 			m.expandedDirs = make(map[string]bool)
 			m.setStatusMessage("All folders collapsed", false)
 		} else {
-			// Not in tree view - show helpful message
+			// Not in tree view and no tabs - show helpful message
 			m.setStatusMessage("Collapse all only works in tree view (press 3)", false)
 		}
 
@@ -2242,6 +2364,126 @@ rm -f "$0"
 		}
 		m.showFavoritesOnly = !m.showFavoritesOnly
 
+	case "ctrl+g":
+		// Ctrl+G: Toggle git changes filter (show modified/untracked files)
+		// Auto-exit trash mode
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
+
+		m.showChangesOnly = !m.showChangesOnly
+
+		if m.showChangesOnly {
+			// Scan for changed files from git root
+			changed, err := m.getChangedFiles()
+			if err != nil {
+				m.setStatusMessage(err.Error(), true)
+				m.showChangesOnly = false
+			} else {
+				m.changedFiles = changed
+				// Load agent sessions and build file-to-agent map
+				m.agentSessions = getAgentSessions()
+				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
+				// Auto-switch to detail view for changes
+				m.displayMode = modeDetail
+				m.detailScrollX = 0
+				// Enable diff preview by default in changes mode
+				m.showDiffPreview = true
+				m.calculateLayout()
+				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
+			}
+		} else {
+			// Exiting changes mode: clear agent data and disable diff preview
+			m.showDiffPreview = false
+			m.agentSessions = nil
+			m.agentFileMap = nil
+		}
+		m.cursor = 0
+		m.loadFiles()
+
+	case "d":
+		// 'd': Toggle between diff view and full file view (only in changes mode)
+		if m.showChangesOnly && !m.commandFocused {
+			m.showDiffPreview = !m.showDiffPreview
+			// Reset scroll position when switching views
+			m.preview.scrollPos = 0
+			m.preview.cacheValid = false
+			if m.showDiffPreview {
+				m.setStatusMessage("Diff preview enabled", false)
+			} else {
+				m.setStatusMessage("File preview enabled", false)
+			}
+			return m, nil
+		}
+
+	case "y":
+		// 'y': In changes mode, copy current file's diff to clipboard as markdown
+		if m.showChangesOnly && !m.commandFocused {
+			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+				statusCode := extractGitStatusCode(currentFile.name)
+				diff, err := m.getFileDiff(currentFile.path, statusCode)
+				if err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to get diff: %s", err), true)
+					return m, nil
+				}
+				// Format as markdown with file path header and diff code fence
+				gitRoot := m.findGitRoot(m.currentPath)
+				relPath := currentFile.path
+				if gitRoot != "" {
+					if rp, err := filepath.Rel(gitRoot, currentFile.path); err == nil {
+						relPath = rp
+					}
+				}
+				markdown := fmt.Sprintf("## %s\n\n```diff\n%s```\n", relPath, diff)
+				if err := copyToClipboard(markdown); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to copy diff: %s", err), true)
+				} else {
+					m.setStatusMessage(fmt.Sprintf("Copied diff for %s to clipboard", filepath.Base(relPath)), false)
+				}
+				return m, nil
+			}
+		}
+
+	case "Y":
+		// 'Y': In changes mode, copy ALL changed files' diffs to clipboard as markdown
+		if m.showChangesOnly && !m.commandFocused && len(m.changedFiles) > 0 {
+			gitRoot := m.findGitRoot(m.currentPath)
+			var allDiffs strings.Builder
+			copied := 0
+			for _, f := range m.changedFiles {
+				if f.isDir {
+					continue
+				}
+				statusCode := extractGitStatusCode(f.name)
+				diff, err := m.getFileDiff(f.path, statusCode)
+				if err != nil {
+					continue
+				}
+				relPath := f.path
+				if gitRoot != "" {
+					if rp, err := filepath.Rel(gitRoot, f.path); err == nil {
+						relPath = rp
+					}
+				}
+				if copied > 0 {
+					allDiffs.WriteString("\n---\n\n")
+				}
+				allDiffs.WriteString(fmt.Sprintf("## %s\n\n```diff\n%s```\n", relPath, diff))
+				copied++
+			}
+			if copied == 0 {
+				m.setStatusMessage("No diffs available to copy", true)
+				return m, nil
+			}
+			if err := copyToClipboard(allDiffs.String()); err != nil {
+				m.setStatusMessage(fmt.Sprintf("Failed to copy diffs: %s", err), true)
+			} else {
+				m.setStatusMessage(fmt.Sprintf("Copied diffs for %d files to clipboard", copied), false)
+			}
+			return m, nil
+		}
+
 	case "f11":
 		// F11: Toggle prompts filter (show only .yaml, .md, .txt files)
 		// Auto-exit trash mode when toggling prompts filter
@@ -2284,6 +2526,8 @@ rm -f "$0"
 			m.showTrashOnly = true
 			m.showFavoritesOnly = false // Disable favorites filter
 			m.showPromptsOnly = false   // Disable prompts filter
+			m.showChangesOnly = false   // Disable changes filter
+			m.showDiffPreview = false   // Disable diff preview
 			m.cursor = 0
 			// Default to detail view for trash
 			m.displayMode = modeDetail

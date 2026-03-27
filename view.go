@@ -216,10 +216,7 @@ func (m model) renderSinglePane() string {
 		Width(m.width - 6).       // Leave margin for padding
 		Height(contentHeight).    // Content area height (borders added by Lipgloss)
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.AdaptiveColor{
-			Light: "#0087d7", // Dark blue border for light
-			Dark:  "#5fd7ff",  // Bright cyan border for dark
-		})
+		BorderForeground(currentTheme.BorderFocused.adaptiveColor())
 
 	s.WriteString(fileListStyle.Render(fileListContent))
 	s.WriteString("\n")
@@ -357,6 +354,15 @@ func (m model) renderSinglePane() string {
 			promptsIndicator = " • 📝 prompts only"
 		}
 
+		changesIndicator := ""
+		if m.showChangesOnly {
+			diffMode := "file"
+			if m.showDiffPreview {
+				diffMode = "diff"
+			}
+			changesIndicator = fmt.Sprintf(" • ⚡ %d changes [%s]", len(m.changedFiles), diffMode)
+		}
+
 		// View mode indicator
 		viewModeText := fmt.Sprintf(" • view: %s", m.displayMode.String())
 
@@ -368,7 +374,7 @@ func (m model) renderSinglePane() string {
 
 		// Split status into two lines to prevent truncation
 		// Line 1: Counts, indicators, view mode, help
-		statusLine1 := fmt.Sprintf("%s%s%s%s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, viewModeText, helpHint)
+		statusLine1 := fmt.Sprintf("%s%s%s%s%s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, changesIndicator, viewModeText, helpHint)
 		// Use scrolling footer (click to activate) or truncate if too long
 		statusLine1 = m.renderScrollingFooter(statusLine1, m.width-4)
 		s.WriteString(statusStyle.Render(statusLine1))

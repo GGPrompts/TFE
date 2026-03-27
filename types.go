@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/fsnotify/fsnotify"
 )
 
 // Version is the current version of TFE
@@ -308,6 +309,12 @@ type model struct {
 	gitReposLastScan  time.Time   // When we last scanned for git repos
 	gitReposScanRoot  string      // Root directory of last scan
 	gitReposScanDepth int         // Max depth to scan (default: 5)
+	// Git changes filter (working set: modified/untracked files across project)
+	showChangesOnly bool              // Filter to show only git-changed/untracked files
+	changedFiles    []fileItem        // Cached list of changed files from git status
+	showDiffPreview bool              // When true, show git diff in preview instead of file content (default in changes mode)
+	agentSessions   []AgentSession    // Cached agent sessions (populated on changes mode entry)
+	agentFileMap    map[string]string // File path -> agent label (built from agentSessions + changedFiles)
 	// Trash/Recycle bin system
 	showTrashOnly     bool        // Filter to show trash contents
 	trashItems        []trashItem // Cached trash items when viewing trash
@@ -364,6 +371,24 @@ type model struct {
 	footerOffset    int  // Horizontal scroll offset for footer text
 	// Standalone preview mode (tfe --preview /path/to/file)
 	previewOnly bool // When true, only show file preview with minimal UI (for tmux splits)
+	// Tab-based review system (for changes mode)
+	tabs      []openTab // Open file tabs for review
+	activeTab int       // Index of the currently active tab
+	// File watcher (fsnotify)
+	watcher       *fsnotify.Watcher        // fsnotify watcher instance
+	watcherChan   chan fileChangedMsg       // Bridge channel for watcher events
+	watcherActive bool                      // Whether the watcher is currently running
+	watchedPath   string                    // Currently watched directory path
+	// Agent auto-watch (auto-open changes mode when agent finishes)
+	agentAutoWatch          bool              // Whether auto-watch is enabled (TFE_AUTO_CHANGES=1)
+	lastKnownAgentSessions  map[string]string // session_id -> status (for detecting completions)
+}
+
+// openTab represents a file opened as a tab for review (used in changes mode)
+type openTab struct {
+	path      string // Full file path
+	name      string // Display name (filename only)
+	gitStatus string // Two-character git status code (e.g. " M", "??", "A ")
 }
 
 // treeItem represents an item in the tree view with depth information
@@ -395,6 +420,15 @@ type updateAvailableMsg struct {
 	changelog string // Release notes/changelog
 	url       string // GitHub release URL
 }
+
+// fileChangedMsg is sent when fsnotify detects a file system change in the watched directory
+type fileChangedMsg struct {
+	path string         // Path of the changed file/directory
+	op   fsnotify.Op    // Type of operation (Create, Write, Remove, Rename, Chmod)
+}
+
+// agentCheckTickMsg is sent periodically to poll agent session state for completions
+type agentCheckTickMsg struct{}
 
 // dialogType represents different types of dialogs
 type dialogType int
@@ -431,4 +465,41 @@ type MenuItem struct {
 type Menu struct {
 	Label string     // Menu label in menu bar
 	Items []MenuItem // Menu items
+}
+
+// ThemeColor represents a single adaptive color with light and dark variants
+type ThemeColor struct {
+	Light string `toml:"light"`
+	Dark  string `toml:"dark"`
+}
+
+// Theme defines all configurable colors for TFE's UI
+// Colors are specified as hex strings (e.g., "#5fd7ff") and adapt to light/dark terminals
+type Theme struct {
+	// Core UI colors
+	Title          ThemeColor `toml:"title"`           // Title bar text (titleStyle fg, spinner fg)
+	Path           ThemeColor `toml:"path"`            // Path display text
+	Status         ThemeColor `toml:"status"`          // Status bar text
+	// Selection colors
+	SelectionBg    ThemeColor `toml:"selection_bg"`    // Selected item background
+	SelectionFg    ThemeColor `toml:"selection_fg"`    // Selected item foreground
+	NarrowSelect   ThemeColor `toml:"narrow_select"`   // Narrow terminal selection (matrix green)
+	// File type colors
+	Folder         ThemeColor `toml:"folder"`          // Directory names
+	File           ThemeColor `toml:"file"`            // Regular file names
+	// Special file colors
+	ClaudeContext  ThemeColor `toml:"claude_context"`  // CLAUDE.md and similar files (orange)
+	Agents         ThemeColor `toml:"agents"`          // Agent files (purple)
+	PromptsFolder  ThemeColor `toml:"prompts_folder"`  // Prompts folder (magenta/pink)
+	ObsidianVault  ThemeColor `toml:"obsidian_vault"`  // Obsidian vault folders (teal)
+	// Border colors (used for pane borders, preview borders)
+	BorderFocused  ThemeColor `toml:"border_focused"`  // Focused pane border
+	BorderUnfocused ThemeColor `toml:"border_unfocused"` // Unfocused pane border
+	// Alternating row background
+	AlternateRow   ThemeColor `toml:"alternate_row"`   // Even-row background in file lists
+	// Diff colors (git diff preview in changes mode)
+	DiffAdded      ThemeColor `toml:"diff_added"`      // Added lines (green)
+	DiffRemoved    ThemeColor `toml:"diff_removed"`     // Removed lines (red)
+	DiffHunkHeader ThemeColor `toml:"diff_hunk_header"` // @@ hunk headers (cyan)
+	DiffMeta       ThemeColor `toml:"diff_meta"`        // diff/index/--- /+++ header lines (dim)
 }

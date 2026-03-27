@@ -60,7 +60,13 @@ tfe/
 ├── prompt_parser.go           # Prompt template parsing
 ├── fuzzy_search.go            # Fuzzy file search
 ├── terminal_graphics.go       # HD image preview
-└── helpers.go                 # Helper functions
+├── helpers.go                 # Helper functions
+├── file_watcher.go            # fsnotify file watcher & debouncing
+├── theme.go                   # Configurable theme system (TOML)
+├── agent_awareness.go         # AI agent session detection
+├── render_layout.go           # Layout rendering & tab bar
+├── render_prompts.go          # Prompt template rendering
+└── tmux.go                    # Tmux integration
 ```
 
 ---
@@ -108,6 +114,18 @@ tfe/
 - **`fuzzy_search.go`** - Ctrl+P fuzzy search (fzf)
 - **`prompt_parser.go`** - Prompt template variables
 - **`terminal_graphics.go`** - HD image preview
+
+### File Watching & Agent Integration
+- **`file_watcher.go`** - fsnotify watcher with 3-layer debounce pipeline
+- **`agent_awareness.go`** - AI agent session detection from /tmp/claude-code-state/
+
+### Theming
+- **`theme.go`** - TOML-based configurable theme system
+
+### Layout & Rendering
+- **`render_layout.go`** - Pane layout rendering & tab bar
+- **`render_prompts.go`** - Prompt template rendering
+- **`tmux.go`** - Tmux integration
 
 ### Utilities
 - **`helpers.go`** - Reusable helper functions

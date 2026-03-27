@@ -67,6 +67,7 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "📝 Prompts Library", Action: "toggle-prompts", Shortcut: "F11", IsCheckable: true, IsChecked: m.showPromptsOnly},
 				{Label: "⭐ Favorites", Action: "toggle-favorites", Shortcut: "F6", IsCheckable: true, IsChecked: m.showFavoritesOnly},
 				{Label: "🔀 Git Repositories", Action: "toggle-git-repos", IsCheckable: true, IsChecked: m.showGitReposOnly},
+				{Label: "⚡ Git Changes", Action: "toggle-changes", Shortcut: "Ctrl+G", IsCheckable: true, IsChecked: m.showChangesOnly},
 				{Label: "🗑  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
 			},
 		},
@@ -253,10 +254,10 @@ func (m model) renderMenuBar() string {
 
 	var renderedMenus []string
 
-	// Menu bar styles - use adaptive colors for light/dark theme support
+	// Menu bar styles - use theme colors for light/dark theme support
 	menuActiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
 		Bold(true).
 		Padding(0, 1)
 
@@ -267,7 +268,7 @@ func (m model) renderMenuBar() string {
 		Padding(0, 1)
 
 	menuInactiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.Title.adaptiveColor()).
 		Bold(true).
 		Padding(0, 1)
 
@@ -342,18 +343,18 @@ func (m model) renderActiveDropdown() string {
 		return ""
 	}
 
-	// Menu item styles - use adaptive colors for light/dark theme support
+	// Menu item styles - use theme colors for light/dark theme support
 	menuItemStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.AdaptiveColor{Light: "#333333", Dark: "#DDDDDD"}).
 		Background(lipgloss.AdaptiveColor{Light: "#F0F0F0", Dark: "#303030"})
 
 	menuItemSelectedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
 		Bold(true)
 
 	menuItemDisabledStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#999999", Dark: "#666666"}).
+		Foreground(currentTheme.BorderUnfocused.adaptiveColor()).
 		Background(lipgloss.AdaptiveColor{Light: "#F0F0F0", Dark: "#303030"})
 
 	// Build dropdown panel
@@ -429,7 +430,7 @@ func (m model) renderActiveDropdown() string {
 	// Create dropdown panel
 	dropdown := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.AdaptiveColor{Light: "#999999", Dark: "#666666"}).
+		BorderForeground(currentTheme.BorderUnfocused.adaptiveColor()).
 		Width(maxWidth).
 		Render(strings.Join(lines, "\n"))
 
@@ -442,13 +443,13 @@ func (m model) getMenuXPosition(menuKey string) int {
 	menuOrder := getMenuOrder()
 
 	menuActiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
 		Bold(true).
 		Padding(0, 1)
 
 	menuInactiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.Title.adaptiveColor()).
 		Bold(true).
 		Padding(0, 1)
 
@@ -507,13 +508,13 @@ func (m model) getMenuAtPosition(x int) string {
 	menuOrder := getMenuOrder()
 
 	menuActiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#000000"}).
-		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
 		Bold(true).
 		Padding(0, 1)
 
 	menuInactiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.Title.adaptiveColor()).
 		Bold(true).
 		Padding(0, 1)
 
@@ -1009,6 +1010,40 @@ Additional context: {{variable2}}
 		m.cursor = 0
 		m.loadFiles()
 
+	case "toggle-changes":
+		// Auto-exit trash mode when toggling git changes filter
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
+
+		m.showChangesOnly = !m.showChangesOnly
+
+		if m.showChangesOnly {
+			changed, err := m.getChangedFiles()
+			if err != nil {
+				m.setStatusMessage(err.Error(), true)
+				m.showChangesOnly = false
+			} else {
+				m.changedFiles = changed
+				// Load agent sessions and build file-to-agent map
+				m.agentSessions = getAgentSessions()
+				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
+				m.displayMode = modeDetail
+				m.detailScrollX = 0
+				m.showDiffPreview = true
+				m.calculateLayout()
+				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
+			}
+		} else {
+			m.showDiffPreview = false
+			m.agentSessions = nil
+			m.agentFileMap = nil
+		}
+
+		m.cursor = 0
+		m.loadFiles()
+
 	case "toggle-trash":
 		// Navigate to trash view (or exit if already in trash)
 		if m.showTrashOnly {
@@ -1026,6 +1061,8 @@ Additional context: {{variable2}}
 			m.showTrashOnly = true
 			m.showFavoritesOnly = false
 			m.showPromptsOnly = false
+			m.showChangesOnly = false
+			m.showDiffPreview = false
 			m.cursor = 0
 			m.loadFiles()
 		}

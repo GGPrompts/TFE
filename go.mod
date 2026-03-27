@@ -6,11 +6,13 @@ toolchain go1.24.9
 
 require (
 	github.com/BourgeoisBear/rasterm v1.1.1
+	github.com/BurntSushi/toml v1.6.0
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/mattn/go-runewidth v0.0.19
 	golang.org/x/image v0.32.0
 	gopkg.in/yaml.v3 v3.0.1

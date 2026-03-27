@@ -17,6 +17,123 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// renderTabBar renders the tab bar above the preview pane
+// Shows open tabs with git status indicators, highlights the active tab
+func (m model) renderTabBar(maxWidth int) string {
+	if len(m.tabs) == 0 {
+		return ""
+	}
+
+	var s strings.Builder
+
+	// Style for active tab
+	activeTabStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
+		Padding(0, 1)
+
+	// Style for inactive tabs
+	inactiveTabStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
+		Background(lipgloss.Color("238")).
+		Padding(0, 1)
+
+	// Style for git status indicators
+	modifiedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // Yellow
+	addedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("77"))    // Green
+	deletedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // Red
+	untrackedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Cyan
+
+	// Style for the close indicator on active tab
+	closeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+
+	// Build tab labels and track total width
+	usedWidth := 0
+	tabSep := " "
+	sepWidth := 1
+
+	for i, tab := range m.tabs {
+		if i > 0 {
+			usedWidth += sepWidth
+		}
+
+		// Format git status indicator
+		var statusIndicator string
+		switch {
+		case strings.Contains(tab.gitStatus, "M"):
+			statusIndicator = modifiedStyle.Render("M")
+		case strings.Contains(tab.gitStatus, "A"):
+			statusIndicator = addedStyle.Render("+")
+		case strings.Contains(tab.gitStatus, "D"):
+			statusIndicator = deletedStyle.Render("-")
+		case strings.Contains(tab.gitStatus, "?"):
+			statusIndicator = untrackedStyle.Render("?")
+		case strings.Contains(tab.gitStatus, "R"):
+			statusIndicator = modifiedStyle.Render("R")
+		default:
+			statusIndicator = " "
+		}
+
+		// Build tab label: "statusIndicator name [x]" for active, "statusIndicator name" for inactive
+		tabName := tab.name
+		// Truncate long names
+		maxTabName := 20
+		if visualWidth(tabName) > maxTabName {
+			tabName = truncateToWidth(tabName, maxTabName-1) + "~"
+		}
+
+		var tabLabel string
+		if i == m.activeTab {
+			tabLabel = statusIndicator + " " + tabName + " " + closeStyle.Render("x")
+			rendered := activeTabStyle.Render(tabLabel)
+			tabWidth := m.visualWidthCompensated(rendered)
+
+			// Check if adding this tab would exceed available width
+			if usedWidth+tabWidth > maxWidth && i > 0 {
+				// Add overflow indicator
+				s.WriteString(tabSep)
+				overflow := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("241")).
+					Italic(true).
+					Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
+				s.WriteString(overflow)
+				break
+			}
+
+			if i > 0 {
+				s.WriteString(tabSep)
+			}
+			s.WriteString(rendered)
+			usedWidth += tabWidth
+		} else {
+			tabLabel = statusIndicator + " " + tabName
+			rendered := inactiveTabStyle.Render(tabLabel)
+			tabWidth := m.visualWidthCompensated(rendered)
+
+			// Check if adding this tab would exceed available width
+			if usedWidth+tabWidth > maxWidth && i > 0 {
+				// Add overflow indicator
+				s.WriteString(tabSep)
+				overflow := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("241")).
+					Italic(true).
+					Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
+				s.WriteString(overflow)
+				break
+			}
+
+			if i > 0 {
+				s.WriteString(tabSep)
+			}
+			s.WriteString(rendered)
+			usedWidth += tabWidth
+		}
+	}
+
+	return s.String()
+}
+
 // renderPreviewOnly renders a standalone file viewer with minimal UI
 // Used when TFE is launched with --preview /path/to/file for tmux splits
 func (m model) renderPreviewOnly() string {
@@ -34,8 +151,8 @@ func (m model) renderPreviewOnly() string {
 	// Title bar with file name (single line, minimal)
 	previewTitleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
-		Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
 		Width(m.width).
 		Padding(0, 1)
 
@@ -65,10 +182,7 @@ func (m model) renderPreviewOnly() string {
 		Width(m.width - 6).
 		Height(contentHeight).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.AdaptiveColor{
-			Light: "#00af87",
-			Dark:  "#5faf87",
-		})
+		BorderForeground(currentTheme.BorderFocused.adaptiveColor())
 
 	s.WriteString(previewBoxStyle.Render(previewContent))
 	s.WriteString("\n")
@@ -122,8 +236,8 @@ func (m model) renderFullPreview() string {
 		// Title bar with file name
 		previewTitleStyle := lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#ffffff"}).
-			Background(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}).
+			Foreground(currentTheme.SelectionFg.adaptiveColor()).
+			Background(currentTheme.SelectionBg.adaptiveColor()).
 			Width(m.width).
 			Padding(0, 1)
 
@@ -146,7 +260,12 @@ func (m model) renderFullPreview() string {
 		// Calculate scroll percentage
 		totalLines := m.getWrappedLineCount()
 		// Calculate how many lines will be visible (need to calculate early for percentage)
-		maxVisible := m.height - 4 - 2 // headerLines = 2 when mouse enabled
+		// headerLines = 2 when mouse enabled, +1 if tabs are open
+		earlyHeaderLines := 2
+		if len(m.tabs) > 0 {
+			earlyHeaderLines = 3
+		}
+		maxVisible := m.height - 4 - earlyHeaderLines
 		contentHeight := maxVisible - 2
 
 		var scrollPercent int
@@ -200,6 +319,15 @@ func (m model) renderFullPreview() string {
 		s.WriteString("\n")
 
 		headerLines = 2 // title + info line
+
+		// Tab bar (shown when tabs are open)
+		if len(m.tabs) > 0 {
+			tabBar := m.renderTabBar(m.width - 4)
+			s.WriteString(tabBar)
+			s.WriteString("\033[0m")
+			s.WriteString("\n")
+			headerLines++ // tab bar adds one line
+		}
 	}
 
 	// Content with border
@@ -219,10 +347,7 @@ func (m model) renderFullPreview() string {
 		// Mouse enabled: show decorative border
 		previewBoxStyle = previewBoxStyle.
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.AdaptiveColor{
-				Light: "#00af87", // Teal for light
-				Dark:  "#5faf87", // Light teal for dark
-			})
+			BorderForeground(currentTheme.BorderFocused.adaptiveColor())
 	} else {
 		// Mouse disabled (text selection mode): no border for cleaner copying
 		previewBoxStyle = previewBoxStyle.Padding(0, 1) // Just add side padding
@@ -467,13 +592,20 @@ func (m model) renderDualPane() string {
 		topContentHeight := topHeight - 2       // Account for borders
 		bottomContentHeight := bottomHeight - 2
 
+		// Reserve space for tab bar in bottom pane if tabs are open
+		hasTabs := len(m.tabs) > 0
+		previewContentHeight := bottomContentHeight
+		if hasTabs {
+			previewContentHeight = bottomContentHeight - 1
+		}
+
 		// Render top pane (detail view with full width)
 		topContent := m.renderDetailView(topContentHeight)
 
 		// Render bottom pane (preview with full width)
 		var bottomContent string
 		if m.preview.loaded {
-			bottomContent = m.renderPreview(bottomContentHeight)
+			bottomContent = m.renderPreview(previewContentHeight)
 		} else {
 			emptyStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("241")).
@@ -481,13 +613,19 @@ func (m model) renderDualPane() string {
 			bottomContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
 		}
 
+		// Prepend tab bar inside the bottom pane if tabs are open
+		if hasTabs {
+			tabBar := m.renderTabBar(m.width - 8)
+			bottomContent = tabBar + "\033[0m\n" + bottomContent
+		}
+
 		// Border colors based on focus
-		topBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
-		bottomBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
+		topBorderColor := currentTheme.BorderUnfocused.adaptiveColor()
+		bottomBorderColor := currentTheme.BorderUnfocused.adaptiveColor()
 		if m.focusedPane == leftPane {
-			topBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+			topBorderColor = currentTheme.BorderFocused.adaptiveColor()
 		} else {
-			bottomBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+			bottomBorderColor = currentTheme.BorderFocused.adaptiveColor()
 		}
 
 		// Create boxes with full width
@@ -529,6 +667,13 @@ func (m model) renderDualPane() string {
 			topContentHeight := topHeight - 2       // Account for borders
 			bottomContentHeight := bottomHeight - 2
 
+			// Reserve space for tab bar in bottom pane if tabs are open
+			hasTabs := len(m.tabs) > 0
+			previewContentHeight := bottomContentHeight
+			if hasTabs {
+				previewContentHeight = bottomContentHeight - 1
+			}
+
 			// Render top pane (file list with full width)
 			var topContent string
 			switch m.displayMode {
@@ -543,7 +688,7 @@ func (m model) renderDualPane() string {
 			// Render bottom pane (preview with full width)
 			var bottomContent string
 			if m.preview.loaded {
-				bottomContent = m.renderPreview(bottomContentHeight)
+				bottomContent = m.renderPreview(previewContentHeight)
 			} else {
 				emptyStyle := lipgloss.NewStyle().
 					Foreground(lipgloss.Color("241")).
@@ -551,13 +696,19 @@ func (m model) renderDualPane() string {
 				bottomContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
 			}
 
+			// Prepend tab bar inside the bottom pane if tabs are open
+			if hasTabs {
+				tabBar := m.renderTabBar(m.width - 8)
+				bottomContent = tabBar + "\033[0m\n" + bottomContent
+			}
+
 			// Border colors based on focus
-			topBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
-			bottomBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
+			topBorderColor := currentTheme.BorderUnfocused.adaptiveColor()
+			bottomBorderColor := currentTheme.BorderUnfocused.adaptiveColor()
 			if m.focusedPane == leftPane {
-				topBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+				topBorderColor = currentTheme.BorderFocused.adaptiveColor()
 			} else {
-				bottomBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+				bottomBorderColor = currentTheme.BorderFocused.adaptiveColor()
 			}
 
 			// Create boxes with full width
@@ -581,6 +732,14 @@ func (m model) renderDualPane() string {
 
 		} else {
 			// HORIZONTAL SPLIT for wide terminals - accordion style
+
+			// Check if tab bar needs space (reduces preview height)
+			hasTabs := len(m.tabs) > 0
+			rightContentHeight := contentHeight
+			if hasTabs {
+				rightContentHeight = contentHeight - 1 // Reserve 1 line for tab bar
+			}
+
 			// Get left pane content - use contentHeight so content fits within the box
 			var leftContent string
 			switch m.displayMode {
@@ -595,7 +754,7 @@ func (m model) renderDualPane() string {
 			// Get right pane content (preview)
 			var rightContent string
 			if m.preview.loaded {
-				rightContent = m.renderPreview(contentHeight)
+				rightContent = m.renderPreview(rightContentHeight)
 			} else {
 				emptyStyle := lipgloss.NewStyle().
 					Foreground(lipgloss.Color("241")).
@@ -603,13 +762,19 @@ func (m model) renderDualPane() string {
 				rightContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
 			}
 
+			// If tabs are open, prepend tab bar inside the right pane content
+			if hasTabs {
+				tabBar := m.renderTabBar(m.rightWidth - 4)
+				rightContent = tabBar + "\033[0m\n" + rightContent
+			}
+
 			// Border colors based on focus (accordion style)
-			leftBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
-			rightBorderColor := lipgloss.AdaptiveColor{Light: "#999999", Dark: "#585858"}
+			leftBorderColor := currentTheme.BorderUnfocused.adaptiveColor()
+			rightBorderColor := currentTheme.BorderUnfocused.adaptiveColor()
 			if m.focusedPane == leftPane {
-				leftBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+				leftBorderColor = currentTheme.BorderFocused.adaptiveColor()
 			} else {
-				rightBorderColor = lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#00d7ff"}
+				rightBorderColor = currentTheme.BorderFocused.adaptiveColor()
 			}
 
 			// Use exact Width and Height to ensure panes stay perfectly aligned
@@ -670,6 +835,20 @@ func (m model) renderDualPane() string {
 	gitReposIndicator := ""
 	if m.showGitReposOnly {
 		gitReposIndicator = " • 🔀 git repos only"
+	}
+
+	changesIndicator := ""
+	if m.showChangesOnly {
+		diffMode := "file"
+		if m.showDiffPreview {
+			diffMode = "diff"
+		}
+		changesIndicator = fmt.Sprintf(" • ⚡ %d changes [%s]", len(m.changedFiles), diffMode)
+	}
+
+	tabsIndicator := ""
+	if len(m.tabs) > 0 {
+		tabsIndicator = fmt.Sprintf(" • %d tabs", len(m.tabs))
 	}
 
 	// Show focused pane info in status bar
@@ -734,7 +913,7 @@ func (m model) renderDualPane() string {
 
 	// Split status into two lines to prevent truncation
 	// Line 1: Counts, indicators, view mode, focus, help
-	statusLine1 := fmt.Sprintf("%s%s%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, gitReposIndicator, m.displayMode.String(), focusInfo, helpHint)
+	statusLine1 := fmt.Sprintf("%s%s%s%s%s%s%s • %s%s%s", itemsInfo, hiddenIndicator, favoritesIndicator, promptsIndicator, gitReposIndicator, changesIndicator, tabsIndicator, m.displayMode.String(), focusInfo, helpHint)
 	// Use scrolling footer (click to activate) or truncate if too long
 	statusLine1 = m.renderScrollingFooter(statusLine1, m.width-4)
 	s.WriteString(statusStyle.Render(statusLine1))

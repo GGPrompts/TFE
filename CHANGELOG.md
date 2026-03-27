@@ -5,6 +5,31 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added
+- **Agent Review Surface — Full diff review alongside Claude Code**
+  - **Changes Mode (Ctrl+G)**: Filter to show only git-modified/untracked files across the entire project
+  - **Diff Preview**: Colorized git diff in preview pane (toggle with 'd' key) — green/red/cyan styling
+  - **Tab-Based Review**: Open changed files as persistent tabs (t/T to open, Ctrl+W to close, Alt+arrows to cycle)
+  - **Diff-to-Clipboard**: Yank single file diff (y) or all diffs (Y) as markdown for AI review
+  - **Push-to-Clean**: After git push, changed files auto-clear from changes view and stale tabs close
+  - **Agent Session Awareness**: Detects Claude Code sessions via /tmp/claude-code-state/, shows [CC] labels
+  - **Auto-Open on Agent Completion**: Opt-in (TFE_AUTO_CHANGES=1) — auto-switches to changes mode when agent finishes
+  - Files modified: types.go, update.go, update_keyboard.go, update_mouse.go, render_preview.go, render_file_list.go, render_layout.go, view.go, menu.go, helpers.go, git_operations.go, favorites.go, context_menu.go
+  - New files: file_watcher.go, agent_awareness.go
+
+- **fsnotify File Watcher**
+  - Live file watching with auto-refresh on file create/modify/delete
+  - 3-layer debounce pipeline: per-file dedup (200ms), timer-based batching (500ms), max delay cap (2s)
+  - Atomic write handling (vim-style delete+recreate detection)
+  - Auto-follows directory changes
+  - New files: file_watcher.go, file_watcher_test.go
+
+- **Configurable Theme System**
+  - All 15 color definitions extracted from hardcoded values to configurable theme
+  - TOML-based config at ~/.config/tfe/theme.toml
+  - Falls back to original colors when no config exists
+  - Includes diff colors (added/removed/hunk header/meta)
+  - New files: theme.go
+
 - **Panel Width Lock for Dual-Pane Mode**
   - `Ctrl+L` or View menu toggle to lock panel widths
   - Prevents accordion 60/40 resize when switching focus between panes

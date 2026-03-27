@@ -164,6 +164,10 @@ func (m model) getContextMenuItems() []contextMenuItem {
 		}
 
 		items = append(items, contextMenuItem{"📋 Copy Path", "copypath"})
+		// Add "Copy Diff" option when in changes mode
+		if m.showChangesOnly {
+			items = append(items, contextMenuItem{"📋 Copy Diff", "copydiff"})
+		}
 		items = append(items, contextMenuItem{"📋 Copy to...", "copy"})
 		items = append(items, contextMenuItem{"✏  Rename...", "rename"})
 		items = append(items, contextMenuItem{"🗑  Delete", "delete"})
@@ -308,6 +312,31 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			m.setStatusMessage(fmt.Sprintf("Failed to copy to clipboard: %s", err), true)
 		} else {
 			m.setStatusMessage("Path copied to clipboard", false)
+		}
+		return m, tea.ClearScreen
+
+	case "copydiff":
+		// Copy git diff for file to clipboard as markdown (changes mode only)
+		if m.contextMenuFile != nil && m.showChangesOnly {
+			statusCode := extractGitStatusCode(m.contextMenuFile.name)
+			diff, err := m.getFileDiff(m.contextMenuFile.path, statusCode)
+			if err != nil {
+				m.setStatusMessage(fmt.Sprintf("Failed to get diff: %s", err), true)
+				return m, tea.ClearScreen
+			}
+			gitRoot := m.findGitRoot(m.currentPath)
+			relPath := m.contextMenuFile.path
+			if gitRoot != "" {
+				if rp, err := filepath.Rel(gitRoot, m.contextMenuFile.path); err == nil {
+					relPath = rp
+				}
+			}
+			markdown := fmt.Sprintf("## %s\n\n```diff\n%s```\n", relPath, diff)
+			if err := copyToClipboard(markdown); err != nil {
+				m.setStatusMessage(fmt.Sprintf("Failed to copy diff: %s", err), true)
+			} else {
+				m.setStatusMessage(fmt.Sprintf("Copied diff for %s to clipboard", filepath.Base(relPath)), false)
+			}
 		}
 		return m, tea.ClearScreen
 

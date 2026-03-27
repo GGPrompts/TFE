@@ -260,6 +260,9 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 
 // loadFiles loads the files from the current directory
 func (m *model) loadFiles() {
+	// Update file watcher to track the current directory
+	m.switchWatchPath(m.currentPath)
+
 	// Clear prompts directory cache when reloading files (performance optimization)
 	// This ensures cache stays fresh when files change
 	m.promptDirsCache = make(map[string]bool)

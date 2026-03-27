@@ -10,6 +10,10 @@ import (
 )
 
 func initialModel() model {
+	// Initialize theme and styles before building the model
+	initTheme()
+	initStyles()
+
 	// Use startPath from CLI if provided, otherwise use current working directory
 	initialPath := startPath
 	if initialPath == "" {
@@ -22,7 +26,7 @@ func initialModel() model {
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#0087d7", Dark: "#5fd7ff"})
+	s.Style = lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor())
 
 	m := model{
 		currentPath:     initialPath,
@@ -86,6 +90,9 @@ func initialModel() model {
 		cachedMenus:     nil,                   // Will be built on first access
 		// Performance caching
 		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
+		// Agent auto-watch: enable if TFE_AUTO_CHANGES=1
+		agentAutoWatch:         os.Getenv("TFE_AUTO_CHANGES") == "1",
+		lastKnownAgentSessions: make(map[string]string),
 	}
 
 	// Load command history from disk (supports per-directory and global history)
@@ -96,6 +103,9 @@ func initialModel() model {
 	m.rebuildCombinedHistory()
 
 	m.loadFiles()
+
+	// Initialize file watcher (fsnotify) for live directory refresh
+	m.initWatcher()
 
 	// If a file was specified on CLI, find and select it
 	if selectFile != "" {

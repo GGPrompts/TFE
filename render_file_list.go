@@ -222,8 +222,8 @@ func (m model) renderDetailView(maxVisible int) string {
 	usableWidth := renderWidth - 17
 
 	var nameWidth, sizeWidth, modifiedWidth, extraWidth int
-	if m.showTrashOnly || m.showFavoritesOnly || m.showGitReposOnly {
-		// 4 columns: Name, Size, Modified/Deleted, Location/Branch
+	if m.showTrashOnly || m.showFavoritesOnly || m.showGitReposOnly || m.showChangesOnly {
+		// 4 columns: Name, Size, Modified/Deleted, Location/Branch/Status
 		nameWidth = usableWidth * 35 / 100    // 35%
 		sizeWidth = 10                         // Fixed
 		modifiedWidth = 12                     // Fixed
@@ -347,6 +347,25 @@ func (m model) renderDetailView(maxVisible int) string {
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
 		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, branchWidth, branchHeader, statusWidth, statusHeader, commitWidth, commitHeader)
+	} else if m.showChangesOnly {
+		// Changes mode: Name (with status), Size, Modified, Location
+		nameHeader := "Name"
+		sizeHeader := "Size"
+		modifiedHeader := "Modified"
+		locationHeader := "Location"
+
+		// Add indicator to active column
+		switch m.sortBy {
+		case "name":
+			nameHeader += sortIndicator
+		case "size":
+			sizeHeader += sortIndicator
+		case "modified":
+			modifiedHeader += sortIndicator
+		}
+
+		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
+		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
 	} else {
 		// Regular mode: Name, Size, Modified, Type
 		nameHeader := "Name"
@@ -593,6 +612,31 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Use visual-width padding for name column (contains emojis), regular padding for others
 		paddedName := m.padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, branchWidth, branch, statusWidth, status, commitWidth, lastCommit)
+		} else if m.showChangesOnly {
+			// Changes mode: Name (includes status prefix), Size, Modified, Location
+			location := filepath.Dir(file.path)
+			homeDir, _ := os.UserHomeDir()
+			if homeDir != "" && strings.HasPrefix(location, homeDir) {
+				location = "~" + strings.TrimPrefix(location, homeDir)
+			}
+			// Show relative to git root if possible
+			gitRoot := m.findGitRoot(m.currentPath)
+			if gitRoot != "" {
+				if relLoc, err := filepath.Rel(gitRoot, location); err == nil {
+					location = relLoc
+				}
+			}
+			// Append agent indicator if this file is associated with an active agent session
+			if m.agentFileMap != nil {
+				if label, ok := m.agentFileMap[file.path]; ok {
+					location = location + " [" + label + "]"
+				}
+			}
+			if len(location) > extraWidth {
+				location = "..." + location[len(location)-(extraWidth-3):]
+			}
+			paddedName := m.padToVisualWidth(name, nameWidth)
+			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
 		} else {
 			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)
@@ -650,7 +694,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				// Add alternating row background for easier reading on wide terminals
 				// Disabled on narrow terminals to prevent wrapping issues with horizontal scroll
 				if !m.isNarrowTerminal() && i%2 == 0 {
-					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#333333"})
+					alternateStyle := style.Copy().Background(currentTheme.AlternateRow.adaptiveColor())
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
 				} else {
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, style.Render(nameWithoutEmoji)), 1)
@@ -671,7 +715,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				// Add alternating row background for easier reading on wide terminals
 				// Disabled on narrow terminals to prevent wrapping issues with horizontal scroll
 				if !m.isNarrowTerminal() && i%2 == 0 {
-					alternateStyle := style.Copy().Background(lipgloss.AdaptiveColor{Light: "#eeeeee", Dark: "#333333"})
+					alternateStyle := style.Copy().Background(currentTheme.AlternateRow.adaptiveColor())
 					line = alternateStyle.Render(line)
 				} else {
 					line = style.Render(line)
