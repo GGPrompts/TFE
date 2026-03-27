@@ -296,9 +296,9 @@ git pull
 			}
 
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [V] [⬜/⬌] [>_] [🔍] [📝] [🎮] [🗑]
-			// Layout:  0-4   5-9    10-12 13-17 18-22 23-27 28-32 33-37 38-42 43-47
-			// Note: Most buttons are 5 chars ([ + emoji(2) + ] + space), [V] is 3 chars
+			// Toolbar: [🏠] [⭐/✨] [📊/📄/🌲] [⬜/⬌] [>_] [🔍] [📝] [🔀] [⚡] [🗑/♻]
+			// Layout:  0-4   5-9     10-14      15-19  20-24 25-29 30-34 35-39 40-44 45-49
+			// All buttons are 5 cols: [ (1) + icon (2) + ] (1) + space (1)
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
 				if msg.X >= 0 && msg.X <= 4 {
@@ -343,8 +343,8 @@ git pull
 					}
 					return m, nil
 				}
-				// View mode toggle button [V] (X=10-12: [ + V + ] + space)
-				if msg.X >= 10 && msg.X <= 12 {
+				// View mode toggle button [📊/📄/🌲] (X=10-14)
+				if msg.X >= 10 && msg.X <= 14 {
 					// Cycle through display modes: List → Detail → Tree → List
 					if m.displayMode == modeList {
 						m.displayMode = modeDetail
@@ -359,8 +359,8 @@ git pull
 					m.calculateLayout() // Recalculate widths for new display mode
 					return m, nil
 				}
-				// Pane toggle button [⬜/⬌] (X=13-17: [ + emoji(2) + ] + space)
-				if msg.X >= 13 && msg.X <= 17 {
+				// Pane toggle button [⬜/⬌] (X=15-19)
+				if msg.X >= 15 && msg.X <= 19 {
 					// Toggle between single and dual-pane (like Tab or Space)
 					if m.viewMode == viewDualPane {
 						m.viewMode = viewSinglePane
@@ -371,8 +371,8 @@ git pull
 					m.populatePreviewCache() // Refresh cache with new layout
 					return m, nil
 				}
-				// Terminal button [>_] (X=18-22: [ + >_(2) + ] + space)
-				if msg.X >= 18 && msg.X <= 22 {
+				// Terminal button [>_] (X=20-24)
+				if msg.X >= 20 && msg.X <= 24 {
 					// Toggle command mode focus
 					m.commandFocused = !m.commandFocused
 					if !m.commandFocused {
@@ -381,8 +381,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Context-aware search button [🔍] (X=23-27: [ + emoji(2) + ] + space)
-				if msg.X >= 23 && msg.X <= 27 {
+				// Context-aware search button [🔍] (X=25-29)
+				if msg.X >= 25 && msg.X <= 29 {
 					// Context-aware search toggle:
 					// - When viewing file (full preview or dual-pane with right pane focused): Toggle in-file search (Ctrl+F)
 					// - When browsing files (left pane or single-pane): Toggle directory filter search (/)
@@ -420,8 +420,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Prompts filter button [📝] (X=28-32: [ + emoji(2) + ] + space)
-				if msg.X >= 28 && msg.X <= 32 {
+				// Prompts filter button [📝] (X=30-34)
+				if msg.X >= 30 && msg.X <= 34 {
 					// Auto-exit trash mode when toggling prompts filter
 					if m.showTrashOnly {
 						m.showTrashOnly = false
@@ -444,8 +444,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Git repositories toggle button [🔀] (X=33-37: [ + emoji(2) + ] + space)
-				if msg.X >= 33 && msg.X <= 37 {
+				// Git repositories toggle button [🔀] (X=35-39)
+				if msg.X >= 35 && msg.X <= 39 {
 					// Auto-exit trash mode when toggling git repos filter
 					if m.showTrashOnly {
 						m.showTrashOnly = false
@@ -474,8 +474,8 @@ git pull
 
 					return m, tea.ClearScreen
 				}
-				// Git changes toggle button [] (X=38-42: [ + icon(2) + ] + space)
-				if msg.X >= 38 && msg.X <= 42 {
+				// Git changes toggle button [⚡] (X=40-44)
+				if msg.X >= 40 && msg.X <= 44 {
 					// Auto-exit trash mode
 					if m.showTrashOnly {
 						m.showTrashOnly = false
@@ -510,8 +510,8 @@ git pull
 					m.loadFiles()
 					return m, tea.ClearScreen
 				}
-				// Trash button [🗑] or [♻] (X=43-47: [ + emoji(2) + ] + space)
-				if msg.X >= 43 && msg.X <= 47 {
+				// Trash button [🗑/♻] (X=45-49)
+				if msg.X >= 45 && msg.X <= 49 {
 					// Navigate to trash view (or exit if already in trash)
 					if m.showTrashOnly {
 						// Already in trash - exit and restore previous path
