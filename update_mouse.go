@@ -296,55 +296,12 @@ git pull
 			}
 
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [⭐/✨] [📊/📄/🌲] [⬜/⬌] [>_] [🔍] [📝] [🔀] [⚡] [🗑/♻]
-			// Layout:  0-4   5-9     10-14      15-19  20-24 25-29 30-34 35-39 40-44 45-49
+			// Toolbar: [📊/📄/🌲] [⬜/⬌] [>_] [🔍] [⚡]
+			// Layout:  0-4         5-9    10-14 15-19 20-24
 			// All buttons are 5 cols: [ (1) + icon (2) + ] (1) + space (1)
 			if msg.Y == 1 {
-				// Home button [🏠] (X=0-4: [ + emoji(2) + ] + space)
+				// View mode toggle button [📊/📄/🌲] (X=0-4)
 				if msg.X >= 0 && msg.X <= 4 {
-					// Auto-exit trash mode when navigating to home
-					if m.showTrashOnly {
-						m.showTrashOnly = false
-						m.trashRestorePath = ""
-					}
-
-					// Navigate to home directory
-					homeDir, err := os.UserHomeDir()
-					if err == nil {
-						m.currentPath = homeDir
-						m.cursor = 0
-
-						// If git repos filter is active, rescan from home
-						if m.showGitReposOnly {
-							m.setStatusMessage("🔍 Scanning git repositories from home...", false)
-							m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
-							m.gitReposLastScan = time.Now()
-							m.gitReposScanRoot = m.currentPath
-							m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
-						}
-
-						m.loadFiles()
-					}
-					return m, nil
-				}
-				// Star button [⭐/✨] (X=5-9: [ + emoji(2) + ] + space)
-				if msg.X >= 5 && msg.X <= 9 {
-					// Auto-exit trash mode when toggling favorites
-					if m.showTrashOnly {
-						m.showTrashOnly = false
-						m.trashRestorePath = ""
-					}
-
-					// Toggle favorites filter (like F6)
-					m.showFavoritesOnly = !m.showFavoritesOnly
-					m.cursor = 0
-					if m.showFavoritesOnly {
-						m.loadFiles()
-					}
-					return m, nil
-				}
-				// View mode toggle button [📊/📄/🌲] (X=10-14)
-				if msg.X >= 10 && msg.X <= 14 {
 					// Cycle through display modes: List → Detail → Tree → List
 					if m.displayMode == modeList {
 						m.displayMode = modeDetail
@@ -359,8 +316,8 @@ git pull
 					m.calculateLayout() // Recalculate widths for new display mode
 					return m, nil
 				}
-				// Pane toggle button [⬜/⬌] (X=15-19)
-				if msg.X >= 15 && msg.X <= 19 {
+				// Pane toggle button [⬜/⬌] (X=5-9)
+				if msg.X >= 5 && msg.X <= 9 {
 					// Toggle between single and dual-pane (like Tab or Space)
 					if m.viewMode == viewDualPane {
 						m.viewMode = viewSinglePane
@@ -371,8 +328,8 @@ git pull
 					m.populatePreviewCache() // Refresh cache with new layout
 					return m, nil
 				}
-				// Terminal button [>_] (X=20-24)
-				if msg.X >= 20 && msg.X <= 24 {
+				// Terminal button [>_] (X=10-14)
+				if msg.X >= 10 && msg.X <= 14 {
 					// Toggle command mode focus
 					m.commandFocused = !m.commandFocused
 					if !m.commandFocused {
@@ -381,8 +338,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Context-aware search button [🔍] (X=25-29)
-				if msg.X >= 25 && msg.X <= 29 {
+				// Context-aware search button [🔍] (X=15-19)
+				if msg.X >= 15 && msg.X <= 19 {
 					// Context-aware search toggle:
 					// - When viewing file (full preview or dual-pane with right pane focused): Toggle in-file search (Ctrl+F)
 					// - When browsing files (left pane or single-pane): Toggle directory filter search (/)
@@ -420,62 +377,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Prompts filter button [📝] (X=30-34)
-				if msg.X >= 30 && msg.X <= 34 {
-					// Auto-exit trash mode when toggling prompts filter
-					if m.showTrashOnly {
-						m.showTrashOnly = false
-						m.trashRestorePath = ""
-					}
-
-					// Toggle prompts filter
-					m.showPromptsOnly = !m.showPromptsOnly
-
-					// Auto-expand ~/.prompts when filter is turned on
-					if m.showPromptsOnly {
-						if homeDir, err := os.UserHomeDir(); err == nil {
-							globalPromptsDir := filepath.Join(homeDir, ".prompts")
-							// Check if ~/.prompts exists
-							if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
-								// Expand the ~/.prompts directory
-								m.expandedDirs[globalPromptsDir] = true
-							}
-						}
-					}
-					return m, nil
-				}
-				// Git repositories toggle button [🔀] (X=35-39)
-				if msg.X >= 35 && msg.X <= 39 {
-					// Auto-exit trash mode when toggling git repos filter
-					if m.showTrashOnly {
-						m.showTrashOnly = false
-						m.trashRestorePath = ""
-					}
-
-					m.showGitReposOnly = !m.showGitReposOnly
-
-					if m.showGitReposOnly {
-						// Auto-switch to Detail view
-						m.displayMode = modeDetail
-						m.detailScrollX = 0 // Reset scroll
-						m.calculateLayout() // Recalculate widths for detail view
-
-						// Scan for git repos
-						m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
-						m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
-						m.gitReposScanRoot = m.currentPath
-						m.gitReposLastScan = time.Now()
-						m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
-					} else {
-						m.showGitReposOnly = false
-						m.cursor = 0
-						m.loadFiles()
-					}
-
-					return m, tea.ClearScreen
-				}
-				// Git changes toggle button [⚡] (X=40-44)
-				if msg.X >= 40 && msg.X <= 44 {
+				// Git changes toggle button [⚡] (X=20-24)
+				if msg.X >= 20 && msg.X <= 24 {
 					// Auto-exit trash mode
 					if m.showTrashOnly {
 						m.showTrashOnly = false
@@ -509,33 +412,6 @@ git pull
 					m.cursor = 0
 					m.loadFiles()
 					return m, tea.ClearScreen
-				}
-				// Trash button [🗑/♻] (X=45-49)
-				if msg.X >= 45 && msg.X <= 49 {
-					// Navigate to trash view (or exit if already in trash)
-					if m.showTrashOnly {
-						// Already in trash - exit and restore previous path
-						m.showTrashOnly = false
-						if m.trashRestorePath != "" {
-							m.currentPath = m.trashRestorePath
-							m.trashRestorePath = ""
-						}
-						m.cursor = 0
-						m.loadFiles()
-					} else {
-						// Enter trash view - save current path
-						m.trashRestorePath = m.currentPath
-						m.showTrashOnly = true
-						m.showFavoritesOnly = false
-						m.showPromptsOnly = false
-						m.cursor = 0
-						// Default to detail view for trash
-						m.displayMode = modeDetail
-						m.detailScrollX = 0
-						m.calculateLayout()
-						m.loadFiles()
-					}
-					return m, nil
 				}
 			}
 

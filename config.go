@@ -33,6 +33,9 @@ type Config struct {
 	// External tools
 	Editor string `toml:"editor"` // Preferred editor command (empty = use $EDITOR)
 
+	// Profiles (launchable terminal sessions from the Profiles menu)
+	Profiles []Profile `toml:"profiles,omitempty"` // Custom profiles; nil/empty = use defaults
+
 	// Theme colors (optional — falls back to theme.toml or defaults)
 	Theme *Theme `toml:"theme,omitempty"` // Inline theme; nil means not present in config
 }
@@ -48,6 +51,10 @@ func defaultConfig() Config {
 		ShowHidden:         false,
 		SortOrder:          "name",
 		Editor:             "",
+		Profiles: []Profile{
+			{Name: "Shell Here", Command: "bash"},
+			{Name: "Claude Here", Command: "claude"},
+		},
 	}
 }
 

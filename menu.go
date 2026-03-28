@@ -48,9 +48,9 @@ func (m model) getMenus() map[string]Menu {
 			Label: "File",
 			Items: fileMenuItems,
 		},
-		"ai": {
-			Label: "AI",
-			Items: []MenuItem{},
+		"profiles": {
+			Label: "Profiles",
+			Items: m.buildProfileMenuItems(),
 		},
 		"view": {
 			Label: "View",
@@ -190,52 +190,56 @@ func (m model) getMenus() map[string]Menu {
 
 	menus["tools"] = toolsMenu
 
-	// Add AI tools to AI menu if available (using cached availability)
-	aiMenu := menus["ai"]
-	hasAITools := false
-
-	// Use cached tool availability instead of filesystem lookups (performance optimization)
-	if m.toolsAvailable["claude"] {
-		if !hasAITools {
-			hasAITools = true
-		}
-		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "🤖 Claude", Action: "claude"})
-	}
-	if m.toolsAvailable["claude"] { // Check again for YOLO Claude (uses same binary)
-		if !hasAITools {
-			hasAITools = true
-		}
-		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "⚡ YOLO Claude", Action: "yolo-claude"})
-	}
-	if m.toolsAvailable["codex"] {
-		if !hasAITools {
-			hasAITools = true
-		}
-		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "🔧 Codex", Action: "codex"})
-	}
-	if m.toolsAvailable["gemini"] {
-		if !hasAITools {
-			hasAITools = true
-		}
-		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "💎 Gemini", Action: "gemini"})
-	}
-	if m.toolsAvailable["opencode"] {
-		if !hasAITools {
-			hasAITools = true
-		}
-		aiMenu.Items = append(aiMenu.Items, MenuItem{Label: "🔓 OpenCode", Action: "opencode"})
-	}
-
-	menus["ai"] = aiMenu
-
 	// The performance win comes from using m.toolsAvailable instead of editorAvailable()
 	// which eliminates filesystem lookups per render (was causing dropdown lag)
 	return menus
 }
 
+// buildProfileMenuItems builds menu items from configured profiles
+func (m model) buildProfileMenuItems() []MenuItem {
+	profiles := m.config.Profiles
+	if len(profiles) == 0 {
+		// Fallback to defaults if config has no profiles
+		profiles = []Profile{
+			{Name: "Shell Here", Command: "bash"},
+			{Name: "Claude Here", Command: "claude"},
+		}
+	}
+
+	var items []MenuItem
+	for i, p := range profiles {
+		label := p.Name
+		hint := ""
+		if p.Dir != "" {
+			hint = p.Dir
+		}
+		items = append(items, MenuItem{
+			Label:    label,
+			Action:   fmt.Sprintf("profile-%d", i),
+			Shortcut: hint,
+		})
+	}
+
+	// Separator + Edit Profiles...
+	items = append(items, MenuItem{IsSeparator: true})
+	items = append(items, MenuItem{Label: "Edit Profiles...", Action: "edit-profiles"})
+
+	return items
+}
+
+// writePostCommand writes the command to execute after TFE exits
+func writePostCommand(command string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	targetFile := filepath.Join(homeDir, ".tfe_post_command")
+	return os.WriteFile(targetFile, []byte(command), 0644)
+}
+
 // getMenuOrder returns the order of menus in the menu bar
 func getMenuOrder() []string {
-	return []string{"file", "ai", "view", "go", "git", "tools", "settings", "help"}
+	return []string{"file", "profiles", "view", "go", "git", "tools", "settings", "help"}
 }
 
 // getPreviousMenu returns the menu key to the left of the current menu (with wrapping)
@@ -964,43 +968,23 @@ Additional context: {{variable2}}
 		m.selectedMenuItem = -1
 		return m, openTUITool("pyradio", m.currentPath)
 
-	// AI menu
-	case "claude":
-		// Launch Claude Code in current directory
+	// Profiles menu
+	case "edit-profiles":
+		// Open config file in editor
 		m.menuOpen = false
 		m.activeMenu = ""
 		m.selectedMenuItem = -1
-		return m, openTUITool(getClaudePath(), m.currentPath)
-
-	case "yolo-claude":
-		// Launch Claude Code with --dangerously-skip-permissions flag in current directory
-		m.menuOpen = false
-		m.activeMenu = ""
-		m.selectedMenuItem = -1
-		// For YOLO Claude, we need to pass flags, so we need a special command
-		// Use openTUIToolWithArgs instead of openTUITool
-		return m, openTUIToolWithArgs(getClaudePath(), []string{"--dangerously-skip-permissions"}, m.currentPath)
-
-	case "codex":
-		// Launch Codex in current directory
-		m.menuOpen = false
-		m.activeMenu = ""
-		m.selectedMenuItem = -1
-		return m, openTUITool("codex", m.currentPath)
-
-	case "gemini":
-		// Launch Gemini in current directory
-		m.menuOpen = false
-		m.activeMenu = ""
-		m.selectedMenuItem = -1
-		return m, openTUITool("gemini", m.currentPath)
-
-	case "opencode":
-		// Launch OpenCode in current directory
-		m.menuOpen = false
-		m.activeMenu = ""
-		m.selectedMenuItem = -1
-		return m, openTUITool("opencode", m.currentPath)
+		cfgPath, err := configPath()
+		if err != nil {
+			m.setStatusMessage(fmt.Sprintf("Failed to find config path: %s", err), true)
+			return m, nil
+		}
+		editor := getAvailableEditor()
+		if editor == "" {
+			m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
+			return m, nil
+		}
+		return m, openEditor(editor, cfgPath)
 
 	case "toggle-prompts":
 		// Auto-exit trash mode when toggling prompts filter
@@ -1468,6 +1452,41 @@ Additional context: {{variable2}}
 		m.setStatusMessage("GitHub: https://github.com/GGPrompts/TFE", false)
 
 	default:
+		// Handle profile-N actions dynamically
+		if strings.HasPrefix(action, "profile-") {
+			idxStr := strings.TrimPrefix(action, "profile-")
+			idx := 0
+			for _, ch := range idxStr {
+				idx = idx*10 + int(ch-'0')
+			}
+			profiles := m.config.Profiles
+			if idx >= 0 && idx < len(profiles) {
+				profile := profiles[idx]
+				m.menuOpen = false
+				m.activeMenu = ""
+				m.selectedMenuItem = -1
+
+				// Determine target directory
+				targetDir := m.currentPath
+				if profile.Dir != "" {
+					targetDir = profile.Dir
+				}
+
+				// Write CD target so the wrapper changes to the right directory
+				if err := writeCDTarget(targetDir); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to write CD target: %s", err), true)
+					return m, nil
+				}
+
+				// Write the post-exit command for the wrapper to execute
+				if err := writePostCommand(profile.Command); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to write post command: %s", err), true)
+					return m, nil
+				}
+
+				return m, tea.Quit
+			}
+		}
 		m.setStatusMessage("Action: "+action+" (not implemented)", false)
 	}
 

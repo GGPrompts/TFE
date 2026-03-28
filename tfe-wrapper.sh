@@ -95,4 +95,15 @@ tfe() {
         fi
         rm -f "$CD_TARGET"
     fi
+
+    # Check if TFE wrote a post-exit command (from Profiles menu)
+    local POST_CMD="$HOME/.tfe_post_command"
+    if [ -f "$POST_CMD" ]; then
+        local CMD="$(cat "$POST_CMD")"
+        rm -f "$POST_CMD"
+        if [ -n "$CMD" ]; then
+            echo "Running: $CMD"
+            eval "$CMD"
+        fi
+    fi
 }

@@ -630,41 +630,11 @@ func (m model) getPreviewVisibleLines() int {
 }
 
 // renderToolbarRow renders the emoji button toolbar row
-// Shows: [🏠] [⭐/✨] [📄/📊/🌲] [⬜/⬌] [>_] [🔍] [📝] [🔀] [🗑/♻]
+// Shows: [📄/📊/🌲] [⬜/⬌] [>_] [🔍] [⚡]
+// Navigation buttons (Home, Favorites, Prompts, Git Repos, Trash) are in the Go menu
 // This function is shared between single-pane (view.go) and dual-pane (render_preview.go) views
 func (m model) renderToolbarRow() string {
 	var s strings.Builder
-
-	homeDir, _ := os.UserHomeDir()
-
-	// Home button (highlight if in home directory)
-	homeIcon := "🏠"
-	if m.currentPath == homeDir {
-		// Active: gray background (in home directory)
-		activeHomeStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeHomeStyle.Render("[" + homeIcon + "]"))
-	} else {
-		// Inactive: normal styling
-		homeButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(homeButtonStyle.Render("[" + homeIcon + "]"))
-	}
-	s.WriteString(" ")
-
-	// Favorites filter toggle button
-	starIcon := "⭐"
-	if m.showFavoritesOnly {
-		starIcon = "✨" // Different icon when filter is active
-	}
-	favButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(favButtonStyle.Render("[" + starIcon + "]"))
-	s.WriteString(" ")
 
 	// View mode toggle button (cycles List → Detail → Tree)
 	// Show different emoji based on current display mode
@@ -731,42 +701,6 @@ func (m model) renderToolbarRow() string {
 	}
 	s.WriteString(" ")
 
-	// Prompts filter toggle button
-	promptIcon := "📝"
-	if m.showPromptsOnly {
-		// Active: gray background (like command mode)
-		activeStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[" + promptIcon + "]"))
-	} else {
-		// Inactive: normal styling
-		promptButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(promptButtonStyle.Render("[" + promptIcon + "]"))
-	}
-	s.WriteString(" ")
-
-	// Git repositories toggle button
-	gitIcon := "🔀"
-	if m.showGitReposOnly {
-		// Active: gray background (like other active toggles)
-		activeStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeStyle.Render("[" + gitIcon + "]"))
-	} else {
-		// Inactive: normal styling
-		gitButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(gitButtonStyle.Render("[" + gitIcon + "]"))
-	}
-	s.WriteString(" ")
-
 	// Git changes toggle button
 	changesIcon := "⚡"
 	if m.showChangesOnly {
@@ -782,23 +716,6 @@ func (m model) renderToolbarRow() string {
 			Bold(true)
 		s.WriteString(changesButtonStyle.Render("[" + changesIcon + "]"))
 	}
-	s.WriteString(" ")
-
-	// Trash/Recycle bin button - add space after icon for proper alignment
-	trashIcon := "󰩺"
-	if m.showTrashOnly {
-		trashIcon = "♻" // Recycle icon when viewing trash
-	}
-	bracketStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	trashIconStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(bracketStyle.Render("["))
-	s.WriteString(trashIconStyle.Render(trashIcon))
-	s.WriteString(" ") // Extra space before closing bracket to prevent overlap
-	s.WriteString(bracketStyle.Render("]"))
 	s.WriteString(" ")
 
 	// Pad to full terminal width to prevent ANSI escape sequence leakage into adjacent tmux panes

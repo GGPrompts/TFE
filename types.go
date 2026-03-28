@@ -475,6 +475,13 @@ type Menu struct {
 	Items []MenuItem // Menu items
 }
 
+// Profile represents a launchable terminal session profile (shown in the Profiles menu)
+type Profile struct {
+	Name    string `toml:"name"`              // Display name in the menu
+	Dir     string `toml:"dir,omitempty"`     // Optional working directory (empty = use current browsing dir)
+	Command string `toml:"command"`           // Command to execute after exiting TFE
+}
+
 // ThemeColor represents a single adaptive color with light and dark variants
 type ThemeColor struct {
 	Light string `toml:"light"`
