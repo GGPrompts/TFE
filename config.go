@@ -118,6 +118,16 @@ func saveConfig(cfg Config) error {
 	return encoder.Encode(cfg)
 }
 
+// persistConfig syncs the current model state to m.config and saves to disk.
+// Called after any runtime toggle that should be remembered across sessions.
+func (m *model) persistConfig() {
+	m.config.PanelLock = m.panelsLocked
+	m.config.ShowHidden = m.showHidden
+	m.config.DarkMode = !m.forceLightTheme
+	m.config.SortOrder = m.sortBy
+	_ = saveConfig(m.config)
+}
+
 // parseViewMode converts a config string to a displayMode value
 func parseViewMode(s string) displayMode {
 	switch s {

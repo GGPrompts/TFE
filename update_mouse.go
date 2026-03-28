@@ -770,6 +770,7 @@ git pull
 						}
 					}
 
+					m.persistConfig()
 					return m, nil
 				}
 			}

@@ -384,6 +384,11 @@ type model struct {
 	lastKnownAgentSessions  map[string]string // session_id -> status (for detecting completions)
 	// Unified configuration (loaded from ~/.config/tfe/config.toml)
 	config Config
+	// Settings panel state (Ctrl+,)
+	settingsCategory int // Active category tab (0=General, 1=Appearance, 2=File Watcher)
+	settingsCursor   int // Selected setting within category
+	settingsEditing  bool   // Whether currently editing a string field
+	settingsInput    string // Buffer for string input editing
 }
 
 // openTab represents a file opened as a tab for review (used in changes mode)
@@ -437,9 +442,10 @@ type dialogType int
 
 const (
 	dialogNone dialogType = iota
-	dialogInput   // Text input dialog (F7 directory name)
-	dialogConfirm // Yes/No confirmation (F8 delete)
-	dialogMessage // Status messages (success/error)
+	dialogInput    // Text input dialog (F7 directory name)
+	dialogConfirm  // Yes/No confirmation (F8 delete)
+	dialogMessage  // Status messages (success/error)
+	dialogSettings // Settings panel (Ctrl+,)
 )
 
 // dialogModel holds dialog state

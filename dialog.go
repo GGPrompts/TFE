@@ -13,6 +13,8 @@ func (m model) renderDialog() string {
 		return m.renderInputDialog()
 	case dialogConfirm:
 		return m.renderConfirmDialog()
+	case dialogSettings:
+		return m.renderSettingsPanel()
 	default:
 		return ""
 	}
@@ -108,9 +110,19 @@ func (m model) renderConfirmDialog() string {
 
 // getDialogPosition calculates centered position for dialog
 func (m model) getDialogPosition() (int, int) {
-	// Rough estimate: dialog is about 50 chars wide, 10 lines tall
+	// For settings panel, use larger dimensions
 	dialogWidth := 54  // 50 + border
 	dialogHeight := 10 // Approximate
+
+	if m.dialog.dialogType == dialogSettings {
+		dialogWidth = m.width - 10
+		if dialogWidth > 76 {
+			dialogWidth = 76
+		}
+		// Estimate height from category items + chrome
+		items := settingsByCategory(m.settingsCategory)
+		dialogHeight = len(items) + 10 // items + title + tabs + separator + hints + padding
+	}
 
 	x := (m.width - dialogWidth) / 2
 	y := (m.height - dialogHeight) / 2

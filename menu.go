@@ -84,6 +84,21 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "🎯 Fuzzy Search", Action: "go-fuzzy", Shortcut: "Ctrl+P"},
 			},
 		},
+		"git": {
+			Label: "Git",
+			Items: []MenuItem{
+				{Label: "⚡ Changes Mode", Action: "git-changes-mode", Shortcut: "Ctrl+G", IsCheckable: true, IsChecked: m.showChangesOnly},
+				{Label: "📋 Toggle Diff", Action: "git-toggle-diff", Shortcut: "d", IsCheckable: true, IsChecked: m.showDiffPreview},
+				{IsSeparator: true},
+				{Label: "⬇  Pull", Action: "git-pull"},
+				{Label: "⬆  Push", Action: "git-push"},
+				{Label: "🔄 Sync", Action: "git-sync"},
+				{Label: "📡 Fetch", Action: "git-fetch"},
+				{IsSeparator: true},
+				{Label: "📋 Yank Diff", Action: "git-yank-diff", Shortcut: "y"},
+				{Label: "📋 Yank All Diffs", Action: "git-yank-all-diffs", Shortcut: "Y"},
+			},
+		},
 		"tools": {
 			Label: "Tools",
 			Items: []MenuItem{
@@ -209,7 +224,7 @@ func (m model) getMenus() map[string]Menu {
 
 // getMenuOrder returns the order of menus in the menu bar
 func getMenuOrder() []string {
-	return []string{"file", "ai", "view", "go", "tools", "help"}
+	return []string{"file", "ai", "view", "go", "git", "tools", "help"}
 }
 
 // getPreviousMenu returns the menu key to the left of the current menu (with wrapping)
@@ -317,7 +332,7 @@ func (m model) renderMenuBar() string {
 		}
 
 		// Render menu label with underlined first letter (hotkey indicator)
-		// F for File, A for AI, V for View, T for Tools, H for Help
+		// F for File, A for AI, V for View, G for Go/Git, T for Tools, H for Help
 		label := menu.Label
 		if len(label) > 0 {
 			// Create underline style based on current style (without padding)
@@ -839,6 +854,7 @@ Additional context: {{variable2}}
 				m.calculateLayout()
 				m.populatePreviewCache()
 			}
+			m.persistConfig()
 		} else {
 			m.setStatusMessage("Panel lock only works in dual-pane mode", false)
 		}
@@ -846,6 +862,7 @@ Additional context: {{variable2}}
 	case "toggle-hidden":
 		m.showHidden = !m.showHidden
 		m.loadFiles()
+		m.persistConfig()
 
 	case "pull-rebuild":
 		// Pull latest TFE code, rebuild, and exit (so user can restart with new version)
@@ -1203,6 +1220,166 @@ Additional context: {{variable2}}
 			tea.ClearScreen,
 			m.launchFuzzySearch(),
 		)
+
+	// Git menu
+	case "git-changes-mode":
+		// Toggle git changes mode (same as Ctrl+G)
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
+
+		m.showChangesOnly = !m.showChangesOnly
+
+		if m.showChangesOnly {
+			changed, err := m.getChangedFiles()
+			if err != nil {
+				m.setStatusMessage(err.Error(), true)
+				m.showChangesOnly = false
+			} else {
+				m.changedFiles = changed
+				m.agentSessions = getAgentSessions()
+				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
+				m.displayMode = modeDetail
+				m.detailScrollX = 0
+				m.showDiffPreview = true
+				m.calculateLayout()
+				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
+			}
+		} else {
+			m.showDiffPreview = false
+			m.agentSessions = nil
+			m.agentFileMap = nil
+		}
+
+		m.cursor = 0
+		m.loadFiles()
+
+	case "git-toggle-diff":
+		// Toggle diff preview in changes mode
+		if m.showChangesOnly {
+			m.showDiffPreview = !m.showDiffPreview
+			if m.showDiffPreview {
+				m.setStatusMessage("Diff preview enabled", false)
+			} else {
+				m.setStatusMessage("File preview enabled", false)
+			}
+		} else {
+			m.setStatusMessage("Toggle diff only works in Changes Mode (Ctrl+G)", false)
+		}
+
+	case "git-pull":
+		// Git pull in current directory's git root
+		gitRoot := m.findGitRoot(m.currentPath)
+		if gitRoot != "" {
+			m.menuOpen = false
+			m.activeMenu = ""
+			m.selectedMenuItem = -1
+			return m, gitPull(gitRoot)
+		}
+		m.setStatusMessage("Not in a git repository", true)
+
+	case "git-push":
+		// Git push in current directory's git root
+		gitRoot := m.findGitRoot(m.currentPath)
+		if gitRoot != "" {
+			m.menuOpen = false
+			m.activeMenu = ""
+			m.selectedMenuItem = -1
+			return m, gitPush(gitRoot)
+		}
+		m.setStatusMessage("Not in a git repository", true)
+
+	case "git-sync":
+		// Git sync (pull + push) in current directory's git root
+		gitRoot := m.findGitRoot(m.currentPath)
+		if gitRoot != "" {
+			m.menuOpen = false
+			m.activeMenu = ""
+			m.selectedMenuItem = -1
+			return m, gitSync(gitRoot)
+		}
+		m.setStatusMessage("Not in a git repository", true)
+
+	case "git-fetch":
+		// Git fetch in current directory's git root
+		gitRoot := m.findGitRoot(m.currentPath)
+		if gitRoot != "" {
+			m.menuOpen = false
+			m.activeMenu = ""
+			m.selectedMenuItem = -1
+			return m, gitFetch(gitRoot)
+		}
+		m.setStatusMessage("Not in a git repository", true)
+
+	case "git-yank-diff":
+		// Yank current file's diff to clipboard (same as 'y' in changes mode)
+		if m.showChangesOnly {
+			if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
+				statusCode := extractGitStatusCode(currentFile.name)
+				diff, err := m.getFileDiff(currentFile.path, statusCode)
+				if err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to get diff: %s", err), true)
+				} else {
+					// Format as markdown with file path header and diff code fence
+					gitRoot := m.findGitRoot(m.currentPath)
+					relPath := currentFile.path
+					if gitRoot != "" {
+						if rp, err := filepath.Rel(gitRoot, currentFile.path); err == nil {
+							relPath = rp
+						}
+					}
+					markdown := fmt.Sprintf("## %s\n\n```diff\n%s```\n", relPath, diff)
+					if err := copyToClipboard(markdown); err != nil {
+						m.setStatusMessage(fmt.Sprintf("Failed to copy diff: %s", err), true)
+					} else {
+						m.setStatusMessage(fmt.Sprintf("Copied diff for %s to clipboard", filepath.Base(relPath)), false)
+					}
+				}
+			}
+		} else {
+			m.setStatusMessage("Yank diff only works in Changes Mode (Ctrl+G)", false)
+		}
+
+	case "git-yank-all-diffs":
+		// Yank all diffs to clipboard (same as 'Y' in changes mode)
+		if m.showChangesOnly && len(m.changedFiles) > 0 {
+			gitRoot := m.findGitRoot(m.currentPath)
+			var allDiffs strings.Builder
+			copied := 0
+			for _, f := range m.changedFiles {
+				if f.isDir {
+					continue
+				}
+				statusCode := extractGitStatusCode(f.name)
+				diff, err := m.getFileDiff(f.path, statusCode)
+				if err != nil || diff == "" {
+					continue
+				}
+				relPath := f.path
+				if gitRoot != "" {
+					if rel, err := filepath.Rel(gitRoot, f.path); err == nil {
+						relPath = rel
+					}
+				}
+				if copied > 0 {
+					allDiffs.WriteString("\n---\n\n")
+				}
+				allDiffs.WriteString(fmt.Sprintf("## %s\n\n```diff\n%s```\n", relPath, diff))
+				copied++
+			}
+			if copied > 0 {
+				if err := copyToClipboard(allDiffs.String()); err != nil {
+					m.setStatusMessage(fmt.Sprintf("Failed to copy diffs: %s", err), true)
+				} else {
+					m.setStatusMessage(fmt.Sprintf("Copied diffs for %d files to clipboard", copied), false)
+				}
+			} else {
+				m.setStatusMessage("No diffs available to copy", false)
+			}
+		} else {
+			m.setStatusMessage("Yank all diffs only works in Changes Mode (Ctrl+G)", false)
+		}
 
 	// Help menu
 	case "show-hotkeys":

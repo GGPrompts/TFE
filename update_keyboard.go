@@ -1156,6 +1156,9 @@ rm -f "$0"
 				return m, tea.ClearScreen
 			}
 			return m, nil
+
+		case dialogSettings:
+			return m.handleSettingsKeyEvent(msg)
 		}
 	}
 
@@ -2096,6 +2099,7 @@ rm -f "$0"
 		// Toggle hidden files
 		m.showHidden = !m.showHidden
 		m.loadFiles()
+		m.persistConfig()
 
 	case "alt", "f9":
 		// Alt or F9: Enter menu bar navigation mode
@@ -2246,6 +2250,7 @@ rm -f "$0"
 				m.calculateLayout()
 				m.populatePreviewCache()
 			}
+			m.persistConfig()
 		} else {
 			m.setStatusMessage("Panel lock only works in dual-pane mode (Tab/Space)", false)
 		}
@@ -2627,6 +2632,19 @@ rm -f "$0"
 			message:    fmt.Sprintf("Delete '%s'?\nThis cannot be undone.", currentFile.name),
 		}
 		m.showDialog = true
+		return m, tea.ClearScreen
+
+	case "ctrl+,":
+		// Ctrl+,: Open settings panel
+		m.dialog = dialogModel{
+			dialogType: dialogSettings,
+			title:      "Settings",
+		}
+		m.showDialog = true
+		m.settingsCategory = 0
+		m.settingsCursor = 0
+		m.settingsEditing = false
+		m.settingsInput = ""
 		return m, tea.ClearScreen
 
 	// Default case removed - command input is now focus-based (press : to enter command mode)
