@@ -253,6 +253,13 @@ git pull
 			if time.Since(m.startupTime) >= 5*time.Second {
 				if m.isInMenuBar(msg.X, msg.Y) {
 					menuKey := m.getMenuAtPosition(msg.X)
+					if menuKey == "home" {
+						// Home icon click: navigate to home directory
+						m.menuOpen = false
+						m.activeMenu = ""
+						m.selectedMenuItem = -1
+						return m.executeMenuAction("go-home")
+					}
 					if menuKey != "" {
 						if m.menuOpen && m.activeMenu == menuKey {
 							// Clicking same menu closes it
