@@ -2433,7 +2433,7 @@ rm -f "$0"
 					return m, nil
 				}
 				// Format as markdown with file path header and diff code fence
-				gitRoot := m.findGitRoot(m.currentPath)
+				gitRoot := m.resolveGitRoot()
 				relPath := currentFile.path
 				if gitRoot != "" {
 					if rp, err := filepath.Rel(gitRoot, currentFile.path); err == nil {
@@ -2453,7 +2453,7 @@ rm -f "$0"
 	case "Y":
 		// 'Y': In changes mode, copy ALL changed files' diffs to clipboard as markdown
 		if m.showChangesOnly && !m.commandFocused && len(m.changedFiles) > 0 {
-			gitRoot := m.findGitRoot(m.currentPath)
+			gitRoot := m.resolveGitRoot()
 			var allDiffs strings.Builder
 			copied := 0
 			for _, f := range m.changedFiles {

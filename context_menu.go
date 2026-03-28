@@ -321,7 +321,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 				m.setStatusMessage(fmt.Sprintf("Failed to get diff: %s", err), true)
 				return m, tea.ClearScreen
 			}
-			gitRoot := m.findGitRoot(m.currentPath)
+			gitRoot := m.resolveGitRoot()
 			relPath := m.contextMenuFile.path
 			if gitRoot != "" {
 				if rp, err := filepath.Rel(gitRoot, m.contextMenuFile.path); err == nil {

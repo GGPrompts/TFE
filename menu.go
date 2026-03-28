@@ -1261,7 +1261,7 @@ Additional context: {{variable2}}
 
 	case "git-pull":
 		// Git pull in current directory's git root
-		gitRoot := m.findGitRoot(m.currentPath)
+		gitRoot := m.resolveGitRoot()
 		if gitRoot != "" {
 			m.menuOpen = false
 			m.activeMenu = ""
@@ -1272,7 +1272,7 @@ Additional context: {{variable2}}
 
 	case "git-push":
 		// Git push in current directory's git root
-		gitRoot := m.findGitRoot(m.currentPath)
+		gitRoot := m.resolveGitRoot()
 		if gitRoot != "" {
 			m.menuOpen = false
 			m.activeMenu = ""
@@ -1283,7 +1283,7 @@ Additional context: {{variable2}}
 
 	case "git-sync":
 		// Git sync (pull + push) in current directory's git root
-		gitRoot := m.findGitRoot(m.currentPath)
+		gitRoot := m.resolveGitRoot()
 		if gitRoot != "" {
 			m.menuOpen = false
 			m.activeMenu = ""
@@ -1294,7 +1294,7 @@ Additional context: {{variable2}}
 
 	case "git-fetch":
 		// Git fetch in current directory's git root
-		gitRoot := m.findGitRoot(m.currentPath)
+		gitRoot := m.resolveGitRoot()
 		if gitRoot != "" {
 			m.menuOpen = false
 			m.activeMenu = ""
@@ -1313,7 +1313,7 @@ Additional context: {{variable2}}
 					m.setStatusMessage(fmt.Sprintf("Failed to get diff: %s", err), true)
 				} else {
 					// Format as markdown with file path header and diff code fence
-					gitRoot := m.findGitRoot(m.currentPath)
+					gitRoot := m.resolveGitRoot()
 					relPath := currentFile.path
 					if gitRoot != "" {
 						if rp, err := filepath.Rel(gitRoot, currentFile.path); err == nil {
@@ -1335,7 +1335,7 @@ Additional context: {{variable2}}
 	case "git-yank-all-diffs":
 		// Yank all diffs to clipboard (same as 'Y' in changes mode)
 		if m.showChangesOnly && len(m.changedFiles) > 0 {
-			gitRoot := m.findGitRoot(m.currentPath)
+			gitRoot := m.resolveGitRoot()
 			var allDiffs strings.Builder
 			copied := 0
 			for _, f := range m.changedFiles {

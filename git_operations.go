@@ -563,9 +563,13 @@ func getGitStatusSortValue(item fileItem) int {
 //   - For unstaged modifications, uses "git diff -- <path>"
 //   - Falls back to "git diff HEAD -- <path>" to catch both staged and unstaged
 func (m *model) getFileDiff(path string, gitStatusCode string) (string, error) {
-	gitRoot := m.findGitRoot(m.currentPath)
-	if gitRoot == "" {
-		return "", fmt.Errorf("not inside a git repository")
+	// Use git's own root detection (handles worktrees, submodules, GIT_DIR, etc.)
+	gitRoot, err := m.gitRevParseRoot(m.currentPath)
+	if err != nil {
+		gitRoot = m.findGitRoot(m.currentPath)
+		if gitRoot == "" {
+			return "", fmt.Errorf("not inside a git repository")
+		}
 	}
 
 	// Get the relative path from git root
@@ -646,15 +650,40 @@ func extractGitStatusCode(itemName string) string {
 	return ""
 }
 
+// gitRevParseRoot uses `git rev-parse --show-toplevel` to find the repository root.
+// This is more robust than manually walking for .git — it handles worktrees,
+// submodules, GIT_DIR overrides, and other non-standard layouts.
+func (m *model) gitRevParseRoot(fromPath string) (string, error) {
+	cmd := exec.Command("git", "-C", fromPath, "rev-parse", "--show-toplevel")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// resolveGitRoot finds the git repository root from m.currentPath using
+// git rev-parse (robust) with fallback to manual .git walk.
+func (m *model) resolveGitRoot() string {
+	if root, err := m.gitRevParseRoot(m.currentPath); err == nil {
+		return root
+	}
+	return m.findGitRoot(m.currentPath)
+}
+
 // getChangedFiles runs `git status --porcelain` from the git root and returns
 // fileItems for every modified, added, deleted, or untracked file.  Each item's
 // name is prefixed with the two-character git status indicator (e.g. " M", "??").
 // Returns an error if the current directory is not inside a git repository.
 func (m *model) getChangedFiles() ([]fileItem, error) {
-	// Find git root from current path
-	gitRoot := m.findGitRoot(m.currentPath)
-	if gitRoot == "" {
-		return nil, fmt.Errorf("not inside a git repository")
+	// Use git's own root detection (handles worktrees, submodules, GIT_DIR, etc.)
+	gitRoot, err := m.gitRevParseRoot(m.currentPath)
+	if err != nil {
+		// Fallback to manual .git walk
+		gitRoot = m.findGitRoot(m.currentPath)
+		if gitRoot == "" {
+			return nil, fmt.Errorf("not inside a git repository")
+		}
 	}
 
 	cmd := exec.Command("git", "-C", gitRoot, "status", "--porcelain")
