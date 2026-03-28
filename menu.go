@@ -315,17 +315,35 @@ func (m model) renderMenuBar() string {
 		Bold(true).
 		Padding(0, 1)
 
-	for _, menuKey := range menuOrder {
+	// Styles for first menu (no left padding for left alignment)
+	menuActiveStyleFirst := menuActiveStyle.Copy().Padding(0, 1, 0, 0)
+	menuHighlightedStyleFirst := menuHighlightedStyle.Copy().Padding(0, 1, 0, 0)
+	menuInactiveStyleFirst := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
+
+	for i, menuKey := range menuOrder {
 		menu := menus[menuKey]
+		isFirst := i == 0
 
 		// Style based on state: active (open) > highlighted (focused) > inactive
 		var style lipgloss.Style
 		if m.activeMenu == menuKey && m.menuOpen {
-			style = menuActiveStyle
+			if isFirst {
+				style = menuActiveStyleFirst
+			} else {
+				style = menuActiveStyle
+			}
 		} else if m.highlightedMenu == menuKey && m.menuBarFocused {
-			style = menuHighlightedStyle
+			if isFirst {
+				style = menuHighlightedStyleFirst
+			} else {
+				style = menuHighlightedStyle
+			}
 		} else {
-			style = menuInactiveStyle
+			if isFirst {
+				style = menuInactiveStyleFirst
+			} else {
+				style = menuInactiveStyle
+			}
 		}
 
 		// Render menu label with underlined first letter (hotkey indicator)
@@ -346,12 +364,8 @@ func (m model) renderMenuBar() string {
 		}
 	}
 
-	// Prepend home icon button (no left padding to align flush left)
-	homeStyle := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
-	homeIcon := homeStyle.Render("🏠")
-
-	// Join with single space, home icon first
-	menuBarContent := homeIcon + " " + strings.Join(renderedMenus, " ")
+	// Join with single space
+	menuBarContent := strings.Join(renderedMenus, " ")
 	padding := m.width - lipgloss.Width(menuBarContent)
 	if padding < 0 {
 		padding = 0
@@ -482,21 +496,31 @@ func (m model) getMenuXPosition(menuKey string) int {
 		Bold(true).
 		Padding(0, 1)
 
-	// Start after home icon (🏠 rendered with no-left-padding style + space separator)
-	homeIconStyle := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
-	homeIcon := homeIconStyle.Render("🏠")
-	xPos := lipgloss.Width(homeIcon) + 1 // +1 for space separator
-	for _, key := range menuOrder {
+	// Styles for first menu (no left padding)
+	menuActiveStyleFirst := menuActiveStyle.Copy().Padding(0, 1, 0, 0)
+	menuInactiveStyleFirst := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
+
+	xPos := 0
+	for i, key := range menuOrder {
 		if key == menuKey {
 			return xPos
 		}
 		menu := menus[key]
+		isFirst := i == 0
 		// Use actual rendered width (matching renderMenuBar logic with underlined first letter)
 		var style lipgloss.Style
 		if m.activeMenu == key && m.menuOpen {
-			style = menuActiveStyle
+			if isFirst {
+				style = menuActiveStyleFirst
+			} else {
+				style = menuActiveStyle
+			}
 		} else {
-			style = menuInactiveStyle
+			if isFirst {
+				style = menuInactiveStyleFirst
+			} else {
+				style = menuInactiveStyle
+			}
 		}
 		// Calculate width with underlined first letter (same as renderMenuBar)
 		label := menu.Label
@@ -522,7 +546,6 @@ func (m model) isInMenuBar(x, y int) bool {
 }
 
 // getMenuAtPosition returns which menu is at the given X position
-// Returns "home" if the home icon is clicked
 func (m model) getMenuAtPosition(x int) string {
 	menus := m.getMenus()
 	menuOrder := getMenuOrder()
@@ -538,24 +561,29 @@ func (m model) getMenuAtPosition(x int) string {
 		Bold(true).
 		Padding(0, 1)
 
-	// Check home icon area first
-	homeIconStyle := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
-	homeIcon := homeIconStyle.Render("🏠")
-	homeWidth := lipgloss.Width(homeIcon)
-	if x < homeWidth {
-		return "home"
-	}
+	// Styles for first menu (no left padding)
+	menuActiveStyleFirst := menuActiveStyle.Copy().Padding(0, 1, 0, 0)
+	menuInactiveStyleFirst := menuInactiveStyle.Copy().Padding(0, 1, 0, 0)
 
-	xPos := homeWidth + 1 // +1 for space separator after home icon
-	for _, menuKey := range menuOrder {
+	xPos := 0
+	for i, menuKey := range menuOrder {
 		menu := menus[menuKey]
+		isFirst := i == 0
 
 		// Calculate actual rendered width (matching renderMenuBar logic with underlined first letter)
 		var style lipgloss.Style
 		if m.activeMenu == menuKey && m.menuOpen {
-			style = menuActiveStyle
+			if isFirst {
+				style = menuActiveStyleFirst
+			} else {
+				style = menuActiveStyle
+			}
 		} else {
-			style = menuInactiveStyle
+			if isFirst {
+				style = menuInactiveStyleFirst
+			} else {
+				style = menuInactiveStyle
+			}
 		}
 		// Calculate width with underlined first letter (same as renderMenuBar)
 		label := menu.Label

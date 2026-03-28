@@ -630,11 +630,17 @@ func (m model) getPreviewVisibleLines() int {
 }
 
 // renderToolbarRow renders the emoji button toolbar row
-// Shows: [📄/📊/🌲] [⬜/⬌] [>_] [🔍] [⚡]
-// Navigation buttons (Home, Favorites, Prompts, Git Repos, Trash) are in the Go menu
+// Shows: [🏠] [📄/📊/🌲] [⬜/⬌] [>_] [🔍] [⚡]
 // This function is shared between single-pane (view.go) and dual-pane (render_preview.go) views
 func (m model) renderToolbarRow() string {
 	var s strings.Builder
+
+	// Home button - navigate to home directory
+	homeButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(homeButtonStyle.Render("[🏠]"))
+	s.WriteString(" ")
 
 	// View mode toggle button (cycles List → Detail → Tree)
 	// Show different emoji based on current display mode

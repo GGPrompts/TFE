@@ -253,13 +253,6 @@ git pull
 			if time.Since(m.startupTime) >= 5*time.Second {
 				if m.isInMenuBar(msg.X, msg.Y) {
 					menuKey := m.getMenuAtPosition(msg.X)
-					if menuKey == "home" {
-						// Home icon click: navigate to home directory
-						m.menuOpen = false
-						m.activeMenu = ""
-						m.selectedMenuItem = -1
-						return m.executeMenuAction("go-home")
-					}
 					if menuKey != "" {
 						if m.menuOpen && m.activeMenu == menuKey {
 							// Clicking same menu closes it
@@ -303,12 +296,16 @@ git pull
 			}
 
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [📊/📄/🌲] [⬜/⬌] [>_] [🔍] [⚡]
-			// Layout:  0-4         5-9    10-14 15-19 20-24
+			// Toolbar: [🏠] [📊/📄/🌲] [⬜/⬌] [>_] [🔍] [⚡]
+			// Layout:  0-4  5-9         10-14  15-19 20-24 25-29
 			// All buttons are 5 cols: [ (1) + icon (2) + ] (1) + space (1)
 			if msg.Y == 1 {
-				// View mode toggle button [📊/📄/🌲] (X=0-4)
+				// Home button [🏠] (X=0-4)
 				if msg.X >= 0 && msg.X <= 4 {
+					return m.executeMenuAction("go-home")
+				}
+				// View mode toggle button [📊/📄/🌲] (X=5-9)
+				if msg.X >= 5 && msg.X <= 9 {
 					// Cycle through display modes: List → Detail → Tree → List
 					if m.displayMode == modeList {
 						m.displayMode = modeDetail
@@ -323,8 +320,8 @@ git pull
 					m.calculateLayout() // Recalculate widths for new display mode
 					return m, nil
 				}
-				// Pane toggle button [⬜/⬌] (X=5-9)
-				if msg.X >= 5 && msg.X <= 9 {
+				// Pane toggle button [⬜/⬌] (X=10-14)
+				if msg.X >= 10 && msg.X <= 14 {
 					// Toggle between single and dual-pane (like Tab or Space)
 					if m.viewMode == viewDualPane {
 						m.viewMode = viewSinglePane
@@ -335,8 +332,8 @@ git pull
 					m.populatePreviewCache() // Refresh cache with new layout
 					return m, nil
 				}
-				// Terminal button [>_] (X=10-14)
-				if msg.X >= 10 && msg.X <= 14 {
+				// Terminal button [>_] (X=15-19)
+				if msg.X >= 15 && msg.X <= 19 {
 					// Toggle command mode focus
 					m.commandFocused = !m.commandFocused
 					if !m.commandFocused {
@@ -345,8 +342,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Context-aware search button [🔍] (X=15-19)
-				if msg.X >= 15 && msg.X <= 19 {
+				// Context-aware search button [🔍] (X=20-24)
+				if msg.X >= 20 && msg.X <= 24 {
 					// Context-aware search toggle:
 					// - When viewing file (full preview or dual-pane with right pane focused): Toggle in-file search (Ctrl+F)
 					// - When browsing files (left pane or single-pane): Toggle directory filter search (/)
@@ -384,8 +381,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Git changes toggle button [⚡] (X=20-24)
-				if msg.X >= 20 && msg.X <= 24 {
+				// Git changes toggle button [⚡] (X=25-29)
+				if msg.X >= 25 && msg.X <= 29 {
 					// Auto-exit trash mode
 					if m.showTrashOnly {
 						m.showTrashOnly = false
