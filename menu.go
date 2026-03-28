@@ -71,6 +71,19 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "🗑  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
 			},
 		},
+		"go": {
+			Label: "Go",
+			Items: []MenuItem{
+				{Label: "🏠 Home (~)", Action: "go-home", Shortcut: "~"},
+				{Label: "⭐ Favorites", Action: "go-favorites", Shortcut: "F6"},
+				{Label: "📝 Prompts", Action: "go-prompts", Shortcut: "F11"},
+				{Label: "🔀 Git Repos", Action: "go-git-repos"},
+				{Label: "🗑  Trash", Action: "go-trash", Shortcut: "F12"},
+				{IsSeparator: true},
+				{Label: "📂 Quick CD", Action: "go-quickcd", Shortcut: "Ctrl+D"},
+				{Label: "🎯 Fuzzy Search", Action: "go-fuzzy", Shortcut: "Ctrl+P"},
+			},
+		},
 		"tools": {
 			Label: "Tools",
 			Items: []MenuItem{
@@ -196,7 +209,7 @@ func (m model) getMenus() map[string]Menu {
 
 // getMenuOrder returns the order of menus in the menu bar
 func getMenuOrder() []string {
-	return []string{"file", "ai", "view", "tools", "help"}
+	return []string{"file", "ai", "view", "go", "tools", "help"}
 }
 
 // getPreviousMenu returns the menu key to the left of the current menu (with wrapping)
@@ -1066,6 +1079,130 @@ Additional context: {{variable2}}
 			m.cursor = 0
 			m.loadFiles()
 		}
+
+	// Go menu
+	case "go-home":
+		// Navigate to home directory
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			if m.showTrashOnly {
+				m.showTrashOnly = false
+				m.trashRestorePath = ""
+			}
+			m.currentPath = homeDir
+			m.cursor = 0
+			m.showFavoritesOnly = false
+			m.showPromptsOnly = false
+			m.showGitReposOnly = false
+			m.showChangesOnly = false
+			m.showDiffPreview = false
+			m.loadFiles()
+		} else {
+			m.setStatusMessage("Error: Could not find home directory", true)
+		}
+
+	case "go-favorites":
+		// Toggle favorites view (same as F6)
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
+		m.showFavoritesOnly = !m.showFavoritesOnly
+		m.cursor = 0
+		if m.showFavoritesOnly {
+			m.loadFiles()
+		}
+
+	case "go-prompts":
+		// Toggle prompts view (same as F11)
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
+		m.showPromptsOnly = !m.showPromptsOnly
+		m.cursor = 0
+		m.loadFiles()
+
+		// Auto-expand ~/.prompts when filter is turned on
+		if m.showPromptsOnly {
+			if homeDir, err := os.UserHomeDir(); err == nil {
+				globalPromptsDir := filepath.Join(homeDir, ".prompts")
+				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
+					m.expandedDirs[globalPromptsDir] = true
+				} else {
+					m.setStatusMessage("💡 Tip: Create ~/.prompts/ folder for global prompts (see helper below)", false)
+				}
+			}
+		}
+
+	case "go-git-repos":
+		// Toggle git repos view (same as toggle-git-repos)
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			m.trashRestorePath = ""
+		}
+
+		m.showGitReposOnly = !m.showGitReposOnly
+
+		if m.showGitReposOnly {
+			m.displayMode = modeDetail
+			m.detailScrollX = 0
+			m.calculateLayout()
+
+			m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
+			m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
+			m.gitReposLastScan = time.Now()
+			m.gitReposScanRoot = m.currentPath
+			m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+		}
+
+		m.cursor = 0
+		m.loadFiles()
+
+	case "go-trash":
+		// Toggle trash view (same as F12)
+		if m.showTrashOnly {
+			m.showTrashOnly = false
+			if m.trashRestorePath != "" {
+				m.currentPath = m.trashRestorePath
+				m.trashRestorePath = ""
+			}
+			m.cursor = 0
+			m.loadFiles()
+		} else {
+			m.trashRestorePath = m.currentPath
+			m.showTrashOnly = true
+			m.showFavoritesOnly = false
+			m.showPromptsOnly = false
+			m.showChangesOnly = false
+			m.showDiffPreview = false
+			m.cursor = 0
+			m.loadFiles()
+		}
+
+	case "go-quickcd":
+		// Quick CD: write current directory as CD target and quit
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		if isTermux() && !hasParentShell() {
+			return m, termuxNewSession("exec bash -l", m.currentPath)
+		}
+		if err := writeCDTarget(m.currentPath); err != nil {
+			m.setStatusMessage(fmt.Sprintf("Failed to save directory for quick CD: %s", err), true)
+			return m, tea.ClearScreen
+		}
+		return m, tea.Quit
+
+	case "go-fuzzy":
+		// Fuzzy search (same as Ctrl+P)
+		m.menuOpen = false
+		m.activeMenu = ""
+		m.selectedMenuItem = -1
+		m.fuzzySearchActive = true
+		return m, tea.Sequence(
+			tea.ClearScreen,
+			m.launchFuzzySearch(),
+		)
 
 	// Help menu
 	case "show-hotkeys":

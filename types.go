@@ -382,6 +382,8 @@ type model struct {
 	// Agent auto-watch (auto-open changes mode when agent finishes)
 	agentAutoWatch          bool              // Whether auto-watch is enabled (TFE_AUTO_CHANGES=1)
 	lastKnownAgentSessions  map[string]string // session_id -> status (for detecting completions)
+	// Unified configuration (loaded from ~/.config/tfe/config.toml)
+	config Config
 }
 
 // openTab represents a file opened as a tab for review (used in changes mode)

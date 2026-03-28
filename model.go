@@ -14,6 +14,24 @@ func initialModel() model {
 	initTheme()
 	initStyles()
 
+	// Load unified configuration from ~/.config/tfe/config.toml
+	cfg := loadConfig()
+
+	// CLI flags override config values
+	// Check if --light or --dark was explicitly passed
+	for _, arg := range os.Args[1:] {
+		if arg == "--light" {
+			cfg.DarkMode = false
+		} else if arg == "--dark" {
+			cfg.DarkMode = true
+		}
+	}
+
+	// Environment variable overrides config for auto-changes
+	if os.Getenv("TFE_AUTO_CHANGES") == "1" {
+		cfg.AutoChanges = true
+	}
+
 	// Use startPath from CLI if provided, otherwise use current working directory
 	initialPath := startPath
 	if initialPath == "" {
@@ -33,12 +51,12 @@ func initialModel() model {
 		cursor:          0,
 		height:          24,
 		width:           80,
-		showHidden:      false,
+		showHidden:      cfg.ShowHidden,
 		inTmux:          isInsideTmux(),       // Detect if running inside tmux
 		terminalType:    detectTerminalType(), // Detect terminal for emoji width compensation
-		forceLightTheme: forceLightTheme,      // Set from CLI flag (--light / --dark)
-		displayMode:       modeTree,             // Tree view works better on narrow terminals
-		sortBy:            "name",
+		forceLightTheme: !cfg.DarkMode,        // Config dark_mode maps to inverse of forceLightTheme
+		displayMode:       parseViewMode(cfg.DefaultViewMode),
+		sortBy:            cfg.SortOrder,
 		sortAsc:           true,
 		viewMode:          viewSinglePane, // Will be set to dual-pane if terminal width >= 100
 		focusedPane:       leftPane,
@@ -90,9 +108,11 @@ func initialModel() model {
 		cachedMenus:     nil,                   // Will be built on first access
 		// Performance caching
 		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
-		// Agent auto-watch: enable if TFE_AUTO_CHANGES=1
-		agentAutoWatch:         os.Getenv("TFE_AUTO_CHANGES") == "1",
+		// Agent auto-watch: enable via config or TFE_AUTO_CHANGES=1
+		agentAutoWatch:         cfg.AutoChanges,
 		lastKnownAgentSessions: make(map[string]string),
+		// Unified configuration
+		config: cfg,
 	}
 
 	// Load command history from disk (supports per-directory and global history)
@@ -102,10 +122,15 @@ func initialModel() model {
 	// Build combined history for current directory
 	m.rebuildCombinedHistory()
 
+	// Apply config settings that need post-init setup
+	m.panelsLocked = cfg.PanelLock
+
 	m.loadFiles()
 
 	// Initialize file watcher (fsnotify) for live directory refresh
-	m.initWatcher()
+	if cfg.FileWatcherEnabled {
+		m.initWatcher()
+	}
 
 	// If a file was specified on CLI, find and select it
 	if selectFile != "" {
