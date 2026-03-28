@@ -109,6 +109,17 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "🔄 Pull & Rebuild TFE", Action: "pull-rebuild", Shortcut: ""},
 			},
 		},
+		"settings": {
+			Label: "Settings",
+			Items: []MenuItem{
+				{Label: "🌙 Dark Mode", Action: "settings-dark-mode", IsCheckable: true, IsChecked: !m.forceLightTheme},
+				{Label: "🔒 Panel Lock", Action: "settings-panel-lock", Shortcut: "Ctrl+L", IsCheckable: true, IsChecked: m.panelsLocked},
+				{Label: "👁  File Watcher", Action: "settings-file-watcher", IsCheckable: true, IsChecked: m.watcherActive},
+				{Label: "📁 Show Hidden Files", Action: "settings-show-hidden", IsCheckable: true, IsChecked: m.showHidden},
+				{IsSeparator: true},
+				{Label: "⚙  Open Settings Panel...", Action: "settings-open-panel", Shortcut: "Ctrl+,"},
+			},
+		},
 		"help": {
 			Label: "Help",
 			Items: []MenuItem{
@@ -224,7 +235,7 @@ func (m model) getMenus() map[string]Menu {
 
 // getMenuOrder returns the order of menus in the menu bar
 func getMenuOrder() []string {
-	return []string{"file", "ai", "view", "go", "git", "tools", "help"}
+	return []string{"file", "ai", "view", "go", "git", "tools", "settings", "help"}
 }
 
 // getPreviousMenu returns the menu key to the left of the current menu (with wrapping)
@@ -1380,6 +1391,40 @@ Additional context: {{variable2}}
 		} else {
 			m.setStatusMessage("Yank all diffs only works in Changes Mode (Ctrl+G)", false)
 		}
+
+	// Settings menu
+	case "settings-dark-mode":
+		m.setConfigBool("dark_mode", m.forceLightTheme) // toggle: if light, set dark=true; if dark, set dark=false
+		m.persistConfig()
+		// Invalidate glamour cache so markdown re-renders with correct theme
+		m.glamourRenderer = nil
+		m.glamourRendererWidth = 0
+		m.preview.cacheValid = false
+
+	case "settings-panel-lock":
+		m.setConfigBool("panel_lock", !m.panelsLocked)
+		m.persistConfig()
+		if !m.panelsLocked {
+			m.calculateLayout()
+			m.populatePreviewCache()
+		}
+
+	case "settings-file-watcher":
+		m.setConfigBool("file_watcher_enabled", !m.watcherActive)
+		m.persistConfig()
+
+	case "settings-show-hidden":
+		m.setConfigBool("show_hidden", !m.showHidden)
+		m.persistConfig()
+
+	case "settings-open-panel":
+		m.dialog = dialogModel{
+			dialogType: dialogSettings,
+			title:      "Settings",
+		}
+		m.showDialog = true
+		m.settingsCategory = 0
+		m.settingsCursor = 0
 
 	// Help menu
 	case "show-hotkeys":

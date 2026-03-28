@@ -132,9 +132,19 @@ func loadTheme(path string) (Theme, error) {
 	return theme, nil
 }
 
-// initTheme loads the theme from ~/.config/tfe/theme.toml if it exists,
-// otherwise uses the default theme. It sets the global currentTheme variable.
-func initTheme() {
+// initTheme sets the global currentTheme variable.
+// Priority order:
+//  1. If configTheme is non-nil ([theme] section present in config.toml), use it.
+//  2. Else if ~/.config/tfe/theme.toml exists, load from there (backwards compat).
+//  3. Else use built-in defaults.
+func initTheme(configTheme *Theme) {
+	// 1. Config.toml [theme] section takes priority
+	if configTheme != nil {
+		currentTheme = *configTheme
+		return
+	}
+
+	// 2. Backwards compat: try legacy theme.toml
 	home, err := os.UserHomeDir()
 	if err != nil {
 		currentTheme = defaultTheme()

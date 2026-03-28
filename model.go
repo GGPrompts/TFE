@@ -10,12 +10,12 @@ import (
 )
 
 func initialModel() model {
-	// Initialize theme and styles before building the model
-	initTheme()
-	initStyles()
-
 	// Load unified configuration from ~/.config/tfe/config.toml
 	cfg := loadConfig()
+
+	// Initialize theme from config [theme] section, falling back to theme.toml
+	initTheme(cfg.Theme)
+	initStyles()
 
 	// CLI flags override config values
 	// Check if --light or --dark was explicitly passed

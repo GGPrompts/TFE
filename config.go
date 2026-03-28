@@ -32,6 +32,9 @@ type Config struct {
 
 	// External tools
 	Editor string `toml:"editor"` // Preferred editor command (empty = use $EDITOR)
+
+	// Theme colors (optional — falls back to theme.toml or defaults)
+	Theme *Theme `toml:"theme,omitempty"` // Inline theme; nil means not present in config
 }
 
 // defaultConfig returns the built-in configuration matching TFE's current hardcoded behavior
@@ -85,6 +88,15 @@ func loadConfig() Config {
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
 		// Parse error: return defaults
 		return defaultConfig()
+	}
+
+	// Check whether [theme] section was actually present in the file
+	var raw map[string]interface{}
+	if _, err := toml.Decode(string(data), &raw); err == nil {
+		if _, hasTheme := raw["theme"]; !hasTheme {
+			// No [theme] section in config.toml — leave cfg.Theme nil
+			cfg.Theme = nil
+		}
 	}
 
 	return cfg
