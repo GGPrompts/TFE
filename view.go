@@ -41,6 +41,16 @@ func (m model) View() string {
 			// Position dropdown below menu bar (line 1)
 			menuX := m.getMenuXPosition(m.activeMenu)
 			menuY := 1 // Below menu bar on line 0
+
+			// Clamp X so the dropdown doesn't overflow the right edge
+			dropdownWidth := lipgloss.Width(dropdown)
+			if menuX+dropdownWidth > m.width {
+				menuX = m.width - dropdownWidth
+				if menuX < 0 {
+					menuX = 0
+				}
+			}
+
 			baseView = m.overlayDropdown(baseView, dropdown, menuX, menuY)
 		}
 	}

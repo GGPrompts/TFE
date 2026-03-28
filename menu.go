@@ -655,7 +655,16 @@ func (m model) isInDropdown(x, y int) bool {
 		}
 	}
 
-	return x >= menuX && x < menuX+maxWidth && y >= 1 && y < 1+height
+	// Clamp X so dropdown stays within terminal width (matches overlay logic)
+	totalWidth := maxWidth + 2 // +2 for border
+	if menuX+totalWidth > m.width {
+		menuX = m.width - totalWidth
+		if menuX < 0 {
+			menuX = 0
+		}
+	}
+
+	return x >= menuX && x < menuX+totalWidth && y >= 1 && y < 1+height
 }
 
 // getMenuItemAtPosition returns the menu item index at the given Y position in dropdown
