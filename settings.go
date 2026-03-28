@@ -313,7 +313,9 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.settingsCursor < len(items) {
 				item := items[m.settingsCursor]
 				m.setConfigString(item.key, m.settingsInput)
-				_ = saveConfig(m.config)
+				if err := saveConfig(m.config); err != nil {
+				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+			}
 			}
 			m.settingsEditing = false
 			m.settingsInput = ""
@@ -373,7 +375,9 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case settingsToggle:
 			current := m.getConfigBool(item.key)
 			m.setConfigBool(item.key, !current)
-			_ = saveConfig(m.config)
+			if err := saveConfig(m.config); err != nil {
+				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+			}
 
 		case settingsSelect:
 			current := m.getConfigString(item.key)
@@ -382,7 +386,9 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if opt == current {
 					next := (idx + 1) % len(item.options)
 					m.setConfigString(item.key, item.options[next])
-					_ = saveConfig(m.config)
+					if err := saveConfig(m.config); err != nil {
+				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+			}
 					break
 				}
 			}
@@ -404,7 +410,9 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					if opt == current {
 						next := (idx + 1) % len(item.options)
 						m.setConfigString(item.key, item.options[next])
-						_ = saveConfig(m.config)
+						if err := saveConfig(m.config); err != nil {
+				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+			}
 						break
 					}
 				}
@@ -422,7 +430,9 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					if opt == current {
 						prev := (idx - 1 + len(item.options)) % len(item.options)
 						m.setConfigString(item.key, item.options[prev])
-						_ = saveConfig(m.config)
+						if err := saveConfig(m.config); err != nil {
+				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+			}
 						break
 					}
 				}
@@ -434,7 +444,3 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// settingsStatusMessage returns a brief confirmation message for the status bar
-func settingsStatusMessage(key, val string) string {
-	return fmt.Sprintf("Setting %s = %s", key, val)
-}

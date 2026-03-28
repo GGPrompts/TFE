@@ -9,6 +9,7 @@ package main
 // - Providing sensible defaults for all settings
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -144,7 +145,9 @@ func (m *model) persistConfig() {
 	m.config.ShowHidden = m.showHidden
 	m.config.DarkMode = !m.forceLightTheme
 	m.config.SortOrder = m.sortBy
-	_ = saveConfig(m.config)
+	if err := saveConfig(m.config); err != nil {
+		m.statusMessage = fmt.Sprintf("Failed to save config: %v", err)
+	}
 }
 
 // parseViewMode converts a config string to a displayMode value

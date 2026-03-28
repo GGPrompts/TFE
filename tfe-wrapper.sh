@@ -103,7 +103,7 @@ tfe() {
         rm -f "$POST_CMD"
         if [ -n "$CMD" ]; then
             echo "Running: $CMD"
-            eval "$CMD"
+            $CMD
         fi
     fi
 }

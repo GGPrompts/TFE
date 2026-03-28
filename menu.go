@@ -234,7 +234,7 @@ func writePostCommand(command string) error {
 		return err
 	}
 	targetFile := filepath.Join(homeDir, ".tfe_post_command")
-	return os.WriteFile(targetFile, []byte(command), 0644)
+	return os.WriteFile(targetFile, []byte(command), 0600)
 }
 
 // getMenuOrder returns the order of menus in the menu bar
@@ -812,9 +812,7 @@ Additional context: {{variable2}}
 		}
 		m.showFavoritesOnly = !m.showFavoritesOnly
 		m.cursor = 0
-		if m.showFavoritesOnly {
-			m.loadFiles()
-		}
+		m.loadFiles()
 
 	case "delete":
 		// Delete selected file/folder
@@ -1120,9 +1118,7 @@ Additional context: {{variable2}}
 		}
 		m.showFavoritesOnly = !m.showFavoritesOnly
 		m.cursor = 0
-		if m.showFavoritesOnly {
-			m.loadFiles()
-		}
+		m.loadFiles()
 
 	case "go-prompts":
 		// Toggle prompts view (same as F11)
