@@ -1399,8 +1399,19 @@ Additional context: {{variable2}}
 		}
 
 	case "settings-file-watcher":
-		m.setConfigBool("file_watcher_enabled", !m.watcherActive)
+		enabling := !m.watcherActive
+		m.setConfigBool("file_watcher_enabled", enabling)
 		m.persistConfig()
+		if enabling {
+			// initWatcher was called by setConfigBool; now start watching
+			if cmd := m.startWatcher(m.currentPath); cmd != nil {
+				m.setStatusMessage("File watcher enabled", false)
+				return m, cmd
+			}
+			m.setStatusMessage("File watcher: could not watch this directory", true)
+		} else {
+			m.setStatusMessage("File watcher disabled", false)
+		}
 
 	case "settings-show-hidden":
 		m.setConfigBool("show_hidden", !m.showHidden)
