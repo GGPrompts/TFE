@@ -2101,6 +2101,26 @@ rm -f "$0"
 		m.loadFiles()
 		m.persistConfig()
 
+	case "`":
+		// Backtick: Open context menu for the CURRENT DIRECTORY (not the selected file)
+		// This gives quick access to Quick CD, Terminal Here, Claude Here, etc.
+		// for the folder you're already browsing
+		info, err := os.Stat(m.currentPath)
+		if err == nil {
+			dirItem := &fileItem{
+				name:  filepath.Base(m.currentPath),
+				path:  m.currentPath,
+				isDir: true,
+				mode:  info.Mode(),
+			}
+			// Position menu near top-left
+			m.contextMenuOpen = true
+			m.contextMenuX = 10
+			m.contextMenuY = 3
+			m.contextMenuFile = dirItem
+			m.contextMenuCursor = 0
+		}
+
 	case "alt", "f9":
 		// Alt or F9: Enter menu bar navigation mode
 		if !m.menuBarFocused && !m.menuOpen {
