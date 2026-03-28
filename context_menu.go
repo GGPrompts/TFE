@@ -225,14 +225,11 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 	case "quickcd":
 		// Quick CD: change to directory after exiting TFE
 		if m.contextMenuFile.isDir {
-			// In Termux, spawn a new terminal session in the target directory
-			// This works even when launched from a widget (no parent shell)
-			if isTermux() {
-				// Use -l (login shell) so it sources profile scripts and has proper PATH
-				// Without this, tools like 'claude' won't be found in the new shell
+			// In Termux without a parent shell (widget launch), spawn a new terminal session
+			if isTermux() && !hasParentShell() {
 				return m, termuxNewSession("exec bash -l", m.contextMenuFile.path)
 			}
-			// Standard behavior: write target to file for wrapper script to read
+			// Standard behavior (and Termux with parent shell): write target for wrapper script
 			if err := writeCDTarget(m.contextMenuFile.path); err != nil {
 				m.setStatusMessage(fmt.Sprintf("Failed to save directory for quick CD: %s", err), true)
 				return m, tea.ClearScreen
@@ -490,10 +487,8 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 	case "claude":
 		// Launch Claude Code in the selected directory (with permission prompts)
 		if m.contextMenuFile.isDir {
-			// In Termux, spawn a new terminal session for Claude
-			// Use getClaudeCodePathForTermux() because the standard 'claude' script
-			// has shebang #!/usr/bin/env node which fails (no /usr/bin/env in Termux)
-			if isTermux() {
+			// In Termux without a parent shell (widget launch), spawn a new terminal session
+			if isTermux() && !hasParentShell() {
 				claudePath := getClaudeCodePathForTermux()
 				return m, termuxNewSession(claudePath, m.contextMenuFile.path)
 			}
@@ -504,10 +499,8 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 	case "claude_yolo":
 		// Launch Claude Code in YOLO mode (skip permission prompts)
 		if m.contextMenuFile.isDir {
-			// In Termux, spawn a new terminal session for Claude
-			// Use getClaudeCodePathForTermux() because the standard 'claude' script
-			// has shebang #!/usr/bin/env node which fails (no /usr/bin/env in Termux)
-			if isTermux() {
+			// In Termux without a parent shell (widget launch), spawn a new terminal session
+			if isTermux() && !hasParentShell() {
 				claudePath := getClaudeCodePathForTermux()
 				yoloCmd := claudePath + " --dangerously-skip-permissions"
 				return m, termuxNewSession(yoloCmd, m.contextMenuFile.path)

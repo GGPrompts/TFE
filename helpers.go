@@ -931,6 +931,23 @@ func isTermux() bool {
 	return err == nil
 }
 
+// hasParentShell returns true if TFE was launched from an interactive shell
+// (as opposed to being launched from a widget/shortcut with no parent shell).
+// When there's a parent shell, the tfe wrapper function handles cd after exit.
+func hasParentShell() bool {
+	ppid := os.Getppid()
+	if ppid <= 1 {
+		return false
+	}
+	// Check if parent process is a shell
+	cmdline, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", ppid))
+	if err != nil {
+		return false
+	}
+	cmd := strings.ToLower(string(cmdline))
+	return strings.Contains(cmd, "bash") || strings.Contains(cmd, "zsh") || strings.Contains(cmd, "fish") || strings.Contains(cmd, "sh")
+}
+
 // termuxNewSessionCmd returns the am startservice command to launch a new Termux session
 // This enables features like Quick CD and Claude launch when TFE is started from a widget
 // Requires: allow-external-apps = true in ~/.termux/termux.properties
