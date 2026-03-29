@@ -334,6 +334,10 @@ func formatFileSize(size int64) string {
 
 // formatModTime returns a relative time string
 func formatModTime(t time.Time) string {
+	if t.IsZero() {
+		return "—"
+	}
+
 	now := time.Now()
 	diff := now.Sub(t)
 

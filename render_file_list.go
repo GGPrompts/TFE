@@ -485,7 +485,11 @@ func (m model) renderDetailView(maxVisible int) string {
 				}
 			}
 		} else {
-			size = formatFileSize(file.size)
+			if file.modTime.IsZero() && file.size == 0 {
+				size = "—"
+			} else {
+				size = formatFileSize(file.size)
+			}
 		}
 		modified := formatModTime(file.modTime)
 
