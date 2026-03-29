@@ -2264,8 +2264,18 @@ rm -f "$0"
 		if m.viewMode == viewDualPane {
 			m.panelsLocked = !m.panelsLocked
 			if m.panelsLocked {
+				// Capture vertical split ratio for lock
+				useVertical := m.displayMode == modeDetail || m.isNarrowTerminal()
+				if useVertical {
+					if m.focusedPane == leftPane {
+						m.lockedTopRatio = 2.0 / 3.0
+					} else {
+						m.lockedTopRatio = 1.0 / 3.0
+					}
+				}
 				m.setStatusMessage("Panels locked (widths won't change with focus)", false)
 			} else {
+				m.lockedTopRatio = 0
 				m.setStatusMessage("Panels unlocked (accordion mode)", false)
 				m.calculateLayout()
 				m.populatePreviewCache()

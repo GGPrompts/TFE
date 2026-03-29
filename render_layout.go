@@ -577,17 +577,8 @@ func (m model) renderDualPane() string {
 
 	if m.displayMode == modeDetail {
 		// VERTICAL SPLIT for detail view - gives full width to detail columns
-		// ACCORDION: Focused pane gets 2/3 height, unfocused gets 1/3
-		var topHeight, bottomHeight int
-		if m.focusedPane == leftPane {
-			// Top pane (detail view) is focused
-			topHeight = (maxVisible * 2) / 3
-			bottomHeight = maxVisible - topHeight
-		} else {
-			// Bottom pane (preview) is focused
-			bottomHeight = (maxVisible * 2) / 3
-			topHeight = maxVisible - bottomHeight
-		}
+		// Uses accordion (2/3 focused) or locked ratio via verticalSplitHeights
+		topHeight, bottomHeight := m.verticalSplitHeights(maxVisible)
 
 		topContentHeight := topHeight - 2       // Account for borders
 		bottomContentHeight := bottomHeight - 2
@@ -652,17 +643,8 @@ func (m model) renderDualPane() string {
 
 		if m.isNarrowTerminal() {
 			// VERTICAL SPLIT for narrow terminals (phones) - same as detail view
-			// ACCORDION: Focused pane gets 2/3 height, unfocused gets 1/3
-			var topHeight, bottomHeight int
-			if m.focusedPane == leftPane {
-				// Top pane (file list) is focused
-				topHeight = (maxVisible * 2) / 3
-				bottomHeight = maxVisible - topHeight
-			} else {
-				// Bottom pane (preview) is focused
-				bottomHeight = (maxVisible * 2) / 3
-				topHeight = maxVisible - bottomHeight
-			}
+			// Uses accordion (2/3 focused) or locked ratio via verticalSplitHeights
+			topHeight, bottomHeight := m.verticalSplitHeights(maxVisible)
 
 			topContentHeight := topHeight - 2       // Account for borders
 			bottomContentHeight := bottomHeight - 2

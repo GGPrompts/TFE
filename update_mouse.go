@@ -125,15 +125,9 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
 
 			if useVerticalSplit {
-				// Calculate pane heights for vertical split based on CURRENT focus
-				// (matches render_preview.go accordion behavior)
+				// Calculate pane heights for vertical split (respects panel lock)
 				maxVisible := m.height - headerLines - footerLines
-				var topHeight int
-				if m.focusedPane == leftPane {
-					topHeight = (maxVisible * 2) / 3  // Top pane currently focused = 2/3
-				} else {
-					topHeight = maxVisible - ((maxVisible * 2) / 3)  // Top pane unfocused = 1/3
-				}
+				topHeight, _ := m.verticalSplitHeights(maxVisible)
 
 				// Calculate Y position relative to pane area start
 				paneY := msg.Y - headerLines

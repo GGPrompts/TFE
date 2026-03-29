@@ -872,7 +872,17 @@ Additional context: {{variable2}}
 	case "toggle-panel-lock":
 		if m.viewMode == viewDualPane {
 			m.panelsLocked = !m.panelsLocked
-			if !m.panelsLocked {
+			if m.panelsLocked {
+				useVertical := m.displayMode == modeDetail || m.isNarrowTerminal()
+				if useVertical {
+					if m.focusedPane == leftPane {
+						m.lockedTopRatio = 2.0 / 3.0
+					} else {
+						m.lockedTopRatio = 1.0 / 3.0
+					}
+				}
+			} else {
+				m.lockedTopRatio = 0
 				m.calculateLayout()
 				m.populatePreviewCache()
 			}
@@ -1393,7 +1403,17 @@ Additional context: {{variable2}}
 	case "settings-panel-lock":
 		m.setConfigBool("panel_lock", !m.panelsLocked)
 		m.persistConfig()
-		if !m.panelsLocked {
+		if m.panelsLocked {
+			useVertical := m.displayMode == modeDetail || m.isNarrowTerminal()
+			if useVertical {
+				if m.focusedPane == leftPane {
+					m.lockedTopRatio = 2.0 / 3.0
+				} else {
+					m.lockedTopRatio = 1.0 / 3.0
+				}
+			}
+		} else {
+			m.lockedTopRatio = 0
 			m.calculateLayout()
 			m.populatePreviewCache()
 		}

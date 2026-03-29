@@ -243,6 +243,36 @@ func (m *model) calculateLayout() {
 	}
 }
 
+// verticalSplitHeights returns (topHeight, bottomHeight) for vertical split mode.
+// Respects panelsLocked: when locked, preserves the current ratio instead of
+// applying accordion focus-based sizing.
+func (m *model) verticalSplitHeights(maxVisible int) (int, int) {
+	if m.panelsLocked && m.lockedTopRatio > 0 {
+		// Locked: use saved ratio
+		topHeight := int(float64(maxVisible) * m.lockedTopRatio)
+		if topHeight < 3 {
+			topHeight = 3
+		}
+		bottomHeight := maxVisible - topHeight
+		if bottomHeight < 3 {
+			bottomHeight = 3
+			topHeight = maxVisible - bottomHeight
+		}
+		return topHeight, bottomHeight
+	}
+
+	// Accordion: focused pane gets 2/3
+	var topHeight, bottomHeight int
+	if m.focusedPane == leftPane {
+		topHeight = (maxVisible * 2) / 3
+		bottomHeight = maxVisible - topHeight
+	} else {
+		bottomHeight = (maxVisible * 2) / 3
+		topHeight = maxVisible - bottomHeight
+	}
+	return topHeight, bottomHeight
+}
+
 // detectTerminalType determines which terminal emulator is being used
 // This is used for emoji width compensation (variation selector handling)
 func detectTerminalType() terminalType {
