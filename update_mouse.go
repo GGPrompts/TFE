@@ -290,8 +290,8 @@ git pull
 			}
 
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [📊/📄/🌲] [🔃] [⬜/⬌] [>_] [🔍] [⚡]
-			// Layout:  0-4  5-9         10-14 15-19  20-24 25-29 30-34
+			// Toolbar: [🏠] [📊/📄/🌲] [🔃] [⬜/⬌] [>_] [🔍] [🤖] [⚡]
+			// Layout:  0-4  5-9         10-14 15-19  20-24 25-29 30-34 35-39
 			// All buttons are 5 cols: [ (1) + icon (2) + ] (1) + space (1)
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4)
@@ -403,8 +403,13 @@ git pull
 					}
 					return m, nil
 				}
-				// Git changes toggle button [⚡] (X=30-34)
+				// Agent conversations button [🤖] (X=30-34)
 				if msg.X >= 30 && msg.X <= 34 {
+					m.toggleAgentView()
+					return m, nil
+				}
+				// Git changes toggle button [⚡] (X=35-39)
+				if msg.X >= 35 && msg.X <= 39 {
 					// Auto-exit trash mode
 					if m.showTrashOnly {
 						m.showTrashOnly = false

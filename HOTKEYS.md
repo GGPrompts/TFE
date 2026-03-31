@@ -247,6 +247,26 @@ When tabs are open:
 - Close individual tabs with Ctrl+W
 - Works in dual-pane and full preview modes
 
+## Agent Conversation Viewer (Ctrl+A)
+
+| Key | Action |
+|-----|--------|
+| **Ctrl+A** | Toggle agent conversation viewer |
+
+When agent view is active:
+- Navigates to `~/.claude/projects/<project>/` showing all session JSONL files
+- Sorted by modified time (newest first) so active sessions appear at top
+- Selecting a `.jsonl` file shows the conversation with color-coded messages:
+  - **User messages** in blue/bold
+  - **Assistant text** in green
+  - **Tool calls** with orange tool name + parameter summary
+  - **Thinking blocks** as dimmed italic summaries
+  - **System messages** in gray
+- Navigate into session directories to find `subagents/` with individual subagent conversations
+- Large JSONL files are tail-read (last 512KB) for fast loading
+- Press **Ctrl+A** again to return to previous directory
+- Also accessible via the **[🤖]** toolbar button
+
 ## Prompts Mode (F11)
 
 | Key | Action |

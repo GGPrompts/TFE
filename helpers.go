@@ -630,7 +630,7 @@ func (m model) getPreviewVisibleLines() int {
 }
 
 // renderToolbarRow renders the emoji button toolbar row
-// Shows: [🏠] [📄/📊/🌲] [🔃] [⬜/⬌] [>_] [🔍] [⚡]
+// Shows: [🏠] [📄/📊/🌲] [🔃] [⬜/⬌] [>_] [🔍] [🤖] [⚡]
 // This function is shared between single-pane (view.go) and dual-pane (render_preview.go) views
 func (m model) renderToolbarRow() string {
 	var s strings.Builder
@@ -712,6 +712,22 @@ func (m model) renderToolbarRow() string {
 			Foreground(lipgloss.Color("39")).
 			Bold(true)
 		s.WriteString(searchButtonStyle.Render("[" + searchIcon + "]"))
+	}
+	s.WriteString(" ")
+
+	// Agent conversations toggle button
+	agentIcon := "🤖"
+	if m.showAgentView {
+		activeAgentStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Background(lipgloss.Color("237"))
+		s.WriteString(activeAgentStyle.Render("[" + agentIcon + "]"))
+	} else {
+		agentButtonStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true)
+		s.WriteString(agentButtonStyle.Render("[" + agentIcon + "]"))
 	}
 	s.WriteString(" ")
 

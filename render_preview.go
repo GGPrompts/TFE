@@ -34,6 +34,11 @@ func (m model) renderPreview(maxVisible int) string {
 		return m.renderDiffPreview(maxVisible)
 	}
 
+	// JSONL conversation file rendering (uses pre-cached rendered lines)
+	if m.preview.isJSONL {
+		return m.renderJSONLPreview(maxVisible)
+	}
+
 	// Calculate available width for content based on file type and view mode
 	var availableWidth int
 	var boxContentWidth int // Width of the box content area

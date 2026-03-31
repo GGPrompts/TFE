@@ -2399,6 +2399,11 @@ rm -f "$0"
 		}
 		m.showFavoritesOnly = !m.showFavoritesOnly
 
+	case "ctrl+a":
+		// Ctrl+A: Toggle agent conversation viewer
+		m.toggleAgentView()
+		return m, nil
+
 	case "ctrl+g":
 		// Ctrl+G: Toggle git changes filter (show modified/untracked files)
 		// Auto-exit trash mode

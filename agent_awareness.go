@@ -258,3 +258,80 @@ func (m *model) checkAgentCompletions() tea.Cmd {
 	m.setStatusMessage(fmt.Sprintf("Agent finished -- showing %d changed files", len(changed)), false)
 	return statusTimeoutCmd()
 }
+
+// toggleAgentView enters or exits the agent conversation viewer.
+// When entering, it navigates to the active session's directory (or project dir)
+// and sorts by modified time. When exiting, it restores the previous path.
+func (m *model) toggleAgentView() {
+	if m.showAgentView {
+		// Exit agent view — restore previous path
+		m.showAgentView = false
+		if m.agentViewRestore != "" {
+			m.currentPath = m.agentViewRestore
+			m.agentViewRestore = ""
+		}
+		m.cursor = 0
+		m.loadFiles()
+		m.setStatusMessage("Agent view closed", false)
+		return
+	}
+
+	// Enter agent view — find the project's .claude directory
+	// Try current path first, then git root
+	agentDir := getClaudeSessionDir(m.currentPath)
+	if agentDir == "" {
+		gitRoot, err := m.gitRevParseRoot(m.currentPath)
+		if err == nil {
+			agentDir = getClaudeSessionDir(gitRoot)
+		}
+	}
+	if agentDir == "" {
+		m.setStatusMessage("No Claude session found for this directory", true)
+		return
+	}
+
+	// Clear other filter modes
+	m.showChangesOnly = false
+	m.showDiffPreview = false
+	m.showFavoritesOnly = false
+	m.showGitReposOnly = false
+	m.showTrashOnly = false
+	m.showPromptsOnly = false
+
+	m.showAgentView = true
+	m.agentViewRestore = m.currentPath
+	m.currentPath = agentDir
+	m.sortBy = "modified"
+	m.sortAsc = false // Newest first
+	m.cursor = 0
+	m.loadFiles()
+	m.sortFiles()
+	m.setStatusMessage(fmt.Sprintf("Agent sessions: %s", agentDir), false)
+}
+
+// getClaudeProjectDir returns the path to the .claude/projects/<encoded-cwd>/ directory
+// for the given working directory. Claude Code encodes paths by replacing "/" with "-".
+func getClaudeProjectDir(cwd string) string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	// Claude Code encodes: /home/builder/projects/TFE → -home-builder-projects-TFE
+	encoded := strings.ReplaceAll(cwd, "/", "-")
+	return filepath.Join(homeDir, ".claude", "projects", encoded)
+}
+
+// getClaudeSessionDir returns the project-level .claude/projects/<encoded-cwd>/ directory.
+// This directory contains session JSONL files at the top level and session subdirectories
+// with subagent conversations inside them.
+func getClaudeSessionDir(cwd string) string {
+	projectDir := getClaudeProjectDir(cwd)
+	if projectDir == "" {
+		return ""
+	}
+	if info, err := os.Stat(projectDir); err == nil && info.IsDir() {
+		return projectDir
+	}
+	return ""
+}

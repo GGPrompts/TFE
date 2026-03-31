@@ -63,7 +63,8 @@ tfe/
 ├── helpers.go                 # Helper functions
 ├── file_watcher.go            # fsnotify file watcher & debouncing
 ├── theme.go                   # Configurable theme system (TOML)
-├── agent_awareness.go         # AI agent session detection
+├── agent_awareness.go         # AI agent session detection & conversation viewer
+├── render_jsonl.go            # JSONL conversation file rendering
 ├── render_layout.go           # Layout rendering & tab bar
 ├── render_prompts.go          # Prompt template rendering
 └── tmux.go                    # Tmux integration
@@ -117,7 +118,8 @@ tfe/
 
 ### File Watching & Agent Integration
 - **`file_watcher.go`** - fsnotify watcher with 3-layer debounce pipeline
-- **`agent_awareness.go`** - AI agent session detection from /tmp/claude-code-state/
+- **`agent_awareness.go`** - AI agent session detection, conversation viewer (Ctrl+A)
+- **`render_jsonl.go`** - JSONL conversation file rendering with color-coded messages
 
 ### Theming
 - **`theme.go`** - TOML-based configurable theme system

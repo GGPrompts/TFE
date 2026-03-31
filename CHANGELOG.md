@@ -5,6 +5,24 @@ All notable changes to the Terminal File Explorer (TFE) project.
 ## [Unreleased]
 
 ### Added
+- **Agent Conversation Viewer (Ctrl+A / [🤖] toolbar button)**
+  - Browse Claude Code session JSONL files with color-coded conversation rendering
+  - User messages (blue), assistant text (green), tool calls (orange name + params), thinking (dim italic)
+  - Smart tool summaries: shows file paths for Read/Edit, commands for Bash, patterns for Grep
+  - Tail-reads large JSONL files (last 512KB) for fast loading
+  - Pre-rendered line caching for smooth scrolling
+  - Navigate into session dirs to view subagent conversations
+  - New file: render_jsonl.go
+
+- **Sort toolbar button ([🔃])**
+  - Clickable sort cycle button in toolbar row between view mode and pane toggle
+  - Cycles through: name → size → modified → type
+
+- **Git changes view improvements**
+  - Individual untracked files now shown (uses `git status -uall`) instead of collapsed directories
+  - New/staged files show full content as diff when git diff strategies fail
+  - Untracked directories handled gracefully in diff preview
+
 - **Agent Review Surface — Full diff review alongside Claude Code**
   - **Changes Mode (Ctrl+G)**: Filter to show only git-modified/untracked files across the entire project
   - **Diff Preview**: Colorized git diff in preview pane (toggle with 'd' key) — green/red/cyan styling

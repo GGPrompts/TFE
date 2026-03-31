@@ -643,6 +643,8 @@ func (m *model) loadPreview(path string) {
 	m.preview.hasGraphicsProtocol = false
 	m.preview.isPrompt = false
 	m.preview.promptTemplate = nil
+	m.preview.isJSONL = false
+	m.preview.cachedJSONLLines = nil
 	// Invalidate cache when loading new file
 	m.preview.cacheValid = false
 	m.preview.cachedWrappedLines = nil
@@ -722,6 +724,12 @@ func (m *model) loadPreview(path string) {
 	}
 
 	m.preview.fileSize = info.Size()
+
+	// JSONL conversation files: read last N lines (tail) regardless of size
+	if isJSONLFile(path) {
+		m.loadJSONLPreview(path, info.Size())
+		return
+	}
 
 	// Check if file is too large (>1MB)
 	const maxSize = 1024 * 1024 // 1MB

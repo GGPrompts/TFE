@@ -137,6 +137,9 @@ type previewModel struct {
 	cachedLineCount       int      // Cached total line count after wrapping
 	cachedWidth           int      // Width the cache was computed for
 	cacheValid            bool     // Whether cache is valid
+	// JSONL conversation rendering cache
+	isJSONL            bool     // Whether the file is a JSONL conversation
+	cachedJSONLLines   []string // Pre-rendered JSONL conversation lines
 	// Prompt template (for prompt files)
 	isPrompt       bool            // Whether the file is a prompt template
 	promptTemplate *promptTemplate // Parsed prompt template
@@ -316,6 +319,9 @@ type model struct {
 	showDiffPreview bool              // When true, show git diff in preview instead of file content (default in changes mode)
 	agentSessions   []AgentSession    // Cached agent sessions (populated on changes mode entry)
 	agentFileMap    map[string]string // File path -> agent label (built from agentSessions + changedFiles)
+	// Agent conversation viewer (Ctrl+A / robot emoji)
+	showAgentView     bool   // Filter mode: browsing agent JSONL conversation files
+	agentViewRestore  string // Path to restore when exiting agent view
 	// Trash/Recycle bin system
 	showTrashOnly     bool        // Filter to show trash contents
 	trashItems        []trashItem // Cached trash items when viewing trash
