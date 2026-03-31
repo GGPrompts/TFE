@@ -630,7 +630,7 @@ func (m model) getPreviewVisibleLines() int {
 }
 
 // renderToolbarRow renders the emoji button toolbar row
-// Shows: [🏠] [📄/📊/🌲] [⬜/⬌] [>_] [🔍] [⚡]
+// Shows: [🏠] [📄/📊/🌲] [🔃] [⬜/⬌] [>_] [🔍] [⚡]
 // This function is shared between single-pane (view.go) and dual-pane (render_preview.go) views
 func (m model) renderToolbarRow() string {
 	var s strings.Builder
@@ -657,6 +657,14 @@ func (m model) renderToolbarRow() string {
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
 	s.WriteString(viewButtonStyle.Render("[" + viewIcon + "]"))
+	s.WriteString(" ")
+
+	// Sort toggle button (cycles Name → Size → Modified → Type)
+	sortIcon := "🔃"
+	sortButtonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+	s.WriteString(sortButtonStyle.Render("[" + sortIcon + "]"))
 	s.WriteString(" ")
 
 	// Pane toggle button (toggles single ↔ dual-pane)

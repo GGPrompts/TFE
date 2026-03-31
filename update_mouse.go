@@ -290,8 +290,8 @@ git pull
 			}
 
 			// Check for toolbar button clicks (Y=1)
-			// Toolbar: [🏠] [📊/📄/🌲] [⬜/⬌] [>_] [🔍] [⚡]
-			// Layout:  0-4  5-9         10-14  15-19 20-24 25-29
+			// Toolbar: [🏠] [📊/📄/🌲] [🔃] [⬜/⬌] [>_] [🔍] [⚡]
+			// Layout:  0-4  5-9         10-14 15-19  20-24 25-29 30-34
 			// All buttons are 5 cols: [ (1) + icon (2) + ] (1) + space (1)
 			if msg.Y == 1 {
 				// Home button [🏠] (X=0-4)
@@ -314,8 +314,36 @@ git pull
 					m.calculateLayout() // Recalculate widths for new display mode
 					return m, nil
 				}
-				// Pane toggle button [⬜/⬌] (X=10-14)
+				// Sort toggle button [🔃] (X=10-14)
 				if msg.X >= 10 && msg.X <= 14 {
+					// Cycle sort: name → size → modified → type → name
+					switch m.sortBy {
+					case "name":
+						m.sortBy = "size"
+					case "size":
+						m.sortBy = "modified"
+					case "modified":
+						m.sortBy = "type"
+					default:
+						m.sortBy = "name"
+					}
+					m.sortAsc = true
+					currentFile := m.getCurrentFile()
+					m.sortFiles()
+					if currentFile != nil {
+						for i, file := range m.files {
+							if file.path == currentFile.path {
+								m.cursor = i
+								break
+							}
+						}
+					}
+					m.persistConfig()
+					m.setStatusMessage(fmt.Sprintf("Sort: %s ↑", m.sortBy), false)
+					return m, nil
+				}
+				// Pane toggle button [⬜/⬌] (X=15-19)
+				if msg.X >= 15 && msg.X <= 19 {
 					// Toggle between single and dual-pane (like Tab or Space)
 					if m.viewMode == viewDualPane {
 						m.viewMode = viewSinglePane
@@ -326,8 +354,8 @@ git pull
 					m.populatePreviewCache() // Refresh cache with new layout
 					return m, nil
 				}
-				// Terminal button [>_] (X=15-19)
-				if msg.X >= 15 && msg.X <= 19 {
+				// Terminal button [>_] (X=20-24)
+				if msg.X >= 20 && msg.X <= 24 {
 					// Toggle command mode focus
 					m.commandFocused = !m.commandFocused
 					if !m.commandFocused {
@@ -336,8 +364,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Context-aware search button [🔍] (X=20-24)
-				if msg.X >= 20 && msg.X <= 24 {
+				// Context-aware search button [🔍] (X=25-29)
+				if msg.X >= 25 && msg.X <= 29 {
 					// Context-aware search toggle:
 					// - When viewing file (full preview or dual-pane with right pane focused): Toggle in-file search (Ctrl+F)
 					// - When browsing files (left pane or single-pane): Toggle directory filter search (/)
@@ -375,8 +403,8 @@ git pull
 					}
 					return m, nil
 				}
-				// Git changes toggle button [⚡] (X=25-29)
-				if msg.X >= 25 && msg.X <= 29 {
+				// Git changes toggle button [⚡] (X=30-34)
+				if msg.X >= 30 && msg.X <= 34 {
 					// Auto-exit trash mode
 					if m.showTrashOnly {
 						m.showTrashOnly = false

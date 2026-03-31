@@ -582,6 +582,10 @@ func (m *model) getFileDiff(path string, gitStatusCode string) (string, error) {
 
 	// Untracked files: show full content with NEW FILE header
 	if statusCode == "??" {
+		// Check if it's a directory
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			return "", fmt.Errorf("directory — individual files listed below")
+		}
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return "", fmt.Errorf("cannot read untracked file: %w", err)
@@ -638,6 +642,23 @@ func (m *model) getFileDiff(path string, gitStatusCode string) (string, error) {
 		return string(output), nil
 	}
 
+	// Final fallback for new/added files: show full content as new file diff
+	if statusCode == "A" || strings.Contains(gitStatusCode, "A") {
+		content, readErr := os.ReadFile(path)
+		if readErr == nil {
+			lines := strings.Split(string(content), "\n")
+			var sb strings.Builder
+			sb.WriteString(fmt.Sprintf("new file: %s\n", relPath))
+			sb.WriteString("--- /dev/null\n")
+			sb.WriteString(fmt.Sprintf("+++ b/%s\n", relPath))
+			sb.WriteString(fmt.Sprintf("@@ -0,0 +1,%d @@\n", len(lines)))
+			for _, line := range lines {
+				sb.WriteString("+" + line + "\n")
+			}
+			return sb.String(), nil
+		}
+	}
+
 	return "", fmt.Errorf("no diff available for %s", relPath)
 }
 
@@ -686,7 +707,7 @@ func (m *model) getChangedFiles() ([]fileItem, error) {
 		}
 	}
 
-	cmd := exec.Command("git", "-C", gitRoot, "status", "--porcelain")
+	cmd := exec.Command("git", "-C", gitRoot, "status", "--porcelain", "-uall")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git status failed: %w", err)
