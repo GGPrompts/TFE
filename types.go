@@ -137,9 +137,10 @@ type previewModel struct {
 	cachedLineCount       int      // Cached total line count after wrapping
 	cachedWidth           int      // Width the cache was computed for
 	cacheValid            bool     // Whether cache is valid
-	// JSONL conversation rendering cache
-	isJSONL            bool     // Whether the file is a JSONL conversation
-	cachedJSONLLines   []string // Pre-rendered JSONL conversation lines
+	// JSONL conversation rendering
+	isJSONL             bool           // Whether the file is a JSONL conversation
+	cachedJSONLMessages []jsonlMessage // Parsed JSONL messages (expensive JSON parsing done once)
+	cachedJSONLIsTailed bool           // Whether the file was tail-read
 	// Prompt template (for prompt files)
 	isPrompt       bool            // Whether the file is a prompt template
 	promptTemplate *promptTemplate // Parsed prompt template

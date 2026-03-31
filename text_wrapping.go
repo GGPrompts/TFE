@@ -88,9 +88,20 @@ func (m model) getWrappedLineCount() int {
 		return 0
 	}
 
-	// JSONL files use pre-rendered cached lines
-	if m.preview.isJSONL && len(m.preview.cachedJSONLLines) > 0 {
-		return len(m.preview.cachedJSONLLines)
+	// JSONL files: compute rendered line count at current width
+	if m.preview.isJSONL && len(m.preview.cachedJSONLMessages) > 0 {
+		var boxContentWidth int
+		if m.viewMode == viewFullPreview {
+			boxContentWidth = m.width - 6
+		} else {
+			boxContentWidth = m.rightWidth - 2
+		}
+		availableWidth := boxContentWidth - 2
+		if availableWidth < 20 {
+			availableWidth = 20
+		}
+		lines := renderJSONLFromMessages(m.preview.cachedJSONLMessages, availableWidth, m.preview.cachedJSONLIsTailed, m.preview.fileSize)
+		return len(lines)
 	}
 
 	// Calculate available width based on file type and view mode

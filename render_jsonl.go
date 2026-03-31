@@ -353,7 +353,7 @@ func isJSONLFile(path string) bool {
 }
 
 // loadJSONLPreview reads a JSONL file for preview, using tail-reading for large files.
-// Pre-renders the conversation lines and caches them for fast scrolling.
+// Parses JSON messages once (expensive) and caches them. Rendering happens lazily.
 func (m *model) loadJSONLPreview(path string, fileSize int64) {
 	const maxJSONLBytes = 512 * 1024 // 512KB tail for large files
 
@@ -394,9 +394,49 @@ func (m *model) loadJSONLPreview(path string, fileSize int64) {
 		}
 	}
 
-	rawLines := strings.Split(string(data), "\n")
+	// Parse JSON messages once (expensive part)
+	rawLines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	messages := make([]jsonlMessage, 0, len(rawLines))
+	for _, line := range rawLines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var msg jsonlMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			continue
+		}
+		messages = append(messages, msg)
+	}
 
-	// Calculate available width for pre-rendering
+	m.preview.isJSONL = true
+	m.preview.cachedJSONLMessages = messages
+	m.preview.cachedJSONLIsTailed = isTailed
+	m.preview.fileSize = fileSize
+	m.preview.loaded = true
+}
+
+// renderJSONLFromMessages renders parsed JSONL messages at the given width.
+func renderJSONLFromMessages(messages []jsonlMessage, width int, isTailed bool, fileSize int64) []string {
+	var rendered []string
+	if isTailed {
+		header := jsonlSystemStyle.Render(fmt.Sprintf("... (showing tail of %s file)",
+			formatFileSize(fileSize)))
+		rendered = append(rendered, header, "")
+	}
+
+	for _, msg := range messages {
+		lines := renderJSONLEntry(msg, width)
+		rendered = append(rendered, lines...)
+	}
+	return rendered
+}
+
+// renderJSONLPreview renders a JSONL conversation in the preview pane with
+// scrolling, scrollbar, and color-coded messages.
+func (m model) renderJSONLPreview(maxVisible int) string {
+	var s strings.Builder
+
 	var boxContentWidth int
 	if m.viewMode == viewFullPreview {
 		boxContentWidth = m.width - 6
@@ -408,27 +448,8 @@ func (m *model) loadJSONLPreview(path string, fileSize int64) {
 		availableWidth = 20
 	}
 
-	// Pre-render and cache
-	var rendered []string
-	if isTailed {
-		header := jsonlSystemStyle.Render(fmt.Sprintf("... (showing last %s of %s)", formatFileSize(int64(len(data))), formatFileSize(fileSize)))
-		rendered = append(rendered, header, "")
-	}
-	rendered = append(rendered, renderJSONLLines(rawLines, availableWidth)...)
-
-	m.preview.content = rawLines // Keep raw for potential re-render
-	m.preview.isJSONL = true
-	m.preview.cachedJSONLLines = rendered
-	m.preview.loaded = true
-}
-
-// renderJSONLPreview renders a JSONL conversation in the preview pane with
-// scrolling, scrollbar, and color-coded messages. Uses pre-cached rendered lines.
-func (m model) renderJSONLPreview(maxVisible int) string {
-	var s strings.Builder
-
-	// Use cached rendered lines
-	renderedLines := m.preview.cachedJSONLLines
+	// Render from cached parsed messages (JSON parsing already done)
+	renderedLines := renderJSONLFromMessages(m.preview.cachedJSONLMessages, availableWidth, m.preview.cachedJSONLIsTailed, m.preview.fileSize)
 	if len(renderedLines) == 0 {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).

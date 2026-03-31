@@ -644,7 +644,7 @@ func (m *model) loadPreview(path string) {
 	m.preview.isPrompt = false
 	m.preview.promptTemplate = nil
 	m.preview.isJSONL = false
-	m.preview.cachedJSONLLines = nil
+	m.preview.cachedJSONLMessages = nil
 	// Invalidate cache when loading new file
 	m.preview.cacheValid = false
 	m.preview.cachedWrappedLines = nil
