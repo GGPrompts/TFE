@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -328,11 +329,21 @@ func extractToolDetail(block jsonlContentBlock) string {
 		}
 	}
 
-	// Fallback: show first string value found
-	for _, v := range input {
-		if s, ok := v.(string); ok && len(s) > 0 && len(s) < 200 {
-			return s
+	// Fallback: show all short string values, sorted by key for stable output
+	// (Go map iteration order is randomized, which causes flickering on re-render)
+	keys := make([]string, 0, len(input))
+	for k := range input {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var parts []string
+	for _, k := range keys {
+		if s, ok := input[k].(string); ok && len(s) > 0 && len(s) < 200 {
+			parts = append(parts, s)
 		}
+	}
+	if len(parts) > 0 {
+		return strings.Join(parts, " ")
 	}
 	return ""
 }
