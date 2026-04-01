@@ -108,6 +108,9 @@ type fileItem struct {
 	isSymlink     bool   // Whether this is a symbolic link
 	symlinkTarget string // Target path if this is a symlink
 	hasVariables  *bool  // Cached: whether prompt file has {{variables}} (nil = not checked yet)
+	// Agent metadata (populated in agent view)
+	agentType        string // From .meta.json (e.g. "Explore", "general-purpose")
+	agentDescription string // First user message or slug from JSONL
 	// Git status (populated for git repositories)
 	isGitRepo      bool      // Whether this directory is a git repository
 	gitBranch      string    // Current branch name

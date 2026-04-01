@@ -318,6 +318,131 @@ func (m *model) toggleAgentView() {
 	m.setStatusMessage(fmt.Sprintf("Agent sessions: %s", agentDir), false)
 }
 
+// populateAgentMetadata enriches fileItems with agent type and description
+// by reading .meta.json and the first JSONL line for each agent/session file.
+func (m *model) populateAgentMetadata() {
+	for i := range m.files {
+		file := &m.files[i]
+		if file.isDir || file.name == ".." {
+			continue
+		}
+
+		ext := filepath.Ext(file.name)
+
+		if ext == ".jsonl" {
+			// Read first line to get slug or initial user message
+			f, err := os.Open(file.path)
+			if err != nil {
+				continue
+			}
+
+			// Read up to 8KB for the first line
+			buf := make([]byte, 8192)
+			n, _ := f.Read(buf)
+			f.Close()
+			if n == 0 {
+				continue
+			}
+
+			// Find first newline to get just the first line
+			line := string(buf[:n])
+			if idx := strings.IndexByte(line, '\n'); idx >= 0 {
+				line = line[:idx]
+			}
+
+			var firstEntry struct {
+				Type    string `json:"type"`
+				Slug    string `json:"slug"`
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			}
+			if json.Unmarshal([]byte(line), &firstEntry) == nil {
+				if firstEntry.Slug != "" {
+					file.agentDescription = firstEntry.Slug
+				} else if firstEntry.Message.Content != "" {
+					// Truncate long prompts to first 80 chars
+					desc := firstEntry.Message.Content
+					// Take first line only
+					if idx := strings.IndexByte(desc, '\n'); idx >= 0 {
+						desc = desc[:idx]
+					}
+					if len(desc) > 80 {
+						desc = desc[:77] + "..."
+					}
+					file.agentDescription = desc
+				}
+			}
+
+			// Check for corresponding .meta.json (for subagent files)
+			metaPath := strings.TrimSuffix(file.path, ".jsonl") + ".meta.json"
+			if metaData, err := os.ReadFile(metaPath); err == nil {
+				var meta struct {
+					AgentType string `json:"agentType"`
+				}
+				if json.Unmarshal(metaData, &meta) == nil && meta.AgentType != "" {
+					file.agentType = meta.AgentType
+				}
+			}
+		}
+	}
+}
+
+// formatAgentDisplayName returns a human-readable name for agent view files.
+// Replaces raw UUID filenames with type + slug or short description.
+func (m *model) formatAgentDisplayName(file fileItem) string {
+	ext := filepath.Ext(file.name)
+	base := strings.TrimSuffix(file.name, ext)
+
+	if file.isDir {
+		// Session directories: show "session" + short UUID
+		if len(base) > 8 {
+			return "session " + base[:8]
+		}
+		return file.name
+	}
+
+	switch ext {
+	case ".jsonl":
+		// Subagent files: show agent type or slug
+		if file.agentType != "" {
+			// Clean up agent type (e.g. "opus-agents:general-purpose" → "general-purpose")
+			agentType := file.agentType
+			if idx := strings.LastIndex(agentType, ":"); idx >= 0 {
+				agentType = agentType[idx+1:]
+			}
+			return agentType
+		}
+		if file.agentDescription != "" {
+			// Use slug as display name (e.g. "peaceful-chasing-bubble")
+			desc := file.agentDescription
+			if len(desc) > 40 {
+				desc = desc[:37] + "..."
+			}
+			return desc
+		}
+		// Fallback: short UUID
+		if len(base) > 12 {
+			return base[:12] + ".."
+		}
+		return base
+
+	case ".json":
+		// Meta files: hide or show as "meta"
+		if strings.HasSuffix(base, ".meta") {
+			parent := strings.TrimSuffix(base, ".meta")
+			if len(parent) > 8 {
+				return "meta " + parent[:8] + ".."
+			}
+			return "meta " + parent
+		}
+		return file.name
+
+	default:
+		return file.name
+	}
+}
+
 // getClaudeProjectDir returns the path to the .claude/projects/<encoded-cwd>/ directory
 // for the given working directory. Claude Code encodes paths by replacing "/" with "-".
 func getClaudeProjectDir(cwd string) string {

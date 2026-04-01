@@ -263,6 +263,20 @@ func (m *model) loadFiles() {
 	// Update file watcher to track the current directory
 	m.switchWatchPath(m.currentPath)
 
+	// Auto-exit agent view if user navigated outside the .claude/projects/ directory
+	if m.showAgentView {
+		homeDir, _ := os.UserHomeDir()
+		claudeProjectsDir := filepath.Join(homeDir, ".claude", "projects")
+		if !strings.HasPrefix(m.currentPath, claudeProjectsDir) {
+			m.showAgentView = false
+			m.sortBy = m.agentViewRestoreSort
+			m.sortAsc = m.agentViewRestoreAsc
+			m.displayMode = m.agentViewRestoreMode
+			m.agentViewRestore = ""
+			m.calculateLayout()
+		}
+	}
+
 	// Clear prompts directory cache when reloading files (performance optimization)
 	// This ensures cache stays fresh when files change
 	m.promptDirsCache = make(map[string]bool)
@@ -465,6 +479,11 @@ func (m *model) loadFiles() {
 
 	// Apply sorting based on sortBy and sortAsc settings
 	m.sortFiles()
+
+	// Populate agent metadata for agent view
+	if m.showAgentView {
+		m.populateAgentMetadata()
+	}
 
 	// Rebuild combined command history for current directory
 	// This ensures Up/Down arrows show directory-specific commands first

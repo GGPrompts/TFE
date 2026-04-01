@@ -103,6 +103,11 @@ func (m model) renderListView(maxVisible int) string {
 		// In dual-pane mode, use narrower width to fit in left pane
 		displayName := file.name
 
+		// In agent view, replace UUID filenames with readable descriptions
+		if m.showAgentView && file.name != ".." {
+			displayName = m.formatAgentDisplayName(file)
+		}
+
 		// Show parent folder name for ".." entry
 		if file.name == ".." {
 			parentPath := filepath.Dir(m.currentPath)
@@ -222,7 +227,16 @@ func (m model) renderDetailView(maxVisible int) string {
 	usableWidth := renderWidth - 17
 
 	var nameWidth, sizeWidth, modifiedWidth, extraWidth int
-	if m.showTrashOnly || m.showFavoritesOnly || m.showGitReposOnly || m.showChangesOnly {
+	if m.showAgentView {
+		// Agent view: Name (wide), Modified, Type
+		nameWidth = usableWidth * 55 / 100    // 55% — descriptions are long
+		sizeWidth = 0                          // Not shown
+		modifiedWidth = 12                     // Fixed
+		extraWidth = usableWidth - nameWidth - modifiedWidth
+		if extraWidth < 15 {
+			extraWidth = 15
+		}
+	} else if m.showTrashOnly || m.showFavoritesOnly || m.showGitReposOnly || m.showChangesOnly {
 		// 4 columns: Name, Size, Modified/Deleted, Location/Branch/Status
 		nameWidth = usableWidth * 35 / 100    // 35%
 		sizeWidth = 10                         // Fixed
@@ -347,6 +361,22 @@ func (m model) renderDetailView(maxVisible int) string {
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
 		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, branchWidth, branchHeader, statusWidth, statusHeader, commitWidth, commitHeader)
+	} else if m.showAgentView {
+		// Agent view: Name, Modified, Description
+		nameHeader := "Agent"
+		modifiedHeader := "Modified"
+		descHeader := "Description"
+
+		// Add indicator to active column
+		switch m.sortBy {
+		case "name":
+			nameHeader += sortIndicator
+		case "modified":
+			modifiedHeader += sortIndicator
+		}
+
+		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
+		header = fmt.Sprintf("%s  %-*s  %-*s", paddedNameHeader, modifiedWidth, modifiedHeader, extraWidth, descHeader)
 	} else if m.showChangesOnly {
 		// Changes mode: Name (with status), Size, Modified, Location
 		nameHeader := "Name"
@@ -431,6 +461,11 @@ func (m model) renderDetailView(maxVisible int) string {
 
 		// Truncate long names based on dynamic width
 		displayName := file.name
+
+		// In agent view, replace UUID filenames with readable descriptions
+		if m.showAgentView && file.name != ".." {
+			displayName = m.formatAgentDisplayName(file)
+		}
 
 		// Show parent folder name for ".." entry
 		if file.name == ".." {
@@ -616,6 +651,22 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Use visual-width padding for name column (contains emojis), regular padding for others
 		paddedName := m.padToVisualWidth(name, nameWidth)
 		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, branchWidth, branch, statusWidth, status, commitWidth, lastCommit)
+		} else if m.showAgentView {
+			// Agent view: Name, Modified, Description
+			desc := file.agentDescription
+			if desc == "" && file.isDir {
+				count := getDirItemCount(file.path)
+				if count == 1 {
+					desc = "1 conversation"
+				} else if count > 0 {
+					desc = fmt.Sprintf("%d conversations", count)
+				}
+			}
+			if len(desc) > extraWidth {
+				desc = desc[:extraWidth-2] + ".."
+			}
+			paddedName := m.padToVisualWidth(name, nameWidth)
+			line = fmt.Sprintf("%s  %-*s  %-*s", paddedName, modifiedWidth, modified, extraWidth, desc)
 		} else if m.showChangesOnly {
 			// Changes mode: Name (includes status prefix), Size, Modified, Location
 			location := filepath.Dir(file.path)
