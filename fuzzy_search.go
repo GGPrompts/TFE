@@ -95,69 +95,63 @@ func (m *model) findGitRoot(startPath string) string {
 	}
 }
 
-// launchFuzzySearch uses external fzf + fd/find for blazing fast search
+// launchFuzzySearch uses external fzf + fd/find for blazing fast search.
+// Uses tea.ExecProcess so Bubble Tea suspends and fzf gets full terminal control.
 func (m *model) launchFuzzySearch() tea.Cmd {
-	return func() tea.Msg {
-		// Check if fzf is installed
-		_, err := exec.LookPath("fzf")
-		if err != nil {
+	// Check if fzf is installed before suspending the TUI
+	_, err := exec.LookPath("fzf")
+	if err != nil {
+		return func() tea.Msg {
 			return fuzzySearchResultMsg{
 				selected: "",
 				err:      fmt.Errorf("fzf not found. Install: sudo apt install fzf (Linux) or brew install fzf (macOS)"),
 			}
 		}
+	}
 
-		// Get the best file finder
-		finder, args := getFileFinder()
-
-		// Determine search root (git root or home directory)
-		searchRoot, promptText := m.getSearchRoot()
-
-		// Build shell command that pipes file finder to fzf
-		// This is simpler and more reliable than trying to coordinate stdin/tty
-		var shellCmd string
-
-		// Optimized fzf options for performance:
-		// --no-preview: Disable preview by default (user can toggle with '?' if needed)
-		// --no-mouse: Disable mouse for better performance
-		// --cycle: Wrap around when reaching end
-		// --bind '?:toggle-preview': Press '?' to show/hide preview
-		fzfOpts := fmt.Sprintf("--height=100%% --layout=reverse --border --prompt='%s' --no-preview --no-mouse --cycle --bind '?:toggle-preview' --preview='head -50 {}' --preview-window=right:50%%:wrap:hidden", promptText)
-
-		if finder == "find" {
-			// find outputs relative paths like "./file.txt", clean them up
-			shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | sed 's|^\\./||' | fzf %s",
-				searchRoot, finder, strings.Join(args, " "), fzfOpts)
-		} else {
-			// fd/fdfind already outputs clean relative paths
-			shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | fzf %s",
-				searchRoot, finder, strings.Join(args, " "), fzfOpts)
-		}
-
-		// Run the shell command with proper TTY access
-		cmd := exec.Command("sh", "-c", shellCmd)
-		cmd.Stdin = os.Stdin
-		cmd.Stderr = os.Stderr
-
-		// Capture output
-		output, err := cmd.Output()
-		if err != nil {
-			// User cancelled (exit code 130) or other error
-			// This is normal, not an error
+	// Create a temp file to capture fzf's selection
+	tmpFile, err := os.CreateTemp("", "tfe-fzf-*.txt")
+	if err != nil {
+		return func() tea.Msg {
 			return fuzzySearchResultMsg{
 				selected: "",
-				err:      nil,
+				err:      fmt.Errorf("failed to create temp file: %v", err),
 			}
+		}
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+
+	// Get the best file finder
+	finder, args := getFileFinder()
+
+	// Determine search root (git root or home directory)
+	searchRoot, promptText := m.getSearchRoot()
+
+	// Build shell command that pipes file finder to fzf, writing selection to temp file
+	fzfOpts := fmt.Sprintf("--height=100%% --layout=reverse --border --prompt='%s' --no-mouse --cycle --bind '?:toggle-preview' --preview='head -50 {}' --preview-window=right:50%%:wrap:hidden", promptText)
+
+	var shellCmd string
+	if finder == "find" {
+		shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | sed 's|^\\./||' | fzf %s > %q",
+			searchRoot, finder, strings.Join(args, " "), fzfOpts, tmpPath)
+	} else {
+		shellCmd = fmt.Sprintf("cd %q && %s %s 2>/dev/null | fzf %s > %q",
+			searchRoot, finder, strings.Join(args, " "), fzfOpts, tmpPath)
+	}
+
+	c := exec.Command("sh", "-c", shellCmd)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		defer os.Remove(tmpPath)
+
+		// Read the selection from the temp file
+		data, readErr := os.ReadFile(tmpPath)
+		if readErr != nil || len(strings.TrimSpace(string(data))) == 0 {
+			// User cancelled or no selection
+			return fuzzySearchResultMsg{selected: "", err: nil}
 		}
 
-		// Get the selected file path
-		selectedFile := strings.TrimSpace(string(output))
-		if selectedFile == "" {
-			return fuzzySearchResultMsg{
-				selected: "",
-				err:      nil,
-			}
-		}
+		selectedFile := strings.TrimSpace(string(data))
 
 		// Convert relative path to absolute (using search root, not current path)
 		resultSearchRoot, _ := m.getSearchRoot()
@@ -167,7 +161,7 @@ func (m *model) launchFuzzySearch() tea.Cmd {
 			selected: absPath,
 			err:      nil,
 		}
-	}
+	})
 }
 
 // navigateToFuzzyResult navigates to the selected file from fuzzy search

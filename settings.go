@@ -296,6 +296,139 @@ func (m model) renderSettingsPanel() string {
 	return borderStyle.Render(content.String())
 }
 
+// getSettingsPanelGeometry returns the dialog position and dimensions for mouse hit-testing.
+// Returns (dialogX, dialogY, panelWidth, panelHeight).
+func (m model) getSettingsPanelGeometry() (int, int, int, int) {
+	panelWidth := m.width - 10
+	if panelWidth > 72 {
+		panelWidth = 72
+	}
+	if panelWidth < 40 {
+		panelWidth = 40
+	}
+
+	// Use the same position as getDialogPosition to stay in sync
+	dialogX, dialogY := m.getDialogPosition()
+
+	// Height: match getDialogPosition's calculation
+	items := settingsByCategory(m.settingsCategory)
+	panelHeight := len(items) + 10
+
+	return dialogX, dialogY, panelWidth, panelHeight
+}
+
+// handleSettingsMouseEvent processes mouse input when the settings panel is open.
+// Returns (model, cmd, handled). If handled is true, the caller should not process further.
+func (m model) handleSettingsMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd, bool) {
+	dialogX, dialogY, panelWidth, panelHeight := m.getSettingsPanelGeometry()
+
+	// Check if click is inside the dialog bounds
+	inDialog := msg.X >= dialogX && msg.X < dialogX+panelWidth &&
+		msg.Y >= dialogY && msg.Y < dialogY+panelHeight
+
+	// Relative position inside the dialog content area (after border + padding)
+	relY := msg.Y - dialogY - 2 // -1 border, -1 padding
+	relX := msg.X - dialogX - 3 // -1 border, -2 padding
+
+	items := settingsByCategory(m.settingsCategory)
+
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		// Scroll up through settings items
+		if len(items) > 0 {
+			m.settingsCursor--
+			if m.settingsCursor < 0 {
+				m.settingsCursor = len(items) - 1
+			}
+		}
+		return m, nil, true
+
+	case tea.MouseButtonWheelDown:
+		// Scroll down through settings items
+		if len(items) > 0 {
+			m.settingsCursor++
+			if m.settingsCursor >= len(items) {
+				m.settingsCursor = 0
+			}
+		}
+		return m, nil, true
+
+	case tea.MouseButtonLeft:
+		if msg.Action != tea.MouseActionRelease {
+			return m, nil, true
+		}
+
+		// Click outside dialog = close
+		if !inDialog {
+			m.showDialog = false
+			m.dialog = dialogModel{}
+			m.settingsEditing = false
+			return m, tea.ClearScreen, true
+		}
+
+		// Row 2 (relY == 2) is the category tab bar
+		if relY == 2 && relX >= 0 {
+			// Hit-test each tab: tabs are rendered with padding(0,1) so each is len(name)+2, separated by space
+			tabX := 0
+			for i, name := range settingsCategoryNames {
+				tabWidth := len(name) + 2 // +2 for padding(0,1)
+				if relX >= tabX && relX < tabX+tabWidth {
+					m.settingsCategory = i
+					m.settingsCursor = 0
+					m.settingsEditing = false
+					return m, nil, true
+				}
+				tabX += tabWidth + 1 // +1 for space separator
+			}
+			return m, nil, true
+		}
+
+		// Rows 5+ are settings items (relY == 4 is the blank line after separator)
+		itemStartRow := 5
+		itemIndex := relY - itemStartRow
+		if itemIndex >= 0 && itemIndex < len(items) {
+			m.settingsCursor = itemIndex
+
+			// Click acts like Enter/Space — toggle, cycle, or enter edit mode
+			item := items[itemIndex]
+			switch item.kind {
+			case settingsToggle:
+				current := m.getConfigBool(item.key)
+				m.setConfigBool(item.key, !current)
+				if err := saveConfig(m.config); err != nil {
+					m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+				}
+			case settingsSelect:
+				current := m.getConfigString(item.key)
+				for idx, opt := range item.options {
+					if opt == current {
+						next := (idx + 1) % len(item.options)
+						m.setConfigString(item.key, item.options[next])
+						if err := saveConfig(m.config); err != nil {
+							m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+						}
+						break
+					}
+				}
+			case settingsString:
+				m.settingsEditing = true
+				m.settingsInput = m.getConfigString(item.key)
+			}
+			return m, nil, true
+		}
+
+		// Click somewhere else inside the dialog — consume but do nothing
+		return m, nil, true
+
+	case tea.MouseButtonRight:
+		// Consume right clicks so they don't open context menu behind the panel
+		return m, nil, true
+	}
+
+	// Consume all other mouse events while settings is open
+	return m, nil, true
+}
+
 // handleSettingsKeyEvent processes keyboard input when the settings panel is open
 func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	items := settingsByCategory(m.settingsCategory)

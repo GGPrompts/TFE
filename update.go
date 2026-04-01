@@ -372,7 +372,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fuzzySearchResultMsg:
 		// Fuzzy search completed
 		m.fuzzySearchActive = false
-		if msg.err == nil && msg.selected != "" {
+		if msg.err != nil {
+			m.setStatusMessage(msg.err.Error(), true)
+		} else if msg.selected != "" {
 			m.navigateToFuzzyResult(msg.selected)
 		}
 		// Force a refresh and re-enable mouse support

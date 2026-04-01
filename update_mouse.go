@@ -64,6 +64,12 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// If settings panel is open, handle mouse within it and block click-through
+	if m.showDialog && m.dialog.dialogType == dialogSettings {
+		newM, cmd, _ := m.handleSettingsMouseEvent(msg)
+		return newM, cmd
+	}
+
 	// Handle mouse wheel scrolling for command history when command prompt is focused
 	// Block file tree navigation even if no history exists
 	if m.commandFocused {

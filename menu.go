@@ -104,7 +104,6 @@ func (m model) getMenus() map[string]Menu {
 			Items: []MenuItem{
 				{Label: ">_ Command Prompt", Action: "toggle-command", Shortcut: ":", IsCheckable: true, IsChecked: m.commandFocused},
 				{Label: "🔍 Search in Folder", Action: "toggle-search", Shortcut: "/"},
-				{Label: "🎯 Fuzzy Search", Action: "fuzzy-search", Shortcut: "Ctrl+P"},
 				{IsSeparator: true},
 				{Label: "🔄 Pull & Rebuild TFE", Action: "pull-rebuild", Shortcut: ""},
 			},
