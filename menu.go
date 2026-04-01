@@ -1070,6 +1070,7 @@ Additional context: {{variable2}}
 				// Load agent sessions and build file-to-agent map
 				m.agentSessions = getAgentSessions()
 				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
+				m.changesRestoreDisplay = m.displayMode
 				m.displayMode = modeDetail
 				m.detailScrollX = 0
 				m.showDiffPreview = true
@@ -1077,9 +1078,7 @@ Additional context: {{variable2}}
 				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
 			}
 		} else {
-			m.showDiffPreview = false
-			m.agentSessions = nil
-			m.agentFileMap = nil
+			m.exitChangesMode()
 		}
 
 		m.cursor = 0
@@ -1102,8 +1101,9 @@ Additional context: {{variable2}}
 			m.showTrashOnly = true
 			m.showFavoritesOnly = false
 			m.showPromptsOnly = false
-			m.showChangesOnly = false
-			m.showDiffPreview = false
+			if m.showChangesOnly {
+				m.exitChangesMode()
+			}
 			m.cursor = 0
 			m.loadFiles()
 		}
@@ -1121,8 +1121,9 @@ Additional context: {{variable2}}
 			m.showFavoritesOnly = false
 			m.showPromptsOnly = false
 			m.showGitReposOnly = false
-			m.showChangesOnly = false
-			m.showDiffPreview = false
+			if m.showChangesOnly {
+				m.exitChangesMode()
+			}
 			m.loadFiles()
 		} else {
 			m.setStatusMessage("Error: Could not find home directory", true)
@@ -1199,8 +1200,9 @@ Additional context: {{variable2}}
 			m.showTrashOnly = true
 			m.showFavoritesOnly = false
 			m.showPromptsOnly = false
-			m.showChangesOnly = false
-			m.showDiffPreview = false
+			if m.showChangesOnly {
+				m.exitChangesMode()
+			}
 			m.cursor = 0
 			m.loadFiles()
 		}
@@ -1249,6 +1251,7 @@ Additional context: {{variable2}}
 				m.changedFiles = changed
 				m.agentSessions = getAgentSessions()
 				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
+				m.changesRestoreDisplay = m.displayMode
 				m.displayMode = modeDetail
 				m.detailScrollX = 0
 				m.showDiffPreview = true
@@ -1256,9 +1259,7 @@ Additional context: {{variable2}}
 				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
 			}
 		} else {
-			m.showDiffPreview = false
-			m.agentSessions = nil
-			m.agentFileMap = nil
+			m.exitChangesMode()
 		}
 
 		m.cursor = 0

@@ -242,6 +242,7 @@ func (m *model) checkAgentCompletions() tea.Cmd {
 	m.changedFiles = changed
 	m.agentSessions = currentSessions
 	m.agentFileMap = buildAgentFileMap(changed, currentSessions)
+	m.changesRestoreDisplay = m.displayMode
 	m.displayMode = modeDetail
 	m.detailScrollX = 0
 	m.showDiffPreview = true
@@ -264,12 +265,16 @@ func (m *model) checkAgentCompletions() tea.Cmd {
 // and sorts by modified time. When exiting, it restores the previous path.
 func (m *model) toggleAgentView() {
 	if m.showAgentView {
-		// Exit agent view — restore previous path
+		// Exit agent view — restore previous state
 		m.showAgentView = false
 		if m.agentViewRestore != "" {
 			m.currentPath = m.agentViewRestore
 			m.agentViewRestore = ""
 		}
+		m.sortBy = m.agentViewRestoreSort
+		m.sortAsc = m.agentViewRestoreAsc
+		m.displayMode = m.agentViewRestoreMode
+		m.calculateLayout()
 		m.cursor = 0
 		m.loadFiles()
 		m.setStatusMessage("Agent view closed", false)
@@ -291,8 +296,9 @@ func (m *model) toggleAgentView() {
 	}
 
 	// Clear other filter modes
-	m.showChangesOnly = false
-	m.showDiffPreview = false
+	if m.showChangesOnly {
+		m.exitChangesMode()
+	}
 	m.showFavoritesOnly = false
 	m.showGitReposOnly = false
 	m.showTrashOnly = false
@@ -300,6 +306,9 @@ func (m *model) toggleAgentView() {
 
 	m.showAgentView = true
 	m.agentViewRestore = m.currentPath
+	m.agentViewRestoreSort = m.sortBy
+	m.agentViewRestoreAsc = m.sortAsc
+	m.agentViewRestoreMode = m.displayMode
 	m.currentPath = agentDir
 	m.sortBy = "modified"
 	m.sortAsc = false // Newest first

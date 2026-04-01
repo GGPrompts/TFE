@@ -1724,8 +1724,7 @@ rm -f "$0"
 				if currentFile.isDir {
 					m.currentPath = currentFile.path
 					m.cursor = 0
-					m.showChangesOnly = false // Exit changes mode
-					m.showDiffPreview = false
+					m.exitChangesMode()
 					m.loadFiles()
 				} else {
 					// Open as tab
@@ -2425,6 +2424,8 @@ rm -f "$0"
 				// Load agent sessions and build file-to-agent map
 				m.agentSessions = getAgentSessions()
 				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
+				// Save current display mode before switching
+				m.changesRestoreDisplay = m.displayMode
 				// Auto-switch to detail view for changes
 				m.displayMode = modeDetail
 				m.detailScrollX = 0
@@ -2434,10 +2435,7 @@ rm -f "$0"
 				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
 			}
 		} else {
-			// Exiting changes mode: clear agent data and disable diff preview
-			m.showDiffPreview = false
-			m.agentSessions = nil
-			m.agentFileMap = nil
+			m.exitChangesMode()
 		}
 		m.cursor = 0
 		m.loadFiles()
@@ -2566,8 +2564,9 @@ rm -f "$0"
 			m.showTrashOnly = true
 			m.showFavoritesOnly = false // Disable favorites filter
 			m.showPromptsOnly = false   // Disable prompts filter
-			m.showChangesOnly = false   // Disable changes filter
-			m.showDiffPreview = false   // Disable diff preview
+			if m.showChangesOnly {
+				m.exitChangesMode()
+			}
 			m.cursor = 0
 			// Default to detail view for trash
 			m.displayMode = modeDetail

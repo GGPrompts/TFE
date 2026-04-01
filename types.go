@@ -315,14 +315,18 @@ type model struct {
 	gitReposScanRoot  string      // Root directory of last scan
 	gitReposScanDepth int         // Max depth to scan (default: 5)
 	// Git changes filter (working set: modified/untracked files across project)
-	showChangesOnly bool              // Filter to show only git-changed/untracked files
-	changedFiles    []fileItem        // Cached list of changed files from git status
-	showDiffPreview bool              // When true, show git diff in preview instead of file content (default in changes mode)
-	agentSessions   []AgentSession    // Cached agent sessions (populated on changes mode entry)
-	agentFileMap    map[string]string // File path -> agent label (built from agentSessions + changedFiles)
+	showChangesOnly       bool              // Filter to show only git-changed/untracked files
+	changedFiles          []fileItem        // Cached list of changed files from git status
+	showDiffPreview       bool              // When true, show git diff in preview instead of file content (default in changes mode)
+	agentSessions         []AgentSession    // Cached agent sessions (populated on changes mode entry)
+	agentFileMap          map[string]string // File path -> agent label (built from agentSessions + changedFiles)
+	changesRestoreDisplay displayMode       // Display mode to restore when exiting changes mode
 	// Agent conversation viewer (Ctrl+A / robot emoji)
-	showAgentView     bool   // Filter mode: browsing agent JSONL conversation files
-	agentViewRestore  string // Path to restore when exiting agent view
+	showAgentView        bool        // Filter mode: browsing agent JSONL conversation files
+	agentViewRestore     string      // Path to restore when exiting agent view
+	agentViewRestoreSort string      // Sort order to restore when exiting agent view
+	agentViewRestoreAsc  bool        // Sort direction to restore when exiting agent view
+	agentViewRestoreMode displayMode // Display mode to restore when exiting agent view
 	// Trash/Recycle bin system
 	showTrashOnly     bool        // Filter to show trash contents
 	trashItems        []trashItem // Cached trash items when viewing trash

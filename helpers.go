@@ -506,14 +506,23 @@ func (m *model) navigateToPath(newPath string) {
 
 	// Auto-exit changes mode when navigating to a different directory
 	if m.showChangesOnly {
-		m.showChangesOnly = false
-		m.showDiffPreview = false
+		m.exitChangesMode()
 	}
 
 	// Normal navigation
 	m.currentPath = newPath
 	m.cursor = 0
 	m.loadFiles()
+}
+
+// exitChangesMode cleanly exits git changes mode, restoring previous display state.
+func (m *model) exitChangesMode() {
+	m.showChangesOnly = false
+	m.showDiffPreview = false
+	m.agentSessions = nil
+	m.agentFileMap = nil
+	m.displayMode = m.changesRestoreDisplay
+	m.calculateLayout()
 }
 
 // getFileListVisibleLines returns the number of file items visible in the file list
