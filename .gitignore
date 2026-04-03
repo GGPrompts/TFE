@@ -54,3 +54,8 @@ games/
 new-prompt-*.prompty
 *-demo-*.gif
 *-recording-*.cast
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
