@@ -1275,6 +1275,7 @@ rm -f "$0"
 			m.addToHistory(cmd)
 			m.commandInput = ""
 			m.commandFocused = false // Exit command mode after executing
+			m.clearGhostText()
 
 			// Check for exit/quit commands
 			cmdLower := strings.ToLower(strings.TrimSpace(cmd))
@@ -1357,7 +1358,9 @@ rm -f "$0"
 			// Delete character before cursor
 			m.commandInput = m.commandInput[:m.commandCursorPos-1] + m.commandInput[m.commandCursorPos:]
 			m.commandCursorPos--
-			return m, nil
+			// Re-trigger ghost text or clear if input is too short
+			ghostCmd := m.triggerGhostText()
+			return m, ghostCmd
 		}
 		// If no command input, backspace does nothing
 
@@ -1438,9 +1441,15 @@ rm -f "$0"
 	case "esc":
 		// Exit command mode if focused
 		if m.commandFocused {
+			// If ghost text is showing, dismiss it first (don't exit command mode)
+			if m.ghostText != "" {
+				m.clearGhostText()
+				return m, nil
+			}
 			m.commandInput = ""
 			m.commandCursorPos = 0
 			m.commandFocused = false
+			m.clearGhostText()
 			return m, nil
 		}
 		// If there's leftover command input (but not focused), clear it
@@ -1491,7 +1500,9 @@ rm -f "$0"
 					m.commandInput = m.commandInput[:m.commandCursorPos] + cleanText + m.commandInput[m.commandCursorPos:]
 					m.commandCursorPos += len(cleanText)
 					m.historyPos = len(m.commandHistory)
-					return m, nil
+					// Trigger ghost text suggestion (debounced)
+					ghostCmd := m.triggerGhostText()
+					return m, ghostCmd
 				}
 			}
 		}
@@ -1567,6 +1578,7 @@ rm -f "$0"
 	case "up":
 		// If in command mode, navigate command history (or just block navigation if no history)
 		if m.commandFocused {
+			m.clearGhostText()
 			if len(m.commandHistory) > 0 {
 				m.commandInput = m.getPreviousCommand()
 				m.commandCursorPos = len(m.commandInput) // Move cursor to end
@@ -1613,6 +1625,7 @@ rm -f "$0"
 	case "down":
 		// If in command mode, navigate command history (or just block navigation if no history)
 		if m.commandFocused {
+			m.clearGhostText()
 			if len(m.commandHistory) > 0 {
 				m.commandInput = m.getNextCommand()
 				m.commandCursorPos = len(m.commandInput) // Move cursor to end
@@ -1785,6 +1798,12 @@ rm -f "$0"
 		}
 
 	case "tab":
+		// Priority -1: Accept ghost text suggestion in command mode
+		if m.commandFocused && m.ghostText != "" {
+			m.acceptGhostText()
+			return m, nil
+		}
+
 		// Priority 0: Prompt edit mode in dual-pane (when right pane focused on a prompt)
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane && m.preview.isPrompt && m.preview.promptTemplate != nil && m.showPromptsOnly {
 			if !m.promptEditMode {
@@ -2025,6 +2044,9 @@ rm -f "$0"
 		if m.commandFocused {
 			if m.commandCursorPos < len(m.commandInput) {
 				m.commandCursorPos++
+			} else if m.ghostText != "" {
+				// At end of input with ghost text: accept the suggestion
+				m.acceptGhostText()
 			}
 			return m, nil
 		}
@@ -2096,9 +2118,7 @@ rm -f "$0"
 
 	case ".", "ctrl+h":
 		// Toggle hidden files
-		m.showHidden = !m.showHidden
-		m.loadFiles()
-		m.persistConfig()
+		m.toggleShowHidden()
 
 	case "`":
 		// Backtick: Open context menu for the CURRENT DIRECTORY (not the selected file)
@@ -2260,26 +2280,12 @@ rm -f "$0"
 
 	case "ctrl+l":
 		// Ctrl+L: Toggle panel lock (disable accordion resizing in dual-pane)
-		if m.viewMode == viewDualPane {
-			m.panelsLocked = !m.panelsLocked
+		if m.togglePanelLock() {
 			if m.panelsLocked {
-				// Capture vertical split ratio for lock
-				useVertical := m.displayMode == modeDetail || m.isNarrowTerminal()
-				if useVertical {
-					if m.focusedPane == leftPane {
-						m.lockedTopRatio = 2.0 / 3.0
-					} else {
-						m.lockedTopRatio = 1.0 / 3.0
-					}
-				}
 				m.setStatusMessage("Panels locked (widths won't change with focus)", false)
 			} else {
-				m.lockedTopRatio = 0
 				m.setStatusMessage("Panels unlocked (accordion mode)", false)
-				m.calculateLayout()
-				m.populatePreviewCache()
 			}
-			m.persistConfig()
 		} else {
 			m.setStatusMessage("Panel lock only works in dual-pane mode (Tab/Space)", false)
 		}
@@ -2390,13 +2396,8 @@ rm -f "$0"
 	// To toggle favorites, use F2 (context menu) or right-click → "☆ Add Favorite"
 
 	case "f6":
-		// F6: Toggle favorites filter (replaces b/B)
-		// Auto-exit trash mode when toggling favorites
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-		m.showFavoritesOnly = !m.showFavoritesOnly
+		// F6: Toggle favorites filter
+		m.toggleFavorites()
 
 	case "ctrl+a":
 		// Ctrl+A: Toggle agent conversation viewer
@@ -2405,40 +2406,7 @@ rm -f "$0"
 
 	case "ctrl+g":
 		// Ctrl+G: Toggle git changes filter (show modified/untracked files)
-		// Auto-exit trash mode
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-
-		m.showChangesOnly = !m.showChangesOnly
-
-		if m.showChangesOnly {
-			// Scan for changed files from git root
-			changed, err := m.getChangedFiles()
-			if err != nil {
-				m.setStatusMessage(err.Error(), true)
-				m.showChangesOnly = false
-			} else {
-				m.changedFiles = changed
-				// Load agent sessions and build file-to-agent map
-				m.agentSessions = getAgentSessions()
-				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
-				// Save current display mode before switching
-				m.changesRestoreDisplay = m.displayMode
-				// Auto-switch to detail view for changes
-				m.displayMode = modeDetail
-				m.detailScrollX = 0
-				// Enable diff preview by default in changes mode
-				m.showDiffPreview = true
-				m.calculateLayout()
-				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
-			}
-		} else {
-			m.exitChangesMode()
-		}
-		m.cursor = 0
-		m.loadFiles()
+		m.toggleChangesMode()
 
 	case "d":
 		// 'd': Toggle between diff view and full file view (only in changes mode)
@@ -2523,55 +2491,17 @@ rm -f "$0"
 		}
 
 	case "f11":
-		// F11: Toggle prompts filter (show only .yaml, .md, .txt files)
-		// Auto-exit trash mode when toggling prompts filter
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-		m.showPromptsOnly = !m.showPromptsOnly
-
-		// Auto-expand ~/.prompts when filter is turned on
-		if m.showPromptsOnly {
-			if homeDir, err := os.UserHomeDir(); err == nil {
-				globalPromptsDir := filepath.Join(homeDir, ".prompts")
-				// Check if ~/.prompts exists
-				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
-					// Expand the ~/.prompts directory
-					m.expandedDirs[globalPromptsDir] = true
-				} else {
-					// ~/.prompts doesn't exist - show helpful message
-					m.setStatusMessage("💡 Tip: Create ~/.prompts/ folder for global prompts (see helper below)", false)
-				}
-			}
-		}
-
+		// F11: Toggle prompts filter
+		m.togglePrompts()
 
 	case "f12":
 		// F12: Navigate to trash view (or exit if already in trash)
-		if m.showTrashOnly {
-			// Already in trash - exit and restore previous path
-			m.showTrashOnly = false
-			if m.trashRestorePath != "" {
-				m.currentPath = m.trashRestorePath
-				m.trashRestorePath = ""
-			}
-			m.cursor = 0
-			m.loadFiles()
-		} else {
-			// Enter trash view - save current path
-			m.trashRestorePath = m.currentPath
-			m.showTrashOnly = true
-			m.showFavoritesOnly = false // Disable favorites filter
-			m.showPromptsOnly = false   // Disable prompts filter
-			if m.showChangesOnly {
-				m.exitChangesMode()
-			}
-			m.cursor = 0
+		wasInTrash := m.showTrashOnly
+		m.toggleTrash()
+		if !wasInTrash {
 			// Default to detail view for trash
 			m.displayMode = modeDetail
-			m.calculateLayout() // Recalculate widths for detail view
-			m.loadFiles()
+			m.calculateLayout()
 		}
 
 	case "f1":

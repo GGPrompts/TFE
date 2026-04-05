@@ -67,7 +67,9 @@ tfe/
 ├── render_jsonl.go            # JSONL conversation file rendering
 ├── render_layout.go           # Layout rendering & tab bar
 ├── render_prompts.go          # Prompt template rendering
-└── tmux.go                    # Tmux integration
+├── tmux.go                    # Tmux integration
+├── actions.go                 # Shared action helpers for state mutations
+└── ghost_text.go              # Haiku-powered ghost text suggestions
 ```
 
 ---
@@ -128,6 +130,10 @@ tfe/
 - **`render_layout.go`** - Pane layout rendering & tab bar
 - **`render_prompts.go`** - Prompt template rendering
 - **`tmux.go`** - Tmux integration
+
+### Actions & AI
+- **`actions.go`** - Shared action helpers (toggle filters, navigate, panel lock)
+- **`ghost_text.go`** - Haiku API integration for command autocomplete
 
 ### Utilities
 - **`helpers.go`** - Reusable helper functions

@@ -69,6 +69,7 @@ func (m model) getMenus() map[string]Menu {
 				{Label: "🔀 Git Repositories", Action: "toggle-git-repos", IsCheckable: true, IsChecked: m.showGitReposOnly},
 				{Label: "⚡ Git Changes", Action: "toggle-changes", Shortcut: "Ctrl+G", IsCheckable: true, IsChecked: m.showChangesOnly},
 				{Label: "🗑  Trash", Action: "toggle-trash", Shortcut: "F12", IsCheckable: true, IsChecked: m.showTrashOnly},
+				{Label: "🤖 Agent Conversations", Action: "toggle-agent-view", Shortcut: "Ctrl+A", IsCheckable: true, IsChecked: m.showAgentView},
 			},
 		},
 		"go": {
@@ -813,14 +814,7 @@ Additional context: {{variable2}}
 
 	// View menu
 	case "toggle-favorites":
-		// Auto-exit trash mode when toggling favorites
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-		m.showFavoritesOnly = !m.showFavoritesOnly
-		m.cursor = 0
-		m.loadFiles()
+		m.toggleFavorites()
 
 	case "delete":
 		// Delete selected file/folder
@@ -860,40 +854,15 @@ Additional context: {{variable2}}
 		}
 
 	case "toggle-dual-pane":
-		if m.viewMode == viewDualPane {
-			m.viewMode = viewSinglePane
-		} else {
-			m.viewMode = viewDualPane
-		}
-		m.calculateLayout()
-		m.populatePreviewCache()
+		m.toggleDualPane()
 
 	case "toggle-panel-lock":
-		if m.viewMode == viewDualPane {
-			m.panelsLocked = !m.panelsLocked
-			if m.panelsLocked {
-				useVertical := m.displayMode == modeDetail || m.isNarrowTerminal()
-				if useVertical {
-					if m.focusedPane == leftPane {
-						m.lockedTopRatio = 2.0 / 3.0
-					} else {
-						m.lockedTopRatio = 1.0 / 3.0
-					}
-				}
-			} else {
-				m.lockedTopRatio = 0
-				m.calculateLayout()
-				m.populatePreviewCache()
-			}
-			m.persistConfig()
-		} else {
+		if !m.togglePanelLock() {
 			m.setStatusMessage("Panel lock only works in dual-pane mode", false)
 		}
 
 	case "toggle-hidden":
-		m.showHidden = !m.showHidden
-		m.loadFiles()
-		m.persistConfig()
+		m.toggleShowHidden()
 
 	case "pull-rebuild":
 		// Pull latest TFE code, rebuild, and exit (so user can restart with new version)
@@ -1003,14 +972,7 @@ Additional context: {{variable2}}
 		return m, openEditor(editor, cfgPath)
 
 	case "toggle-prompts":
-		// Auto-exit trash mode when toggling prompts filter
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-		m.showPromptsOnly = !m.showPromptsOnly
-		m.cursor = 0
-		m.loadFiles()
+		m.togglePrompts()
 
 	case "launch-games":
 		// Launch TUIClassics game launcher
@@ -1026,186 +988,34 @@ Additional context: {{variable2}}
 		m.setStatusMessage("TUIClassics not found. Install: git clone https://github.com/GGPrompts/TUIClassics ~/TUIClassics && cd ~/TUIClassics && make build", true)
 
 	case "toggle-git-repos":
-		// Auto-exit trash mode when toggling git repos filter
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-
-		m.showGitReposOnly = !m.showGitReposOnly
-
-		// If turning ON, scan for repos recursively from current directory
-		if m.showGitReposOnly {
-			// Auto-switch to Detail view when enabling git repos filter
-			m.displayMode = modeDetail
-			m.detailScrollX = 0 // Reset scroll
-			m.calculateLayout() // Recalculate widths for detail view
-
-			m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
-			m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
-			m.gitReposLastScan = time.Now()
-			m.gitReposScanRoot = m.currentPath
-			m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
-		}
-
-		m.cursor = 0
-		m.loadFiles()
+		m.toggleGitRepos()
 
 	case "toggle-changes":
-		// Auto-exit trash mode when toggling git changes filter
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-
-		m.showChangesOnly = !m.showChangesOnly
-
-		if m.showChangesOnly {
-			changed, err := m.getChangedFiles()
-			if err != nil {
-				m.setStatusMessage(err.Error(), true)
-				m.showChangesOnly = false
-			} else {
-				m.changedFiles = changed
-				// Load agent sessions and build file-to-agent map
-				m.agentSessions = getAgentSessions()
-				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
-				m.changesRestoreDisplay = m.displayMode
-				m.displayMode = modeDetail
-				m.detailScrollX = 0
-				m.showDiffPreview = true
-				m.calculateLayout()
-				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
-			}
-		} else {
-			m.exitChangesMode()
-		}
-
-		m.cursor = 0
-		m.loadFiles()
+		m.toggleChangesMode()
 
 	case "toggle-trash":
-		// Navigate to trash view (or exit if already in trash)
-		if m.showTrashOnly {
-			// Already in trash - exit and restore previous path
-			m.showTrashOnly = false
-			if m.trashRestorePath != "" {
-				m.currentPath = m.trashRestorePath
-				m.trashRestorePath = ""
-			}
-			m.cursor = 0
-			m.loadFiles()
-		} else {
-			// Enter trash view - save current path
-			m.trashRestorePath = m.currentPath
-			m.showTrashOnly = true
-			m.showFavoritesOnly = false
-			m.showPromptsOnly = false
-			if m.showChangesOnly {
-				m.exitChangesMode()
-			}
-			m.cursor = 0
-			m.loadFiles()
-		}
+		m.toggleTrash()
+
+	case "toggle-agent-view":
+		m.toggleAgentView()
 
 	// Go menu
 	case "go-home":
-		// Navigate to home directory
-		if homeDir, err := os.UserHomeDir(); err == nil {
-			if m.showTrashOnly {
-				m.showTrashOnly = false
-				m.trashRestorePath = ""
-			}
-			m.currentPath = homeDir
-			m.cursor = 0
-			m.showFavoritesOnly = false
-			m.showPromptsOnly = false
-			m.showGitReposOnly = false
-			if m.showChangesOnly {
-				m.exitChangesMode()
-			}
-			m.loadFiles()
-		} else {
-			m.setStatusMessage("Error: Could not find home directory", true)
+		if errMsg := m.navigateHome(); errMsg != "" {
+			m.setStatusMessage(errMsg, true)
 		}
 
 	case "go-favorites":
-		// Toggle favorites view (same as F6)
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-		m.showFavoritesOnly = !m.showFavoritesOnly
-		m.cursor = 0
-		m.loadFiles()
+		m.toggleFavorites()
 
 	case "go-prompts":
-		// Toggle prompts view (same as F11)
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-		m.showPromptsOnly = !m.showPromptsOnly
-		m.cursor = 0
-		m.loadFiles()
-
-		// Auto-expand ~/.prompts when filter is turned on
-		if m.showPromptsOnly {
-			if homeDir, err := os.UserHomeDir(); err == nil {
-				globalPromptsDir := filepath.Join(homeDir, ".prompts")
-				if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
-					m.expandedDirs[globalPromptsDir] = true
-				} else {
-					m.setStatusMessage("💡 Tip: Create ~/.prompts/ folder for global prompts (see helper below)", false)
-				}
-			}
-		}
+		m.togglePrompts()
 
 	case "go-git-repos":
-		// Toggle git repos view (same as toggle-git-repos)
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-
-		m.showGitReposOnly = !m.showGitReposOnly
-
-		if m.showGitReposOnly {
-			m.displayMode = modeDetail
-			m.detailScrollX = 0
-			m.calculateLayout()
-
-			m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
-			m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
-			m.gitReposLastScan = time.Now()
-			m.gitReposScanRoot = m.currentPath
-			m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
-		}
-
-		m.cursor = 0
-		m.loadFiles()
+		m.toggleGitRepos()
 
 	case "go-trash":
-		// Toggle trash view (same as F12)
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			if m.trashRestorePath != "" {
-				m.currentPath = m.trashRestorePath
-				m.trashRestorePath = ""
-			}
-			m.cursor = 0
-			m.loadFiles()
-		} else {
-			m.trashRestorePath = m.currentPath
-			m.showTrashOnly = true
-			m.showFavoritesOnly = false
-			m.showPromptsOnly = false
-			if m.showChangesOnly {
-				m.exitChangesMode()
-			}
-			m.cursor = 0
-			m.loadFiles()
-		}
+		m.toggleTrash()
 
 	case "go-quickcd":
 		// Quick CD: write current directory as CD target and quit
@@ -1234,36 +1044,7 @@ Additional context: {{variable2}}
 
 	// Git menu
 	case "git-changes-mode":
-		// Toggle git changes mode (same as Ctrl+G)
-		if m.showTrashOnly {
-			m.showTrashOnly = false
-			m.trashRestorePath = ""
-		}
-
-		m.showChangesOnly = !m.showChangesOnly
-
-		if m.showChangesOnly {
-			changed, err := m.getChangedFiles()
-			if err != nil {
-				m.setStatusMessage(err.Error(), true)
-				m.showChangesOnly = false
-			} else {
-				m.changedFiles = changed
-				m.agentSessions = getAgentSessions()
-				m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
-				m.changesRestoreDisplay = m.displayMode
-				m.displayMode = modeDetail
-				m.detailScrollX = 0
-				m.showDiffPreview = true
-				m.calculateLayout()
-				m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
-			}
-		} else {
-			m.exitChangesMode()
-		}
-
-		m.cursor = 0
-		m.loadFiles()
+		m.toggleChangesMode()
 
 	case "git-toggle-diff":
 		// Toggle diff preview in changes mode
@@ -1402,21 +1183,9 @@ Additional context: {{variable2}}
 
 	case "settings-panel-lock":
 		m.setConfigBool("panel_lock", !m.panelsLocked)
+		// setConfigBool already set m.panelsLocked; apply side effects only
+		m.applyPanelLockEffects()
 		m.persistConfig()
-		if m.panelsLocked {
-			useVertical := m.displayMode == modeDetail || m.isNarrowTerminal()
-			if useVertical {
-				if m.focusedPane == leftPane {
-					m.lockedTopRatio = 2.0 / 3.0
-				} else {
-					m.lockedTopRatio = 1.0 / 3.0
-				}
-			}
-		} else {
-			m.lockedTopRatio = 0
-			m.calculateLayout()
-			m.populatePreviewCache()
-		}
 
 	case "settings-file-watcher":
 		enabling := !m.watcherActive

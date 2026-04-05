@@ -179,6 +179,19 @@ func (m model) renderSinglePane() string {
 
 			// Render text after cursor
 			s.WriteString(inputStyle.Render(afterCursor))
+
+			// Render ghost text after cursor (dim gray suggestion)
+			if m.ghostText != "" && afterCursor == "" {
+				ghostSuffix := getGhostTextSuffix(m.commandInput, m.ghostText)
+				if ghostSuffix != "" {
+					ghostStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+					s.WriteString(ghostStyle.Render(ghostSuffix))
+				}
+			} else if m.ghostTextLoading && afterCursor == "" {
+				// Show subtle loading indicator
+				loadingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+				s.WriteString(loadingStyle.Render("..."))
+			}
 		} else {
 			// Not focused - just show the text
 			if strings.HasPrefix(m.commandInput, "!") {
