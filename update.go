@@ -423,18 +423,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, statusTimeoutCmd()
 
-	case ghostTextMsg:
-		// Ghost text suggestion received from Haiku API
-		// Only apply if the sequence number matches (discard stale responses)
-		if msg.seq == m.ghostTextSeq {
-			m.ghostTextLoading = false
-			if msg.err == nil {
-				m.ghostText = msg.suggestion
-			} else {
-				m.ghostText = ""
-			}
+	case ghostTextFinishedMsg:
+		// Back from claude -p query, refresh files and restore terminal
+		m.loadFiles()
+		m.ghostTextLoading = false
+		if msg.err == nil && msg.suggestion != "" {
+			m.ghostText = msg.suggestion
+			m.commandFocused = true
+			m.setStatusMessage("Tab to accept suggestion, Esc to dismiss", false)
 		}
-		return m, nil
+		return m, tea.Batch(
+			tea.EnterAltScreen,
+			tea.ClearScreen,
+			tea.EnableMouseCellMotion,
+		)
 
 	case agentCheckTickMsg:
 		// Periodic poll: detect agent session completions

@@ -1286,12 +1286,20 @@ rm -f "$0"
 
 			// Check for ! prefix - run command and exit TFE
 			if strings.HasPrefix(cmd, "!") {
-				// Remove the ! prefix
 				actualCmd := strings.TrimPrefix(cmd, "!")
 				actualCmd = strings.TrimSpace(actualCmd)
 				if actualCmd != "" {
 					return m, runCommandAndExit(actualCmd, m.currentPath)
 				}
+			}
+
+			// Check for ? prefix - ask AI for command suggestion
+			if handled, ghostCmd := m.handleQuestionPrefix(cmd); handled {
+				if ghostCmd != nil {
+					m.ghostTextLoading = true
+					return m, ghostCmd
+				}
+				return m, nil
 			}
 
 			// Handle cd command specially (change TFE's directory instead of subprocess)
@@ -1358,9 +1366,7 @@ rm -f "$0"
 			// Delete character before cursor
 			m.commandInput = m.commandInput[:m.commandCursorPos-1] + m.commandInput[m.commandCursorPos:]
 			m.commandCursorPos--
-			// Re-trigger ghost text or clear if input is too short
-			ghostCmd := m.triggerGhostText()
-			return m, ghostCmd
+			return m, nil
 		}
 		// If no command input, backspace does nothing
 
@@ -1500,9 +1506,7 @@ rm -f "$0"
 					m.commandInput = m.commandInput[:m.commandCursorPos] + cleanText + m.commandInput[m.commandCursorPos:]
 					m.commandCursorPos += len(cleanText)
 					m.historyPos = len(m.commandHistory)
-					// Trigger ghost text suggestion (debounced)
-					ghostCmd := m.triggerGhostText()
-					return m, ghostCmd
+					return m, nil
 				}
 			}
 		}

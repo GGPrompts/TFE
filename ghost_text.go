@@ -1,173 +1,130 @@
 package main
 
 // Module: ghost_text.go
-// Purpose: Haiku-powered ghost text suggestions for the command prompt
+// Purpose: AI-assisted command suggestions via claude CLI
 // Responsibilities:
-// - Debounced API requests (300ms after last keystroke)
-// - Anthropic API integration for command suggestions
-// - Building context (cwd, file list, selection) for the prompt
+// - Handling ? prefix in command prompt to ask Haiku for command suggestions
+// - Running claude -p with file context, suspending TFE to show the response
+// - Capturing the suggested command and pre-filling it as ghost text
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+	"os/exec"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// ghostTextDebounceDelay is the delay after the last keystroke before requesting ghost text
-const ghostTextDebounceDelay = 300 * time.Millisecond
+// ghostTextFinishedMsg is sent when the claude -p process completes
+type ghostTextFinishedMsg struct {
+	suggestion string // The suggested command to pre-fill
+	err        error
+}
 
-// ghostTextMinInput is the minimum input length before requesting ghost text
-const ghostTextMinInput = 2
-
-// requestGhostText creates a tea.Cmd that waits for the debounce delay, then calls
-// the Anthropic API to get a command suggestion. The seq parameter is used to
-// discard stale responses (if the user typed more while the request was in flight).
-func requestGhostText(input string, cwd string, files []string, selectedFile string, seq int) tea.Cmd {
+// runGhostTextQuery runs claude -p with the user's question and file context.
+// It suspends TFE (like runCommand), shows the response in the terminal,
+// and captures the suggested command in a temp file for ghost text pre-fill.
+func runGhostTextQuery(question string, cwd string, files []string, selectedFile string) tea.Cmd {
 	return func() tea.Msg {
-		// Debounce: wait before making the request
-		time.Sleep(ghostTextDebounceDelay)
-
-		apiKey := os.Getenv("ANTHROPIC_API_KEY")
-		if apiKey == "" {
-			return ghostTextMsg{seq: seq, err: fmt.Errorf("ANTHROPIC_API_KEY not set")}
-		}
-
-		// Build file list context (limit to avoid huge prompts)
+		// Build file context for the system prompt
 		fileList := strings.Join(files, ", ")
-		if len(fileList) > 1500 {
-			// Truncate at a rune boundary to avoid splitting multi-byte UTF-8
-			runes := []rune(fileList)
-			if len(runes) > 500 {
-				fileList = string(runes[:500]) + "..."
-			}
+		runes := []rune(fileList)
+		if len(runes) > 500 {
+			fileList = string(runes[:500]) + "..."
 		}
-
-		systemPrompt := `You are a shell command autocomplete assistant embedded in a terminal file explorer (TFE).
-Your job is to suggest a SINGLE shell command completion based on the user's partial input.
-
-Rules:
-- Only suggest valid shell commands (bash/zsh compatible)
-- Focus on file operations: mv, cp, rm, mkdir, find, grep, ls, cat, chmod, chown, tar, zip, git, etc.
-- Complete the user's partial input into a full command
-- Use the provided working directory and file list for accurate path completions
-- Output ONLY the completed command text (no explanation, no quotes, no markdown)
-- If the input already looks like a complete command, suggest a reasonable extension or return it as-is
-- Do NOT include the partial input prefix - return the FULL command
-- Keep suggestions concise and practical
-- If you cannot suggest anything meaningful, respond with just the original input`
 
 		selectedContext := ""
 		if selectedFile != "" {
 			selectedContext = fmt.Sprintf("\nCurrently selected file: %s", selectedFile)
 		}
 
-		userPrompt := fmt.Sprintf(`Working directory: %s
-Files in current directory: %s%s
+		systemPrompt := fmt.Sprintf(`You suggest shell commands for file operations.
 
-User's partial input: %s
+Working directory: %s
+Files: %s%s
 
-Suggest the completed command:`, cwd, fileList, selectedContext, input)
+RULES:
+- Output ONLY the shell command, nothing else
+- No markdown, no backticks, no code fences, no formatting
+- No explanations, no commentary, no follow-up text
+- No "Here's the command:" or similar prefixes
+- No "Let me know" or similar closers
+- Just the raw command, one line, plain text
+- If no command applies, output only: NO_COMMAND`, cwd, fileList, selectedContext)
 
-		// Build API request
-		reqBody := map[string]interface{}{
-			"model":      "claude-haiku-4-5-20250514",
-			"max_tokens": 150,
-			"system":     systemPrompt,
-			"messages": []map[string]string{
-				{"role": "user", "content": userPrompt},
-			},
-		}
-
-		jsonBody, err := json.Marshal(reqBody)
+		// Write system prompt to a temp file (avoids shell escaping issues)
+		tmpFile, err := os.CreateTemp("", "tfe-ghost-*.txt")
 		if err != nil {
-			return ghostTextMsg{seq: seq, err: err}
+			return ghostTextFinishedMsg{err: err}
 		}
+		systemPromptFile := tmpFile.Name()
+		tmpFile.WriteString(systemPrompt)
+		tmpFile.Close()
 
-		req, err := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(jsonBody))
-		if err != nil {
-			return ghostTextMsg{seq: seq, err: err}
-		}
+		// Temp file to capture the suggestion (last line of output)
+		suggestionFile := systemPromptFile + ".suggestion"
 
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("x-api-key", apiKey)
-		req.Header.Set("anthropic-version", "2023-06-01")
+		// Build the script: run claude -p, capture full output, display it, save last line
+		outputFile := systemPromptFile + ".output"
+		script := fmt.Sprintf(`
+echo "? %s"
+echo "---"
+SYSTEM_PROMPT=$(cat %s)
+claude -p %s --model haiku --system-prompt "$SYSTEM_PROMPT" --bare --tools "" --no-input 2>/dev/null > %s
+cat %s
+tail -1 %s > %s
+echo ""
+echo "Press any key to continue..."
+read -n 1 -s -r
+rm -f %s %s
+`,
+			shellQuote(question),
+			shellQuote(systemPromptFile),
+			shellQuote(question),
+			shellQuote(outputFile),
+			shellQuote(outputFile),
+			shellQuote(outputFile),
+			shellQuote(suggestionFile),
+			shellQuote(systemPromptFile),
+			shellQuote(outputFile),
+		)
 
-		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return ghostTextMsg{seq: seq, err: err}
-		}
-		defer resp.Body.Close()
+		c := exec.Command("bash", "-c", script)
+		c.Dir = cwd
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return ghostTextMsg{seq: seq, err: err}
-		}
+		return tea.Sequence(
+			tea.ClearScreen,
+			tea.ExecProcess(c, func(err error) tea.Msg {
+				// Read the captured suggestion
+				suggestion := ""
+				if data, readErr := os.ReadFile(suggestionFile); readErr == nil {
+					suggestion = strings.TrimSpace(string(data))
+					os.Remove(suggestionFile)
+				}
 
-		if resp.StatusCode != 200 {
-			return ghostTextMsg{seq: seq, err: fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))}
-		}
+				// Clean up suggestion
+				if suggestion == "NO_COMMAND" || suggestion == "" {
+					suggestion = ""
+				}
+				// Strip backticks/fences the model might add
+				suggestion = strings.TrimPrefix(suggestion, "```")
+				suggestion = strings.TrimSuffix(suggestion, "```")
+				suggestion = strings.TrimPrefix(suggestion, "`")
+				suggestion = strings.TrimSuffix(suggestion, "`")
+				suggestion = strings.TrimSpace(suggestion)
 
-		// Parse response
-		var apiResp struct {
-			Content []struct {
-				Text string `json:"text"`
-			} `json:"content"`
-		}
-
-		if err := json.Unmarshal(body, &apiResp); err != nil {
-			return ghostTextMsg{seq: seq, err: err}
-		}
-
-		if len(apiResp.Content) == 0 {
-			return ghostTextMsg{seq: seq, err: fmt.Errorf("empty response")}
-		}
-
-		suggestion := strings.TrimSpace(apiResp.Content[0].Text)
-
-		// Clean up: remove backticks or code fences that the model might add
-		suggestion = strings.TrimPrefix(suggestion, "```")
-		suggestion = strings.TrimSuffix(suggestion, "```")
-		suggestion = strings.TrimPrefix(suggestion, "`")
-		suggestion = strings.TrimSuffix(suggestion, "`")
-		suggestion = strings.TrimSpace(suggestion)
-
-		// If suggestion equals input exactly, no ghost text needed
-		if suggestion == input {
-			return ghostTextMsg{seq: seq, suggestion: ""}
-		}
-
-		return ghostTextMsg{seq: seq, suggestion: suggestion}
+				return ghostTextFinishedMsg{suggestion: suggestion, err: err}
+			}),
+		)()
 	}
-}
-
-// getGhostTextSuffix returns only the part of the ghost text that extends
-// beyond the current input. If the suggestion starts with the input, return
-// the suffix; otherwise return the full suggestion.
-func getGhostTextSuffix(input, suggestion string) string {
-	if suggestion == "" {
-		return ""
-	}
-
-	// If suggestion starts with the current input, show only the completion part
-	if strings.HasPrefix(suggestion, input) {
-		return suggestion[len(input):]
-	}
-
-	// Otherwise the model suggested a different command entirely;
-	// show the whole thing as ghost text (user can tab to accept)
-	return " [" + suggestion + "]"
 }
 
 // buildFileListForGhostText returns a slice of filenames in the current directory
-// suitable for sending to the API as context.
+// suitable for sending as context.
 func (m model) buildFileListForGhostText() []string {
 	names := make([]string, 0, len(m.files))
 	for _, f := range m.files {
@@ -187,68 +144,60 @@ func (m model) buildFileListForGhostText() []string {
 	return names
 }
 
-// triggerGhostText increments the sequence counter and returns a Cmd to request ghost text.
-// Should be called after each keystroke that modifies commandInput.
-func (m *model) triggerGhostText() tea.Cmd {
-	// Don't request if input is too short
-	if len(m.commandInput) < ghostTextMinInput {
-		m.ghostText = ""
-		m.ghostTextLoading = false
-		return nil
+// getGhostTextSuffix returns only the part of the ghost text that extends
+// beyond the current input. If the suggestion starts with the input, return
+// the suffix; otherwise return the full suggestion.
+func getGhostTextSuffix(input, suggestion string) string {
+	if suggestion == "" {
+		return ""
+	}
+	if strings.HasPrefix(suggestion, input) {
+		return suggestion[len(input):]
+	}
+	return suggestion
+}
+
+// clearGhostText removes any ghost text suggestion.
+func (m *model) clearGhostText() {
+	m.ghostText = ""
+	m.ghostTextLoading = false
+}
+
+// acceptGhostText applies the ghost text suggestion to the command input.
+func (m *model) acceptGhostText() bool {
+	if m.ghostText == "" {
+		return false
+	}
+	m.commandInput = m.ghostText
+	m.commandCursorPos = len(m.commandInput)
+	m.ghostText = ""
+	m.ghostTextLoading = false
+	return true
+}
+
+// handleQuestionPrefix checks if the command starts with ? and runs the ghost text query.
+// Returns true and a Cmd if handled, false otherwise.
+func (m *model) handleQuestionPrefix(cmd string) (bool, tea.Cmd) {
+	if !strings.HasPrefix(cmd, "?") {
+		return false, nil
 	}
 
-	// Don't request if no API key
-	if os.Getenv("ANTHROPIC_API_KEY") == "" {
-		return nil
+	question := strings.TrimSpace(strings.TrimPrefix(cmd, "?"))
+	if question == "" {
+		m.setStatusMessage("Usage: ?<question> — ask AI for a command suggestion", false)
+		return true, nil
 	}
-
-	m.ghostTextSeq++
-	m.ghostTextLoading = true
 
 	selectedName := ""
 	if f := m.getCurrentFile(); f != nil {
 		selectedName = f.name
 	}
 
-	return requestGhostText(
-		m.commandInput,
+	return true, runGhostTextQuery(
+		question,
 		m.currentPath,
 		m.buildFileListForGhostText(),
 		selectedName,
-		m.ghostTextSeq,
 	)
 }
 
-// clearGhostText removes any ghost text suggestion and cancels pending requests.
-func (m *model) clearGhostText() {
-	m.ghostText = ""
-	m.ghostTextLoading = false
-	m.ghostTextSeq++ // Invalidate any in-flight requests
-}
-
-// acceptGhostText applies the ghost text suggestion to the command input.
-// Returns true if ghost text was accepted, false if there was nothing to accept.
-func (m *model) acceptGhostText() bool {
-	if m.ghostText == "" {
-		return false
-	}
-
-	suffix := getGhostTextSuffix(m.commandInput, m.ghostText)
-	if suffix == "" || strings.HasPrefix(suffix, " [") {
-		// Full replacement suggestion
-		if strings.HasPrefix(suffix, " [") {
-			// Extract the actual suggestion from " [suggestion]"
-			m.commandInput = m.ghostText
-		} else {
-			return false
-		}
-	} else {
-		// Append the suffix
-		m.commandInput += suffix
-	}
-
-	m.commandCursorPos = len(m.commandInput)
-	m.ghostText = ""
-	m.ghostTextLoading = false
-	return true
-}

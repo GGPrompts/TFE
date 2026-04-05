@@ -404,10 +404,9 @@ type model struct {
 	settingsCursor   int // Selected setting within category
 	settingsEditing  bool   // Whether currently editing a string field
 	settingsInput    string // Buffer for string input editing
-	// Ghost text (Haiku-powered command suggestions)
-	ghostText           string // Suggested command (displayed as dim text after cursor)
-	ghostTextLoading    bool   // Whether a ghost text request is in flight
-	ghostTextSeq        int    // Sequence number for debouncing (incremented on each keystroke)
+	// Ghost text (AI-powered command suggestions via ? prefix)
+	ghostText        string // Suggested command (displayed as dim text after cursor)
+	ghostTextLoading bool   // Whether a ghost text request is in flight
 }
 
 // openTab represents a file opened as a tab for review (used in changes mode)
@@ -453,12 +452,6 @@ type fileChangedMsg struct {
 	op   fsnotify.Op    // Type of operation (Create, Write, Remove, Rename, Chmod)
 }
 
-// ghostTextMsg is sent when Haiku returns a command suggestion for the ghost text
-type ghostTextMsg struct {
-	suggestion string // The suggested command text
-	seq        int    // Sequence number to match against current model state
-	err        error  // Error if API call failed
-}
 
 // agentCheckTickMsg is sent periodically to poll agent session state for completions
 type agentCheckTickMsg struct{}
