@@ -42,28 +42,43 @@ type jsonlContentBlock struct {
 	Input json.RawMessage `json:"input"` // tool_use: input parameters
 }
 
-// Styles for JSONL rendering
-var (
-	jsonlUserStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-	jsonlAssistantStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("78"))
-	jsonlToolNameStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("214")).
-				Bold(true)
-	jsonlToolInputStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("243"))
-	jsonlThinkingStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("241")).
-				Italic(true)
-	jsonlSystemStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("245"))
-	jsonlSeparatorStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("236"))
-	jsonlToolResultStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("243"))
-)
+func jsonlUserStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(currentTheme.Title.adaptiveColor()).
+		Bold(true)
+}
+
+func jsonlAssistantStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(uiBodyText())
+}
+
+func jsonlToolNameStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(currentTheme.DiffHunkHeader.adaptiveColor()).
+		Bold(true)
+}
+
+func jsonlToolInputStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(uiMutedText())
+}
+
+func jsonlThinkingStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(uiSubtleText()).
+		Italic(true)
+}
+
+func jsonlSystemStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(uiMutedText())
+}
+
+func jsonlSeparatorStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(uiSubtleText())
+}
+
+func jsonlToolResultStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(uiMutedText())
+}
 
 // renderJSONLPreview renders a Claude Code .jsonl conversation file
 // with color-coded messages. Returns formatted lines for the preview pane.
@@ -125,13 +140,13 @@ func renderJSONLUserMessage(msg jsonlMessage, width int) []string {
 		if contentStr == "" {
 			return nil
 		}
-		sep := jsonlSeparatorStyle.Render(strings.Repeat("─", min(width, 40)))
+		sep := jsonlSeparatorStyle().Render(strings.Repeat("─", min(width, 40)))
 		lines = append(lines, sep)
-		header := jsonlUserStyle.Render("USER")
+		header := jsonlUserStyle().Render("USER")
 		lines = append(lines, header)
 
 		for _, textLine := range wrapLine(contentStr, width) {
-			lines = append(lines, jsonlUserStyle.Render(textLine))
+			lines = append(lines, jsonlUserStyle().Render(textLine))
 		}
 		lines = append(lines, "")
 		return lines
@@ -149,12 +164,12 @@ func renderJSONLUserMessage(msg jsonlMessage, width int) []string {
 			if block.Text == "" {
 				continue
 			}
-			sep := jsonlSeparatorStyle.Render(strings.Repeat("─", min(width, 40)))
+			sep := jsonlSeparatorStyle().Render(strings.Repeat("─", min(width, 40)))
 			lines = append(lines, sep)
-			header := jsonlUserStyle.Render("USER")
+			header := jsonlUserStyle().Render("USER")
 			lines = append(lines, header)
 			for _, textLine := range wrapLine(block.Text, width) {
-				lines = append(lines, jsonlUserStyle.Render(textLine))
+				lines = append(lines, jsonlUserStyle().Render(textLine))
 			}
 			lines = append(lines, "")
 
@@ -166,7 +181,7 @@ func renderJSONLUserMessage(msg jsonlMessage, width int) []string {
 				if len(resultText) > maxLen {
 					resultText = resultText[:maxLen] + "..."
 				}
-				lines = append(lines, jsonlToolResultStyle.Render("  "+resultText))
+				lines = append(lines, jsonlToolResultStyle().Render("  "+resultText))
 			}
 		}
 	}
@@ -200,18 +215,18 @@ func renderJSONLAssistantMessage(msg jsonlMessage, width int) []string {
 				continue
 			}
 			if !hasContent {
-				header := jsonlAssistantStyle.Render("ASSISTANT")
+				header := jsonlAssistantStyle().Render("ASSISTANT")
 				lines = append(lines, header)
 				hasContent = true
 			}
 			for _, textLine := range wrapLine(block.Text, width) {
-				lines = append(lines, jsonlAssistantStyle.Render(textLine))
+				lines = append(lines, jsonlAssistantStyle().Render(textLine))
 			}
 			lines = append(lines, "")
 
 		case "tool_use":
 			if !hasContent {
-				header := jsonlAssistantStyle.Render("ASSISTANT")
+				header := jsonlAssistantStyle().Render("ASSISTANT")
 				lines = append(lines, header)
 				hasContent = true
 			}
@@ -227,7 +242,7 @@ func renderJSONLAssistantMessage(msg jsonlMessage, width int) []string {
 			if visualWidth(firstLine) > width-12 {
 				firstLine = truncateToWidth(firstLine, width-12)
 			}
-			lines = append(lines, jsonlThinkingStyle.Render("  thinking: "+firstLine))
+			lines = append(lines, jsonlThinkingStyle().Render("  thinking: "+firstLine))
 		}
 	}
 
@@ -239,7 +254,7 @@ func renderJSONLSystemMessage(msg jsonlMessage, width int) []string {
 	if msg.Subtype == "" {
 		return nil // Skip generic system messages
 	}
-	line := jsonlSystemStyle.Render(fmt.Sprintf("  [system: %s]", msg.Subtype))
+	line := jsonlSystemStyle().Render(fmt.Sprintf("  [system: %s]", msg.Subtype))
 	return []string{line}
 }
 
@@ -253,14 +268,14 @@ func renderToolUseSummary(block jsonlContentBlock, width int) string {
 	// Extract key parameter for context
 	detail := extractToolDetail(block)
 
-	prefix := jsonlToolNameStyle.Render("  " + name)
+	prefix := jsonlToolNameStyle().Render("  " + name)
 	if detail != "" {
 		maxDetail := width - visualWidth(name) - 5
 		if maxDetail > 10 {
 			if len(detail) > maxDetail {
 				detail = detail[:maxDetail] + "..."
 			}
-			return prefix + " " + jsonlToolInputStyle.Render(detail)
+			return prefix + " " + jsonlToolInputStyle().Render(detail)
 		}
 	}
 	return prefix
@@ -431,7 +446,7 @@ func (m *model) loadJSONLPreview(path string, fileSize int64) {
 func renderJSONLFromMessages(messages []jsonlMessage, width int, isTailed bool, fileSize int64) []string {
 	var rendered []string
 	if isTailed {
-		header := jsonlSystemStyle.Render(fmt.Sprintf("... (showing tail of %s file)",
+		header := jsonlSystemStyle().Render(fmt.Sprintf("... (showing tail of %s file)",
 			formatFileSize(fileSize)))
 		rendered = append(rendered, header, "")
 	}
@@ -463,7 +478,7 @@ func (m model) renderJSONLPreview(maxVisible int) string {
 	renderedLines := renderJSONLFromMessages(m.preview.cachedJSONLMessages, availableWidth, m.preview.cachedJSONLIsTailed, m.preview.fileSize)
 	if len(renderedLines) == 0 {
 		emptyStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(uiSubtleText()).
 			Italic(true)
 		s.WriteString(emptyStyle.Render("Empty conversation"))
 		for i := 1; i < maxVisible; i++ {
@@ -524,7 +539,7 @@ func (m model) renderJSONLPreview(maxVisible int) string {
 		}
 		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) [jsonl]", end, totalLines, scrollPercent)
 		scrollStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(uiSubtleText()).
 			Italic(true)
 
 		for linesRendered < targetLines {

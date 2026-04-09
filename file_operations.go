@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // isClaudeContextFile checks if a file/folder is automatically loaded by Claude Code
@@ -688,7 +689,7 @@ func (m *model) loadPreview(path string) {
 			content = append(content, fmt.Sprintf("   %v", err))
 		} else {
 			// Successfully read target
-			content = append(content, "Points to: " + target)
+			content = append(content, "Points to: "+target)
 
 			// Resolve relative paths to absolute for clarity
 			absTarget := target
@@ -705,7 +706,7 @@ func (m *model) loadPreview(path string) {
 				content = append(content, "❌ Status: BROKEN LINK")
 				content = append(content, "   Target does not exist or is not accessible")
 				content = append(content, "")
-				content = append(content, "Absolute path: " + absTarget)
+				content = append(content, "Absolute path: "+absTarget)
 			} else {
 				// Valid symlink
 				content = append(content, "")
@@ -718,8 +719,8 @@ func (m *model) loadPreview(path string) {
 					content = append(content, "💡 Tip: Press Enter to navigate into this directory")
 				} else {
 					content = append(content, "Target Type: File")
-					content = append(content, "Size: " + formatFileSize(targetInfo.Size()))
-					content = append(content, "Modified: " + formatModTime(targetInfo.ModTime()))
+					content = append(content, "Size: "+formatFileSize(targetInfo.Size()))
+					content = append(content, "Modified: "+formatModTime(targetInfo.ModTime()))
 					content = append(content, "")
 					content = append(content, "💡 Tip: Press Enter to view the target file's contents")
 				}
@@ -1236,10 +1237,10 @@ func (m *model) renderMarkdownWithTimeout(content string, width int, timeout tim
 					glamour.WithWordWrap(width),
 				)
 			} else {
-				// Use fixed style based on CLI flag (avoids slow terminal probing in WezTerm/Termux)
-				// --light flag uses "light" style, otherwise "dark" (default)
+				// Match markdown rendering to the active theme mode. applyThemeMode()
+				// already synchronizes Lip Gloss background detection with CLI/config.
 				glamourStyle := "dark"
-				if m.forceLightTheme {
+				if !lipgloss.HasDarkBackground() {
 					glamourStyle = "light"
 				}
 				renderer, err = glamour.NewTermRenderer(

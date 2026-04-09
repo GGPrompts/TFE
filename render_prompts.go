@@ -41,7 +41,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 	// Prompt name (if available)
 	if tmpl.name != "" {
-		nameStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+		nameStyle := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Title.adaptiveColor())
 		nameLine := "📝 " + tmpl.name
 
 		// Wrap name if too long (use visual width)
@@ -58,7 +58,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 	// Description (if available) - wrap long descriptions
 	if tmpl.description != "" {
-		descStyle := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("245"))
+		descStyle := lipgloss.NewStyle().Italic(true).Foreground(uiMutedText())
 
 		// Wrap description if too long (use visual width, not byte length)
 		if visualWidth(tmpl.description) > headerWrapWidth {
@@ -73,7 +73,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 	}
 
 	// Source indicator
-	sourceStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	sourceStyle := lipgloss.NewStyle().Foreground(uiMutedText())
 	sourceIcon := ""
 	sourceLabel := ""
 	switch tmpl.source {
@@ -128,10 +128,10 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 			// Color: green if filled, gray if not
 			if filled {
-				filledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")) // Green
+				filledStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffAdded.adaptiveColor())
 				display = filledStyle.Render(display)
 			} else {
-				unfilledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242")) // Gray
+				unfilledStyle := lipgloss.NewStyle().Foreground(uiMutedText())
 				display = unfilledStyle.Render(display)
 			}
 
@@ -147,7 +147,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 			wrappedPlainLines := wrapLine(plainVarsLine, headerWrapWidth)
 
 			// For each wrapped line, apply the appropriate styling
-			labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+			labelStyle := lipgloss.NewStyle().Foreground(uiMutedText())
 			for _, plainLine := range wrappedPlainLines {
 				// Simple approach: style the entire line uniformly for wrapped content
 				// This avoids complex ANSI code handling across line breaks
@@ -156,14 +156,14 @@ func (m model) renderPromptPreview(maxVisible int) string {
 			}
 		} else {
 			// Variables line fits in one line - use original styling with colors
-			labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+			labelStyle := lipgloss.NewStyle().Foreground(uiMutedText())
 			varsLine := labelStyle.Render("Variables: ") + strings.Join(varDisplays, labelStyle.Render(", "))
 			headerLines = append(headerLines, varsLine)
 		}
 	}
 
 	// Separator line - use full header wrap width (each char is 1 visual width)
-	separatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	separatorStyle := lipgloss.NewStyle().Foreground(uiSubtleText())
 	separatorLine := strings.Repeat("─", headerWrapWidth) // Full width separator
 	headerLines = append(headerLines, separatorStyle.Render(separatorLine))
 	// No blank line after separator - the separator itself provides visual separation
@@ -328,7 +328,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		lastVisibleLine := min(start+contentLinesAvailable, end)
 		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", lastVisibleLine, totalLines, scrollPercent)
 		scrollStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(uiSubtleText()).
 			Italic(true)
 
 		// Pad with empty lines to reach target

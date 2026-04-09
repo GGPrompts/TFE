@@ -20,6 +20,7 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // isPromptFile checks if a file is a prompt file (.prompty, .yaml, .md, .txt)
@@ -218,11 +219,11 @@ func getFileIcon(item fileItem) string {
 		".r":    "📊", // R statistics
 
 		// Web
-		".html": "🌐", // HTML globe
-		".css":  "🎨", // CSS art palette
-		".scss": "🎨", // SCSS art palette
-		".sass": "🎨", // Sass art palette
-		".vue":  "💚", // Vue green heart
+		".html":   "🌐", // HTML globe
+		".css":    "🎨", // CSS art palette
+		".scss":   "🎨", // SCSS art palette
+		".sass":   "🎨", // Sass art palette
+		".vue":    "💚", // Vue green heart
 		".svelte": "🧡", // Svelte orange heart
 
 		// Data/Config
@@ -235,10 +236,10 @@ func getFileIcon(item fileItem) string {
 		".sql":  "🗄", // SQL database
 
 		// Documents
-		".md":  "📝", // Markdown memo
-		".txt": "📄", // Text document
-		".pdf": "📕", // PDF red book
-		".doc": "📘", // DOC blue book
+		".md":   "📝", // Markdown memo
+		".txt":  "📄", // Text document
+		".pdf":  "📕", // PDF red book
+		".doc":  "📘", // DOC blue book
 		".docx": "📘", // DOCX blue book
 
 		// Archives
@@ -249,12 +250,12 @@ func getFileIcon(item fileItem) string {
 		".rar": "🗜", // RAR compression
 
 		// Images
-		".png": "󰋩", // PNG frame
-		".jpg": "󰋩", // JPG frame
+		".png":  "󰋩", // PNG frame
+		".jpg":  "󰋩", // JPG frame
 		".jpeg": "󰋩", // JPEG frame
-		".gif": "🎞", // GIF film
-		".svg": "🎨", // SVG palette
-		".ico": "󰋩", // ICO frame
+		".gif":  "🎞", // GIF film
+		".svg":  "🎨", // SVG palette
+		".ico":  "󰋩", // ICO frame
 		".webp": "󰋩", // WebP frame
 
 		// Audio/Video
@@ -437,9 +438,13 @@ func highlightCode(content, filepath string) (string, bool) {
 		formatter = formatters.Fallback
 	}
 
-	// Use monokai style (works well in dark terminals)
-	// Alternative styles: dracula, vim, github, solarized-dark
-	style := styles.Get("monokai")
+	// Match syntax highlighting to the active light/dark theme so previews
+	// don't render dark-theme foregrounds on light backgrounds.
+	styleName := "monokai"
+	if !lipgloss.HasDarkBackground() {
+		styleName = "github"
+	}
+	style := styles.Get(styleName)
 	if style == nil {
 		style = styles.Fallback
 	}
@@ -479,34 +484,34 @@ func getFileType(item fileItem) string {
 	// Map extensions to descriptive types
 	typeMap := map[string]string{
 		// Programming languages
-		".go":     "Go Source",
-		".py":     "Python",
-		".js":     "JavaScript",
-		".ts":     "TypeScript",
-		".jsx":    "React (JSX)",
-		".tsx":    "React (TSX)",
-		".rs":     "Rust",
-		".c":      "C Source",
-		".cpp":    "C++",
-		".cc":     "C++",
-		".cxx":    "C++",
-		".h":      "C Header",
-		".hpp":    "C++ Header",
-		".java":   "Java",
-		".rb":     "Ruby",
-		".php":    "PHP",
-		".sh":     "Shell Script",
-		".bash":   "Bash Script",
-		".zsh":    "ZSH Script",
-		".fish":   "Fish Script",
-		".lua":    "Lua",
-		".r":      "R Script",
-		".swift":  "Swift",
-		".kt":     "Kotlin",
-		".scala":  "Scala",
-		".cs":     "C#",
-		".vb":     "Visual Basic",
-		".pl":     "Perl",
+		".go":    "Go Source",
+		".py":    "Python",
+		".js":    "JavaScript",
+		".ts":    "TypeScript",
+		".jsx":   "React (JSX)",
+		".tsx":   "React (TSX)",
+		".rs":    "Rust",
+		".c":     "C Source",
+		".cpp":   "C++",
+		".cc":    "C++",
+		".cxx":   "C++",
+		".h":     "C Header",
+		".hpp":   "C++ Header",
+		".java":  "Java",
+		".rb":    "Ruby",
+		".php":   "PHP",
+		".sh":    "Shell Script",
+		".bash":  "Bash Script",
+		".zsh":   "ZSH Script",
+		".fish":  "Fish Script",
+		".lua":   "Lua",
+		".r":     "R Script",
+		".swift": "Swift",
+		".kt":    "Kotlin",
+		".scala": "Scala",
+		".cs":    "C#",
+		".vb":    "Visual Basic",
+		".pl":    "Perl",
 
 		// Web
 		".html":   "HTML",
@@ -519,17 +524,17 @@ func getFileType(item fileItem) string {
 		".svelte": "Svelte",
 
 		// Data/Config
-		".json":  "JSON",
-		".yaml":  "YAML",
-		".yml":   "YAML",
-		".toml":  "TOML",
-		".xml":   "XML",
-		".csv":   "CSV",
-		".sql":   "SQL",
-		".env":   "Environment",
-		".ini":   "INI Config",
-		".conf":  "Config",
-		".cfg":   "Config",
+		".json":       "JSON",
+		".yaml":       "YAML",
+		".yml":        "YAML",
+		".toml":       "TOML",
+		".xml":        "XML",
+		".csv":        "CSV",
+		".sql":        "SQL",
+		".env":        "Environment",
+		".ini":        "INI Config",
+		".conf":       "Config",
+		".cfg":        "Config",
 		".properties": "Properties",
 
 		// Documents
@@ -543,14 +548,14 @@ func getFileType(item fileItem) string {
 		".odt":      "OpenDocument",
 
 		// Archives
-		".zip":  "ZIP Archive",
-		".tar":  "TAR Archive",
-		".gz":   "GZip Archive",
-		".bz2":  "BZip2 Archive",
-		".xz":   "XZ Archive",
-		".7z":   "7-Zip Archive",
-		".rar":  "RAR Archive",
-		".tgz":  "TAR.GZ Archive",
+		".zip": "ZIP Archive",
+		".tar": "TAR Archive",
+		".gz":  "GZip Archive",
+		".bz2": "BZip2 Archive",
+		".xz":  "XZ Archive",
+		".7z":  "7-Zip Archive",
+		".rar": "RAR Archive",
+		".tgz": "TAR.GZ Archive",
 
 		// Images
 		".png":  "PNG Image",
@@ -576,17 +581,17 @@ func getFileType(item fileItem) string {
 		".wmv":  "WMV Video",
 
 		// System/Build
-		".exe":    "Executable",
-		".dll":    "DLL Library",
-		".so":     "Shared Library",
-		".dylib":  "Dynamic Library",
-		".a":      "Static Library",
-		".o":      "Object File",
-		".lock":   "Lock File",
-		".log":    "Log File",
-		".tmp":    "Temporary",
-		".bak":    "Backup",
-		".swp":    "Swap File",
+		".exe":   "Executable",
+		".dll":   "DLL Library",
+		".so":    "Shared Library",
+		".dylib": "Dynamic Library",
+		".a":     "Static Library",
+		".o":     "Object File",
+		".lock":  "Lock File",
+		".log":   "Log File",
+		".tmp":   "Temporary",
+		".bak":   "Backup",
+		".swp":   "Swap File",
 
 		// Build/Package files
 		".gradle": "Gradle",
