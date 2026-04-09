@@ -133,16 +133,16 @@ func (m model) renderSinglePane() string {
 	s.WriteString("\n")
 
 	// Command prompt with path (terminal-style)
-	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
-	pathPromptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	promptPrefix := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true).Render("$ ")
+	pathPromptStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
+	inputStyle := lipgloss.NewStyle().Foreground(uiBodyText())
 
 	s.WriteString(promptPrefix)
 	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
 
 	// Show helper text based on focus state
-	helperStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+	helperStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
 	if !m.commandFocused && m.commandInput == "" {
 		// Not focused - show contextual hints
 		if m.displayMode == modeDetail && m.isNarrowTerminal() {
@@ -155,7 +155,7 @@ func (m model) renderSinglePane() string {
 	} else if m.commandFocused && m.commandInput == "" {
 		// Focused but no input - show ! prefix hint and cursor
 		s.WriteString(helperStyle.Render("! prefix to run & exit"))
-		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+		cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
 		s.WriteString(cursorStyle.Render("█"))
 	} else {
 		// Has input - show the command with cursor at correct position
@@ -166,7 +166,7 @@ func (m model) renderSinglePane() string {
 
 			// Handle ! prefix coloring
 			if strings.HasPrefix(beforeCursor, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
 				s.WriteString(prefixStyle.Render("!"))
 				s.WriteString(inputStyle.Render(beforeCursor[1:]))
 			} else {
@@ -174,7 +174,7 @@ func (m model) renderSinglePane() string {
 			}
 
 			// Render cursor
-			cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+			cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
 			s.WriteString(cursorStyle.Render("█"))
 
 			// Render text after cursor
@@ -184,14 +184,14 @@ func (m model) renderSinglePane() string {
 			if m.ghostText != "" && afterCursor == "" {
 				ghostSuffix := getGhostTextSuffix(m.commandInput, m.ghostText)
 				if ghostSuffix != "" {
-					ghostStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+					ghostStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
 					s.WriteString(ghostStyle.Render(ghostSuffix))
 				}
 			}
 		} else {
 			// Not focused - just show the text
 			if strings.HasPrefix(m.commandInput, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
 				s.WriteString(prefixStyle.Render("!"))
 				s.WriteString(inputStyle.Render(m.commandInput[1:]))
 			} else {
@@ -232,8 +232,8 @@ func (m model) renderSinglePane() string {
 	// Wrap content in a bordered box with fixed dimensions
 	// Content is constrained to contentHeight lines to fit within the box
 	fileListStyle := lipgloss.NewStyle().
-		Width(m.width - 6).       // Leave margin for padding
-		Height(contentHeight).    // Content area height (borders added by Lipgloss)
+		Width(m.width - 6).    // Leave margin for padding
+		Height(contentHeight). // Content area height (borders added by Lipgloss)
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(currentTheme.BorderFocused.adaptiveColor())
 
@@ -243,13 +243,13 @@ func (m model) renderSinglePane() string {
 	// Check if we should show status message (auto-dismiss after 3s, except in edit mode or file picker mode)
 	if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
 		msgStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("28")). // Green
-			Foreground(lipgloss.Color("15")). // White for better contrast
+			Background(uiSuccessBackground()).
+			Foreground(uiSuccessForeground()).
 			Bold(true).
 			Padding(0, 1)
 
 		if m.statusIsError {
-			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
+			msgStyle = msgStyle.Background(uiErrorBackground())
 		}
 
 		// Truncate status message to terminal width to prevent wrapping/corruption
@@ -259,13 +259,13 @@ func (m model) renderSinglePane() string {
 		}
 		s.WriteString(msgStyle.Render(statusMsg))
 		s.WriteString("\033[0m") // Reset ANSI codes
-		s.WriteString("\n") // Add blank line to maintain 2-line height
-		s.WriteString(" ") // Empty second line for consistent layout
+		s.WriteString("\n")      // Add blank line to maintain 2-line height
+		s.WriteString(" ")       // Empty second line for consistent layout
 	} else if m.searchMode || m.searchQuery != "" {
 		// Show search status
 		searchStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("33")). // Blue background
-			Foreground(lipgloss.Color("255")). // Bright white for high contrast
+			Background(uiInfoBackground()).
+			Foreground(uiInfoForeground()).
 			Bold(true).
 			Padding(0, 1)
 
@@ -290,8 +290,8 @@ func (m model) renderSinglePane() string {
 		}
 		s.WriteString(searchStyle.Render(searchStatus))
 		s.WriteString("\033[0m") // Reset ANSI codes
-		s.WriteString("\n") // Add blank line to maintain 2-line height
-		s.WriteString(" ") // Empty second line for consistent layout
+		s.WriteString("\n")      // Add blank line to maintain 2-line height
+		s.WriteString(" ")       // Empty second line for consistent layout
 	} else {
 		// Regular status bar
 		// Count directories and files

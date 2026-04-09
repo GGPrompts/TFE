@@ -150,55 +150,56 @@ func (m model) renderSettingsPanel() string {
 	// -- Styles --
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("39")).
+		BorderForeground(currentTheme.BorderFocused.adaptiveColor()).
+		Background(uiPanelBackground()).
 		Padding(1, 2).
 		Width(panelWidth)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("39")).
+		Foreground(currentTheme.Title.adaptiveColor()).
 		Align(lipgloss.Center).
 		Width(innerWidth)
 
 	tabActiveStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color("39")).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
 		Padding(0, 1)
 
 	tabInactiveStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245")).
+		Foreground(uiMutedText()).
 		Padding(0, 1)
 
 	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
+		Foreground(uiBodyText())
 
 	selectedLabelStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("39"))
+		Foreground(currentTheme.Title.adaptiveColor())
 
 	valueOnStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("42")).
+		Foreground(currentTheme.DiffAdded.adaptiveColor()).
 		Bold(true)
 
 	valueOffStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240"))
+		Foreground(uiSubtleText())
 
 	valueSelectStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("220"))
+		Foreground(currentTheme.Title.adaptiveColor())
 
 	editingStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
-		Background(lipgloss.Color("235")).
+		Foreground(uiBodyText()).
+		Background(uiInputBackground()).
 		Padding(0, 1)
 
 	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
+		Foreground(uiMutedText()).
 		Align(lipgloss.Center).
 		Width(innerWidth)
 
 	separatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("237"))
+		Foreground(uiSubtleText())
 
 	// -- Build content --
 	var content strings.Builder

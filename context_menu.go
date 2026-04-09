@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // contextMenuItem represents an item in the context menu
@@ -250,7 +250,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		if !m.contextMenuFile.isDir {
 			m.loadPreview(m.contextMenuFile.path)
 			m.viewMode = viewFullPreview
-			m.calculateLayout() // Update widths for full-screen
+			m.calculateLayout()      // Update widths for full-screen
 			m.populatePreviewCache() // Repopulate cache with correct width
 			// Disable mouse to allow text selection
 			return m, tea.Batch(tea.ClearScreen, func() tea.Msg { return tea.DisableMouse() })
@@ -618,23 +618,23 @@ func (m model) renderContextMenu() string {
 		if item.action == "separator" {
 			// Separator: dim color, not selectable
 			separatorStyle := lipgloss.NewStyle().
-				Background(lipgloss.Color("236")).
-				Foreground(lipgloss.Color("240")).
+				Background(uiPanelBackground()).
+				Foreground(uiMutedText()).
 				Width(menuWidth) // Force exact width
 			line = separatorStyle.Render(fmt.Sprintf("  %s  ", paddedLabel))
 		} else if i == m.contextMenuCursor {
 			// Highlighted selected item
 			selectedStyle := lipgloss.NewStyle().
-				Background(lipgloss.Color("39")).
-				Foreground(lipgloss.Color("0")).
+				Background(currentTheme.SelectionBg.adaptiveColor()).
+				Foreground(currentTheme.SelectionFg.adaptiveColor()).
 				Bold(true).
 				Width(menuWidth) // Force exact width
 			line = selectedStyle.Render(fmt.Sprintf("  %s  ", paddedLabel))
 		} else {
 			// Normal items also need a background to cover underlying text
 			normalStyle := lipgloss.NewStyle().
-				Background(lipgloss.Color("236")).
-				Foreground(lipgloss.Color("252")).
+				Background(uiPanelBackground()).
+				Foreground(uiBodyText()).
 				Width(menuWidth) // Force exact width
 			line = normalStyle.Render(fmt.Sprintf("  %s  ", paddedLabel))
 		}
@@ -647,9 +647,9 @@ func (m model) renderContextMenu() string {
 	// Apply border (content width is already fixed)
 	menuStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("39")).
-		BorderBackground(lipgloss.Color("236")).
-		Background(lipgloss.Color("236"))
+		BorderForeground(currentTheme.BorderFocused.adaptiveColor()).
+		BorderBackground(uiPanelBackground()).
+		Background(uiPanelBackground())
 
 	return menuStyle.Render(menuContent)
 }

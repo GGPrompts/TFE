@@ -25,6 +25,67 @@ func applyThemeMode(darkMode bool) {
 	initStyles()
 }
 
+func uiPanelBackground() lipgloss.AdaptiveColor {
+	return lipgloss.AdaptiveColor{
+		Light: "#f4f6f8",
+		Dark:  "#303030",
+	}
+}
+
+func uiInputBackground() lipgloss.AdaptiveColor {
+	return lipgloss.AdaptiveColor{
+		Light: "#e7edf3",
+		Dark:  "#262626",
+	}
+}
+
+func uiMutedText() lipgloss.AdaptiveColor {
+	return currentTheme.Status.adaptiveColor()
+}
+
+func uiSubtleText() lipgloss.AdaptiveColor {
+	return currentTheme.BorderUnfocused.adaptiveColor()
+}
+
+func uiBodyText() lipgloss.AdaptiveColor {
+	return currentTheme.File.adaptiveColor()
+}
+
+func uiSuccessBackground() lipgloss.AdaptiveColor {
+	return lipgloss.AdaptiveColor{
+		Light: "#1f7a1f",
+		Dark:  "#1f7a1f",
+	}
+}
+
+func uiSuccessForeground() lipgloss.AdaptiveColor {
+	return lipgloss.AdaptiveColor{
+		Light: "#ffffff",
+		Dark:  "#ffffff",
+	}
+}
+
+func uiErrorBackground() lipgloss.AdaptiveColor {
+	return lipgloss.AdaptiveColor{
+		Light: "#b42318",
+		Dark:  "#c62828",
+	}
+}
+
+func uiInfoBackground() lipgloss.AdaptiveColor {
+	return lipgloss.AdaptiveColor{
+		Light: "#005faf",
+		Dark:  "#0087d7",
+	}
+}
+
+func uiInfoForeground() lipgloss.AdaptiveColor {
+	return lipgloss.AdaptiveColor{
+		Light: "#ffffff",
+		Dark:  "#ffffff",
+	}
+}
+
 // adaptiveColor converts a ThemeColor to a lipgloss AdaptiveColor
 func (tc ThemeColor) adaptiveColor() lipgloss.AdaptiveColor {
 	return lipgloss.AdaptiveColor{

@@ -31,24 +31,25 @@ func (m model) renderInputDialog() string {
 	// Dialog styles
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("39")).
+		BorderForeground(currentTheme.BorderFocused.adaptiveColor()).
+		Background(uiPanelBackground()).
 		Padding(1, 2).
 		Width(width)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("39")).
+		Foreground(currentTheme.Title.adaptiveColor()).
 		Align(lipgloss.Center).
 		Width(width)
 
 	inputStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
-		Background(lipgloss.Color("235")).
+		Foreground(uiBodyText()).
+		Background(uiInputBackground()).
 		Padding(0, 1).
 		Width(width - 4)
 
 	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
+		Foreground(uiMutedText()).
 		Align(lipgloss.Center).
 		Width(width)
 
@@ -78,22 +79,23 @@ func (m model) renderConfirmDialog() string {
 	// Dialog styles
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("196")). // Red for warnings
+		BorderForeground(currentTheme.DiffRemoved.adaptiveColor()).
+		Background(uiPanelBackground()).
 		Padding(1, 2).
 		Width(width)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("196")).
+		Foreground(currentTheme.DiffRemoved.adaptiveColor()).
 		Align(lipgloss.Center).
 		Width(width)
 
 	messageStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
+		Foreground(uiBodyText()).
 		Width(width)
 
 	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
+		Foreground(uiMutedText()).
 		Align(lipgloss.Center).
 		Width(width)
 

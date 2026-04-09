@@ -229,27 +229,27 @@ func (m model) renderDetailView(maxVisible int) string {
 	var nameWidth, sizeWidth, modifiedWidth, extraWidth int
 	if m.showAgentView {
 		// Agent view: Name (wide), Modified, Type
-		nameWidth = usableWidth * 55 / 100    // 55% — descriptions are long
-		sizeWidth = 0                          // Not shown
-		modifiedWidth = 12                     // Fixed
+		nameWidth = usableWidth * 55 / 100 // 55% — descriptions are long
+		sizeWidth = 0                      // Not shown
+		modifiedWidth = 12                 // Fixed
 		extraWidth = usableWidth - nameWidth - modifiedWidth
 		if extraWidth < 15 {
 			extraWidth = 15
 		}
 	} else if m.showTrashOnly || m.showFavoritesOnly || m.showGitReposOnly || m.showChangesOnly {
 		// 4 columns: Name, Size, Modified/Deleted, Location/Branch/Status
-		nameWidth = usableWidth * 35 / 100    // 35%
-		sizeWidth = 10                         // Fixed
-		modifiedWidth = 12                     // Fixed
+		nameWidth = usableWidth * 35 / 100 // 35%
+		sizeWidth = 10                     // Fixed
+		modifiedWidth = 12                 // Fixed
 		extraWidth = usableWidth - nameWidth - sizeWidth - modifiedWidth
 		if extraWidth < 15 {
 			extraWidth = 15
 		}
 	} else {
 		// 4 columns: Name, Size, Modified, Type (or symlink target)
-		nameWidth = usableWidth * 40 / 100    // 40%
-		sizeWidth = 10                         // Fixed
-		modifiedWidth = 12                     // Fixed
+		nameWidth = usableWidth * 40 / 100 // 40%
+		sizeWidth = 10                     // Fixed
+		modifiedWidth = 12                 // Fixed
 		// Make Type column dynamic too - symlink targets can be long paths
 		extraWidth = usableWidth - nameWidth - sizeWidth - modifiedWidth
 		if extraWidth < 15 {
@@ -269,7 +269,7 @@ func (m model) renderDetailView(maxVisible int) string {
 	// Header with sort indicators
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("87")). // Bright blue for header
+		Foreground(currentTheme.Title.adaptiveColor()).
 		PaddingLeft(2)
 
 	// Determine sort indicator (arrow)
@@ -550,8 +550,8 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := m.padToVisualWidth(name, nameWidth)
-		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, deleted, extraWidth, location)
+			paddedName := m.padToVisualWidth(name, nameWidth)
+			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, deleted, extraWidth, location)
 		} else if m.showFavoritesOnly {
 			// Favorites mode: Name, Size, Modified, Location
 			// Get parent directory path for location
@@ -566,8 +566,8 @@ func (m model) renderDetailView(maxVisible int) string {
 				location = "..." + location[len(location)-(extraWidth-3):]
 			}
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := m.padToVisualWidth(name, nameWidth)
-		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
+			paddedName := m.padToVisualWidth(name, nameWidth)
+			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
 		} else if m.showGitReposOnly {
 			// Git repos mode: Name (with path), Branch, Status, Last Commit
 			// Get parent directory path for location
@@ -613,10 +613,10 @@ func (m model) renderDetailView(maxVisible int) string {
 
 				// Format status using git fields
 				gitStat := gitStatus{
-					branch:        file.gitBranch,
-					ahead:         file.gitAhead,
-					behind:        file.gitBehind,
-					dirty:         file.gitDirty,
+					branch:         file.gitBranch,
+					ahead:          file.gitAhead,
+					behind:         file.gitBehind,
+					dirty:          file.gitDirty,
 					lastCommitTime: file.gitLastCommit,
 				}
 				status = formatGitStatus(gitStat)
@@ -649,8 +649,8 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := m.padToVisualWidth(name, nameWidth)
-		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, branchWidth, branch, statusWidth, status, commitWidth, lastCommit)
+			paddedName := m.padToVisualWidth(name, nameWidth)
+			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, branchWidth, branch, statusWidth, status, commitWidth, lastCommit)
 		} else if m.showAgentView {
 			// Agent view: Name, Modified, Description
 			desc := file.agentDescription
@@ -707,8 +707,8 @@ func (m model) renderDetailView(maxVisible int) string {
 				}
 			}
 			// Use visual-width padding for name column (contains emojis), regular padding for others
-		paddedName := m.padToVisualWidth(name, nameWidth)
-		line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, fileType)
+			paddedName := m.padToVisualWidth(name, nameWidth)
+			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, fileType)
 		}
 
 		style := fileStyle
@@ -962,7 +962,7 @@ func (m model) truncateToVisualWidth(s string, targetWidth int) string {
 		charWidth := m.runeWidth(r)
 
 		// Check if adding this character would exceed target width
-		if visualWidth + charWidth > targetWidth {
+		if visualWidth+charWidth > targetWidth {
 			// Reached target width - add reset and stop
 			result.WriteString("\033[0m")
 			break
@@ -1223,7 +1223,7 @@ func (m model) renderTreeView(maxVisible int) string {
 		// Set reasonable bounds
 		// Allow very narrow widths when pane is narrow (important for accordion mode)
 		if maxNameLen < 5 {
-			maxNameLen = 5  // Absolute minimum (shows a few chars + "..")
+			maxNameLen = 5 // Absolute minimum (shows a few chars + "..")
 		}
 		if maxNameLen > 100 {
 			maxNameLen = 100 // Reasonable maximum
@@ -1233,7 +1233,7 @@ func (m model) renderTreeView(maxVisible int) string {
 			if maxNameLen > 2 {
 				displayName = displayName[:maxNameLen-2] + ".."
 			} else {
-				displayName = displayName[:maxNameLen]  // Very narrow, no room for ".."
+				displayName = displayName[:maxNameLen] // Very narrow, no room for ".."
 			}
 		}
 

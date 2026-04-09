@@ -305,8 +305,8 @@ func (m model) renderMenuBar() string {
 		Padding(0, 1)
 
 	menuHighlightedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}).
-		Background(lipgloss.AdaptiveColor{Light: "#CCCCCC", Dark: "#404040"}).
+		Foreground(uiBodyText()).
+		Background(uiPanelBackground()).
 		Bold(true).
 		Padding(0, 1)
 
@@ -388,8 +388,8 @@ func (m model) renderActiveDropdown() string {
 
 	// Menu item styles - use theme colors for light/dark theme support
 	menuItemStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#333333", Dark: "#DDDDDD"}).
-		Background(lipgloss.AdaptiveColor{Light: "#F0F0F0", Dark: "#303030"})
+		Foreground(uiBodyText()).
+		Background(uiPanelBackground())
 
 	menuItemSelectedStyle := lipgloss.NewStyle().
 		Foreground(currentTheme.SelectionFg.adaptiveColor()).
@@ -398,7 +398,7 @@ func (m model) renderActiveDropdown() string {
 
 	menuItemDisabledStyle := lipgloss.NewStyle().
 		Foreground(currentTheme.BorderUnfocused.adaptiveColor()).
-		Background(lipgloss.AdaptiveColor{Light: "#F0F0F0", Dark: "#303030"})
+		Background(uiPanelBackground())
 
 	// Build dropdown panel
 	var lines []string
@@ -474,6 +474,7 @@ func (m model) renderActiveDropdown() string {
 	dropdown := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(currentTheme.BorderUnfocused.adaptiveColor()).
+		Background(uiPanelBackground()).
 		Width(maxWidth).
 		Render(strings.Join(lines, "\n"))
 
@@ -832,13 +833,13 @@ Additional context: {{variable2}}
 	case "display-list":
 		m.displayMode = modeList
 		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
-		m.calculateLayout() // Recalculate widths for new display mode
+		m.calculateLayout()                    // Recalculate widths for new display mode
 
 	case "display-detail":
 		m.displayMode = modeDetail
-		m.detailScrollX = 0 // Reset scroll when switching to detail view
+		m.detailScrollX = 0                    // Reset scroll when switching to detail view
 		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
-		m.calculateLayout() // Recalculate widths for detail view columns
+		m.calculateLayout()                    // Recalculate widths for detail view columns
 
 	case "display-tree":
 		m.displayMode = modeTree
@@ -1237,8 +1238,8 @@ Additional context: {{variable2}}
 			}
 
 			m.viewMode = viewFullPreview
-			m.searchMode = false // Disable search mode in preview
-			m.calculateLayout() // Update widths for full-screen
+			m.searchMode = false     // Disable search mode in preview
+			m.calculateLayout()      // Update widths for full-screen
 			m.populatePreviewCache() // Repopulate cache with correct width
 			// Close menu before showing help
 			m.menuOpen = false

@@ -35,18 +35,18 @@ func (m model) renderTabBar(maxWidth int) string {
 
 	// Style for inactive tabs
 	inactiveTabStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
-		Background(lipgloss.Color("238")).
+		Foreground(uiBodyText()).
+		Background(uiPanelBackground()).
 		Padding(0, 1)
 
 	// Style for git status indicators
-	modifiedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // Yellow
-	addedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("77"))    // Green
-	deletedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // Red
-	untrackedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Cyan
+	modifiedStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffHunkHeader.adaptiveColor())
+	addedStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffAdded.adaptiveColor())
+	deletedStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor())
+	untrackedStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor())
 
 	// Style for the close indicator on active tab
-	closeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	closeStyle := lipgloss.NewStyle().Foreground(uiSubtleText())
 
 	// Build tab labels and track total width
 	usedWidth := 0
@@ -94,7 +94,7 @@ func (m model) renderTabBar(maxWidth int) string {
 				// Add overflow indicator
 				s.WriteString(tabSep)
 				overflow := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("241")).
+					Foreground(uiSubtleText()).
 					Italic(true).
 					Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
 				s.WriteString(overflow)
@@ -116,7 +116,7 @@ func (m model) renderTabBar(maxWidth int) string {
 				// Add overflow indicator
 				s.WriteString(tabSep)
 				overflow := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("241")).
+					Foreground(uiSubtleText()).
 					Italic(true).
 					Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
 				s.WriteString(overflow)
@@ -141,7 +141,7 @@ func (m model) renderPreviewOnly() string {
 
 	if !m.preview.loaded {
 		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
+			Foreground(currentTheme.DiffRemoved.adaptiveColor()).
 			Bold(true).
 			Padding(1, 2)
 		s.WriteString(errorStyle.Render("Error: Could not load file preview"))
@@ -167,8 +167,8 @@ func (m model) renderPreviewOnly() string {
 	s.WriteString("\n")
 
 	// Content area: full terminal minus title (1) + help line (1) + border (2)
-	headerLines := 1 // title bar
-	footerLines := 1 // help line
+	headerLines := 1                                       // title bar
+	footerLines := 1                                       // help line
 	maxVisible := m.height - headerLines - footerLines - 2 // -2 for borders
 	if maxVisible < 3 {
 		maxVisible = 3
@@ -188,7 +188,7 @@ func (m model) renderPreviewOnly() string {
 	s.WriteString("\n")
 
 	// Minimal help line
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
+	helpStyle := lipgloss.NewStyle().Foreground(uiSubtleText()).PaddingLeft(2)
 	helpText := "q/Esc: quit | j/k: scroll | Ctrl+F: search"
 	if m.visualWidthCompensated(helpText) > m.width-4 {
 		helpText = m.truncateToWidthCompensated(helpText, m.width-4)
@@ -200,8 +200,8 @@ func (m model) renderPreviewOnly() string {
 	if m.preview.searchActive {
 		s.WriteString("\n")
 		searchStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("33")).
-			Foreground(lipgloss.Color("0")).
+			Background(uiInfoBackground()).
+			Foreground(uiInfoForeground()).
 			Bold(true).
 			Padding(0, 1)
 
@@ -357,7 +357,7 @@ func (m model) renderFullPreview() string {
 
 	// Help text
 	s.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2)
+	helpStyle := lipgloss.NewStyle().Foreground(uiSubtleText()).PaddingLeft(2)
 
 	// Show different F5 text based on file type
 	f5Text := "copy path"
@@ -390,8 +390,8 @@ func (m model) renderFullPreview() string {
 	if m.preview.searchActive {
 		s.WriteString("\n")
 		searchStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("33")). // Blue background
-			Foreground(lipgloss.Color("0")).  // Black text
+			Background(uiInfoBackground()).
+			Foreground(uiInfoForeground()).
 			Bold(true).
 			Padding(0, 1)
 
@@ -416,13 +416,13 @@ func (m model) renderFullPreview() string {
 		// Show status message if present (auto-dismiss after 3s, except in edit mode or file picker mode) and search not active
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("28")). // Green
-			Foreground(lipgloss.Color("15")). // White for better contrast
+			Background(uiSuccessBackground()).
+			Foreground(uiSuccessForeground()).
 			Bold(true).
 			Padding(0, 1)
 
 		if m.statusIsError {
-			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
+			msgStyle = msgStyle.Background(uiErrorBackground())
 		}
 
 		// Truncate status message to terminal width to prevent wrapping/corruption
@@ -500,23 +500,23 @@ func (m model) renderDualPane() string {
 	s.WriteString("\n")
 
 	// Command prompt with path (terminal-style)
-	promptPrefix := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Render("$ ")
-	pathPromptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	promptPrefix := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true).Render("$ ")
+	pathPromptStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
+	inputStyle := lipgloss.NewStyle().Foreground(uiBodyText())
 
 	s.WriteString(promptPrefix)
 	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
 
 	// Show helper text based on focus state
-	helperStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+	helperStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
 	if !m.commandFocused && m.commandInput == "" {
 		// Not focused - show how to enter command mode
 		s.WriteString(helperStyle.Render(": to focus"))
 	} else if m.commandFocused && m.commandInput == "" {
 		// Focused but no input - show ! prefix hint and cursor
 		s.WriteString(helperStyle.Render("! prefix to run & exit"))
-		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+		cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
 		s.WriteString(cursorStyle.Render("█"))
 	} else {
 		// Has input - show the command with cursor at correct position
@@ -527,7 +527,7 @@ func (m model) renderDualPane() string {
 
 			// Handle ! prefix coloring
 			if strings.HasPrefix(beforeCursor, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
 				s.WriteString(prefixStyle.Render("!"))
 				s.WriteString(inputStyle.Render(beforeCursor[1:]))
 			} else {
@@ -535,7 +535,7 @@ func (m model) renderDualPane() string {
 			}
 
 			// Render cursor
-			cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+			cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
 			s.WriteString(cursorStyle.Render("█"))
 
 			// Render text after cursor
@@ -543,7 +543,7 @@ func (m model) renderDualPane() string {
 		} else {
 			// Not focused - just show the text
 			if strings.HasPrefix(m.commandInput, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
 				s.WriteString(prefixStyle.Render("!"))
 				s.WriteString(inputStyle.Render(m.commandInput[1:]))
 			} else {
@@ -580,7 +580,7 @@ func (m model) renderDualPane() string {
 		// Uses accordion (2/3 focused) or locked ratio via verticalSplitHeights
 		topHeight, bottomHeight := m.verticalSplitHeights(maxVisible)
 
-		topContentHeight := topHeight - 2       // Account for borders
+		topContentHeight := topHeight - 2 // Account for borders
 		bottomContentHeight := bottomHeight - 2
 
 		// Reserve space for tab bar in bottom pane if tabs are open
@@ -599,7 +599,7 @@ func (m model) renderDualPane() string {
 			bottomContent = m.renderPreview(previewContentHeight)
 		} else {
 			emptyStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("241")).
+				Foreground(uiSubtleText()).
 				Italic(true)
 			bottomContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
 		}
@@ -646,7 +646,7 @@ func (m model) renderDualPane() string {
 			// Uses accordion (2/3 focused) or locked ratio via verticalSplitHeights
 			topHeight, bottomHeight := m.verticalSplitHeights(maxVisible)
 
-			topContentHeight := topHeight - 2       // Account for borders
+			topContentHeight := topHeight - 2 // Account for borders
 			bottomContentHeight := bottomHeight - 2
 
 			// Reserve space for tab bar in bottom pane if tabs are open
@@ -673,7 +673,7 @@ func (m model) renderDualPane() string {
 				bottomContent = m.renderPreview(previewContentHeight)
 			} else {
 				emptyStyle := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("241")).
+					Foreground(uiSubtleText()).
 					Italic(true)
 				bottomContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
 			}
@@ -739,7 +739,7 @@ func (m model) renderDualPane() string {
 				rightContent = m.renderPreview(rightContentHeight)
 			} else {
 				emptyStyle := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("241")).
+					Foreground(uiSubtleText()).
 					Italic(true)
 				rightContent = emptyStyle.Render("No preview available\n\nSelect a file to preview") + "\033[0m"
 			}
@@ -761,14 +761,14 @@ func (m model) renderDualPane() string {
 
 			// Use exact Width and Height to ensure panes stay perfectly aligned
 			leftPaneStyle := lipgloss.NewStyle().
-				Width(m.leftWidth - 2).   // Content width (borders added by Lipgloss)
-				Height(contentHeight).    // Exact content height (borders added by Lipgloss)
+				Width(m.leftWidth - 2). // Content width (borders added by Lipgloss)
+				Height(contentHeight).  // Exact content height (borders added by Lipgloss)
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(leftBorderColor)
 
 			rightPaneStyle := lipgloss.NewStyle().
-				Width(m.rightWidth - 2).  // Content width (borders added by Lipgloss)
-				Height(contentHeight).    // Exact content height (borders added by Lipgloss)
+				Width(m.rightWidth - 2). // Content width (borders added by Lipgloss)
+				Height(contentHeight).   // Exact content height (borders added by Lipgloss)
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(rightBorderColor)
 
@@ -913,13 +913,13 @@ func (m model) renderDualPane() string {
 	if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
 		s.WriteString("\n")
 		msgStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("28")). // Green
-			Foreground(lipgloss.Color("15")). // White for better contrast
+			Background(uiSuccessBackground()).
+			Foreground(uiSuccessForeground()).
 			Bold(true).
 			Padding(0, 1)
 
 		if m.statusIsError {
-			msgStyle = msgStyle.Background(lipgloss.Color("196")) // Red
+			msgStyle = msgStyle.Background(uiErrorBackground())
 		}
 
 		// Truncate status message to terminal width to prevent wrapping/corruption
@@ -933,8 +933,8 @@ func (m model) renderDualPane() string {
 		// Show search status
 		s.WriteString("\n")
 		searchStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("33")).  // Blue background
-			Foreground(lipgloss.Color("255")). // Bright white for high contrast
+			Background(uiInfoBackground()).
+			Foreground(uiInfoForeground()).
 			Bold(true).
 			Padding(0, 1)
 
