@@ -18,10 +18,10 @@ import (
 
 // settingsItem represents a single editable setting
 type settingsItem struct {
-	label   string          // Display label
-	key     string          // Config key identifier
-	kind    settingsKind    // Widget type
-	options []string        // For select widgets: list of valid values
+	label   string       // Display label
+	key     string       // Config key identifier
+	kind    settingsKind // Widget type
+	options []string     // For select widgets: list of valid values
 }
 
 // settingsKind represents the type of settings widget
@@ -29,8 +29,8 @@ type settingsKind int
 
 const (
 	settingsToggle settingsKind = iota // Boolean on/off
-	settingsSelect                      // Pick from list of options
-	settingsString                      // Free-text input
+	settingsSelect                     // Pick from list of options
+	settingsString                     // Free-text input
 )
 
 // settingsCategories defines the category tabs
@@ -85,6 +85,7 @@ func (m *model) setConfigBool(key string, val bool) {
 	case "dark_mode":
 		m.config.DarkMode = val
 		m.forceLightTheme = !val
+		applyThemeMode(val)
 	case "file_watcher_enabled":
 		m.config.FileWatcherEnabled = val
 		if val && !m.watcherActive {
@@ -447,8 +448,8 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				item := items[m.settingsCursor]
 				m.setConfigString(item.key, m.settingsInput)
 				if err := saveConfig(m.config); err != nil {
-				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
-			}
+					m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+				}
 			}
 			m.settingsEditing = false
 			m.settingsInput = ""
@@ -520,8 +521,8 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					next := (idx + 1) % len(item.options)
 					m.setConfigString(item.key, item.options[next])
 					if err := saveConfig(m.config); err != nil {
-				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
-			}
+						m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+					}
 					break
 				}
 			}
@@ -544,8 +545,8 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						next := (idx + 1) % len(item.options)
 						m.setConfigString(item.key, item.options[next])
 						if err := saveConfig(m.config); err != nil {
-				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
-			}
+							m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+						}
 						break
 					}
 				}
@@ -564,8 +565,8 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						prev := (idx - 1 + len(item.options)) % len(item.options)
 						m.setConfigString(item.key, item.options[prev])
 						if err := saveConfig(m.config); err != nil {
-				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
-			}
+							m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+						}
 						break
 					}
 				}
@@ -576,4 +577,3 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	return m, nil
 }
-

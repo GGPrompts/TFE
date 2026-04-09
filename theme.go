@@ -18,6 +18,13 @@ import (
 // currentTheme holds the active theme used by all style definitions
 var currentTheme Theme
 
+// applyThemeMode forces lipgloss to use the configured terminal background mode
+// and rebuilds shared styles so CLI/config theme choices override autodetection.
+func applyThemeMode(darkMode bool) {
+	lipgloss.SetHasDarkBackground(darkMode)
+	initStyles()
+}
+
 // adaptiveColor converts a ThemeColor to a lipgloss AdaptiveColor
 func (tc ThemeColor) adaptiveColor() lipgloss.AdaptiveColor {
 	return lipgloss.AdaptiveColor{
@@ -163,7 +170,8 @@ func initTheme(configTheme *Theme) {
 }
 
 // initStyles rebuilds all lipgloss style variables from the current theme.
-// Must be called after initTheme() sets currentTheme.
+// Must be called after initTheme() sets currentTheme and after applyThemeMode()
+// selects the active light/dark branch for adaptive colors.
 func initStyles() {
 	titleStyle = lipgloss.NewStyle().
 		Bold(true).

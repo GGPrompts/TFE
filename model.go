@@ -13,10 +13,6 @@ func initialModel() model {
 	// Load unified configuration from ~/.config/tfe/config.toml
 	cfg := loadConfig()
 
-	// Initialize theme from config [theme] section, falling back to theme.toml
-	initTheme(cfg.Theme)
-	initStyles()
-
 	// CLI flags override config values
 	// Check if --light or --dark was explicitly passed
 	for _, arg := range os.Args[1:] {
@@ -31,6 +27,12 @@ func initialModel() model {
 	if os.Getenv("TFE_AUTO_CHANGES") == "1" {
 		cfg.AutoChanges = true
 	}
+
+	// Initialize theme from config [theme] section, falling back to theme.toml.
+	// Apply explicit dark/light mode after CLI overrides so lipgloss doesn't rely
+	// on terminal autodetection when TFE has a chosen theme.
+	initTheme(cfg.Theme)
+	applyThemeMode(cfg.DarkMode)
 
 	// Use startPath from CLI if provided, otherwise use current working directory
 	initialPath := startPath
@@ -55,22 +57,22 @@ func initialModel() model {
 		inTmux:          isInsideTmux(),       // Detect if running inside tmux
 		terminalType:    detectTerminalType(), // Detect terminal for emoji width compensation
 		forceLightTheme: !cfg.DarkMode,        // Config dark_mode maps to inverse of forceLightTheme
-		displayMode:       parseViewMode(cfg.DefaultViewMode),
-		sortBy:            cfg.SortOrder,
-		sortAsc:           true,
-		viewMode:          viewSinglePane, // Will be set to dual-pane if terminal width >= 100
-		focusedPane:       leftPane,
-		lastClickIndex:    -1,
+		displayMode:     parseViewMode(cfg.DefaultViewMode),
+		sortBy:          cfg.SortOrder,
+		sortAsc:         true,
+		viewMode:        viewSinglePane, // Will be set to dual-pane if terminal width >= 100
+		focusedPane:     leftPane,
+		lastClickIndex:  -1,
 		preview: previewModel{
 			maxPreview: 10000, // Max 10k lines
 		},
-		spinner:             s,
-		loading:             false,
-		favorites:           loadFavorites(),
-		showFavoritesOnly:   false,
-		gitReposScanDepth:   3,   // Default scan depth: 3 levels (safer)
-		gitReposList:        make([]fileItem, 0),
-		expandedDirs:        make(map[string]bool),
+		spinner:           s,
+		loading:           false,
+		favorites:         loadFavorites(),
+		showFavoritesOnly: false,
+		gitReposScanDepth: 3, // Default scan depth: 3 levels (safer)
+		gitReposList:      make([]fileItem, 0),
+		expandedDirs:      make(map[string]bool),
 		// Prompt inline editing
 		promptEditMode:       false,
 		focusedVariableIndex: 0,
@@ -95,17 +97,17 @@ func initialModel() model {
 			"htop":          editorAvailable("htop"),
 			"bottom":        editorAvailable("bottom"),
 			"pyradio":       editorAvailable("pyradio"),
-			"micro":         editorAvailable("micro"), // Used in context menu edit action
+			"micro":         editorAvailable("micro"),         // Used in context menu edit action
 			"textual-paint": editorAvailable("textual-paint"), // Used for new image creation
 			"tmux":          editorAvailable("tmux"),          // Used for tmux quad split
 			// AI tools (claude, codex, gemini, opencode)
-			"claude":        editorAvailable("claude"),
-			"codex":         editorAvailable("codex"),
-			"gemini":        editorAvailable("gemini"),
-			"opencode":      editorAvailable("opencode"),
+			"claude":   editorAvailable("claude"),
+			"codex":    editorAvailable("codex"),
+			"gemini":   editorAvailable("gemini"),
+			"opencode": editorAvailable("opencode"),
 		},
 		tuiClassicsPath: getTUIClassicsPath(), // Cache TUIClassics path (checks multiple locations)
-		cachedMenus:     nil,                   // Will be built on first access
+		cachedMenus:     nil,                  // Will be built on first access
 		// Performance caching
 		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
 		// Agent auto-watch: enable via config or TFE_AUTO_CHANGES=1
@@ -196,8 +198,8 @@ func (m *model) calculateLayout() {
 		if useVerticalSplit {
 			// Vertical split (stacked layout) - set full width for both panes
 			// (actual rendering uses full width for top and bottom panes)
-			m.leftWidth = m.width   // Full width for top pane (file list)
-			m.rightWidth = m.width  // Full width for bottom pane (preview)
+			m.leftWidth = m.width  // Full width for top pane (file list)
+			m.rightWidth = m.width // Full width for bottom pane (preview)
 		} else if m.panelsLocked && m.leftWidth > 0 && m.rightWidth > 0 {
 			// Panels locked: keep current widths, only adjust for terminal resize
 			total := m.leftWidth + m.rightWidth + 1 // +1 for separator
