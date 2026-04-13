@@ -59,3 +59,6 @@ new-prompt-*.prompty
 .dolt/
 *.db
 .beads-credential-key
+
+# Codex local config
+.codex
