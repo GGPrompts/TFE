@@ -67,7 +67,11 @@ func (m model) View() string {
 		baseView = m.overlayDialog(baseView, dialog)
 	}
 
-	return baseView
+	// Emit OSC 7 (CWD notification) so terminal emulators can track
+	// TFE's browsed directory for hotspot resolution, pane splits, etc.
+	osc7 := emitOSC7(m.currentPath)
+
+	return osc7 + baseView
 }
 
 // renderSinglePane renders the original single-pane file browser

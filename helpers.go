@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -996,4 +997,13 @@ func (m model) renderScrollingFooter(text string, availableWidth int) string {
 
 	// Not scrolling - truncate with "..."
 	return m.truncateToWidthCompensated(text, availableWidth)
+}
+
+// emitOSC7 returns an OSC 7 escape sequence encoding the given directory
+// as a file:// URI. Terminal emulators use this to track the current working
+// directory for hotspot resolution, status display, and pane-split inheritance.
+func emitOSC7(dir string) string {
+	host, _ := os.Hostname()
+	u := url.URL{Scheme: "file", Host: host, Path: dir}
+	return "\033]7;" + u.String() + "\033\\"
 }
