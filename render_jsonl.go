@@ -466,7 +466,11 @@ func (m model) renderJSONLPreview(maxVisible int) string {
 	var boxContentWidth int
 	if m.viewMode == viewFullPreview {
 		boxContentWidth = m.width - 6
+	} else if m.displayMode == modeDetail || m.isNarrowTerminal() {
+		// Vertical split: box is Width(m.width - 6)
+		boxContentWidth = m.width - 6
 	} else {
+		// Horizontal split: box is Width(m.rightWidth - 2)
 		boxContentWidth = m.rightWidth - 2
 	}
 	availableWidth := boxContentWidth - 2 // scrollbar + space

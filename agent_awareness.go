@@ -395,11 +395,8 @@ func (m *model) formatAgentDisplayName(file fileItem) string {
 	base := strings.TrimSuffix(file.name, ext)
 
 	if file.isDir {
-		// Session directories: show "session" + short UUID
-		if len(base) > 8 {
-			return "session " + base[:8]
-		}
-		return file.name
+		// Session directories: show full UUID (render code handles width truncation)
+		return base
 	}
 
 	switch ext {
@@ -415,25 +412,15 @@ func (m *model) formatAgentDisplayName(file fileItem) string {
 		}
 		if file.agentDescription != "" {
 			// Use slug as display name (e.g. "peaceful-chasing-bubble")
-			desc := file.agentDescription
-			if len(desc) > 40 {
-				desc = desc[:37] + "..."
-			}
-			return desc
+			return file.agentDescription
 		}
-		// Fallback: short UUID
-		if len(base) > 12 {
-			return base[:12] + ".."
-		}
+		// Fallback: show full UUID (render code handles width truncation)
 		return base
 
 	case ".json":
 		// Meta files: hide or show as "meta"
 		if strings.HasSuffix(base, ".meta") {
 			parent := strings.TrimSuffix(base, ".meta")
-			if len(parent) > 8 {
-				return "meta " + parent[:8] + ".."
-			}
 			return "meta " + parent
 		}
 		return file.name

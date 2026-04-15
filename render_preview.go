@@ -45,8 +45,10 @@ func (m model) renderPreview(maxVisible int) string {
 
 	if m.viewMode == viewFullPreview {
 		boxContentWidth = m.width - 6 // Box content width in full preview
+	} else if m.displayMode == modeDetail || m.isNarrowTerminal() {
+		boxContentWidth = m.width - 6 // Vertical split: box is Width(m.width - 6)
 	} else {
-		boxContentWidth = m.rightWidth - 2 // Box content width in dual-pane (accounting for borders)
+		boxContentWidth = m.rightWidth - 2 // Horizontal split: box is Width(m.rightWidth - 2)
 	}
 
 	if m.preview.isMarkdown {
