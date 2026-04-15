@@ -136,8 +136,8 @@ func (m model) renderListView(maxVisible int) string {
 				maxNameLen = 20 // Minimum reasonable length
 			}
 		}
-		if len(displayName) > maxNameLen {
-			displayName = displayName[:maxNameLen-2] + ".."
+		if visualWidth(displayName) > maxNameLen {
+			displayName = truncateToWidth(displayName, maxNameLen-2) + ".."
 		}
 
 		// Build the line with special handling for global virtual folders to preserve emoji color
@@ -484,8 +484,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		if maxNameTextLen < 10 {
 			maxNameTextLen = 10
 		}
-		if len(displayName) > maxNameTextLen {
-			displayName = displayName[:maxNameTextLen-2] + ".."
+		if visualWidth(displayName) > maxNameTextLen {
+			displayName = truncateToWidth(displayName, maxNameTextLen-2) + ".."
 		}
 
 		// Extract leading emoji for global virtual folders to preserve color

@@ -663,9 +663,9 @@ git pull
 						// Same column - toggle sort direction
 						m.sortAsc = !m.sortAsc
 					} else {
-						// Different column - set new sort, default to ascending
+						// Different column - modified defaults to descending (newest first)
 						m.sortBy = newSortBy
-						m.sortAsc = true
+						m.sortAsc = newSortBy != "modified"
 					}
 
 					// Re-sort files and maintain cursor position if possible
