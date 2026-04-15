@@ -470,24 +470,16 @@ func (m *model) loadFiles() {
 		return strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
 	})
 
-	// In agent view, filter to only show session files (.jsonl) and session directories
+	// In agent view, only show .jsonl session files (skip directories entirely —
+	// session UUID dirs just contain subagents/ and tool-results/ with no direct value)
 	if m.showAgentView {
-		var filteredDirs []fileItem
-		for _, d := range dirs {
-			// Keep session UUID directories, skip memory/ and other non-session dirs
-			if d.name == "memory" || d.name == "subagents" {
-				continue
-			}
-			filteredDirs = append(filteredDirs, d)
-		}
+		dirs = nil // Hide all directories; JSONL files are the useful items
 		var filteredFiles []fileItem
 		for _, f := range files {
-			// Only show .jsonl session files
 			if strings.HasSuffix(f.name, ".jsonl") {
 				filteredFiles = append(filteredFiles, f)
 			}
 		}
-		dirs = filteredDirs
 		files = filteredFiles
 	}
 
