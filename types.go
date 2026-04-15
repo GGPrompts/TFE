@@ -144,6 +144,7 @@ type previewModel struct {
 	isJSONL             bool           // Whether the file is a JSONL conversation
 	cachedJSONLMessages []jsonlMessage // Parsed JSONL messages (expensive JSON parsing done once)
 	cachedJSONLIsTailed bool           // Whether the file was tail-read
+	jsonlFullLoad       bool           // Whether to load full file instead of tail
 	// Prompt template (for prompt files)
 	isPrompt       bool            // Whether the file is a prompt template
 	promptTemplate *promptTemplate // Parsed prompt template

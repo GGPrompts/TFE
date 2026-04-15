@@ -230,8 +230,8 @@ func renderJSONLAssistantMessage(msg jsonlMessage, width int) []string {
 				lines = append(lines, header)
 				hasContent = true
 			}
-			toolLine := renderToolUseSummary(block, width)
-			lines = append(lines, toolLine)
+			toolLines := renderToolUseSummary(block, width)
+			lines = append(lines, toolLines...)
 
 		case "thinking":
 			if block.Text == "" {
@@ -258,8 +258,9 @@ func renderJSONLSystemMessage(msg jsonlMessage, width int) []string {
 	return []string{line}
 }
 
-// renderToolUseSummary creates a one-line summary of a tool_use block.
-func renderToolUseSummary(block jsonlContentBlock, width int) string {
+// renderToolUseSummary creates a summary of a tool_use block.
+// Allows detail text to wrap to multiple lines for readability.
+func renderToolUseSummary(block jsonlContentBlock, width int) []string {
 	name := block.Name
 	if name == "" {
 		name = "unknown"
@@ -269,16 +270,42 @@ func renderToolUseSummary(block jsonlContentBlock, width int) string {
 	detail := extractToolDetail(block)
 
 	prefix := jsonlToolNameStyle().Render("  " + name)
-	if detail != "" {
-		maxDetail := width - visualWidth(name) - 5
-		if maxDetail > 10 {
-			if len(detail) > maxDetail {
-				detail = detail[:maxDetail] + "..."
-			}
-			return prefix + " " + jsonlToolInputStyle().Render(detail)
-		}
+	if detail == "" {
+		return []string{prefix}
 	}
-	return prefix
+
+	// Allow detail to use full width, wrapping naturally
+	detailIndent := "    " // Indent continuation lines under tool name
+	maxDetail := width - len(detailIndent)
+	if maxDetail < 20 {
+		maxDetail = 20
+	}
+
+	// First line: tool name + start of detail
+	firstLineMax := width - visualWidth(name) - 5
+	if firstLineMax < 10 {
+		firstLineMax = 10
+	}
+
+	if len(detail) <= firstLineMax {
+		return []string{prefix + " " + jsonlToolInputStyle().Render(detail)}
+	}
+
+	// Detail wraps: first chunk on name line, rest indented
+	var lines []string
+	lines = append(lines, prefix+" "+jsonlToolInputStyle().Render(detail[:firstLineMax]))
+	remaining := detail[firstLineMax:]
+	for len(remaining) > 0 {
+		chunk := remaining
+		if len(chunk) > maxDetail {
+			chunk = remaining[:maxDetail]
+			remaining = remaining[maxDetail:]
+		} else {
+			remaining = ""
+		}
+		lines = append(lines, jsonlToolInputStyle().Render(detailIndent+chunk))
+	}
+	return lines
 }
 
 // extractToolDetail extracts a readable summary from tool_use input parameters.
@@ -394,7 +421,7 @@ func (m *model) loadJSONLPreview(path string, fileSize int64) {
 	var data []byte
 	isTailed := false
 
-	if fileSize > maxJSONLBytes {
+	if fileSize > maxJSONLBytes && !m.preview.jsonlFullLoad {
 		offset := fileSize - maxJSONLBytes
 		if _, err := f.Seek(offset, io.SeekStart); err == nil {
 			data, err = io.ReadAll(f)
@@ -542,6 +569,9 @@ func (m model) renderJSONLPreview(maxVisible int) string {
 			}
 		}
 		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) [jsonl]", end, totalLines, scrollPercent)
+		if m.preview.cachedJSONLIsTailed {
+			scrollIndicator += " | F: load full"
+		}
 		scrollStyle := lipgloss.NewStyle().
 			Foreground(uiSubtleText()).
 			Italic(true)

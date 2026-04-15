@@ -699,6 +699,18 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 		case "f", "F":
+			// JSONL: toggle full transcript loading
+			if m.preview.loaded && m.preview.isJSONL && m.preview.cachedJSONLIsTailed {
+				m.preview.jsonlFullLoad = true
+				m.preview.scrollPos = 0
+				info, _ := os.Stat(m.preview.filePath)
+				if info != nil {
+					m.loadJSONLPreview(m.preview.filePath, info.Size())
+					m.setStatusMessage(fmt.Sprintf("Loaded full transcript (%d messages)", len(m.preview.cachedJSONLMessages)), false)
+				}
+				return m, statusTimeoutCmd()
+			}
+
 			// Follow symlink - load target's actual content
 			if m.preview.loaded && m.preview.filePath != "" {
 				// Check if the current preview is a symlink
