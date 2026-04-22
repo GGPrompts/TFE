@@ -29,7 +29,10 @@ type Config struct {
 	DefaultViewMode string `toml:"default_view_mode"` // "tree", "list", or "detail"
 	PanelLock       bool   `toml:"panel_lock"`         // Lock panel widths (disable accordion)
 	ShowHidden      bool   `toml:"show_hidden"`        // Show hidden files by default
-	SortOrder       string `toml:"sort_order"`         // "name", "size", or "modified"
+	SortOrder       string `toml:"sort_order"`         // "name", "size", "modified", or "type"
+	StartupDualPane   bool   `toml:"startup_dual_pane"`   // Open with preview pane visible
+	StartupFocus      string `toml:"startup_focus"`       // "files" or "preview" — which pane is focused on startup
+	FocusedPaneRatio  int    `toml:"focused_pane_ratio"`  // Focused pane width % in accordion layout (50-90, default 60)
 
 	// External tools
 	Editor string `toml:"editor"` // Preferred editor command (empty = use $EDITOR)
@@ -51,6 +54,9 @@ func defaultConfig() Config {
 		PanelLock:          false,
 		ShowHidden:         false,
 		SortOrder:          "name",
+		StartupDualPane:    true,
+		StartupFocus:       "files",
+		FocusedPaneRatio:   60,
 		Editor:             "",
 		Profiles: []Profile{
 			{Name: "Shell Here", Command: "bash"},

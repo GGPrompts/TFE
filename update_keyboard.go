@@ -600,6 +600,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "f3":
+			// F3: Open in external browser (images/HTML/PDF)
+			if m.preview.loaded && m.preview.filePath != "" && isBrowserFile(m.preview.filePath) {
+				return m, openInBrowser(m.preview.filePath)
+			}
+
 		case "f4":
 			// Open file with appropriate viewer/editor from preview (F4)
 			if m.preview.loaded && m.preview.filePath != "" {

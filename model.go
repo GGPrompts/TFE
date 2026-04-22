@@ -126,6 +126,9 @@ func initialModel() model {
 
 	// Apply config settings that need post-init setup
 	m.panelsLocked = cfg.PanelLock
+	if cfg.StartupFocus == "preview" {
+		m.focusedPane = rightPane
+	}
 
 	m.loadFiles()
 
@@ -148,18 +151,20 @@ func initialModel() model {
 		}
 	}
 
-	// Auto-enable dual-pane mode on WIDE terminals only
-	// Narrow terminals (Termux, phones, small windows) stay in single-pane mode
-	// Rationale:
-	//   - Wide terminals: Side-by-side dual-pane is great (file list + preview)
-	//   - Narrow terminals: Even with vertical-split dual-pane, limited vertical space
-	//     means cramped file list AND cramped preview (especially with keyboard up)
-	//   - Single-pane: Full screen for file list, press Enter for full-screen preview
-	//     Much better use of limited screen space on mobile devices
-	if m.width >= 100 {
+	// Dual-pane on startup (configurable). Narrow terminals use vertical stacking
+	// (file list top, preview bottom) — width is not a factor.
+	// Preload the first file's preview so the right pane isn't empty.
+	if cfg.StartupDualPane {
 		m.viewMode = viewDualPane
+		if !m.preview.loaded {
+			for _, f := range m.files {
+				if !f.isDir && f.name != ".." {
+					m.loadPreview(f.path)
+					break
+				}
+			}
+		}
 	}
-	// else: keep viewSinglePane (default from line 32)
 
 	// If standalone preview file was specified (tfe --preview /path/to/file),
 	// enter preview-only mode: minimal UI showing just the file content
@@ -195,12 +200,17 @@ func (m *model) calculateLayout() {
 		// Check if using vertical split (Detail always uses vertical, List/Tree on narrow terminals)
 		useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
 
+		// Valid horizontal split widths fit within the terminal (leftWidth + rightWidth + separator <= width).
+		// Vertical-split placeholder (leftWidth == rightWidth == width) is larger than width and must not
+		// be scaled into a horizontal layout — it would lock in a 50/50 ratio.
+		validHorizontal := m.leftWidth > 0 && m.rightWidth > 0 && m.leftWidth+m.rightWidth <= m.width
+
 		if useVerticalSplit {
 			// Vertical split (stacked layout) - set full width for both panes
 			// (actual rendering uses full width for top and bottom panes)
 			m.leftWidth = m.width  // Full width for top pane (file list)
 			m.rightWidth = m.width // Full width for bottom pane (preview)
-		} else if m.panelsLocked && m.leftWidth > 0 && m.rightWidth > 0 {
+		} else if m.panelsLocked && validHorizontal {
 			// Panels locked: keep current widths, only adjust for terminal resize
 			total := m.leftWidth + m.rightWidth + 1 // +1 for separator
 			if total != m.width {
@@ -217,14 +227,22 @@ func (m *model) calculateLayout() {
 				}
 			}
 		} else {
-			// List/Tree view on wide terminals: accordion-style horizontal split
-			// Focused pane gets 60%, unfocused gets 40%
+			// List/Tree view on wide terminals: accordion-style horizontal split.
+			// Focused pane gets config.FocusedPaneRatio%, unfocused gets the rest.
+			focused := m.config.FocusedPaneRatio
+			if focused < 50 {
+				focused = 50
+			}
+			if focused > 90 {
+				focused = 90
+			}
+			unfocused := 100 - focused
 			if m.focusedPane == leftPane {
-				m.leftWidth = (m.width * 60) / 100  // 60%
-				m.rightWidth = (m.width * 40) / 100 // 40%
+				m.leftWidth = (m.width * focused) / 100
+				m.rightWidth = (m.width * unfocused) / 100
 			} else {
-				m.leftWidth = (m.width * 40) / 100  // 40%
-				m.rightWidth = (m.width * 60) / 100 // 60%
+				m.leftWidth = (m.width * unfocused) / 100
+				m.rightWidth = (m.width * focused) / 100
 			}
 
 			// Ensure minimum widths for usability

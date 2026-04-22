@@ -43,7 +43,10 @@ func settingsByCategory(cat int) []settingsItem {
 		return []settingsItem{
 			{label: "Show Hidden Files", key: "show_hidden", kind: settingsToggle},
 			{label: "Panel Lock", key: "panel_lock", kind: settingsToggle},
-			{label: "Sort Order", key: "sort_order", kind: settingsSelect, options: []string{"name", "size", "modified"}},
+			{label: "Start in Dual Pane", key: "startup_dual_pane", kind: settingsToggle},
+			{label: "Startup Focus", key: "startup_focus", kind: settingsSelect, options: []string{"files", "preview"}},
+			{label: "Focused Pane Width", key: "focused_pane_ratio", kind: settingsSelect, options: []string{"50%", "60%", "66%", "70%", "75%", "80%"}},
+			{label: "Sort Order", key: "sort_order", kind: settingsSelect, options: []string{"name", "size", "modified", "type"}},
 			{label: "Default View Mode", key: "default_view_mode", kind: settingsSelect, options: []string{"tree", "list", "detail"}},
 			{label: "Editor", key: "editor", kind: settingsString},
 		}
@@ -72,6 +75,8 @@ func (m model) getConfigBool(key string) bool {
 		return m.config.ShowHidden
 	case "panel_lock":
 		return m.config.PanelLock
+	case "startup_dual_pane":
+		return m.config.StartupDualPane
 	case "auto_changes":
 		return m.config.AutoChanges
 	default:
@@ -100,6 +105,9 @@ func (m *model) setConfigBool(key string, val bool) {
 	case "panel_lock":
 		m.config.PanelLock = val
 		m.panelsLocked = val
+	case "startup_dual_pane":
+		m.config.StartupDualPane = val
+		// Applied on next launch; don't disrupt the current view
 	case "auto_changes":
 		m.config.AutoChanges = val
 		m.agentAutoWatch = val
@@ -113,6 +121,10 @@ func (m model) getConfigString(key string) string {
 		return m.config.SortOrder
 	case "default_view_mode":
 		return m.config.DefaultViewMode
+	case "startup_focus":
+		return m.config.StartupFocus
+	case "focused_pane_ratio":
+		return fmt.Sprintf("%d%%", m.config.FocusedPaneRatio)
 	case "editor":
 		return m.config.Editor
 	default:
@@ -130,6 +142,22 @@ func (m *model) setConfigString(key, val string) {
 	case "default_view_mode":
 		m.config.DefaultViewMode = val
 		// Note: don't change current view mode — this sets the default for next launch
+	case "startup_focus":
+		m.config.StartupFocus = val
+		// Note: applied on next launch; don't yank focus mid-session
+	case "focused_pane_ratio":
+		// Parse "60%" -> 60. Ignore malformed input.
+		trimmed := strings.TrimSuffix(val, "%")
+		var n int
+		if _, err := fmt.Sscanf(trimmed, "%d", &n); err == nil && n >= 50 && n <= 90 {
+			m.config.FocusedPaneRatio = n
+			// Reset locked widths so the new ratio takes effect on next calculateLayout.
+			// Without this, panel lock would preserve the old width indefinitely.
+			m.leftWidth = 0
+			m.rightWidth = 0
+			m.calculateLayout()
+			m.populatePreviewCache()
+		}
 	case "editor":
 		m.config.Editor = val
 	}
