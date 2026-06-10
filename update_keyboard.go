@@ -695,7 +695,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.previewMouseEnabled = !m.previewMouseEnabled
 
 			if m.previewMouseEnabled {
-				m.setStatusMessage("🖱️  Mouse scrolling enabled (press 'm' to enable text selection)", false)
+				m.setStatusMessage("🖱  Mouse scrolling enabled (press 'm' to enable text selection)", false)
 				return m, tea.Batch(tea.EnableMouseCellMotion, statusTimeoutCmd())
 			} else {
 				m.setStatusMessage("📄 Text selection enabled - Use mouse to select & copy text (Ctrl+Shift+C)", false)
