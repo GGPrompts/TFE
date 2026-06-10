@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -402,6 +404,49 @@ func TestOpenInBrowser(t *testing.T) {
 	// tea.Cmd is just a function, so we can't easily inspect it
 	// We just verify it doesn't panic
 	t.Log("openInBrowser() returned a valid tea.Cmd")
+}
+
+// TestViewerPauseScriptQuotesApostrophe verifies that paths containing single
+// quotes are safely shell-quoted in the generated viewer scripts (tfe-e40)
+func TestViewerPauseScriptQuotesApostrophe(t *testing.T) {
+	path := "/tmp/it's a photo.png"
+	script := viewerPauseScript("viu -t", path, "Press any key to continue...")
+
+	// The raw path must never appear unquoted in the script
+	expectedQuoted := `'/tmp/it'\''s a photo.png'`
+	if !strings.Contains(script, expectedQuoted) {
+		t.Errorf("viewerPauseScript() did not shell-quote apostrophe path:\n%s", script)
+	}
+	if strings.Contains(script, "'"+path+"'") {
+		t.Errorf("viewerPauseScript() contains naively quoted path (apostrophe breaks quoting):\n%s", script)
+	}
+}
+
+// TestViewerPauseScriptApostropheExecutes runs the quoted path through real
+// bash against a file with an apostrophe in its name to prove the quoting works
+func TestViewerPauseScriptApostropheExecutes(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available on this system")
+	}
+
+	dir := t.TempDir()
+	path := dir + "/it's a photo.png"
+	if err := os.WriteFile(path, []byte("fake image"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Use the same quoting mechanism as the viewer scripts; 'cat' stands in
+	// for the viewer binary so the test doesn't need viu/timg installed
+	script := fmt.Sprintf("cat %s > /dev/null", shellQuote(path))
+	if err := exec.Command("bash", "-c", script).Run(); err != nil {
+		t.Errorf("bash failed to open apostrophe-bearing file with shellQuote: %v", err)
+	}
+
+	// Sanity check: the old naive quoting must NOT work (proves the test is meaningful)
+	naive := fmt.Sprintf("cat '%s' > /dev/null 2>&1", path)
+	if err := exec.Command("bash", "-c", naive).Run(); err == nil {
+		t.Log("naive quoting unexpectedly succeeded (non-critical)")
+	}
 }
 
 // TestOpenImageViewer tests image viewer command creation

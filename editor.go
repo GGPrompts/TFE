@@ -113,6 +113,11 @@ func launchTmuxQuad(dir string) tea.Cmd {
 	sessionName = strings.ReplaceAll(sessionName, ".", "_")
 	sessionName = strings.ReplaceAll(sessionName, ":", "_")
 
+	// Shell-quote values before interpolating into the script so paths/names
+	// containing quotes or other shell metacharacters can't break out
+	qDir := shellQuote(dir)
+	qSession := shellQuote(sessionName)
+
 	// Create script that launches tmux with quad split after TFE exits
 	tmuxScript := fmt.Sprintf(`#!/bin/bash
 
@@ -125,16 +130,16 @@ stty sane 2>/dev/null || true
 clear
 
 # Change to target directory first so pane 0 inherits it
-cd '%s'
+cd %[1]s
 
 # Check if session already exists
-if tmux has-session -t '%s' 2>/dev/null; then
-    echo "Attaching to existing tmux session: %s"
+if tmux has-session -t %[2]s 2>/dev/null; then
+    echo "Attaching to existing tmux session:" %[2]s
     sleep 0.5
-    tmux attach-session -t '%s'
+    tmux attach-session -t %[2]s
 else
-    echo "Creating tmux quad session: %s"
-    echo "Directory: %s"
+    echo "Creating tmux quad session:" %[2]s
+    echo "Directory:" %[1]s
     sleep 0.5
     # Create new session with quad layout (2x2 grid)
     # Pane layout:
@@ -143,18 +148,18 @@ else
     # +-------+-------+
     # |   2   |   3   |
     # +-------+-------+
-    tmux new-session -d -s '%s' -c '%s' \; \
-        split-window -h -c '%s' \; \
-        split-window -v -c '%s' \; \
+    tmux new-session -d -s %[2]s -c %[1]s \; \
+        split-window -h -c %[1]s \; \
+        split-window -v -c %[1]s \; \
         select-pane -t 0 \; \
-        split-window -v -c '%s' \; \
+        split-window -v -c %[1]s \; \
         select-pane -t 0 \; \
         attach-session
 fi
 
 # Clean up temp script
 rm -f "$0"
-`, dir, sessionName, sessionName, sessionName, sessionName, dir, sessionName, dir, dir, dir, dir)
+`, qDir, qSession)
 
 	// Write script to temp file
 	tmpScript := filepath.Join(os.TempDir(), fmt.Sprintf("tfe-tmux-%d.sh", os.Getpid()))
@@ -172,7 +177,7 @@ rm -f "$0"
 	} else {
 		// macOS/Termux: Use nohup with background execution
 		// The script runs in background (&) and nohup ensures it survives TFE exit
-		cmd = exec.Command("bash", "-c", fmt.Sprintf("nohup bash '%s' &", tmpScript))
+		cmd = exec.Command("bash", "-c", fmt.Sprintf("nohup bash %s &", shellQuote(tmpScript)))
 	}
 
 	cmd.Stdin = nil
@@ -508,6 +513,16 @@ func getAvailableImageViewer() string {
 	return ""
 }
 
+// viewerPauseScript builds a bash script that runs viewerCmd on the given path
+// (shell-quoted to survive apostrophes and other metacharacters in filenames)
+// and pauses for a keypress before returning to TFE.
+func viewerPauseScript(viewerCmd, path, prompt string) string {
+	return fmt.Sprintf(`%s %s
+echo ""
+echo "%s"
+read -n 1 -s -r`, viewerCmd, shellQuote(path), prompt)
+}
+
 // openImageViewer opens an image in a TUI viewer
 func openImageViewer(path string) tea.Cmd {
 	viewer := getAvailableImageViewer()
@@ -521,24 +536,15 @@ func openImageViewer(path string) tea.Cmd {
 	if viewer == "viu" {
 		// viu with transparent background and size to terminal
 		// Wrap in shell to pause after displaying image (same as command prompt)
-		script := fmt.Sprintf(`viu -t '%s'
-echo ""
-echo "Press any key to continue..."
-read -n 1 -s -r`, path)
+		script := viewerPauseScript("viu -t", path, "Press any key to continue...")
 		c = exec.Command("bash", "-c", script)
 	} else if viewer == "timg" {
 		// timg with grid view support
-		script := fmt.Sprintf(`timg '%s'
-echo ""
-echo "Press any key to continue..."
-read -n 1 -s -r`, path)
+		script := viewerPauseScript("timg", path, "Press any key to continue...")
 		c = exec.Command("bash", "-c", script)
 	} else {
 		// chafa or other
-		script := fmt.Sprintf(`%s '%s'
-echo ""
-echo "Press any key to continue..."
-read -n 1 -s -r`, viewer, path)
+		script := viewerPauseScript(viewer, path, "Press any key to continue...")
 		c = exec.Command("bash", "-c", script)
 	}
 
@@ -685,10 +691,7 @@ func openHexViewer(path string) tea.Cmd {
 	if viewer == "hexyl" {
 		// hexyl displays directly with built-in paging on terminals
 		// Add a pause wrapper to return to TFE cleanly
-		script := fmt.Sprintf(`hexyl '%s'
-echo ""
-echo "Press any key to return to TFE..."
-read -n 1 -s -r`, path)
+		script := viewerPauseScript("hexyl", path, "Press any key to return to TFE...")
 		c = exec.Command("bash", "-c", script)
 	} else {
 		// Other hex viewers
@@ -761,10 +764,7 @@ func openPDFViewer(path string) tea.Cmd {
 
 	var c *exec.Cmd
 	if viewer == "timg" {
-		script := fmt.Sprintf(`timg '%s'
-echo ""
-echo "Press any key to continue..."
-read -n 1 -s -r`, path)
+		script := viewerPauseScript("timg", path, "Press any key to continue...")
 		c = exec.Command("bash", "-c", script)
 	} else {
 		c = exec.Command(viewer, path)
