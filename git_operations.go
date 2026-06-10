@@ -8,11 +8,12 @@ package main
 // - Provide user feedback for git operations
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -763,14 +764,12 @@ func (m *model) sortGitReposList() {
 	}
 
 	// Sort the repos based on sortBy criteria
-	sort.Slice(m.gitReposList, func(i, j int) bool {
-		a, b := m.gitReposList[i], m.gitReposList[j]
-
+	slices.SortFunc(m.gitReposList, func(a, b fileItem) int {
 		// Determine sort result based on sortBy
-		var less bool
+		var c int
 		switch m.sortBy {
 		case "name":
-			less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 
 		case "branch":
 			// Sort by git branch name
@@ -778,9 +777,9 @@ func (m *model) sortGitReposList() {
 			bBranch := b.gitBranch
 			if aBranch == bBranch {
 				// If same branch, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = strings.ToLower(aBranch) < strings.ToLower(bBranch)
+				c = strings.Compare(strings.ToLower(aBranch), strings.ToLower(bBranch))
 			}
 
 		case "status":
@@ -790,30 +789,30 @@ func (m *model) sortGitReposList() {
 			bStatus := getGitStatusSortValue(b)
 			if aStatus == bStatus {
 				// If same status, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = aStatus < bStatus
+				c = cmp.Compare(aStatus, bStatus)
 			}
 
 		case "modified":
 			// Sort by last commit time (stored in gitLastCommit)
 			if a.gitLastCommit.Equal(b.gitLastCommit) {
 				// If same time, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = a.gitLastCommit.Before(b.gitLastCommit)
+				c = a.gitLastCommit.Compare(b.gitLastCommit)
 			}
 
 		default:
 			// Fallback to name sorting
-			less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 		}
 
 		// Apply sort direction (ascending vs descending)
 		if !m.sortAsc {
-			less = !less
+			c = -c
 		}
 
-		return less
+		return c
 	})
 }

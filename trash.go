@@ -16,7 +16,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"syscall"
 	"time"
 )
@@ -352,8 +352,8 @@ func getTrashItems() ([]trashItem, error) {
 	}
 
 	// Sort by deletion time (newest first)
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].DeletedAt.After(items[j].DeletedAt)
+	slices.SortFunc(items, func(a, b trashItem) int {
+		return b.DeletedAt.Compare(a.DeletedAt)
 	})
 
 	return items, nil

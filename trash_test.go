@@ -1020,3 +1020,36 @@ func containsHelper(s, substr string) bool {
 	}
 	return false
 }
+
+// TestGetTrashItemsSortedNewestFirst verifies getTrashItems returns items
+// ordered by deletion time descending (newest first) after the migration to
+// slices.SortFunc.
+func TestGetTrashItemsSortedNewestFirst(t *testing.T) {
+	_, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	base := time.Date(2021, 6, 1, 12, 0, 0, 0, time.UTC)
+	items := []trashItem{
+		{OriginalName: "oldest", TrashedPath: "/t/oldest", DeletedAt: base},
+		{OriginalName: "newest", TrashedPath: "/t/newest", DeletedAt: base.Add(2 * time.Hour)},
+		{OriginalName: "middle", TrashedPath: "/t/middle", DeletedAt: base.Add(time.Hour)},
+	}
+	if err := saveTrashMetadata(items); err != nil {
+		t.Fatalf("saveTrashMetadata failed: %v", err)
+	}
+
+	got, err := getTrashItems()
+	if err != nil {
+		t.Fatalf("getTrashItems failed: %v", err)
+	}
+
+	want := []string{"newest", "middle", "oldest"}
+	if len(got) != len(want) {
+		t.Fatalf("got %d items, want %d", len(got), len(want))
+	}
+	for i, name := range want {
+		if got[i].OriginalName != name {
+			t.Errorf("position %d = %q, want %q", i, got[i].OriginalName, name)
+		}
+	}
+}

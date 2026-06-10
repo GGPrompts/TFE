@@ -1,11 +1,12 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -253,11 +254,11 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 	}
 
 	// Sort alphabetically
-	sort.Slice(dirs, func(i, j int) bool {
-		return strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name)
+	slices.SortFunc(dirs, func(a, b fileItem) int {
+		return strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 	})
-	sort.Slice(files, func(i, j int) bool {
-		return strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
+	slices.SortFunc(files, func(a, b fileItem) int {
+		return strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 	})
 
 	result := append(dirs, files...)
@@ -513,11 +514,11 @@ func (m *model) loadFiles() {
 	}
 
 	// Sort alphabetically
-	sort.Slice(dirs, func(i, j int) bool {
-		return strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name)
+	slices.SortFunc(dirs, func(a, b fileItem) int {
+		return strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 	})
-	sort.Slice(files, func(i, j int) bool {
-		return strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
+	slices.SortFunc(files, func(a, b fileItem) int {
+		return strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 	})
 
 	// In agent view, only show .jsonl session files (skip directories entirely —
@@ -604,21 +605,21 @@ func (m *model) sortFiles() {
 		}
 
 		// Sort directories alphabetically
-		sort.Slice(dirs, func(i, j int) bool {
-			less := strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name)
+		slices.SortFunc(dirs, func(a, b fileItem) int {
+			c := strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			if !m.sortAsc {
-				less = !less
+				c = -c
 			}
-			return less
+			return c
 		})
 
 		// Sort files alphabetically
-		sort.Slice(files, func(i, j int) bool {
-			less := strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
+		slices.SortFunc(files, func(a, b fileItem) int {
+			c := strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			if !m.sortAsc {
-				less = !less
+				c = -c
 			}
-			return less
+			return c
 		})
 
 		// Reconstruct: parent dir, then folders, then files
@@ -632,11 +633,9 @@ func (m *model) sortFiles() {
 	}
 
 	// For other sort criteria (size, modified, type): mix folders and files
-	sort.Slice(otherFiles, func(i, j int) bool {
-		a, b := otherFiles[i], otherFiles[j]
-
+	slices.SortFunc(otherFiles, func(a, b fileItem) int {
 		// Determine sort result based on sortBy
-		var less bool
+		var c int
 		switch m.sortBy {
 		case "size":
 			// For directories, compare by item count
@@ -651,17 +650,17 @@ func (m *model) sortFiles() {
 			}
 			if aSize == bSize {
 				// If same size, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = aSize < bSize
+				c = cmp.Compare(aSize, bSize)
 			}
 
 		case "modified":
 			if a.modTime.Equal(b.modTime) {
 				// If same time, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = a.modTime.Before(b.modTime)
+				c = a.modTime.Compare(b.modTime)
 			}
 
 		case "type":
@@ -669,9 +668,9 @@ func (m *model) sortFiles() {
 			bType := getFileType(b)
 			if aType == bType {
 				// If same type, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = aType < bType
+				c = strings.Compare(aType, bType)
 			}
 
 		case "branch":
@@ -680,9 +679,9 @@ func (m *model) sortFiles() {
 			bBranch := b.gitBranch
 			if aBranch == bBranch {
 				// If same branch, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = strings.ToLower(aBranch) < strings.ToLower(bBranch)
+				c = strings.Compare(strings.ToLower(aBranch), strings.ToLower(bBranch))
 			}
 
 		case "status":
@@ -692,22 +691,22 @@ func (m *model) sortFiles() {
 			bStatus := getGitStatusSortValue(b)
 			if aStatus == bStatus {
 				// If same status, sort by name as secondary
-				less = strings.ToLower(a.name) < strings.ToLower(b.name)
+				c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 			} else {
-				less = aStatus < bStatus
+				c = cmp.Compare(aStatus, bStatus)
 			}
 
 		default:
 			// Fallback to name sorting
-			less = strings.ToLower(a.name) < strings.ToLower(b.name)
+			c = strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
 		}
 
 		// Apply sort direction (ascending vs descending)
 		if !m.sortAsc {
-			less = !less
+			c = -c
 		}
 
-		return less
+		return c
 	})
 
 	// Reconstruct files slice with parent directory at top (if present)

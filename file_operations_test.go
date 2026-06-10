@@ -1464,3 +1464,83 @@ func TestLoadFilesStaleIndicesCannotSurviveReload(t *testing.T) {
 		}
 	}
 }
+
+// TestSortFilesName verifies name sorting keeps ".." first, groups directories
+// before files, lowercases for comparison, and reverses on descending order.
+func TestSortFilesName(t *testing.T) {
+	mk := func(name string, isDir bool) fileItem {
+		return fileItem{name: name, isDir: isDir}
+	}
+	base := []fileItem{
+		mk("..", true),
+		mk("Banana.txt", false),
+		mk("apple.txt", false),
+		mk("Zebra", true),
+		mk("alpha", true),
+	}
+
+	names := func(items []fileItem) []string {
+		out := make([]string, len(items))
+		for i, it := range items {
+			out[i] = it.name
+		}
+		return out
+	}
+	eq := func(got, want []string) bool {
+		if len(got) != len(want) {
+			return false
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Ascending: parent first, dirs (case-insensitive) then files (case-insensitive)
+	m := &model{sortBy: "name", sortAsc: true}
+	m.files = append([]fileItem(nil), base...)
+	m.sortFiles()
+	wantAsc := []string{"..", "alpha", "Zebra", "apple.txt", "Banana.txt"}
+	if got := names(m.files); !eq(got, wantAsc) {
+		t.Errorf("ascending name sort = %v, want %v", got, wantAsc)
+	}
+
+	// Descending: parent stays first, dirs and files each reversed
+	m = &model{sortBy: "name", sortAsc: false}
+	m.files = append([]fileItem(nil), base...)
+	m.sortFiles()
+	wantDesc := []string{"..", "Zebra", "alpha", "Banana.txt", "apple.txt"}
+	if got := names(m.files); !eq(got, wantDesc) {
+		t.Errorf("descending name sort = %v, want %v", got, wantDesc)
+	}
+}
+
+// TestSortFilesModifiedSecondaryName verifies that the "modified" sort uses
+// case-insensitive name as the secondary key when modtimes are equal, and that
+// descending order reverses the combined comparison.
+func TestSortFilesModifiedSecondaryName(t *testing.T) {
+	t0 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	t1 := t0.Add(time.Hour)
+	files := []fileItem{
+		{name: "older.txt", modTime: t0},
+		{name: "Beta.txt", modTime: t1},
+		{name: "alpha.txt", modTime: t1},
+	}
+
+	m := &model{sortBy: "modified", sortAsc: true}
+	m.files = append([]fileItem(nil), files...)
+	m.sortFiles()
+	// Ascending: oldest first; the two equal-time files break by name asc.
+	want := []string{"older.txt", "alpha.txt", "Beta.txt"}
+	got := make([]string, len(m.files))
+	for i, it := range m.files {
+		got[i] = it.name
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ascending modified sort = %v, want %v", got, want)
+		}
+	}
+}
