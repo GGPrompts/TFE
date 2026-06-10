@@ -89,6 +89,25 @@ func getDirItemCount(path string) int {
 	return len(entries)
 }
 
+// cachedDirItemCount returns the item count for a directory, memoizing the
+// result in m.dirCountCache to avoid repeated os.ReadDir calls from render
+// (detail/agent views run per visible row per frame) and from the size-sort
+// comparator. Value receiver is intentional: View() renders on a model copy,
+// and map writes through the copy mutate the shared map. The cache is
+// invalidated (recreated) in loadFiles, including fsnotify-triggered reloads.
+func (m model) cachedDirItemCount(path string) int {
+	if m.dirCountCache == nil {
+		// Cache not initialized yet (e.g. before first loadFiles); fall back
+		return getDirItemCount(path)
+	}
+	if count, ok := m.dirCountCache[path]; ok {
+		return count
+	}
+	count := getDirItemCount(path)
+	m.dirCountCache[path] = count
+	return count
+}
+
 // getFileIcon returns the appropriate emoji icon based on file type
 func getFileIcon(item fileItem) string {
 	// Check for symlinks first (takes priority over other icons)

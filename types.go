@@ -307,6 +307,12 @@ type model struct {
 	tuiClassicsPath string          // Cached path to TUIClassics launcher (empty if not found)
 	// Performance: Cache for directoryContainsPrompts() to avoid repeated file I/O
 	promptDirsCache map[string]bool // Path -> contains prompts (cleared on loadFiles)
+	// Performance: Lazy cache for getDirItemCount() to avoid per-frame os.ReadDir
+	// in detail/agent views and O(n log n) ReadDirs in the size-sort comparator.
+	// Map-typed so writes through the value-receiver View() path mutate the
+	// shared map (see cachedDirItemCount). Cleared on loadFiles, which also
+	// covers fsnotify-triggered reloads.
+	dirCountCache map[string]int // Path -> item count (cleared on loadFiles)
 	// Update notification
 	updateAvailable bool   // Whether an update is available
 	updateVersion   string // Version string of available update (e.g., "v0.6.1")

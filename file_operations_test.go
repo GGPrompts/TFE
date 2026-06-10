@@ -408,6 +408,47 @@ func TestGetDirItemCount(t *testing.T) {
 	}
 }
 
+// TestCachedDirItemCount tests the lazy memoization of directory item counts
+func TestCachedDirItemCount(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	testDir := filepath.Join(tmpDir, "test")
+	if err := os.Mkdir(testDir, 0755); err != nil {
+		t.Fatalf("Failed to create test dir: %v", err)
+	}
+	createTestFileWithContent(t, filepath.Join(testDir, "a.txt"), []byte("content"))
+	createTestFileWithContent(t, filepath.Join(testDir, "b.txt"), []byte("content"))
+
+	m := model{dirCountCache: make(map[string]int)}
+
+	// First call populates the cache
+	if got := m.cachedDirItemCount(testDir); got != 2 {
+		t.Errorf("cachedDirItemCount = %d, expected 2", got)
+	}
+	if cached, ok := m.dirCountCache[testDir]; !ok || cached != 2 {
+		t.Errorf("dirCountCache[%s] = %d (present=%v), expected 2", testDir, cached, ok)
+	}
+
+	// Subsequent calls return the memoized value, even if the directory changed
+	createTestFileWithContent(t, filepath.Join(testDir, "c.txt"), []byte("content"))
+	if got := m.cachedDirItemCount(testDir); got != 2 {
+		t.Errorf("cachedDirItemCount after change (cache still valid) = %d, expected memoized 2", got)
+	}
+
+	// Invalidation (as done in loadFiles) picks up the new contents
+	m.dirCountCache = make(map[string]int)
+	if got := m.cachedDirItemCount(testDir); got != 3 {
+		t.Errorf("cachedDirItemCount after invalidation = %d, expected 3", got)
+	}
+
+	// Nil cache falls back to a direct read without panicking
+	var noCache model
+	if got := noCache.cachedDirItemCount(testDir); got != 3 {
+		t.Errorf("cachedDirItemCount with nil cache = %d, expected 3", got)
+	}
+}
+
 // TestGetFileIcon tests icon selection for various file types
 func TestGetFileIcon(t *testing.T) {
 	tests := []struct {

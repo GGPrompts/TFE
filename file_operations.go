@@ -293,6 +293,10 @@ func (m *model) loadFiles() {
 	// This ensures cache stays fresh when files change
 	m.promptDirsCache = make(map[string]bool)
 
+	// Clear directory item count cache so detail/agent views and size sorting
+	// pick up changed directory contents (loadFiles also runs on fsnotify events)
+	m.dirCountCache = make(map[string]int)
+
 	// Special handling for trash view
 	if m.showTrashOnly {
 		trashItems, err := getTrashItems()
@@ -596,10 +600,10 @@ func (m *model) sortFiles() {
 			aSize := a.size
 			bSize := b.size
 			if a.isDir {
-				aSize = int64(getDirItemCount(a.path))
+				aSize = int64(m.cachedDirItemCount(a.path))
 			}
 			if b.isDir {
-				bSize = int64(getDirItemCount(b.path))
+				bSize = int64(m.cachedDirItemCount(b.path))
 			}
 			if aSize == bSize {
 				// If same size, sort by name as secondary

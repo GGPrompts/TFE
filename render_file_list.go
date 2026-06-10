@@ -508,7 +508,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			if file.name == ".." {
 				size = "-"
 			} else {
-				count := getDirItemCount(file.path)
+				count := m.cachedDirItemCount(file.path)
 				if count == 0 {
 					size = "empty"
 				} else if count == 1 {
@@ -653,7 +653,7 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Agent view: Name, Modified, Description
 			desc := file.agentDescription
 			if desc == "" && file.isDir {
-				count := getDirItemCount(file.path)
+				count := m.cachedDirItemCount(file.path)
 				if count == 1 {
 					desc = "1 conversation"
 				} else if count > 0 {
