@@ -441,6 +441,79 @@ func TestEmptyTrash(t *testing.T) {
 	}
 }
 
+// TestEmptyTrash_RetainsUndeletableItems verifies that when os.RemoveAll fails
+// for a trashed item (e.g. permission-protected contents), that item is kept in
+// the metadata so it stays visible and retryable, while successfully deleted
+// items are removed.
+func TestEmptyTrash_RetainsUndeletableItems(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root bypasses permission bits; cannot force RemoveAll to fail")
+	}
+
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	// Trash a normal file that will delete successfully.
+	okFile := filepath.Join(tmpHome, "deletable.txt")
+	createTestFile(t, okFile, "content")
+	if err := moveToTrash(okFile); err != nil {
+		t.Fatalf("moveToTrash failed: %v", err)
+	}
+
+	// Trash a directory, then make its contents undeletable by removing write
+	// permission on a subdirectory that holds a file. os.RemoveAll must unlink
+	// the inner file before removing the subdir, which a 0500 dir prevents.
+	badDir := filepath.Join(tmpHome, "protected")
+	lockedSubdir := filepath.Join(badDir, "locked")
+	createTestFile(t, filepath.Join(lockedSubdir, "inner.txt"), "locked content")
+	if err := moveToTrash(badDir); err != nil {
+		t.Fatalf("moveToTrash failed: %v", err)
+	}
+
+	// Find the trashed directory and lock its subdirectory.
+	items, err := loadTrashMetadata()
+	if err != nil {
+		t.Fatalf("Failed to load metadata: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("Expected 2 items in trash, got %d", len(items))
+	}
+
+	var trashedBadDir string
+	for _, it := range items {
+		if it.OriginalName == "protected" {
+			trashedBadDir = it.TrashedPath
+		}
+	}
+	if trashedBadDir == "" {
+		t.Fatal("Could not find trashed 'protected' directory in metadata")
+	}
+
+	trashedLocked := filepath.Join(trashedBadDir, "locked")
+	if err := os.Chmod(trashedLocked, 0500); err != nil {
+		t.Fatalf("Failed to chmod locked subdir: %v", err)
+	}
+	// Restore permissions during cleanup so t.TempDir can be removed.
+	defer os.Chmod(trashedLocked, 0700)
+
+	// Empty trash: should report an error for the undeletable item.
+	if err := emptyTrash(); err == nil {
+		t.Fatal("Expected emptyTrash to return an error for the undeletable item")
+	}
+
+	// The undeletable item must remain in metadata; the deletable one must be gone.
+	items, err = loadTrashMetadata()
+	if err != nil {
+		t.Fatalf("Failed to load metadata after empty: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("Expected 1 item retained in metadata, got %d", len(items))
+	}
+	if items[0].OriginalName != "protected" {
+		t.Errorf("Expected retained item to be 'protected', got %q", items[0].OriginalName)
+	}
+}
+
 // TestGetTrashItems tests retrieving and sorting trash items
 func TestGetTrashItems(t *testing.T) {
 	tmpHome, cleanup := setupTestTrash(t)

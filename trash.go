@@ -287,16 +287,22 @@ func emptyTrash() error {
 		return fmt.Errorf("failed to load trash metadata: %w", err)
 	}
 
-	// Delete all trashed files/directories
+	// Delete all trashed files/directories, retaining any that fail to delete
+	// so they remain visible in the trash view and can be retried later.
 	var errors []string
+	var failedItems []trashItem
 	for _, item := range items {
 		if err := os.RemoveAll(item.TrashedPath); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", item.OriginalName, err))
+			failedItems = append(failedItems, item)
 		}
 	}
 
-	// Clear metadata
-	if err := saveTrashMetadata([]trashItem{}); err != nil {
+	// Persist metadata for items that could not be deleted (empty slice if all succeeded)
+	if failedItems == nil {
+		failedItems = []trashItem{}
+	}
+	if err := saveTrashMetadata(failedItems); err != nil {
 		return fmt.Errorf("failed to clear trash metadata: %w", err)
 	}
 
