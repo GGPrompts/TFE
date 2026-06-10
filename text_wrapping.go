@@ -202,8 +202,18 @@ func (m model) getWrappedLineCount() int {
 	// agrees with populatePreviewCache() and renderPreview()
 	availableWidth := m.previewAvailableWidth()
 
-	// Use cached line count if available and width matches
-	if m.preview.cacheValid && m.preview.cachedLineCount > 0 && m.preview.cachedWidth == availableWidth {
+	// Use the cached line count whenever the cache is valid for the CURRENT
+	// width. The cache is refreshed once per layout change by
+	// refreshPreviewCacheIfStale() (Update) / populatePreviewCache(), so in the
+	// common scroll path (held-down arrow at a fixed width) this returns in O(1)
+	// instead of re-wrapping the whole file on every keypress.
+	//
+	// The width check is what keeps the count correct: a stale cache built for a
+	// different width (e.g. dual-pane vs full-screen) fails this guard and falls
+	// through to a fresh wrap below. Do NOT add a `cachedLineCount > 0` guard
+	// here — an empty file legitimately wraps to 0 lines, and treating 0 as
+	// "uncached" would re-wrap it on every call for no benefit.
+	if m.preview.cacheValid && m.preview.cachedWidth == availableWidth {
 		return m.preview.cachedLineCount
 	}
 

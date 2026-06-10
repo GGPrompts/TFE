@@ -94,6 +94,106 @@ func TestPreviewWidth_CacheAgreesAcrossCallSites(t *testing.T) {
 	}
 }
 
+// freshWrapCount wraps every preview content line at the given width and
+// returns the total, mirroring populatePreviewCache()'s plain-text path. It is
+// the ground truth getWrappedLineCount()'s cached value must agree with.
+func freshWrapCount(content []string, width int) int {
+	total := 0
+	for _, line := range content {
+		total += len(wrapLine(line, width))
+	}
+	return total
+}
+
+// TestGetWrappedLineCount_MatchesFreshWrap is the tfe-b5w regression test:
+// getWrappedLineCount must return the cached count (O(1), no per-call re-wrap),
+// and that count must equal a freshly-computed wrap at the CURRENT width. When
+// the layout width changes (dual-pane vs full-screen), the count must update
+// rather than returning a stale value for the wrong width.
+func TestGetWrappedLineCount_MatchesFreshWrap(t *testing.T) {
+	// Width 120 (>= 100) keeps List in a horizontal split (narrower preview)
+	// while Detail forces a vertical split (wider preview), so the layout
+	// change below actually moves the wrap width. Below 100 both modes share
+	// the vertical-split width (isNarrowTerminal) and the count wouldn't change.
+	m := previewWidthTestModel(120, viewDualPane, modeList)
+	m.populatePreviewCache()
+
+	want := freshWrapCount(m.preview.content, m.previewAvailableWidth())
+	if got := m.getWrappedLineCount(); got != want {
+		t.Errorf("getWrappedLineCount() = %d, want fresh-wrap count %d at width %d",
+			got, want, m.previewAvailableWidth())
+	}
+
+	// The returned count must equal the cached count (proving it read the cache
+	// rather than recomputing a possibly-divergent value).
+	if m.getWrappedLineCount() != m.preview.cachedLineCount {
+		t.Errorf("getWrappedLineCount() = %d did not match cachedLineCount %d",
+			m.getWrappedLineCount(), m.preview.cachedLineCount)
+	}
+
+	// Change the layout so the preview width changes, then refresh the cache as
+	// Update would. The count must follow the new width (no stale value).
+	narrowWidth := m.previewAvailableWidth()
+	m.displayMode = modeDetail // List (horizontal split) -> Detail (vertical split, wider)
+	m.calculateLayout()
+	wideWidth := m.previewAvailableWidth()
+	if wideWidth == narrowWidth {
+		t.Fatal("test setup broken: layout change did not change preview width")
+	}
+	m.refreshPreviewCacheIfStale()
+
+	wantWide := freshWrapCount(m.preview.content, wideWidth)
+	if got := m.getWrappedLineCount(); got != wantWide {
+		t.Errorf("after width change getWrappedLineCount() = %d, want fresh-wrap count %d at width %d (stale count for wrong width?)",
+			got, wantWide, wideWidth)
+	}
+
+	// Sanity: a wider preview wraps to fewer-or-equal lines than the narrow one.
+	if wantWide > want {
+		t.Errorf("wider layout produced MORE wrapped lines (%d) than narrow (%d) — width plumbing is wrong", wantWide, want)
+	}
+}
+
+// TestGetWrappedLineCount_StaleWidthRecounts verifies the width guard: a cache
+// left valid but populated for a DIFFERENT width must not be returned as-is;
+// getWrappedLineCount must fall through and re-wrap at the current width so the
+// scroll-bounds count is never stale for the wrong layout.
+func TestGetWrappedLineCount_StaleWidthRecounts(t *testing.T) {
+	m := previewWidthTestModel(80, viewDualPane, modeList)
+	m.populatePreviewCache()
+
+	// Corrupt the cache so it claims a count for a width that no longer matches.
+	m.preview.cachedWidth = m.previewAvailableWidth() - 7
+	m.preview.cachedLineCount = 999999
+	m.preview.cacheValid = true
+
+	want := freshWrapCount(m.preview.content, m.previewAvailableWidth())
+	if got := m.getWrappedLineCount(); got != want {
+		t.Errorf("getWrappedLineCount() returned stale count %d for mismatched width; want fresh-wrap %d", got, want)
+	}
+}
+
+// TestGetWrappedLineCount_EmptyContentCached verifies the removed
+// `cachedLineCount > 0` guard: an empty preview legitimately wraps to 0 lines,
+// and a valid cache holding 0 must be trusted (returned in O(1)) rather than
+// re-wrapping on every call.
+func TestGetWrappedLineCount_EmptyContentCached(t *testing.T) {
+	m := previewWidthTestModel(80, viewDualPane, modeList)
+	m.preview.content = nil // empty file
+	m.populatePreviewCache()
+
+	if m.preview.cachedLineCount != 0 {
+		t.Fatalf("expected empty content to cache 0 lines, got %d", m.preview.cachedLineCount)
+	}
+	if !m.preview.cacheValid {
+		t.Fatal("expected cacheValid for empty content")
+	}
+	// Must hit the cache (return 0) at the matching width, not fall through.
+	if got := m.getWrappedLineCount(); got != 0 {
+		t.Errorf("getWrappedLineCount() = %d for empty cached content, want 0", got)
+	}
+}
+
 // TestPreviewAvailableWidth_Formulas verifies the single-source-of-truth
 // helpers encode the expected per-layout and per-file-type formulas.
 func TestPreviewAvailableWidth_Formulas(t *testing.T) {
