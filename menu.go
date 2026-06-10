@@ -984,7 +984,7 @@ Additional context: {{variable2}}
 		m.setStatusMessage("TUIClassics not found. Install: git clone https://github.com/GGPrompts/TUIClassics ~/TUIClassics && cd ~/TUIClassics && make build", true)
 
 	case "toggle-git-repos":
-		m.toggleGitRepos()
+		return m, m.toggleGitRepos()
 
 	case "toggle-changes":
 		m.toggleChangesMode()
@@ -1008,7 +1008,7 @@ Additional context: {{variable2}}
 		m.togglePrompts()
 
 	case "go-git-repos":
-		m.toggleGitRepos()
+		return m, m.toggleGitRepos()
 
 	case "go-trash":
 		m.toggleTrash()

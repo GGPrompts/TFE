@@ -211,8 +211,12 @@ func (m *model) toggleChangesMode() {
 }
 
 // toggleGitRepos toggles the git repositories filter, scanning recursively when enabled.
+// Returns a tea.Cmd that callers must propagate: when git-repos mode is newly
+// activated it starts the slow background-rescan tick (gitReposTick). The tick
+// is self-perpetuating only while the mode stays active, so the caller need not
+// do anything when the mode is dismissed.
 // Used by: menu (toggle-git-repos, go-git-repos).
-func (m *model) toggleGitRepos() {
+func (m *model) toggleGitRepos() tea.Cmd {
 	if m.showTrashOnly {
 		m.showTrashOnly = false
 		m.trashRestorePath = ""
@@ -220,6 +224,7 @@ func (m *model) toggleGitRepos() {
 
 	m.showGitReposOnly = !m.showGitReposOnly
 
+	var cmd tea.Cmd
 	if m.showGitReposOnly {
 		m.setDisplayMode(modeDetail)
 
@@ -228,10 +233,18 @@ func (m *model) toggleGitRepos() {
 		m.gitReposLastScan = time.Now()
 		m.gitReposScanRoot = m.currentPath
 		m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+
+		// Start the background rescan tick if one isn't already running. The
+		// guard prevents stacking multiple ticks across rapid toggles.
+		if !m.gitReposTickActive {
+			m.gitReposTickActive = true
+			cmd = gitReposTick()
+		}
 	}
 
 	m.cursor = 0
 	m.loadFiles()
+	return cmd
 }
 
 // maxPreviewScroll returns the maximum valid preview scroll position, i.e. the

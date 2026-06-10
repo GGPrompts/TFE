@@ -51,13 +51,33 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// tickMsg for landing page animation
+// tickMsg drives the first-5-seconds startup header (the GitHub/update link
+// shown by renderHeader before the menu bar takes over). It is intentionally
+// short-lived: the handler stops re-arming it once the 5s window has elapsed,
+// so an idle TFE does not wake 20x/sec forever.
 type tickMsg struct{}
 
-// tickCmd creates a command that sends tick messages for animation
+// gitReposTickMsg drives the periodic background rescan of git repositories.
+// It is only scheduled while git-repos mode is active and stops re-arming once
+// the mode is dismissed.
+type gitReposTickMsg struct{}
+
+// tickCmd creates a command that sends tick messages for the startup header.
+// 50ms keeps the 5-second GitHub-link -> menu-bar transition smooth without
+// requiring user input. Only re-armed while still inside the startup window.
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Millisecond*50, func(t time.Time) tea.Msg {
 		return tickMsg{}
+	})
+}
+
+// gitReposTick creates a command that sends a slow (10s) tick used only while
+// git-repos mode is active, to drive the ~60s background rescan check. A coarse
+// interval is fine here: the rescan itself only fires once per minute, and a
+// 10s heartbeat keeps battery-sensitive targets (Termux) from waking 20x/sec.
+func gitReposTick() tea.Cmd {
+	return tea.Tick(10*time.Second, func(t time.Time) tea.Msg {
+		return gitReposTickMsg{}
 	})
 }
 
@@ -254,8 +274,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case tickMsg:
-		// Background refresh for git repos (every 60 seconds)
-		if m.showGitReposOnly && !m.gitReposLastScan.IsZero() {
+		// The 50ms tick only exists to redraw the first-5-seconds startup
+		// header (GitHub/update link). Once that window has elapsed there is
+		// nothing left for it to drive, so stop re-arming it. An idle, non-
+		// landing, non-git-repos TFE then sleeps instead of waking 20x/sec.
+		if time.Since(m.startupTime) < 5*time.Second {
+			return m, tickCmd()
+		}
+		return m, nil
+
+	case gitReposTickMsg:
+		// Background refresh for git repos (every 60 seconds). This tick is
+		// only scheduled while git-repos mode is active; re-arm only while it
+		// stays active so dismissing the mode lets the tick die.
+		if !m.showGitReposOnly {
+			m.gitReposTickActive = false
+			return m, nil
+		}
+		if !m.gitReposLastScan.IsZero() {
 			elapsed := time.Since(m.gitReposLastScan)
 			if elapsed >= 60*time.Second {
 				// Re-scan from the same root directory
@@ -263,8 +299,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.gitReposLastScan = time.Now()
 			}
 		}
-
-		return m, tickCmd() // Continue animation
+		return m, gitReposTick()
 
 	case footerTickMsg:
 		// Animate footer scrolling if active

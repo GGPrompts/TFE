@@ -253,6 +253,7 @@ type model struct {
 	gitReposLastScan  time.Time  // When we last scanned for git repos
 	gitReposScanRoot  string     // Root directory of last scan
 	gitReposScanDepth int        // Max depth to scan (default: 5)
+	gitReposTickActive bool      // True while a gitReposTick is scheduled (prevents stacking ticks)
 	// Git changes filter (working set: modified/untracked files across project)
 	showChangesOnly       bool              // Filter to show only git-changed/untracked files
 	changedFiles          []fileItem        // Cached list of changed files from git status
