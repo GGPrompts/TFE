@@ -309,27 +309,12 @@ func (m model) renderPromptPreview(maxVisible int) string {
 
 	// Add scroll position indicator in dual-pane mode
 	if m.viewMode == viewDualPane && totalLines > 0 {
-		// Calculate scroll percentage based on how far through scrollable content we are
 		contentLinesAvailable := targetLines - len(headerLines)
-		maxScrollPos := totalLines - contentLinesAvailable
-		var scrollPercent int
-		if maxScrollPos <= 0 {
-			// Content fits in one screen
-			scrollPercent = 100
-		} else {
-			scrollPercent = (m.preview.scrollPos * 100) / maxScrollPos
-			if scrollPercent > 100 {
-				scrollPercent = 100
-			}
-		}
 
-		// Show the last visible line number (not the top line)
-		// Use end instead of totalLines since end is already correctly clamped
+		// Show the last visible line number (not the top line);
+		// use end instead of totalLines since end is already correctly clamped.
 		lastVisibleLine := min(start+contentLinesAvailable, end)
-		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", lastVisibleLine, totalLines, scrollPercent)
-		scrollStyle := lipgloss.NewStyle().
-			Foreground(uiSubtleText()).
-			Italic(true)
+		scrollIndicator := m.renderScrollIndicator(lastVisibleLine, totalLines, contentLinesAvailable, " ")
 
 		// Pad with empty lines to reach target
 		for len(renderedLines) < targetLines {
@@ -337,7 +322,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		}
 
 		// Add scroll indicator on last line
-		renderedLines = append(renderedLines, scrollStyle.Render(scrollIndicator))
+		renderedLines = append(renderedLines, scrollIndicator)
 	} else {
 		// Pad with empty lines to reach exactly maxVisible lines
 		for len(renderedLines) < maxVisible {

@@ -561,23 +561,11 @@ func (m model) renderJSONLPreview(maxVisible int) string {
 
 	// Scroll indicator for dual-pane
 	if m.viewMode == viewDualPane && totalLines > 0 {
-		maxScrollPos := totalLines - targetLines
-		var scrollPercent int
-		if maxScrollPos <= 0 {
-			scrollPercent = 100
-		} else {
-			scrollPercent = (m.preview.scrollPos * 100) / maxScrollPos
-			if scrollPercent > 100 {
-				scrollPercent = 100
-			}
-		}
-		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) [jsonl]", end, totalLines, scrollPercent)
+		suffix := " [jsonl]"
 		if m.preview.cachedJSONLIsTailed {
-			scrollIndicator += " | F: load full"
+			suffix += " | F: load full"
 		}
-		scrollStyle := lipgloss.NewStyle().
-			Foreground(uiSubtleText()).
-			Italic(true)
+		scrollIndicator := m.renderScrollIndicator(end, totalLines, targetLines, suffix)
 
 		for linesRendered < targetLines {
 			writeLine("\033[0m")
@@ -585,7 +573,7 @@ func (m model) renderJSONLPreview(maxVisible int) string {
 		if linesRendered > 0 {
 			s.WriteString("\n")
 		}
-		s.WriteString(scrollStyle.Render(scrollIndicator))
+		s.WriteString(scrollIndicator)
 		linesRendered++
 	} else {
 		for linesRendered < maxVisible {
