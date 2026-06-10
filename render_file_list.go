@@ -1119,10 +1119,25 @@ func (m model) buildTreeItems(files []fileItem, depth int, parentLasts []bool) [
 	return items
 }
 
-// updateTreeItems rebuilds the tree items cache (called before rendering tree view)
+// updateTreeItems rebuilds the tree items cache when it has been marked dirty.
+// Rebuilding does disk I/O (loadSubdirFiles per expanded directory), so it is
+// event-driven: state mutations call markTreeItemsDirty() and the rebuild runs
+// lazily here (called from Update, never from View). No-op when the cache is clean.
 func (m *model) updateTreeItems() {
+	if !m.treeItemsDirty {
+		return
+	}
 	files := m.getFilteredFiles()
 	m.treeItems = m.buildTreeItems(files, 0, []bool{})
+	m.treeItemsDirty = false
+}
+
+// markTreeItemsDirty flags the cached tree items for a lazy rebuild.
+// Call this whenever state that feeds buildTreeItems changes: m.files
+// (loadFiles/sortFiles), expandedDirs, showHidden, search filter
+// (filteredIndices), favorites/prompts/changes filters, or sort settings.
+func (m *model) markTreeItemsDirty() {
+	m.treeItemsDirty = true
 }
 
 // renderTreeView renders files in a hierarchical tree structure with expandable folders

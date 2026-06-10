@@ -26,8 +26,7 @@ func (m model) getCurrentFile() *fileItem {
 
 	// In tree view, we need to map cursor to the flattened tree
 	if m.displayMode == modeTree {
-		files := m.getFilteredFiles()
-		treeItems := m.buildTreeItems(files, 0, []bool{})
+		treeItems := m.currentTreeItems()
 		if m.cursor < len(treeItems) {
 			return &treeItems[m.cursor].file
 		}
@@ -46,13 +45,23 @@ func (m model) getCurrentFile() *fileItem {
 // getMaxCursor returns the maximum valid cursor position for the current display mode
 func (m model) getMaxCursor() int {
 	if m.displayMode == modeTree {
-		files := m.getFilteredFiles()
-		treeItems := m.buildTreeItems(files, 0, []bool{})
-		return len(treeItems) - 1
+		return len(m.currentTreeItems()) - 1
 	}
 
 	files := m.getFilteredFiles()
 	return len(files) - 1
+}
+
+// currentTreeItems returns the cached tree items, rebuilding a local snapshot
+// only when the cache has been marked dirty (i.e., a handler mutated tree state
+// earlier in the same event and updateTreeItems hasn't run yet). The common
+// path is a free cache read; the rebuild fallback keeps mid-event reads correct
+// without persisting (value receiver).
+func (m model) currentTreeItems() []treeItem {
+	if m.treeItemsDirty {
+		return m.buildTreeItems(m.getFilteredFiles(), 0, []bool{})
+	}
+	return m.treeItems
 }
 
 // getDisplayPath returns a user-friendly path with home directory replaced by ~
@@ -485,6 +494,7 @@ func (m *model) clearSearchFilter() {
 	m.searchMode = false
 	m.searchQuery = ""
 	m.filteredIndices = nil
+	m.markTreeItemsDirty() // filter feeds getFilteredFiles, which feeds the tree cache
 }
 
 // navigateToPath changes the current path and automatically exits special modes (trash, favorites, etc)
@@ -538,6 +548,7 @@ func (m *model) exitChangesMode() {
 	m.agentSessions = nil
 	m.agentFileMap = nil
 	m.displayMode = m.changesRestoreDisplay
+	m.markTreeItemsDirty() // changes filter (and possibly display mode) changed
 	m.calculateLayout()
 }
 

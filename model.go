@@ -132,6 +132,12 @@ func initialModel() model {
 
 	m.loadFiles()
 
+	// Build the tree cache once at startup if the configured view is tree mode,
+	// so the first frame isn't empty (rebuilds are event-driven from here on)
+	if m.displayMode == modeTree {
+		m.updateTreeItems()
+	}
+
 	// Initialize file watcher (fsnotify) for live directory refresh
 	if cfg.FileWatcherEnabled {
 		m.initWatcher()

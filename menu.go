@@ -833,13 +833,15 @@ Additional context: {{variable2}}
 	case "display-list":
 		m.displayMode = modeList
 		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
-		m.calculateLayout()                    // Recalculate widths for new display mode
+		m.markTreeItemsDirty()
+		m.calculateLayout() // Recalculate widths for new display mode
 
 	case "display-detail":
 		m.displayMode = modeDetail
 		m.detailScrollX = 0                    // Reset scroll when switching to detail view
 		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
-		m.calculateLayout()                    // Recalculate widths for detail view columns
+		m.markTreeItemsDirty()
+		m.calculateLayout() // Recalculate widths for detail view columns
 
 	case "display-tree":
 		m.displayMode = modeTree
@@ -849,6 +851,7 @@ Additional context: {{variable2}}
 		// Collapse all expanded folders in tree view
 		if m.displayMode == modeTree {
 			m.expandedDirs = make(map[string]bool)
+			m.markTreeItemsDirty()
 			m.setStatusMessage("All folders collapsed", false)
 		} else {
 			m.setStatusMessage("Collapse all only works in tree view (press 3)", false)
@@ -898,6 +901,7 @@ Additional context: {{variable2}}
 		if !m.searchMode {
 			m.searchQuery = ""
 			m.filteredIndices = nil
+			m.markTreeItemsDirty()
 			m.cursor = 0
 		}
 

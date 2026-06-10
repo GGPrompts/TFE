@@ -317,6 +317,10 @@ func (m *model) loadFiles() {
 	// pick up changed directory contents (loadFiles also runs on fsnotify events)
 	m.dirCountCache = make(map[string]int)
 
+	// The file listing is about to change, so the cached tree view (which is
+	// built from m.files plus expanded subdirectories) needs a rebuild
+	m.markTreeItemsDirty()
+
 	// Special handling for trash view
 	if m.showTrashOnly {
 		trashItems, err := getTrashItems()
@@ -552,6 +556,9 @@ func (m *model) loadFiles() {
 // When sorting by name: keeps folders grouped before files (traditional behavior)
 // When sorting by other criteria: mixes folders and files
 func (m *model) sortFiles() {
+	// Reordering m.files invalidates the cached tree view
+	m.markTreeItemsDirty()
+
 	// When in git repos mode, sort gitReposList instead of files
 	if m.showGitReposOnly {
 		m.sortGitReposList()

@@ -1213,6 +1213,7 @@ rm -f "$0"
 			m.searchMode = false
 			m.searchQuery = ""
 			m.filteredIndices = nil
+			m.markTreeItemsDirty()
 			m.cursor = 0 // Reset cursor
 			return m, nil
 
@@ -1222,6 +1223,7 @@ rm -f "$0"
 				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
 				// Update filtered results
 				m.filteredIndices = m.filterFilesBySearch(m.searchQuery)
+				m.markTreeItemsDirty()
 				// Reset cursor if out of bounds
 				if m.cursor >= len(m.filteredIndices) {
 					m.cursor = 0
@@ -1250,6 +1252,7 @@ rm -f "$0"
 					m.searchQuery += text
 					// Update filtered results
 					m.filteredIndices = m.filterFilesBySearch(m.searchQuery)
+					m.markTreeItemsDirty()
 					// Reset cursor if out of bounds
 					if m.cursor >= len(m.filteredIndices) {
 						m.cursor = 0
@@ -1539,6 +1542,7 @@ rm -f "$0"
 			m.searchMode = true
 			m.searchQuery = ""
 			m.filteredIndices = m.filterFilesBySearch("")
+			m.markTreeItemsDirty()
 		}
 		return m, nil
 
@@ -1803,6 +1807,7 @@ rm -f "$0"
 				m.searchMode = false
 				m.searchQuery = ""
 				m.filteredIndices = nil
+				m.markTreeItemsDirty()
 				m.calculateLayout() // Update widths for full-screen
 				// Populate cache synchronously for full preview (user expects instant display)
 				m.populatePreviewCache()
@@ -1903,6 +1908,7 @@ rm -f "$0"
 				m.searchMode = false
 				m.searchQuery = ""
 				m.filteredIndices = nil
+				m.markTreeItemsDirty()
 				m.calculateLayout() // Update widths for full-screen
 				m.populatePreviewCache() // Repopulate cache with correct width
 				// Clear screen for clean rendering
@@ -2021,6 +2027,7 @@ rm -f "$0"
 					// If directory is expanded, collapse it
 					if m.expandedDirs[currentFile.path] {
 						m.expandedDirs[currentFile.path] = false
+						m.markTreeItemsDirty()
 					} else {
 						// Already collapsed, go to parent
 						if m.currentPath != "/" {
@@ -2113,6 +2120,7 @@ rm -f "$0"
 				// If directory is collapsed, expand it
 				if !m.expandedDirs[currentFile.path] {
 					m.expandedDirs[currentFile.path] = true
+					m.markTreeItemsDirty()
 				} else {
 					// Already expanded, navigate into it
 					m.navigateToPath(currentFile.path)
@@ -2255,12 +2263,14 @@ rm -f "$0"
 		m.displayMode = modeList
 		// Reset tree expansion when leaving tree view
 		m.expandedDirs = make(map[string]bool)
+		m.markTreeItemsDirty()
 
 	case "2":
 		// Switch to detail view
 		m.displayMode = modeDetail
 		// Reset tree expansion when leaving tree view
 		m.expandedDirs = make(map[string]bool)
+		m.markTreeItemsDirty()
 		// Recalculate layout to ensure correct width for detail view columns
 		m.calculateLayout()
 		// Refresh preview cache if in dual-pane mode
@@ -2285,6 +2295,7 @@ rm -f "$0"
 		} else if m.displayMode == modeTree {
 			// Clear all expanded directories to reset tree view
 			m.expandedDirs = make(map[string]bool)
+			m.markTreeItemsDirty()
 			m.setStatusMessage("All folders collapsed", false)
 		} else {
 			// Not in tree view and no tabs - show helpful message

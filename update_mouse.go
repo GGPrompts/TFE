@@ -316,6 +316,7 @@ git pull
 						m.displayMode = modeList
 						// Reset tree expansion when leaving tree view
 						m.expandedDirs = make(map[string]bool)
+						m.markTreeItemsDirty()
 					}
 					m.calculateLayout() // Recalculate widths for new display mode
 					return m, nil
@@ -406,6 +407,7 @@ git pull
 								m.searchQuery = ""
 								m.filteredIndices = m.filterFilesBySearch("")
 							}
+							m.markTreeItemsDirty()
 						}
 					}
 					return m, nil
@@ -501,6 +503,7 @@ git pull
 					m.searchMode = false
 					m.searchQuery = ""
 					m.filteredIndices = nil
+					m.markTreeItemsDirty()
 				}
 
 				// Calculate which column was clicked based on X position

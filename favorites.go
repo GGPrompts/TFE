@@ -92,6 +92,10 @@ func (m *model) toggleFavorite(path string) {
 		m.favorites[path] = true
 	}
 
+	// Tree view filters expanded-subdir contents by favorites when the
+	// favorites filter is active, so the cached tree may now be stale
+	m.markTreeItemsDirty()
+
 	// Save to disk
 	saveFavorites(m.favorites)
 }

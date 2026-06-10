@@ -279,8 +279,9 @@ type model struct {
 	filePickerRestorePrompts bool              // Whether to restore prompts filter after file picker
 	filePickerCopySource     string            // Source path when picking copy destination (context menu)
 	// Tree view expansion
-	expandedDirs map[string]bool // Path -> expanded state
-	treeItems    []treeItem      // Cached tree items for tree view
+	expandedDirs   map[string]bool // Path -> expanded state
+	treeItems      []treeItem      // Cached tree items for tree view
+	treeItemsDirty bool            // Tree cache needs rebuild (set via markTreeItemsDirty)
 	// Context menu (right-click menu)
 	contextMenuOpen   bool
 	contextMenuX      int

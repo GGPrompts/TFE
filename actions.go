@@ -169,6 +169,7 @@ func (m *model) togglePrompts() {
 			globalPromptsDir := filepath.Join(homeDir, ".prompts")
 			if info, err := os.Stat(globalPromptsDir); err == nil && info.IsDir() {
 				m.expandedDirs[globalPromptsDir] = true
+				m.markTreeItemsDirty()
 			} else {
 				m.setStatusMessage("💡 Tip: Create ~/.prompts/ folder for global prompts (see helper below)", false)
 			}

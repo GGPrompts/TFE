@@ -5,6 +5,7 @@ package main
 // (location/branch/commit/description/type) — see tfe-mda.
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -197,5 +198,180 @@ func TestTruncateNameWithEllipsisVirtualFolderPrefix(t *testing.T) {
 				t.Errorf("prefix %q width %d: visual width %d exceeds target: %q", prefix, width, vw, got)
 			}
 		}
+	}
+}
+
+// --- Event-driven tree cache tests (tfe-xsx) ---
+//
+// updateTreeItems must be a lazy, event-driven rebuild: a no-op while the
+// cache is clean (so tree mode pays no disk I/O per tea.Msg) and a full
+// rebuild once markTreeItemsDirty has been called.
+
+// newTreeTestModel builds a minimal tree-mode model with two synthetic files
+// and a freshly built (clean) tree cache.
+func newTreeTestModel(t *testing.T) *model {
+	t.Helper()
+	m := &model{
+		displayMode:  modeTree,
+		expandedDirs: make(map[string]bool),
+		files: []fileItem{
+			{name: "alpha.txt", path: "/synthetic/alpha.txt"},
+			{name: "beta.txt", path: "/synthetic/beta.txt"},
+		},
+	}
+	m.markTreeItemsDirty()
+	m.updateTreeItems()
+	if len(m.treeItems) != 2 {
+		t.Fatalf("Setup: expected 2 tree items after initial rebuild, got %d", len(m.treeItems))
+	}
+	return m
+}
+
+// TestUpdateTreeItemsNoOpWhenClean verifies that updateTreeItems does not
+// rebuild the cache when nothing marked it dirty, even if the underlying
+// state changed behind its back.
+func TestUpdateTreeItemsNoOpWhenClean(t *testing.T) {
+	m := newTreeTestModel(t)
+
+	if m.treeItemsDirty {
+		t.Fatal("treeItemsDirty should be cleared after a rebuild")
+	}
+
+	// Mutate the file list WITHOUT marking the cache dirty
+	m.files = append(m.files, fileItem{name: "gamma.txt", path: "/synthetic/gamma.txt"})
+
+	m.updateTreeItems()
+	if len(m.treeItems) != 2 {
+		t.Errorf("updateTreeItems rebuilt a clean cache: got %d items, want 2 (no-op)", len(m.treeItems))
+	}
+}
+
+// TestUpdateTreeItemsRebuildsWhenDirty verifies that marking the cache dirty
+// causes the next updateTreeItems call to rebuild it from current state and
+// clear the flag.
+func TestUpdateTreeItemsRebuildsWhenDirty(t *testing.T) {
+	m := newTreeTestModel(t)
+
+	m.files = append(m.files, fileItem{name: "gamma.txt", path: "/synthetic/gamma.txt"})
+	m.markTreeItemsDirty()
+
+	m.updateTreeItems()
+	if len(m.treeItems) != 3 {
+		t.Errorf("Expected rebuild to pick up 3 files, got %d items", len(m.treeItems))
+	}
+	if m.treeItemsDirty {
+		t.Error("treeItemsDirty should be cleared after rebuild")
+	}
+}
+
+// TestCurrentTreeItemsDirtyFallback verifies that getCurrentFile/getMaxCursor
+// read the cached treeItems when clean, but fall back to a fresh local build
+// when the cache is dirty (mid-event mutation), without touching the cache.
+func TestCurrentTreeItemsDirtyFallback(t *testing.T) {
+	m := newTreeTestModel(t)
+
+	// Clean cache: reads come straight from m.treeItems
+	if got := m.getMaxCursor(); got != 1 {
+		t.Fatalf("getMaxCursor (clean) = %d, want 1", got)
+	}
+	m.cursor = 1
+	if f := m.getCurrentFile(); f == nil || f.name != "beta.txt" {
+		t.Fatalf("getCurrentFile (clean) = %v, want beta.txt", f)
+	}
+
+	// Simulate a mid-event mutation: state changed and dirty flag set, but
+	// updateTreeItems has not run yet
+	m.files = append(m.files, fileItem{name: "gamma.txt", path: "/synthetic/gamma.txt"})
+	m.markTreeItemsDirty()
+
+	if got := m.getMaxCursor(); got != 2 {
+		t.Errorf("getMaxCursor (dirty) = %d, want 2 (fresh rebuild fallback)", got)
+	}
+	m.cursor = 2
+	if f := m.getCurrentFile(); f == nil || f.name != "gamma.txt" {
+		t.Errorf("getCurrentFile (dirty) = %v, want gamma.txt", f)
+	}
+
+	// The fallback must not have mutated the cache (value receivers)
+	if len(m.treeItems) != 2 {
+		t.Errorf("Dirty-read fallback mutated the cache: %d items, want 2", len(m.treeItems))
+	}
+	if !m.treeItemsDirty {
+		t.Error("Dirty flag should remain set until updateTreeItems runs")
+	}
+}
+
+// TestLoadFilesMarksTreeDirty verifies the loadFiles integration point: any
+// directory (re)load flags the tree cache so the next Update rebuilds it.
+func TestLoadFilesMarksTreeDirty(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFileWithContent(t, filepath.Join(tmpDir, "one.txt"), []byte("x"))
+
+	m := &model{
+		displayMode:  modeTree,
+		expandedDirs: make(map[string]bool),
+		currentPath:  tmpDir,
+	}
+	m.loadFiles()
+	if !m.treeItemsDirty {
+		t.Fatal("loadFiles should mark the tree cache dirty")
+	}
+
+	m.updateTreeItems()
+	if m.treeItemsDirty {
+		t.Fatal("updateTreeItems should clear the dirty flag")
+	}
+
+	// New file appears on disk; reload (as the fsnotify path does) must
+	// re-flag the cache
+	createTestFileWithContent(t, filepath.Join(tmpDir, "two.txt"), []byte("y"))
+	m.loadFiles()
+	if !m.treeItemsDirty {
+		t.Error("loadFiles after a disk change should mark the tree cache dirty again")
+	}
+	m.updateTreeItems()
+
+	// Tree should now include ".." + both files
+	found := false
+	for _, item := range m.treeItems {
+		if item.file.name == "two.txt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Rebuilt tree missing new file two.txt (items: %d)", len(m.treeItems))
+	}
+}
+
+// TestExpandCollapseMarksTreeDirty verifies that toggling a directory's
+// expansion plus a dirty-flag rebuild surfaces (and removes) its children.
+func TestExpandCollapseMarksTreeDirty(t *testing.T) {
+	tmpDir := t.TempDir()
+	subDir := filepath.Join(tmpDir, "sub")
+	createTestFileWithContent(t, filepath.Join(subDir, "child.txt"), []byte("x"))
+
+	m := &model{
+		displayMode:  modeTree,
+		expandedDirs: make(map[string]bool),
+		currentPath:  tmpDir,
+	}
+	m.loadFiles()
+	m.updateTreeItems()
+	baseCount := len(m.treeItems)
+
+	// Expand (as the keyboard handler does: mutate + mark dirty)
+	m.expandedDirs[subDir] = true
+	m.markTreeItemsDirty()
+	m.updateTreeItems()
+	if len(m.treeItems) != baseCount+1 {
+		t.Errorf("Expected %d items after expanding sub/, got %d", baseCount+1, len(m.treeItems))
+	}
+
+	// Collapse
+	m.expandedDirs[subDir] = false
+	m.markTreeItemsDirty()
+	m.updateTreeItems()
+	if len(m.treeItems) != baseCount {
+		t.Errorf("Expected %d items after collapsing sub/, got %d", baseCount, len(m.treeItems))
 	}
 }

@@ -195,7 +195,9 @@ func isSpecialKey(key string) bool {
 
 // Update is the main message dispatcher
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Update tree items cache if in tree mode (before processing events)
+	// Rebuild the tree items cache if a previous event marked it dirty.
+	// This is a no-op when the cache is clean (the common case), so tree
+	// mode no longer pays disk I/O on every message.
 	if m.displayMode == modeTree {
 		m.updateTreeItems()
 	}
@@ -207,6 +209,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		newModel, cmd := m.handleKeyEvent(msg)
 		if nm, ok := newModel.(model); ok {
 			nm.refreshPreviewCacheIfStale()
+			if nm.displayMode == modeTree {
+				nm.updateTreeItems() // rebuild now (if dirtied) so View renders this event's changes
+			}
 			return nm, cmd
 		}
 		return newModel, cmd
@@ -217,6 +222,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		newModel, cmd := m.handleMouseEvent(msg)
 		if nm, ok := newModel.(model); ok {
 			nm.refreshPreviewCacheIfStale()
+			if nm.displayMode == modeTree {
+				nm.updateTreeItems() // rebuild now (if dirtied) so View renders this event's changes
+			}
 			return nm, cmd
 		}
 		return newModel, cmd
