@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -250,60 +251,47 @@ func getGitStatus(repoPath string) gitStatus {
 	return status
 }
 
-// getAheadBehindCounts returns how many commits ahead/behind the remote
-// Returns (0, 0) if no remote or error occurs
+// getAheadBehindCounts returns how many commits the local branch is ahead/behind
+// its origin tracking branch. It runs a single cheap subprocess
+// (git rev-list --left-right --count branch...origin/branch).
+//
+// Returns (0, 0) when there is no upstream, the branch is detached/empty, or any
+// error occurs (e.g. unborn branch, no origin remote) - we never fabricate a
+// direction. Mirrors the error-handling style of hasUncommittedChanges.
 func getAheadBehindCounts(repoPath, branch string) (int, int) {
 	if branch == "" {
+		// Detached HEAD or unborn branch - nothing to compare against.
 		return 0, 0
 	}
 
-	// Read local branch ref
-	localRef := filepath.Join(repoPath, ".git", "refs", "heads", branch)
-	localHash, err := os.ReadFile(localRef)
+	// --left-right --count emits two tab/space-separated counts:
+	//   <ahead>\t<behind>
+	// where ahead = commits in branch not in origin/branch (left side of A...B),
+	// and behind = commits in origin/branch not in branch (right side).
+	revRange := branch + "...origin/" + branch
+	cmd := exec.Command("git", "-C", repoPath, "rev-list", "--left-right", "--count", revRange)
+	output, err := cmd.Output()
+	if err != nil {
+		// No upstream tracking branch (origin/<branch> missing), no origin
+		// remote, or other git error - treat as in-sync rather than guessing.
+		return 0, 0
+	}
+
+	fields := strings.Fields(strings.TrimSpace(string(output)))
+	if len(fields) != 2 {
+		return 0, 0
+	}
+
+	ahead, err := strconv.Atoi(fields[0])
 	if err != nil {
 		return 0, 0
 	}
-	localCommit := strings.TrimSpace(string(localHash))
-
-	// Read remote branch ref (assuming origin)
-	remoteRef := filepath.Join(repoPath, ".git", "refs", "remotes", "origin", branch)
-	remoteHash, err := os.ReadFile(remoteRef)
+	behind, err := strconv.Atoi(fields[1])
 	if err != nil {
-		// No remote tracking branch
 		return 0, 0
 	}
-	remoteCommit := strings.TrimSpace(string(remoteHash))
-
-	// If commits are the same, we're in sync
-	if localCommit == remoteCommit {
-		return 0, 0
-	}
-
-	// Count commits ahead and behind using git log
-	// This is a simplified check - real implementation would parse git objects
-	// For now, we'll use a heuristic based on commit hash comparison
-	// If local != remote, we're either ahead or behind (or diverged)
-
-	// Try to determine ahead/behind by checking packed-refs as fallback
-	ahead, behind := checkPackedRefs(repoPath, branch, localCommit, remoteCommit)
 
 	return ahead, behind
-}
-
-// checkPackedRefs checks packed-refs file for commit history
-// This is a simplified heuristic - not 100% accurate
-func checkPackedRefs(repoPath, branch, localCommit, remoteCommit string) (int, int) {
-	// For now, if commits differ, assume we're ahead by 1
-	// A proper implementation would parse the git object database
-	// This is a placeholder for the real git log parsing
-
-	// Simple heuristic: if local and remote differ, mark as diverged (1 ahead, 1 behind)
-	// Real implementation would use: git rev-list --count local..remote
-	if localCommit != remoteCommit {
-		return 1, 0 // Assume ahead for now
-	}
-
-	return 0, 0
 }
 
 // getLastCommitInfo returns the last commit message and time
