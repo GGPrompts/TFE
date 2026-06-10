@@ -82,6 +82,42 @@ func wrapLine(line string, width int) []string {
 	return wrapped
 }
 
+// previewBoxContentWidth returns the inner content width of the preview box
+// for the current layout. This is the SINGLE source of truth for the preview
+// width branching: populatePreviewCache(), renderPreview(), and
+// getWrappedLineCount() must all derive their widths from this helper.
+// If any call site computes the width ad hoc and disagrees, the wrap/Glamour
+// cache silently misses and the whole preview is re-wrapped (or re-rendered
+// through Glamour) on every frame/scroll event.
+func (m model) previewBoxContentWidth() int {
+	if m.viewMode == viewFullPreview {
+		return m.width - 6 // Full preview: box is Width(m.width - 6)
+	}
+	if m.displayMode == modeDetail || m.isNarrowTerminal() {
+		return m.width - 6 // Vertical split: box is Width(m.width - 6)
+	}
+	return m.rightWidth - 2 // Horizontal split: box is Width(m.rightWidth - 2)
+}
+
+// previewAvailableWidth returns the width available for preview text content,
+// derived from previewBoxContentWidth() based on the current file type.
+// Never compute this ad hoc — see previewBoxContentWidth().
+func (m model) previewAvailableWidth() int {
+	availableWidth := m.previewBoxContentWidth()
+	if m.preview.isMarkdown {
+		// Markdown: no line numbers or scrollbar, but subtract 2 for left
+		// padding (prevents code blocks from touching the border)
+		availableWidth -= 2
+	} else {
+		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
+		availableWidth -= 8
+	}
+	if availableWidth < 20 {
+		availableWidth = 20 // Minimum width
+	}
+	return availableWidth
+}
+
 // getWrappedLineCount calculates the total number of wrapped lines for the current preview
 func (m model) getWrappedLineCount() int {
 	if !m.preview.loaded {
@@ -90,13 +126,8 @@ func (m model) getWrappedLineCount() int {
 
 	// JSONL files: compute rendered line count at current width
 	if m.preview.isJSONL && len(m.preview.cachedJSONLMessages) > 0 {
-		var boxContentWidth int
-		if m.viewMode == viewFullPreview {
-			boxContentWidth = m.width - 6
-		} else {
-			boxContentWidth = m.rightWidth - 2
-		}
-		availableWidth := boxContentWidth - 2
+		// Must match renderJSONLPreview(): scrollbar (1) + space (1)
+		availableWidth := m.previewBoxContentWidth() - 2
 		if availableWidth < 20 {
 			availableWidth = 20
 		}
@@ -104,28 +135,9 @@ func (m model) getWrappedLineCount() int {
 		return len(lines)
 	}
 
-	// Calculate available width based on file type and view mode
-	var availableWidth int
-	var boxContentWidth int
-
-	if m.viewMode == viewFullPreview {
-		boxContentWidth = m.width - 6 // Box content width in full preview
-	} else {
-		boxContentWidth = m.rightWidth - 6 // Box content width in dual-pane (match full preview)
-	}
-
-	if m.preview.isMarkdown {
-		// Markdown: no line numbers or scrollbar, but add left padding for readability
-		// Subtract 2 for left padding (prevents code blocks from touching border)
-		availableWidth = boxContentWidth - 2
-	} else {
-		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
-		availableWidth = boxContentWidth - 8
-	}
-
-	if availableWidth < 20 {
-		availableWidth = 20
-	}
+	// Calculate available width via the shared helper so the cache check below
+	// agrees with populatePreviewCache() and renderPreview()
+	availableWidth := m.previewAvailableWidth()
 
 	// Use cached line count if available and width matches
 	if m.preview.cacheValid && m.preview.cachedLineCount > 0 && m.preview.cachedWidth == availableWidth {

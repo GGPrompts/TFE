@@ -39,30 +39,11 @@ func (m model) renderPreview(maxVisible int) string {
 		return m.renderJSONLPreview(maxVisible)
 	}
 
-	// Calculate available width for content based on file type and view mode
-	var availableWidth int
-	var boxContentWidth int // Width of the box content area
-
-	if m.viewMode == viewFullPreview {
-		boxContentWidth = m.width - 6 // Box content width in full preview
-	} else if m.displayMode == modeDetail || m.isNarrowTerminal() {
-		boxContentWidth = m.width - 6 // Vertical split: box is Width(m.width - 6)
-	} else {
-		boxContentWidth = m.rightWidth - 2 // Horizontal split: box is Width(m.rightWidth - 2)
-	}
-
-	if m.preview.isMarkdown {
-		// Markdown: no line numbers or scrollbar, but add left padding for readability
-		// Subtract 2 for left padding (prevents code blocks from touching border)
-		availableWidth = boxContentWidth - 2
-	} else {
-		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
-		availableWidth = boxContentWidth - 8
-	}
-
-	if availableWidth < 20 {
-		availableWidth = 20 // Minimum width
-	}
+	// Calculate available width for content via the shared helpers so the
+	// cachedWidth check below agrees with populatePreviewCache() and
+	// getWrappedLineCount() — never compute these ad hoc
+	boxContentWidth := m.previewBoxContentWidth() // Width of the box content area
+	availableWidth := m.previewAvailableWidth()
 
 	// If markdown, render with Glamour
 	if m.preview.isMarkdown && m.preview.cachedRenderedContent != "" {

@@ -202,12 +202,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Dispatch to keyboard event handler
-		return m.handleKeyEvent(msg)
+		// Dispatch to keyboard event handler, then refresh the preview cache
+		// once if the handler changed the layout (viewMode/displayMode/focus)
+		newModel, cmd := m.handleKeyEvent(msg)
+		if nm, ok := newModel.(model); ok {
+			nm.refreshPreviewCacheIfStale()
+			return nm, cmd
+		}
+		return newModel, cmd
 
 	case tea.MouseMsg:
-		// Dispatch to mouse event handler
-		return m.handleMouseEvent(msg)
+		// Dispatch to mouse event handler, then refresh the preview cache
+		// once if the handler changed the layout (viewMode/displayMode/focus)
+		newModel, cmd := m.handleMouseEvent(msg)
+		if nm, ok := newModel.(model); ok {
+			nm.refreshPreviewCacheIfStale()
+			return nm, cmd
+		}
+		return newModel, cmd
 
 	case tea.WindowSizeMsg:
 		// Handle window resize

@@ -323,6 +323,44 @@ Terminal width: 60 chars
 
 ---
 
+## Preview Width Must Come From the Single Helper
+
+### The Rule
+**Never compute the preview pane's available width ad hoc. Always use `m.previewBoxContentWidth()` / `m.previewAvailableWidth()` (text_wrapping.go).**
+
+```go
+// ❌ WRONG - Ad-hoc formula, will drift from the cache's width
+boxContentWidth := m.rightWidth - 2
+availableWidth := boxContentWidth - 8
+
+// ✅ RIGHT - Single source of truth
+boxContentWidth := m.previewBoxContentWidth()
+availableWidth := m.previewAvailableWidth()
+```
+
+### Why This Matters
+The preview wrap/Glamour cache (`m.preview.cachedWidth`) only hits when the
+reader computes the **exact same width** the cache was populated with. Before
+this rule, three call sites (populatePreviewCache, renderPreview,
+getWrappedLineCount) used three different formulas, so in dual-pane layouts the
+cache **never** hit: the entire file was silently re-wrapped on every frame,
+and markdown went through a full Glamour render on every scroll keypress.
+Worse, the fallback paths are value receivers, so the recomputed result could
+never be stored back — the cost repeated forever. A width-formula mismatch
+produces **no visible bug**, only invisible per-frame CPU burn.
+
+### Cache Refresh on Layout Change
+`Update()` calls `m.refreshPreviewCacheIfStale()` after every keyboard/mouse
+dispatch: if the layout changed (viewMode, displayMode, focus/accordion ratio),
+the cache is repopulated **once** at the new width. Handlers don't need to
+remember to call `populatePreviewCache()` after layout changes anymore — but
+they must never bypass the helper's width formula.
+
+`TestPreviewWidth_CacheAgreesAcrossCallSites` (text_wrapping_test.go) guards
+this invariant across all layout modes.
+
+---
+
 ## Scroll Bounds Checking
 
 ### The Problem

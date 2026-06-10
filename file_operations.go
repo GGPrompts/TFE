@@ -1131,28 +1131,10 @@ func (m *model) populatePreviewCache() {
 		return
 	}
 
-	// Calculate available width - must match renderPreview() logic exactly
-	var availableWidth int
-	var boxContentWidth int
-
-	if m.viewMode == viewFullPreview {
-		boxContentWidth = m.width - 6 // Box content width in full preview
-	} else {
-		boxContentWidth = m.rightWidth - 2 // Box content width in dual-pane (accounting for borders)
-	}
-
-	if m.preview.isMarkdown {
-		// Markdown: no line numbers or scrollbar, but add left padding for readability
-		// Subtract 2 for left padding (prevents code blocks from touching border)
-		availableWidth = boxContentWidth - 2
-	} else {
-		// Regular text: subtract line nums (6) + scrollbar (1) + space (1) = 8 chars
-		availableWidth = boxContentWidth - 8
-	}
-
-	if availableWidth < 20 {
-		availableWidth = 20 // Minimum width
-	}
+	// Calculate available width via the shared helper - this is the same
+	// formula renderPreview() and getWrappedLineCount() use, so the cache
+	// written here is guaranteed to hit on render
+	availableWidth := m.previewAvailableWidth()
 
 	// Cache markdown rendering
 	if m.preview.isMarkdown {
@@ -1196,6 +1178,10 @@ func (m *model) populatePreviewCache() {
 	}
 
 	// Cache wrapped text lines
+	// Recompute the width first: if markdown fell back to plain text above,
+	// the plain-text formula differs (line numbers + scrollbar vs padding)
+	availableWidth = m.previewAvailableWidth()
+
 	var wrappedLines []string
 	for _, line := range m.preview.content {
 		wrapped := wrapLine(line, availableWidth)
@@ -1205,6 +1191,26 @@ func (m *model) populatePreviewCache() {
 	m.preview.cachedLineCount = len(wrappedLines)
 	m.preview.cachedWidth = availableWidth
 	m.preview.cacheValid = true
+}
+
+// refreshPreviewCacheIfStale re-populates the preview cache when the width it
+// was computed for no longer matches the width the preview will render at
+// (previewAvailableWidth()). Called from Update after keyboard/mouse dispatch
+// so viewMode/displayMode/focus changes refresh the cache exactly once,
+// instead of renderPreview() falling back to a full re-wrap on every frame
+// (a value receiver, so it can never store the result back).
+func (m *model) refreshPreviewCacheIfStale() {
+	if !m.preview.loaded {
+		return
+	}
+	// JSONL and graphics-protocol previews don't use the wrap/Glamour cache
+	if m.preview.isJSONL || m.preview.hasGraphicsProtocol {
+		return
+	}
+	if m.preview.cacheValid && m.preview.cachedWidth == m.previewAvailableWidth() {
+		return // Cache already matches the current layout
+	}
+	m.populatePreviewCache()
 }
 
 // renderMarkdownWithTimeout renders markdown with a timeout to prevent hangs
