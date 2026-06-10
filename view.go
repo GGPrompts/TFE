@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -78,134 +77,12 @@ func (m model) View() string {
 func (m model) renderSinglePane() string {
 	var s strings.Builder
 
-	// Check if we should show GitHub link (first 5 seconds) or menu bar
-	showGitHub := time.Since(m.startupTime) < 5*time.Second
+	// Shared header: GitHub/update title (or menu bar) + toolbar row
+	// (see render_layout.go)
+	s.WriteString(m.renderHeader(""))
 
-	if showGitHub {
-		// Title with mode indicator (first 5 seconds)
-		titleText := "(T)erminal (F)ile (E)xplorer"
-		if m.commandFocused {
-			titleText += " [Command Mode]"
-		}
-		if m.filePickerMode {
-			if m.filePickerCopySource != "" {
-				titleText += " [📋 Copy Mode - Select Destination]"
-			} else {
-				titleText += " [📁 File Picker]"
-			}
-		}
-
-		// Right side: Update notification or GitHub link
-		var rightLink string
-		var displayText string
-
-		if m.updateAvailable {
-			// Show update available with clickable link
-			displayText = fmt.Sprintf("🎉 Update Available: %s (click for details)", m.updateVersion)
-			// Use special marker URL so we can detect clicks in mouse handler
-			rightLink = fmt.Sprintf("\033]8;;update-available\033\\%s\033]8;;\033\\", displayText)
-		} else {
-			// Show GitHub link
-			githubURL := "https://github.com/GGPrompts/TFE"
-			displayText = githubURL
-			rightLink = fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", githubURL, githubURL)
-		}
-
-		// Calculate spacing to right-align
-		availableWidth := m.width - len(titleText) - len(displayText) - 2
-		if availableWidth < 1 {
-			availableWidth = 1
-		}
-		spacing := strings.Repeat(" ", availableWidth)
-
-		// Render title on left, link/update on right
-		title := titleStyle.Render(titleText) + spacing + titleStyle.Render(rightLink)
-		s.WriteString(title)
-		s.WriteString("\033[0m") // Reset ANSI codes
-		s.WriteString("\n")
-	} else {
-		// Show menu bar after 5 seconds
-		menuBar := m.renderMenuBar()
-		s.WriteString(menuBar)
-		s.WriteString("\n")
-	}
-
-	// Toolbar buttons row
-	s.WriteString(m.renderToolbarRow())
-
-	s.WriteString("\033[0m") // Reset ANSI codes
-	s.WriteString("\n")
-
-	// Command prompt with path (terminal-style)
-	promptPrefix := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true).Render("$ ")
-	pathPromptStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
-	inputStyle := lipgloss.NewStyle().Foreground(uiBodyText())
-
-	s.WriteString(promptPrefix)
-	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
-	s.WriteString(" ")
-
-	// Show helper text based on focus state
-	helperStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
-	if !m.commandFocused && m.commandInput == "" {
-		// Not focused - show contextual hints
-		if m.displayMode == modeDetail && m.isNarrowTerminal() {
-			// Detail view on narrow terminal - show scroll hint
-			s.WriteString(helperStyle.Render("←→ scroll | h/l nav | : focus"))
-		} else {
-			// Normal - show how to enter command mode
-			s.WriteString(helperStyle.Render(": to focus"))
-		}
-	} else if m.commandFocused && m.commandInput == "" {
-		// Focused but no input - show ! prefix hint and cursor
-		s.WriteString(helperStyle.Render("! prefix to run & exit"))
-		cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
-		s.WriteString(cursorStyle.Render("█"))
-	} else {
-		// Has input - show the command with cursor at correct position
-		if m.commandFocused {
-			// Render text before cursor, cursor, text after cursor
-			beforeCursor := m.commandInput[:m.commandCursorPos]
-			afterCursor := m.commandInput[m.commandCursorPos:]
-
-			// Handle ! prefix coloring
-			if strings.HasPrefix(beforeCursor, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
-				s.WriteString(prefixStyle.Render("!"))
-				s.WriteString(inputStyle.Render(beforeCursor[1:]))
-			} else {
-				s.WriteString(inputStyle.Render(beforeCursor))
-			}
-
-			// Render cursor
-			cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
-			s.WriteString(cursorStyle.Render("█"))
-
-			// Render text after cursor
-			s.WriteString(inputStyle.Render(afterCursor))
-
-			// Render ghost text after cursor (dim gray suggestion from ? query)
-			if m.ghostText != "" && afterCursor == "" {
-				ghostSuffix := getGhostTextSuffix(m.commandInput, m.ghostText)
-				if ghostSuffix != "" {
-					ghostStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
-					s.WriteString(ghostStyle.Render(ghostSuffix))
-				}
-			}
-		} else {
-			// Not focused - just show the text
-			if strings.HasPrefix(m.commandInput, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
-				s.WriteString(prefixStyle.Render("!"))
-				s.WriteString(inputStyle.Render(m.commandInput[1:]))
-			} else {
-				s.WriteString(inputStyle.Render(m.commandInput))
-			}
-		}
-	}
-	// Explicitly reset styling after cursor to prevent ANSI code leakage
-	s.WriteString("\033[0m")
-	s.WriteString("\n")
+	// Command prompt with path (terminal-style, see render_layout.go)
+	s.WriteString(m.renderCommandLine())
 
 	// Separator line between command prompt and file tree
 	s.WriteString("\n")
@@ -245,26 +122,10 @@ func (m model) renderSinglePane() string {
 	s.WriteString("\n")
 
 	// Check if we should show status message (auto-dismiss after 3s, except in edit mode or file picker mode)
-	if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
-		msgStyle := lipgloss.NewStyle().
-			Background(uiSuccessBackground()).
-			Foreground(uiSuccessForeground()).
-			Bold(true).
-			Padding(0, 1)
-
-		if m.statusIsError {
-			msgStyle = msgStyle.Background(uiErrorBackground())
-		}
-
-		// Truncate status message to terminal width to prevent wrapping/corruption
-		statusMsg := m.statusMessage
-		if m.visualWidthCompensated(statusMsg) > m.width-4 {
-			statusMsg = m.truncateToWidthCompensated(statusMsg, m.width-4)
-		}
-		s.WriteString(msgStyle.Render(statusMsg))
-		s.WriteString("\033[0m") // Reset ANSI codes
-		s.WriteString("\n")      // Add blank line to maintain 2-line height
-		s.WriteString(" ")       // Empty second line for consistent layout
+	if m.statusMessageVisible() {
+		s.WriteString(m.renderStatusMessageBar())
+		s.WriteString("\n") // Add blank line to maintain 2-line height
+		s.WriteString(" ")  // Empty second line for consistent layout
 	} else if m.searchMode || m.searchQuery != "" {
 		// Show search status
 		searchStyle := lipgloss.NewStyle().

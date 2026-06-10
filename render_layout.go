@@ -412,41 +412,29 @@ func (m model) renderFullPreview() string {
 		}
 		s.WriteString(searchStyle.Render(searchText))
 		s.WriteString("\033[0m") // Reset ANSI codes
-	} else if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
+	} else if m.statusMessageVisible() {
 		// Show status message if present (auto-dismiss after 3s, except in edit mode or file picker mode) and search not active
 		s.WriteString("\n")
-		msgStyle := lipgloss.NewStyle().
-			Background(uiSuccessBackground()).
-			Foreground(uiSuccessForeground()).
-			Bold(true).
-			Padding(0, 1)
-
-		if m.statusIsError {
-			msgStyle = msgStyle.Background(uiErrorBackground())
-		}
-
-		// Truncate status message to terminal width to prevent wrapping/corruption
-		statusMsg := m.statusMessage
-		if m.visualWidthCompensated(statusMsg) > m.width-4 {
-			statusMsg = m.truncateToWidthCompensated(statusMsg, m.width-4)
-		}
-		s.WriteString(msgStyle.Render(statusMsg))
-		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString(m.renderStatusMessageBar())
 	}
 
 	return s.String()
 }
 
-// renderDualPane renders the split-pane layout using Lipgloss layout utilities
-func (m model) renderDualPane() string {
+// renderHeader renders the shared chrome above the panes: the title row
+// (GitHub link / update notification during the first 5 seconds, menu bar
+// afterwards) followed by the toolbar button row. titleSuffix is appended
+// to the base title before the mode indicators (e.g. " [Dual-Pane] (WezTerm)").
+// Shared by renderSinglePane (view.go) and renderDualPane.
+func (m model) renderHeader(titleSuffix string) string {
 	var s strings.Builder
 
 	// Check if we should show GitHub link (first 5 seconds) or menu bar
 	showGitHub := time.Since(m.startupTime) < 5*time.Second
 
 	if showGitHub {
-		// Title with mode indicator (first 5 seconds) + terminal type for debugging
-		titleText := fmt.Sprintf("(T)erminal (F)ile (E)xplorer [Dual-Pane] (%s)", m.terminalType.String())
+		// Title with mode indicator (first 5 seconds)
+		titleText := "(T)erminal (F)ile (E)xplorer" + titleSuffix
 		if m.commandFocused {
 			titleText += " [Command Mode]"
 		}
@@ -499,6 +487,16 @@ func (m model) renderDualPane() string {
 	s.WriteString("\033[0m") // Reset ANSI codes
 	s.WriteString("\n")
 
+	return s.String()
+}
+
+// renderCommandLine renders the shared command prompt row: path prompt,
+// ':' focus hints, '!' prefix coloring, cursor-position split rendering,
+// and ghost-text suggestions. Ends with an ANSI reset and a newline.
+// Shared by renderSinglePane (view.go) and renderDualPane.
+func (m model) renderCommandLine() string {
+	var s strings.Builder
+
 	// Command prompt with path (terminal-style)
 	promptPrefix := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true).Render("$ ")
 	pathPromptStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
@@ -511,8 +509,14 @@ func (m model) renderDualPane() string {
 	// Show helper text based on focus state
 	helperStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
 	if !m.commandFocused && m.commandInput == "" {
-		// Not focused - show how to enter command mode
-		s.WriteString(helperStyle.Render(": to focus"))
+		// Not focused - show contextual hints
+		if m.displayMode == modeDetail && m.isNarrowTerminal() {
+			// Detail view on narrow terminal - show scroll hint
+			s.WriteString(helperStyle.Render("←→ scroll | h/l nav | : focus"))
+		} else {
+			// Normal - show how to enter command mode
+			s.WriteString(helperStyle.Render(": to focus"))
+		}
 	} else if m.commandFocused && m.commandInput == "" {
 		// Focused but no input - show ! prefix hint and cursor
 		s.WriteString(helperStyle.Render("! prefix to run & exit"))
@@ -540,6 +544,15 @@ func (m model) renderDualPane() string {
 
 			// Render text after cursor
 			s.WriteString(inputStyle.Render(afterCursor))
+
+			// Render ghost text after cursor (dim gray suggestion from ? query)
+			if m.ghostText != "" && afterCursor == "" {
+				ghostSuffix := getGhostTextSuffix(m.commandInput, m.ghostText)
+				if ghostSuffix != "" {
+					ghostStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
+					s.WriteString(ghostStyle.Render(ghostSuffix))
+				}
+			}
 		} else {
 			// Not focused - just show the text
 			if strings.HasPrefix(m.commandInput, "!") {
@@ -554,6 +567,49 @@ func (m model) renderDualPane() string {
 	// Explicitly reset styling after cursor to prevent ANSI code leakage
 	s.WriteString("\033[0m")
 	s.WriteString("\n")
+
+	return s.String()
+}
+
+// statusMessageVisible reports whether the transient status message should
+// currently be shown (auto-dismiss after 3s, except in edit mode or file
+// picker mode).
+func (m model) statusMessageVisible() bool {
+	return m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second)
+}
+
+// renderStatusMessageBar renders the styled status message (error background
+// when statusIsError), truncated to the terminal width, ending with an ANSI
+// reset. Callers are responsible for surrounding newlines/layout.
+func (m model) renderStatusMessageBar() string {
+	msgStyle := lipgloss.NewStyle().
+		Background(uiSuccessBackground()).
+		Foreground(uiSuccessForeground()).
+		Bold(true).
+		Padding(0, 1)
+
+	if m.statusIsError {
+		msgStyle = msgStyle.Background(uiErrorBackground())
+	}
+
+	// Truncate status message to terminal width to prevent wrapping/corruption
+	statusMsg := m.statusMessage
+	if m.visualWidthCompensated(statusMsg) > m.width-4 {
+		statusMsg = m.truncateToWidthCompensated(statusMsg, m.width-4)
+	}
+	return msgStyle.Render(statusMsg) + "\033[0m" // Reset ANSI codes
+}
+
+// renderDualPane renders the split-pane layout using Lipgloss layout utilities
+func (m model) renderDualPane() string {
+	var s strings.Builder
+
+	// Shared header: GitHub/update title (or menu bar) + toolbar row.
+	// Suffix includes terminal type for debugging.
+	s.WriteString(m.renderHeader(fmt.Sprintf(" [Dual-Pane] (%s)", m.terminalType.String())))
+
+	// Command prompt with path (terminal-style)
+	s.WriteString(m.renderCommandLine())
 
 	// Blank line separator between command prompt and panes
 	s.WriteString("\n")
@@ -910,25 +966,9 @@ func (m model) renderDualPane() string {
 	s.WriteString("\033[0m") // Reset ANSI codes
 
 	// Show status message if present (auto-dismiss after 3s, except in edit mode or file picker mode)
-	if m.statusMessage != "" && (m.promptEditMode || m.filePickerMode || time.Since(m.statusTime) < 3*time.Second) {
+	if m.statusMessageVisible() {
 		s.WriteString("\n")
-		msgStyle := lipgloss.NewStyle().
-			Background(uiSuccessBackground()).
-			Foreground(uiSuccessForeground()).
-			Bold(true).
-			Padding(0, 1)
-
-		if m.statusIsError {
-			msgStyle = msgStyle.Background(uiErrorBackground())
-		}
-
-		// Truncate status message to terminal width to prevent wrapping/corruption
-		statusMsg := m.statusMessage
-		if m.visualWidthCompensated(statusMsg) > m.width-4 {
-			statusMsg = m.truncateToWidthCompensated(statusMsg, m.width-4)
-		}
-		s.WriteString(msgStyle.Render(statusMsg))
-		s.WriteString("\033[0m") // Reset ANSI codes
+		s.WriteString(m.renderStatusMessageBar())
 	} else if m.searchMode || m.searchQuery != "" {
 		// Show search status
 		s.WriteString("\n")
