@@ -168,9 +168,8 @@ Follow this decision tree when adding new features:
 - ✅ **Instead use:** `"🗑"` (U+1F5D1 alone)
 
 **Why this matters:**
-- go-runewidth has a bug (#76) where variation selectors are counted as width=1 instead of width=0
-- This causes misalignment in terminal width calculations
-- Different terminals render emoji+VS inconsistently
+- Different terminals render emoji+VS inconsistently (Windows Terminal: 2 cells; WezTerm/Kitty/Termux: 1 cell) — this is unchanged and is the primary reason the rule stays
+- Historically, go-runewidth also had a bug (#76) where variation selectors were counted as width=1 instead of width=0. That bug is **fixed upstream as of v0.0.21** (TFE now uses v0.0.24, verified by `runewidth_vs_upgrade_test.go`), so the rule is now **defense-in-depth for terminal-rendering consistency**, not a width-math workaround
 
 **How to check:**
 ```bash

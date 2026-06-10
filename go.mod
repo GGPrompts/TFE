@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/mattn/go-runewidth v0.0.19
+	github.com/mattn/go-runewidth v0.0.24
 	golang.org/x/image v0.42.0
 	gopkg.in/yaml.v3 v3.0.1
 )

@@ -56,6 +56,14 @@ line = fmt.Sprintf("%s", paddedName)
 - Truncating long file names or paths
 - Any fmt.Sprintf with width specifiers
 
+### Variation Selectors & go-runewidth (updated 2026-06)
+
+go-runewidth bug #76 (variation selectors U+FE00–U+FE0F counted as width=1 instead of width=0 by `RuneWidth`) was **fixed upstream in v0.0.21**; TFE now depends on v0.0.24. Consequences:
+
+- `runewidth.RuneWidth(0xFE0F)` now returns 0, so per-rune walkers like `truncateToWidth()` agree with the grapheme-based `runewidth.StringWidth()`/`visualWidth()` for VS-bearing content (e.g. file names from disk). On the old v0.0.19 pin, `truncateToWidth()` over-counted each VS by 1 and cut such strings one cell short.
+- `runewidth_vs_upgrade_test.go` pins this behavior and fails if the dependency is ever downgraded below v0.0.21.
+- The CLAUDE.md "no variation selectors in source" rule **still applies** — terminals themselves render emoji+VS inconsistently (Windows Terminal: 2 cells; WezTerm/Kitty/Termux: 1 cell), which is why the terminal-aware compensation (`m.runeWidth()`, `m.visualWidthCompensated()`) also remains. The rule is now defense-in-depth for rendering consistency, no longer a width-math workaround.
+
 ---
 
 ## Terminal-Specific Rendering Differences
