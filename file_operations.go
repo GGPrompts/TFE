@@ -379,8 +379,11 @@ func (m *model) loadFiles() {
 
 	entries, err := os.ReadDir(m.currentPath)
 	if err != nil {
-		m.files = []fileItem{}
-		return
+		// Surface the error (consistent with the trash/restricted-path branches
+		// above) and fall through with no entries so the '..' parent entry is
+		// still appended below, letting the user navigate back out.
+		m.setStatusMessage(fmt.Sprintf("Cannot read directory: %v", err), true)
+		entries = nil
 	}
 
 	// Reset files slice

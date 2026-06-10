@@ -759,12 +759,12 @@ func TestLoadFiles(t *testing.T) {
 	createTestFileWithContent(t, filepath.Join(testDir, ".hidden_file"), []byte("secret"))
 
 	tests := []struct {
-		name           string
-		currentPath    string
-		showHidden     bool
-		expectedMin    int // Minimum expected files (accounts for parent dir)
-		expectParent   bool
-		expectHidden   bool
+		name         string
+		currentPath  string
+		showHidden   bool
+		expectedMin  int // Minimum expected files (accounts for parent dir)
+		expectParent bool
+		expectHidden bool
 	}{
 		{
 			name:         "Load regular directory",
@@ -831,7 +831,10 @@ func TestLoadFiles(t *testing.T) {
 	}
 }
 
-// TestLoadFilesInvalidPath tests loading files from invalid path
+// TestLoadFilesInvalidPath tests loading files from invalid path.
+// On a ReadDir error loadFiles now falls through (instead of returning early)
+// so the '..' parent entry is still appended, letting the user navigate back
+// out. The path "/" has no parent, so it is the only case yielding 0 files.
 func TestLoadFilesInvalidPath(t *testing.T) {
 	m := &model{
 		currentPath: "/nonexistent/path/that/does/not/exist",
@@ -840,8 +843,29 @@ func TestLoadFilesInvalidPath(t *testing.T) {
 
 	m.loadFiles()
 
-	if len(m.files) != 0 {
-		t.Errorf("Expected 0 files for invalid path, got %d", len(m.files))
+	// Expect exactly the '..' parent entry so the user can navigate out.
+	if len(m.files) != 1 {
+		t.Fatalf("Expected 1 file ('..' entry) for invalid path, got %d", len(m.files))
+	}
+	if m.files[0].name != ".." {
+		t.Errorf("Expected '..' parent entry, got %q", m.files[0].name)
+	}
+	if m.statusMessage == "" {
+		t.Errorf("Expected a status message surfacing the ReadDir error, got none")
+	}
+
+	// At root ("/") there is no parent entry to append, so 0 files is expected.
+	mRoot := &model{
+		currentPath: "/",
+		showHidden:  false,
+	}
+	mRoot.loadFiles()
+	// "/" may or may not be readable depending on the environment; only assert
+	// the no-parent invariant when it is unreadable (matching the audit's note).
+	for _, f := range mRoot.files {
+		if f.name == ".." {
+			t.Errorf("Root path should never have a '..' parent entry")
+		}
 	}
 }
 
