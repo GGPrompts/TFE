@@ -182,39 +182,6 @@ func tmuxSmartSplit(cmd, cwd string) tea.Cmd {
 	}
 }
 
-// tmuxSplitRight forces a horizontal (right) split in tmux
-func tmuxSplitRight(cmd, cwd string) tea.Cmd {
-	return func() tea.Msg {
-		tfePaneID := getTmuxPaneID()
-		result := runTmuxSplit("-h", "", cmd, cwd)
-		if result.err == nil {
-			resizeTFESidebar(tfePaneID)
-			rebalanceNonTFEPanes(tfePaneID)
-		}
-		return result
-	}
-}
-
-// tmuxSplitBelow forces a vertical (below) split in tmux
-func tmuxSplitBelow(cmd, cwd string) tea.Cmd {
-	return func() tea.Msg {
-		tfePaneID := getTmuxPaneID()
-		result := runTmuxSplit("-v", "", cmd, cwd)
-		if result.err == nil {
-			resizeTFESidebar(tfePaneID)
-			rebalanceNonTFEPanes(tfePaneID)
-		}
-		return result
-	}
-}
-
-// tmuxNewWindow forces a new tmux window (adjacent to current)
-func tmuxNewWindow(cmd, cwd string) tea.Cmd {
-	return func() tea.Msg {
-		return runTmuxNewWindow(cmd, cwd)
-	}
-}
-
 // runTmuxSplit executes a tmux split-window command with the given orientation flag (-h or -v).
 // If targetPane is non-empty, the split targets that pane instead of the current one.
 // Returns a tmuxSplitMsg with the new pane ID on success, or an error on failure.

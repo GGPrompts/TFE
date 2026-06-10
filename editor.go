@@ -60,27 +60,6 @@ func getTUIClassicsPath() string {
 	return ""
 }
 
-// getClaudePath returns the path to Claude Code binary
-// Prefers the newer version in ~/.claude/local/claude over the system version
-// This is necessary because Go's exec.Command doesn't honor shell aliases
-func getClaudePath() string {
-	// First check for the newer version (typically aliased in shell)
-	homeDir, err := os.UserHomeDir()
-	if err == nil {
-		localClaude := filepath.Join(homeDir, ".claude", "local", "claude")
-		if _, err := os.Stat(localClaude); err == nil {
-			return localClaude
-		}
-	}
-
-	// Fall back to PATH (may be older version)
-	if path, err := exec.LookPath("claude"); err == nil {
-		return path
-	}
-
-	return "claude" // Return "claude" as fallback to let exec.Command handle the error
-}
-
 // openEditor opens a file in an external editor
 func openEditor(editor, path string) tea.Cmd {
 	// SECURITY: Validate filename to prevent argument injection
@@ -116,18 +95,6 @@ func openEditor(editor, path string) tea.Cmd {
 // openTUITool opens a TUI application in the specified directory
 func openTUITool(tool, dir string) tea.Cmd {
 	c := exec.Command(tool)
-	c.Dir = dir // Set working directory
-	return tea.Sequence(
-		tea.ClearScreen,
-		tea.ExecProcess(c, func(err error) tea.Msg {
-			return editorFinishedMsg{err}
-		}),
-	)
-}
-
-// openTUIToolWithArgs opens a TUI application with command-line arguments in the specified directory
-func openTUIToolWithArgs(tool string, args []string, dir string) tea.Cmd {
-	c := exec.Command(tool, args...)
 	c.Dir = dir // Set working directory
 	return tea.Sequence(
 		tea.ClearScreen,

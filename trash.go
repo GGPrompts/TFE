@@ -319,21 +319,6 @@ func getTrashItems() ([]trashItem, error) {
 	return items, nil
 }
 
-// getTrashSize returns the total size of all items in trash
-func getTrashSize() (int64, error) {
-	items, err := loadTrashMetadata()
-	if err != nil {
-		return 0, err
-	}
-
-	var totalSize int64
-	for _, item := range items {
-		totalSize += item.Size
-	}
-
-	return totalSize, nil
-}
-
 // copyRecursive copies a file or directory recursively from src to dst
 // This is used as a fallback when os.Rename() fails due to cross-device errors
 func copyRecursive(src, dst string) error {
@@ -396,36 +381,6 @@ func copyFile(src, dst string, info os.FileInfo) error {
 	}
 
 	return nil
-}
-
-// cleanupOldTrash removes items from trash older than the specified duration
-func cleanupOldTrash(olderThan time.Duration) (int, error) {
-	items, err := loadTrashMetadata()
-	if err != nil {
-		return 0, fmt.Errorf("failed to load trash metadata: %w", err)
-	}
-
-	cutoffTime := time.Now().Add(-olderThan)
-	var keptItems []trashItem
-	removedCount := 0
-
-	for _, item := range items {
-		if item.DeletedAt.Before(cutoffTime) {
-			// Remove old item
-			os.RemoveAll(item.TrashedPath)
-			removedCount++
-		} else {
-			// Keep recent item
-			keptItems = append(keptItems, item)
-		}
-	}
-
-	// Save updated metadata
-	if err := saveTrashMetadata(keptItems); err != nil {
-		return removedCount, fmt.Errorf("removed %d items but failed to update metadata: %w", removedCount, err)
-	}
-
-	return removedCount, nil
 }
 
 // convertTrashItemsToFileItems converts trash items to fileItems for display

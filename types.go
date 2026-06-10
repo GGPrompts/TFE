@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -182,86 +180,6 @@ type promptInputField struct {
 	fieldType    inputFieldType // Type of field (short/long/file)
 	displayWidth int            // Available width for display
 	color        string         // Color for highlighting in preview (e.g., "39", "220")
-}
-
-// getDisplayValue returns the value to display in the input field
-// For long content, shows trailing end with [...] prefix and char count
-func (f *promptInputField) getDisplayValue() string {
-	// Use current value if filled, otherwise use default
-	content := f.value
-	if content == "" {
-		content = f.defaultValue
-	}
-
-	// Calculate max display width (reserve space for brackets and char count)
-	maxDisplay := f.displayWidth - 20
-	if maxDisplay < 20 {
-		maxDisplay = 20
-	}
-
-	// Check if content is multi-line
-	isMultiLine := strings.Contains(content, "\n")
-
-	if isMultiLine {
-		// Multi-line content - just show summary indicator
-		lines := strings.Split(content, "\n")
-		lineCount := len(lines)
-		charCount := len(content)
-
-		// Format character count
-		charDisplay := ""
-		if charCount < 1000 {
-			charDisplay = fmt.Sprintf("%d chars", charCount)
-		} else if charCount < 10000 {
-			charDisplay = fmt.Sprintf("%.1fk chars", float64(charCount)/1000)
-		} else {
-			charDisplay = fmt.Sprintf("%dk chars", charCount/1000)
-		}
-
-		return fmt.Sprintf("[Pasted: %d lines, %s]", lineCount, charDisplay)
-	}
-
-	// Single-line content
-	if len(content) <= maxDisplay {
-		return content
-	}
-
-	// Long single-line content - show trailing end with ellipsis
-	suffix := content[len(content)-maxDisplay:]
-	return suffix // We'll add [...] and (X chars) in the rendering code
-}
-
-// getCharCountDisplay returns a formatted character count string
-func (f *promptInputField) getCharCountDisplay() string {
-	length := len(f.value)
-	if length == 0 {
-		return ""
-	}
-
-	formatted := formatCharCount(length)
-	if formatted == "" {
-		return ""
-	}
-	return " (" + formatted + ")"
-}
-
-// formatCharCount formats character count in human-readable form
-func formatCharCount(count int) string {
-	if count < 1000 {
-		return ""
-	} else if count < 10000 {
-		// Show as "1.2k chars"
-		major := count / 1000
-		minor := (count % 1000) / 100
-		return string(rune('0'+major)) + "." + string(rune('0'+minor)) + "k chars"
-	}
-	// Show as "12k chars"
-	return string(rune('0'+count/1000)) + "k chars"
-}
-
-// hasContent returns whether the field has user-entered content
-func (f *promptInputField) hasContent() bool {
-	return f.value != ""
 }
 
 // model represents the main application state

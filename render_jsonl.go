@@ -80,31 +80,6 @@ func jsonlToolResultStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(uiMutedText())
 }
 
-// renderJSONLPreview renders a Claude Code .jsonl conversation file
-// with color-coded messages. Returns formatted lines for the preview pane.
-func renderJSONLLines(content []string, availableWidth int) []string {
-	var lines []string
-
-	for _, rawLine := range content {
-		rawLine = strings.TrimSpace(rawLine)
-		if rawLine == "" {
-			continue
-		}
-
-		var msg jsonlMessage
-		if err := json.Unmarshal([]byte(rawLine), &msg); err != nil {
-			continue // skip unparseable lines
-		}
-
-		rendered := renderJSONLEntry(msg, availableWidth)
-		if len(rendered) > 0 {
-			lines = append(lines, rendered...)
-		}
-	}
-
-	return lines
-}
-
 // renderJSONLEntry renders a single JSONL entry into display lines.
 func renderJSONLEntry(msg jsonlMessage, width int) []string {
 	switch msg.Type {
