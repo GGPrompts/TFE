@@ -854,7 +854,11 @@ git pull
 						// path and the filter is exited consistently with keyboard Enter.
 						if m.showGitReposOnly {
 							if clickedFile.name == ".." {
-								// Navigating up - rescan from parent
+								// Navigating up - rescan from parent. Clear any active
+								// search filter first: its indices reference the old
+								// listing and would be meaningless in the new one,
+								// matching keyboard Enter and the navigateToPath path.
+								m.clearSearchFilter()
 								m.currentPath = clickedFile.path
 								m.cursor = 0
 								m.setStatusMessage("🔍 Re-scanning from parent directory...", false)

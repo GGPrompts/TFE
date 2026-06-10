@@ -634,6 +634,58 @@ func TestClearSearchFilter(t *testing.T) {
 	}
 }
 
+// TestGitReposRescanClearsSearchFilter verifies that the git-repos-mode ".."
+// rescan branch in update_mouse.go clears the directory search filter before
+// re-listing. That branch calls loadFiles() directly instead of routing through
+// navigateToPath (which clears the filter), so without an explicit
+// clearSearchFilter() a stale searchMode/searchQuery/filteredIndices built
+// against the old listing would carry into the new parent-directory listing.
+// This mirrors the rescan branch's documented statement sequence (regression
+// for tfe-in9; keyboard Enter and the normal double-click path both go through
+// navigateToPath and are already covered by TestNavigateToPathClearsSearchFilter).
+func TestGitReposRescanClearsSearchFilter(t *testing.T) {
+	parentDir := t.TempDir()
+	startDir := filepath.Join(parentDir, "start")
+	if err := os.MkdirAll(startDir, 0755); err != nil {
+		t.Fatalf("Failed to create start dir: %v", err)
+	}
+	for _, name := range []string{"alpha.txt", "beta.txt"} {
+		if err := os.WriteFile(filepath.Join(startDir, name), []byte("x"), 0644); err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+	}
+
+	m := &model{currentPath: startDir, showGitReposOnly: true}
+	m.loadFiles()
+
+	// Simulate an active (accepted) search filter from the old listing.
+	m.searchQuery = "alpha"
+	m.filteredIndices = m.filterFilesBySearch("alpha")
+	if len(m.filteredIndices) == 0 {
+		t.Fatal("Expected search to match at least one file before rescan")
+	}
+
+	// Replicate the git-repos ".." rescan branch sequence (the loadFiles()
+	// path that bypasses navigateToPath): clear the filter, then move up and
+	// reload. scanGitReposRecursive is the real rescan call; its result is not
+	// what we assert on here, only that the filter does not survive.
+	m.clearSearchFilter()
+	m.currentPath = parentDir
+	m.cursor = 0
+	m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
+	m.loadFiles()
+
+	if m.searchMode {
+		t.Error("Expected searchMode to be cleared after git-repos rescan")
+	}
+	if m.searchQuery != "" {
+		t.Errorf("Expected searchQuery cleared after git-repos rescan, got %q", m.searchQuery)
+	}
+	if m.filteredIndices != nil {
+		t.Errorf("Expected filteredIndices nil after git-repos rescan, got %v", m.filteredIndices)
+	}
+}
+
 // TestAtomicWriteFile_NewFile verifies basic write of a new file with
 // correct content and permissions.
 func TestAtomicWriteFile_NewFile(t *testing.T) {
