@@ -334,6 +334,12 @@ func getLastCommitInfo(repoPath string) (string, time.Time) {
 		commitHash = head
 	}
 
+	// Guard against empty/truncated HEAD or ref files (freshly-initialized repo,
+	// interrupted git operation, corrupt repo) - slicing below would panic
+	if len(commitHash) < 3 {
+		return "", time.Time{}
+	}
+
 	// Read commit object (simplified - just get timestamp from file modtime)
 	// A proper implementation would parse the git commit object
 	commitObjectPath := filepath.Join(repoPath, ".git", "objects", commitHash[:2], commitHash[2:])
