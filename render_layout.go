@@ -927,11 +927,13 @@ func (m model) renderDualPane() string {
 
 			// For symlinks, truncate long paths to show the important trailing part
 			if currentFile.isSymlink && currentFile.symlinkTarget != "" {
-				// Calculate available space: terminal width minus other info
+				// Calculate available space: terminal width minus other info.
 				// "Selected: filename (, size, date)"
-				baseInfoLen := len("Selected: ") + len(currentFile.name) + len(", ") +
-					len(formatFileSize(currentFile.size)) + len(", ") +
-					len(formatModTime(currentFile.modTime)) + len(" ()") + 10 // padding
+				// Measure with visualWidth() (not len()) so names with emoji/CJK
+				// don't over-count and wrongly shrink availableForTarget.
+				baseInfoLen := visualWidth("Selected: ") + visualWidth(currentFile.name) + visualWidth(", ") +
+					visualWidth(formatFileSize(currentFile.size)) + visualWidth(", ") +
+					visualWidth(formatModTime(currentFile.modTime)) + visualWidth(" ()") + 10 // padding
 
 				availableForTarget := m.width - baseInfoLen
 				if availableForTarget < 30 {
@@ -939,10 +941,10 @@ func (m model) renderDualPane() string {
 				}
 
 				fullTarget := "Link → " + currentFile.symlinkTarget
-				if len(fullTarget) > availableForTarget {
-					// Show trailing end: "...filename" instead of "Link → /very/long/pa..."
-					fileType = "..." + fullTarget[len(fullTarget)-(availableForTarget-3):]
-				}
+				// Show trailing end: "...filename" instead of "Link → /very/long/pa...".
+				// Rune-aware so a multibyte symlink target is never split mid-rune;
+				// byte slicing here previously emitted invalid UTF-8 ("...").
+				fileType = truncateTail(fullTarget, availableForTarget)
 			}
 
 			selectedInfo = fmt.Sprintf("Selected: %s (%s, %s, %s)",

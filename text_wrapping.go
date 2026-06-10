@@ -336,6 +336,35 @@ func truncateToWidth(s string, targetWidth int) string {
 	return result
 }
 
+// truncateTail keeps the trailing portion of s that fits within targetWidth
+// visual cells, prefixing "..." when truncation occurs. It walks runes from the
+// END summing rune width (mirroring how truncateToWidth walks from the front)
+// so a multibyte rune is never split — unlike byte slicing, which can emit
+// invalid UTF-8. Used for tail-truncating paths so the most specific trailing
+// part (e.g. a symlink target's filename) stays visible.
+func truncateTail(s string, targetWidth int) string {
+	if visualWidth(s) <= targetWidth {
+		return s
+	}
+	const ellipsis = "..."
+	avail := targetWidth - 3 // visual width of "..."
+	if avail <= 0 {
+		return truncateToWidth(ellipsis, targetWidth)
+	}
+	runes := []rune(s)
+	width := 0
+	start := len(runes)
+	for i := len(runes) - 1; i >= 0; i-- {
+		w := runewidth.RuneWidth(runes[i])
+		if width+w > avail {
+			break
+		}
+		width += w
+		start = i
+	}
+	return ellipsis + string(runes[start:])
+}
+
 // truncateToWidthCompensated truncates a string to fit within a target visual width
 // with terminal-specific emoji width compensation (uses m.runeWidth for accurate widths)
 func (m model) truncateToWidthCompensated(s string, targetWidth int) string {

@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // previewWidthTestModel builds a model with a loaded plain-text preview in the
@@ -316,4 +317,100 @@ func TestBreakLongWord(t *testing.T) {
 			t.Errorf("got %q, expected [abc]", chunks)
 		}
 	})
+}
+
+// Tests for truncateTail, the package-level rune-aware tail-truncation helper
+// used by the status bar to shorten long symlink targets — see tfe-c8x.
+func TestTruncateTail(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		targetWidth int
+		want        string
+	}{
+		{"fits unchanged", "/short", 10, "/short"},
+		{"exact fit", "/short", 6, "/short"},
+	}
+	for _, tt := range tests {
+		got := truncateTail(tt.input, tt.targetWidth)
+		if got != tt.want {
+			t.Errorf("truncateTail(%q, %d) = %q, want %q", tt.input, tt.targetWidth, got, tt.want)
+		}
+	}
+
+	t.Run("ascii truncates with ellipsis prefix", func(t *testing.T) {
+		input := "/very/long/path/to/some/file.txt"
+		got := truncateTail(input, 12)
+		if !strings.HasPrefix(got, "...") {
+			t.Errorf("expected ... prefix, got %q", got)
+		}
+		if vw := visualWidth(got); vw > 12 {
+			t.Errorf("visual width %d exceeds target 12: %q", vw, got)
+		}
+		if !strings.HasSuffix(input, strings.TrimPrefix(got, "...")) {
+			t.Errorf("%q is not an ellipsis plus a suffix of input", got)
+		}
+	})
+}
+
+func TestTruncateTailMultibyte(t *testing.T) {
+	// Non-ASCII path: byte slicing would split runes and produce invalid UTF-8.
+	input := "/home/użytkownik/projekty/ważne/dokumenty"
+	for width := 4; width < 30; width++ {
+		got := truncateTail(input, width)
+		if !utf8.ValidString(got) {
+			t.Errorf("width %d: result is invalid UTF-8: %q", width, got)
+		}
+		if !strings.HasPrefix(got, "...") {
+			t.Errorf("width %d: expected ... prefix, got %q", width, got)
+		}
+		if vw := visualWidth(got); vw > width {
+			t.Errorf("width %d: visual width %d exceeds target: %q", width, vw, got)
+		}
+		if !strings.HasSuffix(input, strings.TrimPrefix(got, "...")) {
+			t.Errorf("width %d: %q is not an ellipsis plus a suffix of input", width, got)
+		}
+	}
+}
+
+func TestTruncateTailWideRunes(t *testing.T) {
+	// CJK runes are 2 cells wide; ensure accounting is by visual width, not runes.
+	input := "/路径/非常/长的/目录"
+	got := truncateTail(input, 8)
+	if !utf8.ValidString(got) {
+		t.Fatalf("result is invalid UTF-8: %q", got)
+	}
+	if vw := visualWidth(got); vw > 8 {
+		t.Errorf("visual width %d exceeds target 8: %q", vw, got)
+	}
+	if !strings.HasPrefix(got, "...") {
+		t.Errorf("expected ... prefix, got %q", got)
+	}
+}
+
+func TestTruncateTailEmojiTail(t *testing.T) {
+	// Emoji are wide (2 cells); a trailing emoji must never be split mid-rune.
+	input := "/projects/release-🚀-final/notes-📝.md"
+	for width := 5; width < 25; width++ {
+		got := truncateTail(input, width)
+		if !utf8.ValidString(got) {
+			t.Errorf("width %d: result is invalid UTF-8: %q", width, got)
+		}
+		if vw := visualWidth(got); vw > width {
+			t.Errorf("width %d: visual width %d exceeds target: %q", width, vw, got)
+		}
+		if !strings.HasSuffix(input, strings.TrimPrefix(got, "...")) {
+			t.Errorf("width %d: %q is not an ellipsis plus a suffix of input", width, got)
+		}
+	}
+}
+
+func TestTruncateTailTinyWidth(t *testing.T) {
+	// Widths too small for "..." plus content must not panic or overflow.
+	for width := 0; width <= 3; width++ {
+		got := truncateTail("/some/long/path", width)
+		if vw := visualWidth(got); vw > width {
+			t.Errorf("width %d: visual width %d exceeds target: %q", width, vw, got)
+		}
+	}
 }
