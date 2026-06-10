@@ -1409,17 +1409,71 @@ func (m *model) filterFilesBySearch(query string) []int {
 
 // copyFile copies a file from src to dst
 // Handles both files and directories (recursive copy)
+// Validates src/dst to prevent self-copy data loss, directory-into-itself
+// recursion, and silent overwrite of an existing destination.
 func (m *model) copyFile(src, dst string) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return fmt.Errorf("failed to stat source: %w", err)
 	}
 
+	resolvedSrc, resolvedDst, err := resolveCopyPaths(src, dst)
+	if err != nil {
+		return err
+	}
+
+	// Reject copying onto itself (os.Create would truncate src to zero bytes)
+	if resolvedSrc == resolvedDst {
+		return fmt.Errorf("source and destination are the same: %s", src)
+	}
+
+	// Refuse to silently overwrite an existing destination
+	if dstInfo, err := os.Stat(dst); err == nil {
+		// Also catches hardlinks to the same inode
+		if os.SameFile(srcInfo, dstInfo) {
+			return fmt.Errorf("source and destination are the same file: %s", src)
+		}
+		return fmt.Errorf("destination already exists: %s", dst)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to stat destination: %w", err)
+	}
+
 	if srcInfo.IsDir() {
+		// Reject copying a directory into itself or a subdirectory of itself
+		// (would recurse infinitely as dst appears inside src)
+		if strings.HasPrefix(resolvedDst, resolvedSrc+string(filepath.Separator)) {
+			return fmt.Errorf("cannot copy directory into itself: %s", src)
+		}
 		return copyDirectory(src, dst)
 	}
 
 	return copyFileContent(src, dst)
+}
+
+// resolveCopyPaths resolves src and dst to absolute, symlink-free paths so
+// they can be compared safely. The destination usually does not exist yet,
+// so its parent directory is resolved and the base name re-joined.
+func resolveCopyPaths(src, dst string) (string, string, error) {
+	absSrc, err := filepath.Abs(src)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve source path: %w", err)
+	}
+	resolvedSrc, err := filepath.EvalSymlinks(absSrc)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve source path: %w", err)
+	}
+
+	absDst, err := filepath.Abs(dst)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve destination path: %w", err)
+	}
+	resolvedDstParent, err := filepath.EvalSymlinks(filepath.Dir(absDst))
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve destination directory: %w", err)
+	}
+	resolvedDst := filepath.Join(resolvedDstParent, filepath.Base(absDst))
+
+	return resolvedSrc, resolvedDst, nil
 }
 
 // copyFileContent copies a single file

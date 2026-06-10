@@ -970,3 +970,169 @@ func TestGetIconForExtension(t *testing.T) {
 		})
 	}
 }
+
+// TestCopyFileSelfCopyRejected verifies that copying a file onto itself is
+// rejected and the source content is left intact (regression test for the
+// os.Create truncation data-loss bug).
+func TestCopyFileSelfCopyRejected(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	content := []byte("important data that must survive")
+	srcPath := filepath.Join(tmpDir, "file.txt")
+	createTestFileWithContent(t, srcPath, content)
+
+	m := &model{}
+	if err := m.copyFile(srcPath, srcPath); err == nil {
+		t.Error("Expected error when copying a file onto itself, got nil")
+	}
+
+	got, err := os.ReadFile(srcPath)
+	if err != nil {
+		t.Fatalf("Failed to read source after self-copy attempt: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("Source content was modified by self-copy: got %q, want %q", got, content)
+	}
+}
+
+// TestCopyFileHardlinkSelfCopyRejected verifies that copying a file onto a
+// hardlink of itself is rejected (same inode, different path).
+func TestCopyFileHardlinkSelfCopyRejected(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	content := []byte("hardlinked data")
+	srcPath := filepath.Join(tmpDir, "original.txt")
+	linkPath := filepath.Join(tmpDir, "hardlink.txt")
+	createTestFileWithContent(t, srcPath, content)
+	if err := os.Link(srcPath, linkPath); err != nil {
+		t.Skipf("Hardlinks not supported on this filesystem: %v", err)
+	}
+
+	m := &model{}
+	if err := m.copyFile(srcPath, linkPath); err == nil {
+		t.Error("Expected error when copying a file onto its hardlink, got nil")
+	}
+
+	got, err := os.ReadFile(srcPath)
+	if err != nil {
+		t.Fatalf("Failed to read source after hardlink-copy attempt: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("Source content was modified: got %q, want %q", got, content)
+	}
+}
+
+// TestCopyDirectoryOntoItselfRejected verifies that copying a directory onto
+// itself (dst == src) is rejected.
+func TestCopyDirectoryOntoItselfRejected(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	srcDir := filepath.Join(tmpDir, "mydir")
+	createTestFileWithContent(t, filepath.Join(srcDir, "inner.txt"), []byte("inner"))
+
+	m := &model{}
+	if err := m.copyFile(srcDir, srcDir); err == nil {
+		t.Error("Expected error when copying a directory onto itself, got nil")
+	}
+}
+
+// TestCopyDirectoryIntoItselfRejected verifies that copying a directory into
+// itself (or a subdirectory of itself) is rejected instead of recursing.
+func TestCopyDirectoryIntoItselfRejected(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	srcDir := filepath.Join(tmpDir, "mydir")
+	subDir := filepath.Join(srcDir, "sub")
+	createTestFileWithContent(t, filepath.Join(subDir, "inner.txt"), []byte("inner"))
+
+	m := &model{}
+
+	// Destination directly inside source
+	if err := m.copyFile(srcDir, filepath.Join(srcDir, "mydir")); err == nil {
+		t.Error("Expected error when copying a directory into itself, got nil")
+	}
+
+	// Destination inside a subdirectory of source
+	if err := m.copyFile(srcDir, filepath.Join(subDir, "mydir")); err == nil {
+		t.Error("Expected error when copying a directory into its subdirectory, got nil")
+	}
+}
+
+// TestCopyFileExistingDestinationRejected verifies that an existing
+// destination file is not silently overwritten.
+func TestCopyFileExistingDestinationRejected(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	srcPath := filepath.Join(tmpDir, "src.txt")
+	dstPath := filepath.Join(tmpDir, "dst.txt")
+	createTestFileWithContent(t, srcPath, []byte("new content"))
+	createTestFileWithContent(t, dstPath, []byte("existing content"))
+
+	m := &model{}
+	if err := m.copyFile(srcPath, dstPath); err == nil {
+		t.Error("Expected error when destination already exists, got nil")
+	}
+
+	got, err := os.ReadFile(dstPath)
+	if err != nil {
+		t.Fatalf("Failed to read destination: %v", err)
+	}
+	if string(got) != "existing content" {
+		t.Errorf("Destination was overwritten: got %q, want %q", got, "existing content")
+	}
+}
+
+// TestCopyFileValidDestination verifies that a normal copy still works after
+// the validation was added.
+func TestCopyFileValidDestination(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	content := []byte("copy me")
+	srcPath := filepath.Join(tmpDir, "src.txt")
+	dstPath := filepath.Join(tmpDir, "dst.txt")
+	createTestFileWithContent(t, srcPath, content)
+
+	m := &model{}
+	if err := m.copyFile(srcPath, dstPath); err != nil {
+		t.Fatalf("Expected copy to succeed, got error: %v", err)
+	}
+
+	got, err := os.ReadFile(dstPath)
+	if err != nil {
+		t.Fatalf("Failed to read destination: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("Copied content mismatch: got %q, want %q", got, content)
+	}
+}
+
+// TestCopyDirectoryValidDestination verifies that a normal recursive
+// directory copy still works after the validation was added.
+func TestCopyDirectoryValidDestination(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	srcDir := filepath.Join(tmpDir, "srcdir")
+	createTestFileWithContent(t, filepath.Join(srcDir, "a.txt"), []byte("aaa"))
+	createTestFileWithContent(t, filepath.Join(srcDir, "nested", "b.txt"), []byte("bbb"))
+
+	dstDir := filepath.Join(tmpDir, "dstdir")
+	m := &model{}
+	if err := m.copyFile(srcDir, dstDir); err != nil {
+		t.Fatalf("Expected directory copy to succeed, got error: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(dstDir, "nested", "b.txt"))
+	if err != nil {
+		t.Fatalf("Failed to read copied nested file: %v", err)
+	}
+	if string(got) != "bbb" {
+		t.Errorf("Copied nested content mismatch: got %q, want %q", got, "bbb")
+	}
+}
