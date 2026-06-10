@@ -106,6 +106,11 @@ type fileItem struct {
 	isSymlink     bool   // Whether this is a symbolic link
 	symlinkTarget string // Target path if this is a symlink
 	hasVariables  *bool  // Cached: whether prompt file has {{variables}} (nil = not checked yet)
+	// Directory icon/styling caches, populated in loadFiles()/loadSubdirFiles()
+	// so getFileIcon and the render views avoid per-row disk I/O every frame.
+	// nil = not checked yet (callers fall back to a live disk check).
+	isVault    *bool // Cached: directory is an Obsidian vault (contains .obsidian)
+	isEmptyDir *bool // Cached: directory has no entries
 	// Agent metadata (populated in agent view)
 	agentType        string // From .meta.json (e.g. "Explore", "general-purpose")
 	agentDescription string // First user message or slug from JSONL

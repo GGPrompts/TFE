@@ -365,6 +365,87 @@ func TestIsDirEmpty(t *testing.T) {
 	}
 }
 
+// TestCacheDirChecks tests the load-time vault/emptiness caching on fileItem
+// (populated by loadFiles/loadSubdirFiles via cacheDirChecks) and the cached
+// accessors used by getFileIcon and the render views.
+func TestCacheDirChecks(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	// Plain non-empty directory
+	plainDir := filepath.Join(tmpDir, "plain")
+	if err := os.Mkdir(plainDir, 0755); err != nil {
+		t.Fatalf("Failed to create plain dir: %v", err)
+	}
+	createTestFileWithContent(t, filepath.Join(plainDir, "file.txt"), []byte("content"))
+
+	// Empty directory
+	emptyDir := filepath.Join(tmpDir, "empty")
+	if err := os.Mkdir(emptyDir, 0755); err != nil {
+		t.Fatalf("Failed to create empty dir: %v", err)
+	}
+
+	// Obsidian vault (contains .obsidian folder)
+	vaultDir := filepath.Join(tmpDir, "vault")
+	if err := os.MkdirAll(filepath.Join(vaultDir, ".obsidian"), 0755); err != nil {
+		t.Fatalf("Failed to create vault dir: %v", err)
+	}
+
+	t.Run("populates caches for directories", func(t *testing.T) {
+		item := fileItem{name: "vault", path: vaultDir, isDir: true}
+		cacheDirChecks(&item)
+		if item.isVault == nil || !*item.isVault {
+			t.Errorf("cacheDirChecks: isVault = %v, expected cached true", item.isVault)
+		}
+		if item.isEmptyDir == nil || *item.isEmptyDir {
+			t.Errorf("cacheDirChecks: isEmptyDir = %v, expected cached false", item.isEmptyDir)
+		}
+
+		empty := fileItem{name: "empty", path: emptyDir, isDir: true}
+		cacheDirChecks(&empty)
+		if empty.isEmptyDir == nil || !*empty.isEmptyDir {
+			t.Errorf("cacheDirChecks: isEmptyDir = %v, expected cached true", empty.isEmptyDir)
+		}
+	})
+
+	t.Run("skips non-directories", func(t *testing.T) {
+		item := fileItem{name: "file.txt", path: filepath.Join(plainDir, "file.txt"), isDir: false}
+		cacheDirChecks(&item)
+		if item.isVault != nil || item.isEmptyDir != nil {
+			t.Error("cacheDirChecks should not populate caches for files")
+		}
+	})
+
+	t.Run("getFileIcon reads cached values, not disk", func(t *testing.T) {
+		// Cache deliberately contradicts the on-disk state to prove the cached
+		// value is used instead of a live disk check.
+		cachedTrue, cachedFalse := true, false
+		vaultItem := fileItem{name: "plain", path: plainDir, isDir: true, isVault: &cachedTrue}
+		if icon := getFileIcon(vaultItem); icon != "🧠" {
+			t.Errorf("getFileIcon with cached isVault=true = %s, expected 🧠", icon)
+		}
+		emptyItem := fileItem{name: "plain", path: plainDir, isDir: true, isVault: &cachedFalse, isEmptyDir: &cachedTrue}
+		if icon := getFileIcon(emptyItem); icon != "📂" {
+			t.Errorf("getFileIcon with cached isEmptyDir=true = %s, expected 📂", icon)
+		}
+	})
+
+	t.Run("accessors fall back to disk check when unset", func(t *testing.T) {
+		vaultItem := fileItem{name: "vault", path: vaultDir, isDir: true}
+		if !vaultItem.vaultDir() {
+			t.Error("vaultDir() fallback = false, expected true for vault directory")
+		}
+		emptyItem := fileItem{name: "empty", path: emptyDir, isDir: true}
+		if !emptyItem.emptyDir() {
+			t.Error("emptyDir() fallback = false, expected true for empty directory")
+		}
+		plainItem := fileItem{name: "plain", path: plainDir, isDir: true}
+		if plainItem.vaultDir() || plainItem.emptyDir() {
+			t.Error("vaultDir()/emptyDir() fallback should be false for plain non-empty directory")
+		}
+	})
+}
+
 // TestGetDirItemCount tests directory item counting
 func TestGetDirItemCount(t *testing.T) {
 	tmpDir, cleanup := setupTestDir(t)

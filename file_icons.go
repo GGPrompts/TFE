@@ -11,9 +11,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alecthomas/chroma/v2"
@@ -50,8 +52,7 @@ func isPromptFile(item fileItem) bool {
 			return true
 		}
 		// Check if in ~/.prompts/ or any subfolder
-		homeDir, _ := os.UserHomeDir()
-		promptsDir := filepath.Join(homeDir, ".prompts")
+		promptsDir := filepath.Join(cachedHomeDir(), ".prompts")
 		if strings.HasPrefix(item.path, promptsDir) {
 			return true
 		}
@@ -71,13 +72,43 @@ func isObsidianVault(path string) bool {
 }
 
 // isGitRepo checks if a directory is a git repository (contains .git folder)
-// isDirEmpty checks if a directory is empty (no files or subdirectories)
+// isDirEmpty checks if a directory is empty (no files or subdirectories).
+// Reads at most one dirent instead of the whole directory, so large folders
+// (e.g. node_modules-sized) answer "empty?" without reading thousands of entries.
 func isDirEmpty(path string) bool {
-	entries, err := os.ReadDir(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return false // Can't read, assume not empty
 	}
-	return len(entries) == 0
+	defer f.Close()
+	_, err = f.ReadDir(1)
+	return err == io.EOF
+}
+
+// cachedHomeDir memoizes os.UserHomeDir: getFileIcon and isPromptFile run per
+// visible row per frame, and the home directory cannot change mid-process.
+var cachedHomeDir = sync.OnceValue(func() string {
+	homeDir, _ := os.UserHomeDir()
+	return homeDir
+})
+
+// vaultDir returns whether the directory is an Obsidian vault, using the
+// load-time cache (populated in loadFiles/loadSubdirFiles) when present and
+// falling back to a live disk check for items built elsewhere.
+func (item fileItem) vaultDir() bool {
+	if item.isVault != nil {
+		return *item.isVault
+	}
+	return isObsidianVault(item.path)
+}
+
+// emptyDir returns whether the directory is empty, using the load-time cache
+// when present and falling back to a live disk check for items built elsewhere.
+func (item fileItem) emptyDir() bool {
+	if item.isEmptyDir != nil {
+		return *item.isEmptyDir
+	}
+	return isDirEmpty(item.path)
 }
 
 // getDirItemCount returns the number of items in a directory
@@ -120,10 +151,8 @@ func getFileIcon(item fileItem) string {
 			return "⬆" // Up arrow for parent dir
 		}
 		// Check if this is the user's home directory
-		if homeDir, err := os.UserHomeDir(); err == nil {
-			if item.path == homeDir {
-				return "🏠" // Home emoji for home directory
-			}
+		if homeDir := cachedHomeDir(); homeDir != "" && item.path == homeDir {
+			return "🏠" // Home emoji for home directory
 		}
 		// Virtual global prompts folder - no icon since name already has 🌐
 		if isGlobalPromptsVirtualFolder(item.name) {
@@ -174,12 +203,13 @@ func getFileIcon(item fileItem) string {
 		case "scripts":
 			return "📜" // Scroll
 		default:
-			// Check if this is an Obsidian vault
-			if isObsidianVault(item.path) {
+			// Check if this is an Obsidian vault (cached at load time;
+			// falls back to a disk check for items built outside loadFiles)
+			if item.vaultDir() {
 				return "🧠" // Brain emoji for Obsidian vaults
 			}
-			// Check if folder is empty
-			if isDirEmpty(item.path) {
+			// Check if folder is empty (cached at load time)
+			if item.emptyDir() {
 				return "📂" // Open/empty folder
 			}
 			return "📁" // Regular closed folder (has content)

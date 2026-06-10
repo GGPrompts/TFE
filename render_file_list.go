@@ -88,8 +88,8 @@ func (m model) renderListView(maxVisible int) string {
 			style = promptsFolderStyle
 		}
 
-		// Override with teal if it's an Obsidian vault
-		if file.isDir && isObsidianVault(file.path) {
+		// Override with teal if it's an Obsidian vault (cached at load time)
+		if file.isDir && file.vaultDir() {
 			style = obsidianVaultStyle
 		}
 
@@ -725,7 +725,7 @@ func (m model) renderDetailView(maxVisible int) string {
 		if file.isDir && isClaudePromptsSubfolder(file.name) {
 			style = promptsFolderStyle
 		}
-		if file.isDir && isObsidianVault(file.path) {
+		if file.isDir && file.vaultDir() {
 			style = obsidianVaultStyle
 		}
 
@@ -1210,7 +1210,7 @@ func (m model) renderTreeView(maxVisible int) string {
 			style = promptsFolderStyle
 		}
 
-		if file.isDir && isObsidianVault(file.path) {
+		if file.isDir && file.vaultDir() {
 			style = obsidianVaultStyle
 		}
 

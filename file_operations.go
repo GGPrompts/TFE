@@ -240,6 +240,11 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 			symlinkTarget: symlinkTarget,
 		}
 
+		// Cache vault/emptiness checks for directories (performance optimization)
+		// getFileIcon and row styling read these per visible row per frame;
+		// computing them once here avoids per-frame disk I/O during rendering
+		cacheDirChecks(&item)
+
 		if item.isDir {
 			dirs = append(dirs, item)
 		} else {
@@ -257,6 +262,21 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 
 	result := append(dirs, files...)
 	return result
+}
+
+// cacheDirChecks populates the load-time icon/styling caches on a directory
+// item (Obsidian vault + emptiness). getFileIcon and the render views consult
+// these cached fields instead of hitting the disk per visible row per frame.
+// Invalidation is implicit: items are rebuilt by loadFiles/loadSubdirFiles,
+// including fsnotify-triggered reloads.
+func cacheDirChecks(item *fileItem) {
+	if !item.isDir {
+		return
+	}
+	vault := isObsidianVault(item.path)
+	empty := isDirEmpty(item.path)
+	item.isVault = &vault
+	item.isEmptyDir = &empty
 }
 
 // loadFiles loads the files from the current directory
@@ -378,6 +398,9 @@ func (m *model) loadFiles() {
 			parentItem.mode = info.Mode()
 		}
 
+		// Cache vault/emptiness so per-frame row styling skips disk checks
+		cacheDirChecks(&parentItem)
+
 		m.files = append(m.files, parentItem)
 	}
 
@@ -459,6 +482,11 @@ func (m *model) loadFiles() {
 			isSymlink:     isSymlink,
 			symlinkTarget: symlinkTarget,
 		}
+
+		// Cache vault/emptiness checks for directories (performance optimization)
+		// getFileIcon and row styling read these per visible row per frame;
+		// computing them once here avoids per-frame disk I/O during rendering
+		cacheDirChecks(&item)
 
 		// Cache variable check for prompt files (performance optimization)
 		// Only check if: not a directory, is a prompt-type file, and we're viewing prompts
