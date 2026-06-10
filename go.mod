@@ -1,8 +1,6 @@
 module github.com/GGPrompts/tfe
 
-go 1.24.0
-
-toolchain go1.24.9
+go 1.25.0
 
 require (
 	github.com/BourgeoisBear/rasterm v1.1.1
@@ -14,7 +12,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/mattn/go-runewidth v0.0.19
-	golang.org/x/image v0.32.0
+	golang.org/x/image v0.42.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -42,8 +40,8 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/term v0.31.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 )
