@@ -65,6 +65,55 @@ func TestGetAvailableEditor(t *testing.T) {
 	}
 }
 
+// TestHasAnyExt tests the shared extension-matching helper.
+func TestHasAnyExt(t *testing.T) {
+	exts := []string{".png", ".jpg", ".jpeg"}
+
+	// Match — lowercase path
+	if !hasAnyExt("photo.jpg", exts) {
+		t.Error("hasAnyExt: expected true for photo.jpg")
+	}
+	// Match — uppercase extension (case-insensitive)
+	if !hasAnyExt("PHOTO.PNG", exts) {
+		t.Error("hasAnyExt: expected true for PHOTO.PNG")
+	}
+	// Match — mixed case
+	if !hasAnyExt("image.Jpeg", exts) {
+		t.Error("hasAnyExt: expected true for image.Jpeg")
+	}
+	// No match
+	if hasAnyExt("document.pdf", exts) {
+		t.Error("hasAnyExt: expected false for document.pdf")
+	}
+	// No match — empty ext list
+	if hasAnyExt("photo.png", []string{}) {
+		t.Error("hasAnyExt: expected false for empty ext list")
+	}
+	// No match — empty path
+	if hasAnyExt("", exts) {
+		t.Error("hasAnyExt: expected false for empty path")
+	}
+}
+
+// TestIsImageFileUppercase verifies that isImageFile matches uppercase extensions.
+func TestIsImageFileUppercase(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"photo.PNG", true},
+		{"shot.JPG", true},
+		{"anim.GIF", true},
+		{"plain.TXT", false},
+	}
+	for _, tc := range cases {
+		got := isImageFile(tc.path)
+		if got != tc.want {
+			t.Errorf("isImageFile(%q) = %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}
+
 // TestIsImageFile tests image file extension detection
 func TestIsImageFile(t *testing.T) {
 	tests := []struct {

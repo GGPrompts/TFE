@@ -10,6 +10,18 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// hasAnyExt reports whether path (compared case-insensitively) ends with any of
+// the provided extensions (e.g. ".png", ".jpg").
+func hasAnyExt(path string, exts []string) bool {
+	lower := strings.ToLower(path)
+	for _, e := range exts {
+		if strings.HasSuffix(lower, e) {
+			return true
+		}
+	}
+	return false
+}
+
 // editorAvailable checks if an editor command is available
 func editorAvailable(cmd string) bool {
 	_, err := exec.LookPath(cmd)
@@ -243,36 +255,12 @@ func copyToClipboard(text string) error {
 
 // isImageFile checks if a file is an image based on extension (case-insensitive)
 func isImageFile(path string) bool {
-	imageExts := []string{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp", ".ico", ".tiff", ".tif"}
-	// Convert path to lowercase for case-insensitive comparison
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	for _, ext := range imageExts {
-		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
-			return true
-		}
-	}
-	return false
+	return hasAnyExt(path, []string{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp", ".ico", ".tiff", ".tif"})
 }
 
 // isHTMLFile checks if a file is an HTML file based on extension (case-insensitive)
 func isHTMLFile(path string) bool {
-	// Convert path to lowercase for case-insensitive comparison
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	return len(lowerPath) >= 5 && (lowerPath[len(lowerPath)-5:] == ".html" || lowerPath[len(lowerPath)-4:] == ".htm")
+	return hasAnyExt(path, []string{".html", ".htm"})
 }
 
 // isBrowserFile checks if a file should be opened in a browser
@@ -282,110 +270,32 @@ func isBrowserFile(path string) bool {
 
 // isCSVFile checks if a file is a CSV/TSV file based on extension (case-insensitive)
 func isCSVFile(path string) bool {
-	csvExts := []string{".csv", ".tsv"}
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	for _, ext := range csvExts {
-		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
-			return true
-		}
-	}
-	return false
+	return hasAnyExt(path, []string{".csv", ".tsv"})
 }
 
 // isPDFFile checks if a file is a PDF based on extension (case-insensitive)
 func isPDFFile(path string) bool {
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	return len(lowerPath) >= 4 && lowerPath[len(lowerPath)-4:] == ".pdf"
+	return hasAnyExt(path, []string{".pdf"})
 }
 
 // isVideoFile checks if a file is a video based on extension (case-insensitive)
 func isVideoFile(path string) bool {
-	videoExts := []string{".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v"}
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	for _, ext := range videoExts {
-		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
-			return true
-		}
-	}
-	return false
+	return hasAnyExt(path, []string{".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v"})
 }
 
 // isAudioFile checks if a file is an audio file based on extension (case-insensitive)
 func isAudioFile(path string) bool {
-	audioExts := []string{".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma", ".opus", ".ape"}
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	for _, ext := range audioExts {
-		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
-			return true
-		}
-	}
-	return false
+	return hasAnyExt(path, []string{".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma", ".opus", ".ape"})
 }
 
 // isDatabaseFile checks if a file is a database file based on extension (case-insensitive)
 func isDatabaseFile(path string) bool {
-	dbExts := []string{".db", ".sqlite", ".sqlite3"}
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	for _, ext := range dbExts {
-		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
-			return true
-		}
-	}
-	return false
+	return hasAnyExt(path, []string{".db", ".sqlite", ".sqlite3"})
 }
 
 // isArchiveFile checks if a file is an archive based on extension (case-insensitive)
 func isArchiveFile(path string) bool {
-	archiveExts := []string{".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz", ".tar.gz", ".tgz"}
-	lowerPath := ""
-	for _, ch := range path {
-		if ch >= 'A' && ch <= 'Z' {
-			lowerPath += string(ch + 32)
-		} else {
-			lowerPath += string(ch)
-		}
-	}
-	for _, ext := range archiveExts {
-		if len(lowerPath) >= len(ext) && lowerPath[len(lowerPath)-len(ext):] == ext {
-			return true
-		}
-	}
-	return false
+	return hasAnyExt(path, []string{".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz", ".tar.gz", ".tgz"})
 }
 
 // isWSL checks if we're running in Windows Subsystem for Linux
