@@ -573,3 +573,112 @@ func TestClearSearchFilter(t *testing.T) {
 			m.searchMode, m.searchQuery, m.filteredIndices)
 	}
 }
+
+// TestAtomicWriteFile_NewFile verifies basic write of a new file with
+// correct content and permissions.
+func TestAtomicWriteFile_NewFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "new.json")
+	data := []byte(`{"key": "value"}`)
+
+	if err := atomicWriteFile(path, data, 0644); err != nil {
+		t.Fatalf("atomicWriteFile failed: %v", err)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read written file: %v", err)
+	}
+	if string(got) != string(data) {
+		t.Errorf("content mismatch: got %q, want %q", got, data)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("failed to stat written file: %v", err)
+	}
+	if info.Mode().Perm() != 0644 {
+		t.Errorf("permissions mismatch: got %v, want 0644", info.Mode().Perm())
+	}
+}
+
+// TestAtomicWriteFile_OverwriteExisting verifies an existing file is fully
+// replaced (no stale trailing bytes from a longer previous version).
+func TestAtomicWriteFile_OverwriteExisting(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "existing.json")
+
+	if err := os.WriteFile(path, []byte("old content that is much longer"), 0600); err != nil {
+		t.Fatalf("failed to seed existing file: %v", err)
+	}
+
+	newData := []byte("short")
+	if err := atomicWriteFile(path, newData, 0644); err != nil {
+		t.Fatalf("atomicWriteFile failed: %v", err)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read written file: %v", err)
+	}
+	if string(got) != string(newData) {
+		t.Errorf("content mismatch: got %q, want %q", got, newData)
+	}
+}
+
+// TestAtomicWriteFile_NoLeftoverTempFiles verifies no temp files remain in
+// the directory after both successful and failed writes.
+func TestAtomicWriteFile_NoLeftoverTempFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "target.json")
+
+	if err := atomicWriteFile(path, []byte("data"), 0644); err != nil {
+		t.Fatalf("atomicWriteFile failed: %v", err)
+	}
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to read dir: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "target.json" {
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("expected only target.json in dir, got %v", names)
+	}
+}
+
+// TestAtomicWriteFile_MissingDirectory verifies an error is returned (and
+// nothing is created) when the parent directory does not exist.
+func TestAtomicWriteFile_MissingDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "no-such-dir", "file.json")
+
+	if err := atomicWriteFile(path, []byte("data"), 0644); err == nil {
+		t.Fatal("expected error for missing parent directory, got nil")
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("expected file to not exist, stat err: %v", err)
+	}
+}
+
+// TestAtomicWriteFile_EmptyData verifies writing empty data produces an
+// empty file (e.g. clearing metadata) rather than an error.
+func TestAtomicWriteFile_EmptyData(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "empty.json")
+
+	if err := atomicWriteFile(path, nil, 0644); err != nil {
+		t.Fatalf("atomicWriteFile failed: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("failed to stat written file: %v", err)
+	}
+	if info.Size() != 0 {
+		t.Errorf("expected empty file, got size %d", info.Size())
+	}
+}

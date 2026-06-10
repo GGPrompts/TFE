@@ -100,7 +100,10 @@ func saveTrashMetadata(items []trashItem) error {
 		return err
 	}
 
-	return os.WriteFile(metadataPath, data, 0644)
+	// Atomic write: a crash mid-write must never truncate trash.json,
+	// because loadTrashMetadata hard-fails on corrupt JSON, which would
+	// permanently break all trash operations.
+	return atomicWriteFile(metadataPath, data, 0644)
 }
 
 // moveToTrash moves a file or directory to the trash

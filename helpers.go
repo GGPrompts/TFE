@@ -1025,6 +1025,56 @@ func (m model) renderScrollingFooter(text string, availableWidth int) string {
 	return m.truncateToWidthCompensated(text, availableWidth)
 }
 
+// atomicWriteFile writes data to path atomically: it writes to a temporary
+// file in the same directory, fsyncs it, then renames it over the target.
+// Because the temp file lives in the same directory (same filesystem), the
+// rename is atomic — a crash, power loss, or ENOSPC mid-write can never
+// leave a truncated file at path. The temp file is cleaned up on failure.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	// Clean up the temp file on any failure path.
+	cleanup := func(err error) error {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+
+	if _, err := tmp.Write(data); err != nil {
+		return cleanup(fmt.Errorf("failed to write temp file: %w", err))
+	}
+
+	// CreateTemp uses 0600; apply the requested permissions before the
+	// file becomes visible at its final path.
+	if err := tmp.Chmod(perm); err != nil {
+		return cleanup(fmt.Errorf("failed to set temp file permissions: %w", err))
+	}
+
+	// Flush file contents to stable storage before the rename so the
+	// rename never publishes a file whose data is still only in memory.
+	if err := tmp.Sync(); err != nil {
+		return cleanup(fmt.Errorf("failed to sync temp file: %w", err))
+	}
+
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to rename temp file into place: %w", err)
+	}
+
+	return nil
+}
+
 // emitOSC7 returns an OSC 7 escape sequence encoding the given directory
 // as a file:// URI. Terminal emulators use this to track the current working
 // directory for hotspot resolution, status display, and pane-split inheritance.
