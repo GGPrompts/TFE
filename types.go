@@ -373,9 +373,6 @@ type editorFinishedMsg struct{ err error }
 // footerTickMsg is sent periodically to animate footer scrolling
 type footerTickMsg struct{}
 
-// markdownRenderedMsg is sent when markdown rendering completes
-type markdownRenderedMsg struct{}
-
 // fuzzySearchResultMsg is sent when fuzzy search completes
 type fuzzySearchResultMsg struct {
 	selected string // Selected file path
