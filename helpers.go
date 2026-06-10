@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -1073,6 +1074,20 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	}
 
 	return nil
+}
+
+// quarantineCorruptFile renames a corrupt state file aside (e.g.
+// favorites.json.corrupt-20060102-150405) so it is preserved for manual
+// recovery and a subsequent default/empty save cannot overwrite it. It
+// returns the path the file was moved to, or an error if the rename failed.
+// Callers should treat a non-nil error as "the original is still at path"
+// and surface a warning rather than aborting startup.
+func quarantineCorruptFile(path string) (string, error) {
+	backupPath := fmt.Sprintf("%s.corrupt-%s", path, time.Now().Format("20060102-150405"))
+	if err := os.Rename(path, backupPath); err != nil {
+		return "", err
+	}
+	return backupPath, nil
 }
 
 // emitOSC7 returns an OSC 7 escape sequence encoding the given directory

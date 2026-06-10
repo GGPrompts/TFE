@@ -51,9 +51,12 @@ func TestLoadFavorites_Empty(t *testing.T) {
 	_, cleanup := setupTestFavorites(t)
 	defer cleanup()
 
-	favorites := loadFavorites()
+	favorites, warning := loadFavorites()
 	if len(favorites) != 0 {
 		t.Errorf("Expected empty favorites, got %d items", len(favorites))
+	}
+	if warning != "" {
+		t.Errorf("Expected no warning for missing favorites file, got %q", warning)
 	}
 }
 
@@ -75,7 +78,7 @@ func TestSaveAndLoadFavorites(t *testing.T) {
 	}
 
 	// Load favorites
-	loaded := loadFavorites()
+	loaded, _ := loadFavorites()
 
 	// Verify all favorites were loaded
 	if len(loaded) != len(testFavorites) {
@@ -148,7 +151,7 @@ func TestToggleFavorite(t *testing.T) {
 	}
 
 	// Verify it was saved to disk
-	loaded := loadFavorites()
+	loaded, _ := loadFavorites()
 	if !loaded[testPath] {
 		t.Error("Favorite was not persisted to disk")
 	}
@@ -162,7 +165,7 @@ func TestToggleFavorite(t *testing.T) {
 	}
 
 	// Verify removal was saved to disk
-	loaded = loadFavorites()
+	loaded, _ = loadFavorites()
 	if loaded[testPath] {
 		t.Error("Favorite removal was not persisted to disk")
 	}
@@ -396,9 +399,36 @@ func TestLoadFavorites_CorruptedFile(t *testing.T) {
 	}
 
 	// Should return empty map instead of crashing
-	favorites := loadFavorites()
+	favorites, warning := loadFavorites()
 	if len(favorites) != 0 {
 		t.Error("Corrupted file should return empty favorites")
+	}
+
+	// A warning should be returned so initialModel can surface it
+	if warning == "" {
+		t.Error("Corrupted file should return a non-empty warning")
+	}
+
+	// The corrupt file must be preserved (renamed aside), not left in place
+	// to be overwritten by a later save.
+	if _, err := os.Stat(favPath); !os.IsNotExist(err) {
+		t.Error("Corrupt favorites file should have been renamed aside, not left at original path")
+	}
+
+	// A .corrupt-* backup of the original should exist alongside it
+	matches, err := filepath.Glob(favPath + ".corrupt-*")
+	if err != nil {
+		t.Fatalf("Glob failed: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("Expected exactly 1 corrupt backup file, got %d", len(matches))
+	}
+	backupData, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatalf("Failed to read backup file: %v", err)
+	}
+	if string(backupData) != "{invalid json}" {
+		t.Errorf("Backup file should preserve original corrupt content, got %q", string(backupData))
 	}
 }
 

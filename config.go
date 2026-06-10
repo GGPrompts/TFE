@@ -9,6 +9,7 @@ package main
 // - Providing sensible defaults for all settings
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -78,12 +79,18 @@ func configPath() (string, error) {
 // If the file doesn't exist, it creates the config directory and writes
 // a default config file. Missing fields in an existing file are filled
 // with default values.
-func loadConfig() Config {
+// The second return value is a non-empty warning message when the config
+// file existed but could not be parsed; in that case the corrupt file is
+// renamed aside (config.toml.corrupt-<timestamp>) so a later persistConfig
+// cannot overwrite user customizations with defaults. Loaders run before the
+// model exists, so they return the warning for initialModel to surface rather
+// than calling setStatusMessage directly.
+func loadConfig() (Config, string) {
 	cfg := defaultConfig()
 
 	path, err := configPath()
 	if err != nil {
-		return cfg
+		return cfg, ""
 	}
 
 	data, err := os.ReadFile(path)
@@ -92,16 +99,21 @@ func loadConfig() Config {
 			// Create config directory and write default config
 			dir := filepath.Dir(path)
 			if mkErr := os.MkdirAll(dir, 0755); mkErr != nil {
-				return cfg
+				return cfg, ""
 			}
 			_ = saveConfig(cfg)
 		}
-		return cfg
+		return cfg, ""
 	}
 
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
-		// Parse error: return defaults
-		return defaultConfig()
+		// Parse failure: preserve the corrupt file before returning defaults,
+		// otherwise the next persistConfig would overwrite user customizations
+		// (custom [theme] sections, [[profiles]]) with defaults.
+		if backupPath, renameErr := quarantineCorruptFile(path); renameErr == nil {
+			return defaultConfig(), fmt.Sprintf("Config file was corrupt; backed up to %s", filepath.Base(backupPath))
+		}
+		return defaultConfig(), "Config file was corrupt and could not be backed up; not overwriting"
 	}
 
 	// Check whether [theme] section was actually present in the file
@@ -113,7 +125,7 @@ func loadConfig() Config {
 		}
 	}
 
-	return cfg
+	return cfg, ""
 }
 
 // saveConfig writes the configuration to ~/.config/tfe/config.toml
@@ -129,19 +141,15 @@ func saveConfig(cfg Config) error {
 		return err
 	}
 
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	// Write header comment
-	if _, err := f.WriteString("# TFE Configuration\n# See CLAUDE.md for documentation\n\n"); err != nil {
+	// Render to an in-memory buffer first, then write atomically so a crash
+	// mid-write can't leave config.toml truncated/corrupt.
+	var buf bytes.Buffer
+	buf.WriteString("# TFE Configuration\n# See CLAUDE.md for documentation\n\n")
+	if err := toml.NewEncoder(&buf).Encode(cfg); err != nil {
 		return err
 	}
 
-	encoder := toml.NewEncoder(f)
-	return encoder.Encode(cfg)
+	return atomicWriteFile(path, buf.Bytes(), 0644)
 }
 
 // persistConfig syncs the current model state to m.config and saves to disk.

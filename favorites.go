@@ -9,6 +9,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -30,25 +31,36 @@ func getFavoritesPath() string {
 	return filepath.Join(configDir, "favorites.json")
 }
 
-// loadFavorites loads favorites from disk
-func loadFavorites() map[string]bool {
+// loadFavorites loads favorites from disk.
+// The second return value is a non-empty warning message when the favorites
+// file existed but could not be parsed; in that case the corrupt file is
+// renamed aside (favorites.json.corrupt-<timestamp>) so a later save cannot
+// destroy the recoverable original. initialModel surfaces the warning as a
+// status message — loaders run before the model exists, so they cannot call
+// setStatusMessage themselves.
+func loadFavorites() (map[string]bool, string) {
 	favorites := make(map[string]bool)
 
 	path := getFavoritesPath()
 	if path == "" {
-		return favorites
+		return favorites, ""
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		// File doesn't exist yet or can't be read - return empty map
-		return favorites
+		return favorites, ""
 	}
 
 	// Unmarshal JSON array of paths
 	var paths []string
 	if err := json.Unmarshal(data, &paths); err != nil {
-		return favorites
+		// Parse failure: preserve the corrupt file before proceeding with an
+		// empty set, otherwise the next saveFavorites would overwrite it.
+		if backupPath, renameErr := quarantineCorruptFile(path); renameErr == nil {
+			return favorites, fmt.Sprintf("Favorites file was corrupt; backed up to %s", filepath.Base(backupPath))
+		}
+		return favorites, "Favorites file was corrupt and could not be backed up; not overwriting"
 	}
 
 	// Convert to map for faster lookups
@@ -56,7 +68,7 @@ func loadFavorites() map[string]bool {
 		favorites[p] = true
 	}
 
-	return favorites
+	return favorites, ""
 }
 
 // saveFavorites saves favorites to disk
@@ -78,8 +90,8 @@ func saveFavorites(favorites map[string]bool) error {
 		return err
 	}
 
-	// Write to file
-	return os.WriteFile(path, data, 0644)
+	// Write atomically so a crash mid-write can't corrupt the favorites file.
+	return atomicWriteFile(path, data, 0644)
 }
 
 // toggleFavorite adds or removes a path from favorites
@@ -96,8 +108,11 @@ func (m *model) toggleFavorite(path string) {
 	// favorites filter is active, so the cached tree may now be stale
 	m.markTreeItemsDirty()
 
-	// Save to disk
-	saveFavorites(m.favorites)
+	// Save to disk, surfacing any failure so the user knows the change
+	// did not persist.
+	if err := saveFavorites(m.favorites); err != nil {
+		m.statusMessage = fmt.Sprintf("Failed to save favorites: %v", err)
+	}
 }
 
 // isFavorite checks if a path is favorited

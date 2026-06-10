@@ -10,8 +10,17 @@ import (
 )
 
 func initialModel() model {
+	// Collect any load-time warnings (e.g. corrupt state files quarantined)
+	// so they can be surfaced once the model exists. Loaders run before the
+	// model is constructed, so they return warnings instead of calling
+	// setStatusMessage directly.
+	var loadWarnings []string
+
 	// Load unified configuration from ~/.config/tfe/config.toml
-	cfg := loadConfig()
+	cfg, cfgWarning := loadConfig()
+	if cfgWarning != "" {
+		loadWarnings = append(loadWarnings, cfgWarning)
+	}
 
 	// CLI flags override config values
 	// Check if --light or --dark was explicitly passed
@@ -48,6 +57,11 @@ func initialModel() model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor())
 
+	favorites, favWarning := loadFavorites()
+	if favWarning != "" {
+		loadWarnings = append(loadWarnings, favWarning)
+	}
+
 	m := model{
 		currentPath:     initialPath,
 		cursor:          0,
@@ -68,7 +82,7 @@ func initialModel() model {
 		},
 		spinner:           s,
 		loading:           false,
-		favorites:         loadFavorites(),
+		favorites:         favorites,
 		showFavoritesOnly: false,
 		gitReposScanDepth: 3, // Default scan depth: 3 levels (safer)
 		gitReposList:      make([]fileItem, 0),
@@ -118,11 +132,21 @@ func initialModel() model {
 	}
 
 	// Load command history from disk (supports per-directory and global history)
-	commandHistoryByDir, commandHistoryGlobal := loadCommandHistory()
+	commandHistoryByDir, commandHistoryGlobal, histWarning := loadCommandHistory()
 	m.commandHistoryByDir = commandHistoryByDir
 	m.commandHistoryGlobal = commandHistoryGlobal
+	if histWarning != "" {
+		loadWarnings = append(loadWarnings, histWarning)
+	}
 	// Build combined history for current directory
 	m.rebuildCombinedHistory()
+
+	// Surface any load-time warnings (e.g. corrupt state files that were
+	// quarantined) as the initial status message so the user is informed
+	// without blocking startup.
+	if len(loadWarnings) > 0 {
+		m.statusMessage = strings.Join(loadWarnings, " | ")
+	}
 
 	// Apply config settings that need post-init setup
 	m.panelsLocked = cfg.PanelLock

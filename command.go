@@ -128,8 +128,11 @@ func (m *model) addToHistory(command string) {
 	// Reset history position
 	m.historyPos = len(m.commandHistory)
 
-	// Save to disk after adding
-	m.saveCommandHistory()
+	// Save to disk after adding, surfacing any failure so the user knows the
+	// command was not persisted across sessions.
+	if err := m.saveCommandHistory(); err != nil {
+		m.statusMessage = fmt.Sprintf("Failed to save command history: %v", err)
+	}
 }
 
 // rebuildCombinedHistory creates a combined history list from current directory + global
@@ -262,18 +265,24 @@ func shellQuote(s string) string {
 }
 
 // loadCommandHistory reads command history from disk
-// Returns directory-specific map and global slice
-// Handles backwards compatibility with old format
-func loadCommandHistory() (map[string][]string, []string) {
+// Returns directory-specific map, global slice, and a warning message.
+// Handles backwards compatibility with old format.
+// The warning is non-empty when the history file existed but could not be
+// parsed in either format; in that case the corrupt file is renamed aside
+// (command_history.json.corrupt-<timestamp>) so the next saveCommandHistory
+// cannot overwrite the recoverable original. Loaders run before the model
+// exists, so they return the warning for initialModel to surface rather than
+// calling setStatusMessage directly.
+func loadCommandHistory() (map[string][]string, []string, string) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return make(map[string][]string), []string{}
+		return make(map[string][]string), []string{}, ""
 	}
 
 	historyPath := filepath.Join(homeDir, ".config", "tfe", "command_history.json")
 	data, err := os.ReadFile(historyPath)
 	if err != nil {
-		return make(map[string][]string), []string{} // File doesn't exist yet, start fresh
+		return make(map[string][]string), []string{}, "" // File doesn't exist yet, start fresh
 	}
 
 	// Try new format first
@@ -291,7 +300,7 @@ func loadCommandHistory() (map[string][]string, []string) {
 		if newFormat.Global == nil {
 			newFormat.Global = []string{}
 		}
-		return newFormat.Directories, newFormat.Global
+		return newFormat.Directories, newFormat.Global, ""
 	}
 
 	// Try old format for backwards compatibility
@@ -301,11 +310,15 @@ func loadCommandHistory() (map[string][]string, []string) {
 
 	if err := json.Unmarshal(data, &oldFormat); err == nil && len(oldFormat.Commands) > 0 {
 		// Old format - migrate to global history
-		return make(map[string][]string), oldFormat.Commands
+		return make(map[string][]string), oldFormat.Commands, ""
 	}
 
-	// Failed to parse either format
-	return make(map[string][]string), []string{}
+	// Failed to parse either format: preserve the corrupt file before starting
+	// fresh, otherwise the next saveCommandHistory would overwrite it.
+	if backupPath, renameErr := quarantineCorruptFile(historyPath); renameErr == nil {
+		return make(map[string][]string), []string{}, fmt.Sprintf("Command history file was corrupt; backed up to %s", filepath.Base(backupPath))
+	}
+	return make(map[string][]string), []string{}, "Command history file was corrupt and could not be backed up; not overwriting"
 }
 
 // saveCommandHistory writes command history to disk
@@ -339,5 +352,6 @@ func (m *model) saveCommandHistory() error {
 		return err
 	}
 
-	return os.WriteFile(historyPath, data, 0644)
+	// Write atomically so a crash mid-write can't corrupt the history file.
+	return atomicWriteFile(historyPath, data, 0644)
 }

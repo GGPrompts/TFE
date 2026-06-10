@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -290,5 +292,55 @@ func TestCommandHistoryNavigation(t *testing.T) {
 	}
 	if cmd := m.getNextCommand(); cmd != "" {
 		t.Errorf("Step 6: got %q, expected empty", cmd)
+	}
+}
+
+// TestLoadCommandHistory_CorruptedFile verifies that a corrupt history file is
+// preserved (renamed aside) and a warning is returned instead of being
+// silently overwritten by a later save.
+func TestLoadCommandHistory_CorruptedFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", originalHome)
+
+	configDir := filepath.Join(tmpDir, ".config", "tfe")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("Failed to create config dir: %v", err)
+	}
+	historyPath := filepath.Join(configDir, "command_history.json")
+	corruptContent := "{not valid json at all"
+	if err := os.WriteFile(historyPath, []byte(corruptContent), 0644); err != nil {
+		t.Fatalf("Failed to write corrupt history: %v", err)
+	}
+
+	dirHistory, global, warning := loadCommandHistory()
+
+	if len(dirHistory) != 0 || len(global) != 0 {
+		t.Errorf("Corrupt history should load empty, got dir=%d global=%d", len(dirHistory), len(global))
+	}
+	if warning == "" {
+		t.Error("Corrupt history should return a non-empty warning")
+	}
+
+	// Original path must no longer hold the corrupt file (renamed aside)
+	if _, err := os.Stat(historyPath); !os.IsNotExist(err) {
+		t.Error("Corrupt history file should have been renamed aside")
+	}
+
+	// A backup preserving the original content should exist
+	matches, err := filepath.Glob(historyPath + ".corrupt-*")
+	if err != nil {
+		t.Fatalf("Glob failed: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("Expected 1 corrupt backup, got %d", len(matches))
+	}
+	data, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatalf("Failed to read backup: %v", err)
+	}
+	if string(data) != corruptContent {
+		t.Errorf("Backup should preserve original content, got %q", string(data))
 	}
 }
