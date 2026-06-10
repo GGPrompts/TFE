@@ -374,6 +374,36 @@ func (m model) renderMenuBar() string {
 	return menuBarContent + strings.Repeat(" ", padding)
 }
 
+// dropdownWidth calculates the content width of a dropdown menu (excluding border).
+// Uses terminal-aware visual widths so rendering (renderActiveDropdown) and mouse
+// hit-testing (isInDropdown) agree on geometry. Includes 4 columns of padding and
+// enforces a 20-column minimum.
+func (m model) dropdownWidth(menu Menu) int {
+	maxWidth := 0
+	for _, item := range menu.Items {
+		if item.IsSeparator {
+			continue
+		}
+		width := m.visualWidthCompensated(item.Label) // Use terminal-aware width for emoji
+		if item.IsCheckable {
+			width += m.visualWidthCompensated("✓ ") // Use terminal-aware width of checkmark + space
+		}
+		if item.Shortcut != "" {
+			width += m.visualWidthCompensated(item.Shortcut) + 3 // Use terminal-aware width for shortcut
+		}
+		if width > maxWidth {
+			maxWidth = width
+		}
+	}
+
+	// Add padding
+	maxWidth += 4 // 2 chars padding on each side
+	if maxWidth < 20 {
+		maxWidth = 20
+	}
+	return maxWidth
+}
+
 // renderActiveDropdown renders the currently active dropdown menu
 func (m model) renderActiveDropdown() string {
 	if !m.menuOpen || m.activeMenu == "" {
@@ -402,30 +432,9 @@ func (m model) renderActiveDropdown() string {
 
 	// Build dropdown panel
 	var lines []string
-	maxWidth := 0
 
-	// First pass: calculate max width using terminal-aware width
-	for _, item := range menu.Items {
-		if item.IsSeparator {
-			continue
-		}
-		width := m.visualWidthCompensated(item.Label) // Use terminal-aware width for emoji
-		if item.IsCheckable {
-			width += m.visualWidthCompensated("✓ ") // Use terminal-aware width of checkmark + space
-		}
-		if item.Shortcut != "" {
-			width += m.visualWidthCompensated(item.Shortcut) + 3 // Use terminal-aware width for shortcut
-		}
-		if width > maxWidth {
-			maxWidth = width
-		}
-	}
-
-	// Add padding
-	maxWidth += 4 // 2 chars padding on each side
-	if maxWidth < 20 {
-		maxWidth = 20
-	}
+	// Calculate content width (shared with mouse hit-testing in isInDropdown)
+	maxWidth := m.dropdownWidth(menu)
 
 	// Second pass: render items
 	for i, item := range menu.Items {
@@ -637,24 +646,9 @@ func (m model) isInDropdown(x, y int) bool {
 	}
 	height += 2 // borders
 
-	// Estimate width (will be at least 20)
-	maxWidth := 20
-	for _, item := range menu.Items {
-		if item.IsSeparator {
-			continue
-		}
-		width := len(item.Label)
-		if item.IsCheckable {
-			width += 2
-		}
-		if item.Shortcut != "" {
-			width += len(item.Shortcut) + 3
-		}
-		width += 4 // padding
-		if width > maxWidth {
-			maxWidth = width
-		}
-	}
+	// Use the same width calculation as renderActiveDropdown so the hit-test
+	// matches the drawn geometry (will be at least 20)
+	maxWidth := m.dropdownWidth(menu)
 
 	// Clamp X so dropdown stays within terminal width (matches overlay logic)
 	totalWidth := maxWidth + 2 // +2 for border
