@@ -261,6 +261,17 @@ func (m *model) loadSubdirFiles(dirPath string) []fileItem {
 
 // loadFiles loads the files from the current directory
 func (m *model) loadFiles() {
+	// Re-apply any active search filter once the listing is rebuilt so
+	// filteredIndices always reference the current m.files, never a stale
+	// listing. Deferred so every return path is covered. Directory navigation
+	// clears the search state first (navigateToPath / cd handler), so this
+	// only fires for in-place reloads such as file-watcher events.
+	defer func() {
+		if m.searchMode || m.searchQuery != "" {
+			m.filteredIndices = m.filterFilesBySearch(m.searchQuery)
+		}
+	}()
+
 	// Update file watcher to track the current directory
 	m.switchWatchPath(m.currentPath)
 

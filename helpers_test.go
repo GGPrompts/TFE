@@ -514,3 +514,62 @@ func BenchmarkIsPromptFile(b *testing.B) {
 		isPromptFile(testItems[i%len(testItems)])
 	}
 }
+
+// TestNavigateToPathClearsSearchFilter verifies that navigating to a new
+// directory clears the directory search state. Without this, filteredIndices
+// built against the old listing would be mapped onto the new directory's
+// files, showing an arbitrary wrong subset (regression test for tfe-6nz).
+func TestNavigateToPathClearsSearchFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+	subDir := filepath.Join(tmpDir, "subdir")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("Failed to create subdir: %v", err)
+	}
+	for _, name := range []string{"alpha.txt", "beta.txt", "gamma.txt"} {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte("x"), 0644); err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+	}
+
+	m := &model{currentPath: tmpDir}
+	m.loadFiles()
+
+	// Simulate an accepted search (Enter in search mode keeps the filter)
+	m.searchMode = false
+	m.searchQuery = "alpha"
+	m.filteredIndices = m.filterFilesBySearch("alpha")
+	if len(m.filteredIndices) == 0 {
+		t.Fatal("Expected search to match at least one file")
+	}
+
+	m.navigateToPath(subDir)
+
+	if m.searchMode {
+		t.Error("Expected searchMode to be cleared after navigation")
+	}
+	if m.searchQuery != "" {
+		t.Errorf("Expected searchQuery to be cleared after navigation, got %q", m.searchQuery)
+	}
+	if m.filteredIndices != nil {
+		t.Errorf("Expected filteredIndices to be nil after navigation, got %v", m.filteredIndices)
+	}
+	if m.currentPath != subDir {
+		t.Errorf("Expected currentPath %q, got %q", subDir, m.currentPath)
+	}
+}
+
+// TestClearSearchFilter verifies the shared helper resets all search state.
+func TestClearSearchFilter(t *testing.T) {
+	m := &model{
+		searchMode:      true,
+		searchQuery:     "query",
+		filteredIndices: []int{1, 2, 3},
+	}
+
+	m.clearSearchFilter()
+
+	if m.searchMode || m.searchQuery != "" || m.filteredIndices != nil {
+		t.Errorf("clearSearchFilter did not reset state: searchMode=%v searchQuery=%q filteredIndices=%v",
+			m.searchMode, m.searchQuery, m.filteredIndices)
+	}
+}

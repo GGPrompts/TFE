@@ -1377,6 +1377,9 @@ rm -f "$0"
 						m.showTrashOnly = false
 						m.trashRestorePath = ""
 					}
+					// Clear any active search filter — its indices reference
+					// the old directory's listing (this path bypasses navigateToPath)
+					m.clearSearchFilter()
 					m.currentPath = newPath
 					m.cursor = 0
 					m.loadFiles()

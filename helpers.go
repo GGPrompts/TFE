@@ -477,9 +477,23 @@ func cleanNameFromChangedFile(name string) string {
 	return filepath.Base(name)
 }
 
+// clearSearchFilter resets directory search state (search mode, query, and
+// filtered indices). Called when navigating to a different directory so a
+// filter built against the old listing can't be applied to the new one,
+// where the stale indices would select arbitrary wrong files.
+func (m *model) clearSearchFilter() {
+	m.searchMode = false
+	m.searchQuery = ""
+	m.filteredIndices = nil
+}
+
 // navigateToPath changes the current path and automatically exits special modes (trash, favorites, etc)
 // This ensures users don't get stuck in filter modes when navigating
 func (m *model) navigateToPath(newPath string) {
+	// Clear any active search filter — its indices reference the listing of
+	// the directory we're leaving and would be meaningless in the new one
+	m.clearSearchFilter()
+
 	// If we're in trash mode and navigating away, check if staying within trash
 	if m.showTrashOnly {
 		trashDir, err := getTrashDir()

@@ -1136,3 +1136,78 @@ func TestCopyDirectoryValidDestination(t *testing.T) {
 		t.Errorf("Copied nested content mismatch: got %q, want %q", got, "bbb")
 	}
 }
+
+// TestLoadFilesReappliesSearchFilter verifies that loadFiles re-applies an
+// active search filter against the freshly loaded listing, so filteredIndices
+// can never reference a stale file list after an in-place reload such as a
+// file-watcher event (regression test for tfe-6nz).
+func TestLoadFilesReappliesSearchFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+	for _, name := range []string{"alpha.txt", "beta.txt"} {
+		createTestFileWithContent(t, filepath.Join(tmpDir, name), []byte("x"))
+	}
+
+	m := &model{currentPath: tmpDir}
+	m.loadFiles()
+
+	// Active search (query retained after accepting with Enter)
+	m.searchQuery = "alpha"
+	m.filteredIndices = m.filterFilesBySearch("alpha")
+
+	matchCount := func() int {
+		count := 0
+		for _, idx := range m.filteredIndices {
+			if idx >= len(m.files) {
+				t.Fatalf("filteredIndices contains out-of-range index %d (len(files)=%d)", idx, len(m.files))
+			}
+			name := m.files[idx].name
+			if name != ".." && !strings.Contains(strings.ToLower(name), "alpha") {
+				t.Errorf("filteredIndices points at non-matching file %q", name)
+			}
+			if strings.Contains(strings.ToLower(name), "alpha") {
+				count++
+			}
+		}
+		return count
+	}
+
+	if got := matchCount(); got != 1 {
+		t.Fatalf("Expected 1 matching file before reload, got %d", got)
+	}
+
+	// Simulate a file-watcher reload after a new matching file appears
+	createTestFileWithContent(t, filepath.Join(tmpDir, "alphabet.txt"), []byte("y"))
+	m.loadFiles()
+
+	if m.searchQuery != "alpha" {
+		t.Errorf("Expected active search to survive reload, got query %q", m.searchQuery)
+	}
+	if got := matchCount(); got != 2 {
+		t.Errorf("Expected filter re-applied to new listing with 2 matches, got %d", got)
+	}
+}
+
+// TestLoadFilesStaleIndicesCannotSurviveReload verifies that even if
+// filteredIndices somehow reference a previous directory's listing, loadFiles
+// rebuilds them from the current files when a search is active (tfe-6nz).
+func TestLoadFilesStaleIndicesCannotSurviveReload(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFileWithContent(t, filepath.Join(tmpDir, "match.txt"), []byte("x"))
+
+	m := &model{
+		currentPath:     tmpDir,
+		searchQuery:     "match",
+		filteredIndices: []int{7, 42, 99}, // garbage indices from an old listing
+	}
+	m.loadFiles()
+
+	for _, idx := range m.filteredIndices {
+		if idx >= len(m.files) {
+			t.Fatalf("Stale out-of-range index %d survived loadFiles (len(files)=%d)", idx, len(m.files))
+		}
+		name := m.files[idx].name
+		if name != ".." && !strings.Contains(strings.ToLower(name), "match") {
+			t.Errorf("filteredIndices points at non-matching file %q after reload", name)
+		}
+	}
+}
