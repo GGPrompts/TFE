@@ -432,6 +432,7 @@ git pull
 							m.showChangesOnly = false
 						} else {
 							m.changedFiles = changed
+							m.invalidateDiffPreviewCache() // changedFiles refreshed: cached diff may be stale
 							// Load agent sessions and build file-to-agent map
 							m.agentSessions = getAgentSessions()
 							m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)

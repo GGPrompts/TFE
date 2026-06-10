@@ -689,6 +689,8 @@ func (m *model) loadPreview(path string) {
 	m.preview.promptTemplate = nil
 	m.preview.isJSONL = false
 	m.preview.cachedJSONLMessages = nil
+	m.preview.cachedJSONLRenderedLines = nil
+	m.preview.cachedJSONLRenderedWidth = 0
 	// Invalidate cache when loading new file
 	m.preview.cacheValid = false
 	m.preview.cachedWrappedLines = nil
@@ -1142,6 +1144,13 @@ func (m *model) populatePreviewCache() {
 		return
 	}
 
+	// JSONL previews use their own rendered-line cache (keyed on
+	// jsonlPreviewWidth), not the wrap/Glamour cache below
+	if m.preview.isJSONL {
+		m.populateJSONLRenderCache()
+		return
+	}
+
 	// Calculate available width via the shared helper - this is the same
 	// formula renderPreview() and getWrappedLineCount() use, so the cache
 	// written here is guaranteed to hit on render
@@ -1211,11 +1220,23 @@ func (m *model) populatePreviewCache() {
 // instead of renderPreview() falling back to a full re-wrap on every frame
 // (a value receiver, so it can never store the result back).
 func (m *model) refreshPreviewCacheIfStale() {
+	// Diff preview (changes mode) has its own cache keyed on
+	// (filePath, gitStatusCode) + width; refresh it independently of the
+	// file-content cache below (it works even when no preview is loaded)
+	m.refreshDiffPreviewCacheIfStale()
+
 	if !m.preview.loaded {
 		return
 	}
-	// JSONL and graphics-protocol previews don't use the wrap/Glamour cache
-	if m.preview.isJSONL || m.preview.hasGraphicsProtocol {
+	// JSONL previews use their own rendered-line cache keyed on width
+	if m.preview.isJSONL {
+		if m.preview.cachedJSONLRenderedWidth != m.jsonlPreviewWidth() {
+			m.populateJSONLRenderCache()
+		}
+		return
+	}
+	// Graphics-protocol previews don't use the wrap/Glamour cache
+	if m.preview.hasGraphicsProtocol {
 		return
 	}
 	if m.preview.cacheValid && m.preview.cachedWidth == m.previewAvailableWidth() {

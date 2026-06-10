@@ -223,6 +223,10 @@ func (m *model) checkAgentCompletions() tea.Cmd {
 	if m.showChangesOnly {
 		if changed, err := m.getChangedFiles(); err == nil {
 			m.changedFiles = changed
+			// changedFiles refreshed outside key/mouse dispatch: drop the
+			// cached diff and recompute once
+			m.invalidateDiffPreviewCache()
+			m.refreshDiffPreviewCacheIfStale()
 			m.agentSessions = currentSessions
 			m.agentFileMap = buildAgentFileMap(changed, currentSessions)
 			m.setStatusMessage(fmt.Sprintf("Agent finished -- refreshed changes (%d files)", len(changed)), false)
@@ -240,6 +244,7 @@ func (m *model) checkAgentCompletions() tea.Cmd {
 	// Enter changes mode (mirrors the Ctrl+G entry path)
 	m.showChangesOnly = true
 	m.changedFiles = changed
+	m.invalidateDiffPreviewCache() // changedFiles refreshed: cached diff may be stale
 	m.agentSessions = currentSessions
 	m.agentFileMap = buildAgentFileMap(changed, currentSessions)
 	m.changesRestoreDisplay = m.displayMode
@@ -249,6 +254,10 @@ func (m *model) checkAgentCompletions() tea.Cmd {
 	m.calculateLayout()
 	m.cursor = 0
 	m.loadFiles()
+
+	// This runs from a tick message (outside key/mouse dispatch), so fill the
+	// diff cache here rather than letting View() hit the slow fallback
+	m.refreshDiffPreviewCacheIfStale()
 
 	// Clear any other filter modes
 	m.showFavoritesOnly = false

@@ -157,6 +157,7 @@ func (m *model) toggleChangesMode() {
 			m.showChangesOnly = false
 		} else {
 			m.changedFiles = changed
+			m.invalidateDiffPreviewCache() // changedFiles refreshed: cached diff may be stale
 			m.agentSessions = getAgentSessions()
 			m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
 			m.changesRestoreDisplay = m.displayMode

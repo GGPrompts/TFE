@@ -534,6 +534,7 @@ func (m *model) navigateToPath(newPath string) {
 func (m *model) exitChangesMode() {
 	m.showChangesOnly = false
 	m.showDiffPreview = false
+	m.invalidateDiffPreviewCache() // free cached diff lines; recomputed on next entry
 	m.agentSessions = nil
 	m.agentFileMap = nil
 	m.displayMode = m.changesRestoreDisplay

@@ -118,21 +118,28 @@ func (m model) previewAvailableWidth() int {
 	return availableWidth
 }
 
+// diffPreviewAvailableWidth returns the width available for diff preview
+// content: scrollbar (1) + space (1) = 2 chars overhead, no line numbers.
+// Derived from previewBoxContentWidth() — never compute this ad hoc, or the
+// diff cache (refreshDiffPreviewCacheIfStale / renderDiffPreview) will miss.
+func (m model) diffPreviewAvailableWidth() int {
+	availableWidth := m.previewBoxContentWidth() - 2
+	if availableWidth < 20 {
+		availableWidth = 20
+	}
+	return availableWidth
+}
+
 // getWrappedLineCount calculates the total number of wrapped lines for the current preview
 func (m model) getWrappedLineCount() int {
 	if !m.preview.loaded {
 		return 0
 	}
 
-	// JSONL files: compute rendered line count at current width
+	// JSONL files: count the cached rendered lines (same cache
+	// renderJSONLPreview reads, so the count always matches the render)
 	if m.preview.isJSONL && len(m.preview.cachedJSONLMessages) > 0 {
-		// Must match renderJSONLPreview(): scrollbar (1) + space (1)
-		availableWidth := m.previewBoxContentWidth() - 2
-		if availableWidth < 20 {
-			availableWidth = 20
-		}
-		lines := renderJSONLFromMessages(m.preview.cachedJSONLMessages, availableWidth, m.preview.cachedJSONLIsTailed, m.preview.fileSize)
-		return len(lines)
+		return len(m.jsonlRenderedLines())
 	}
 
 	// Calculate available width via the shared helper so the cache check below

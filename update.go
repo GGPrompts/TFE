@@ -340,6 +340,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				m.changedFiles = changed
 
+				// Git operation may have changed diff content/status codes:
+				// drop the cached diff and recompute once (not per frame)
+				m.invalidateDiffPreviewCache()
+				m.refreshDiffPreviewCacheIfStale()
+
 				// Show contextual status message for push/sync operations
 				cleared := oldCount - len(changed)
 				if msg.err == nil && (msg.operation == "push" || msg.operation == "sync") && cleared > 0 {
@@ -487,6 +492,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.changedFiles = changed
 			}
 		}
+
+		// File contents changed on disk: the cached diff may be stale.
+		// Drop it and recompute once (not per frame in View)
+		m.invalidateDiffPreviewCache()
+		m.refreshDiffPreviewCacheIfStale()
 
 		// If preview is active, refresh it too (file content may have changed)
 		if m.preview.loaded && m.preview.filePath != "" {

@@ -110,23 +110,23 @@ type fileItem struct {
 	agentType        string // From .meta.json (e.g. "Explore", "general-purpose")
 	agentDescription string // First user message or slug from JSONL
 	// Git status (populated for git repositories)
-	isGitRepo      bool      // Whether this directory is a git repository
-	gitBranch      string    // Current branch name
-	gitAhead       int       // Commits ahead of remote
-	gitBehind      int       // Commits behind remote
-	gitDirty       bool      // Has uncommitted changes
-	gitLastCommit  time.Time // Time of last commit
+	isGitRepo     bool      // Whether this directory is a git repository
+	gitBranch     string    // Current branch name
+	gitAhead      int       // Commits ahead of remote
+	gitBehind     int       // Commits behind remote
+	gitDirty      bool      // Has uncommitted changes
+	gitLastCommit time.Time // Time of last commit
 }
 
 // previewModel holds preview pane state
 type previewModel struct {
-	filePath   string
-	fileName   string
-	content    []string // Lines of the file
-	scrollPos  int      // Current scroll position
-	maxPreview int      // Max lines to load (prevent huge files)
-	loaded     bool
-	isBinary   bool
+	filePath            string
+	fileName            string
+	content             []string // Lines of the file
+	scrollPos           int      // Current scroll position
+	maxPreview          int      // Max lines to load (prevent huge files)
+	loaded              bool
+	isBinary            bool
 	tooLarge            bool
 	fileSize            int64
 	isMarkdown          bool // Whether the file is markdown
@@ -138,11 +138,23 @@ type previewModel struct {
 	cachedLineCount       int      // Cached total line count after wrapping
 	cachedWidth           int      // Width the cache was computed for
 	cacheValid            bool     // Whether cache is valid
+	// Diff preview caching (changes mode) — avoids spawning git subprocesses
+	// and re-wrapping the diff on every View() frame
+	diffForPath     string   // File path the cached diff was computed for
+	diffForStatus   string   // Git status code the cached diff was computed for
+	diffContent     string   // Raw diff text from getFileDiff
+	diffErrMsg      string   // Error message when getFileDiff failed ("" = success)
+	diffLoaded      bool     // Whether diffContent/diffErrMsg are valid for (diffForPath, diffForStatus)
+	cachedDiffLines []string // Wrapped + styled diff lines, ready to slice by scroll position
+	cachedDiffWidth int      // Width cachedDiffLines was computed for
+	diffCacheValid  bool     // Whether cachedDiffLines matches diffContent at cachedDiffWidth
 	// JSONL conversation rendering
-	isJSONL             bool           // Whether the file is a JSONL conversation
-	cachedJSONLMessages []jsonlMessage // Parsed JSONL messages (expensive JSON parsing done once)
-	cachedJSONLIsTailed bool           // Whether the file was tail-read
-	jsonlFullLoad       bool           // Whether to load full file instead of tail
+	isJSONL                  bool           // Whether the file is a JSONL conversation
+	cachedJSONLMessages      []jsonlMessage // Parsed JSONL messages (expensive JSON parsing done once)
+	cachedJSONLIsTailed      bool           // Whether the file was tail-read
+	jsonlFullLoad            bool           // Whether to load full file instead of tail
+	cachedJSONLRenderedLines []string       // Fully rendered (styled+wrapped) lines at cachedJSONLRenderedWidth
+	cachedJSONLRenderedWidth int            // Width the rendered lines were computed for (0 = invalid)
 	// Prompt template (for prompt files)
 	isPrompt       bool            // Whether the file is a prompt template
 	promptTemplate *promptTemplate // Parsed prompt template
@@ -168,8 +180,8 @@ type inputFieldType int
 
 const (
 	fieldTypeShort inputFieldType = iota // Short text input (single line)
-	fieldTypeLong                         // Long text input (shows truncated)
-	fieldTypeFile                         // File path (supports file picker)
+	fieldTypeLong                        // Long text input (shows truncated)
+	fieldTypeFile                        // File path (supports file picker)
 )
 
 // promptInputField represents a fillable field for a prompt template variable
@@ -184,25 +196,25 @@ type promptInputField struct {
 
 // model represents the main application state
 type model struct {
-	currentPath  string
-	files        []fileItem
-	cursor       int
-	height       int
-	width        int
-	showHidden   bool
+	currentPath     string
+	files           []fileItem
+	cursor          int
+	height          int
+	width           int
+	showHidden      bool
 	terminalType    terminalType // Detected terminal emulator for emoji width compensation
 	inTmux          bool         // Whether TFE is running inside a tmux session
 	forceLightTheme bool         // Force light theme (--light flag) for glamour and menu colors
 	displayMode     displayMode
-	sortBy      string // "name", "size", "modified" for detail view
-	sortAsc     bool   // Sort ascending or descending
-	detailScrollX int  // Horizontal scroll offset for detail view (narrow terminals)
+	sortBy          string // "name", "size", "modified" for detail view
+	sortAsc         bool   // Sort ascending or descending
+	detailScrollX   int    // Horizontal scroll offset for detail view (narrow terminals)
 	// Preview-related fields
-	viewMode    viewMode
-	preview     previewModel
-	leftWidth      int     // Width of left pane in dual-pane mode
-	rightWidth     int     // Width of right pane in dual-pane mode
-	lockedTopRatio float64 // Vertical split: locked ratio of top pane height (0 = not set)
+	viewMode       viewMode
+	preview        previewModel
+	leftWidth      int      // Width of left pane in dual-pane mode
+	rightWidth     int      // Width of right pane in dual-pane mode
+	lockedTopRatio float64  // Vertical split: locked ratio of top pane height (0 = not set)
 	focusedPane    paneType // Which pane has focus in dual-pane mode
 	panelsLocked   bool     // When true, panel widths don't change with focus (disables accordion)
 	// Glamour renderer cache (avoid recreating on every render)
@@ -216,10 +228,10 @@ type model struct {
 	lastClickY     int // Screen Y position for scroll-aware double-click detection
 	// Command prompt (always visible)
 	commandInput         string
-	commandCursorPos     int                       // Cursor position in command input (0 = start, len = end)
-	commandHistory       []string                  // Combined history (directory + global) for navigation
-	commandHistoryByDir  map[string][]string       // Per-directory command history
-	commandHistoryGlobal []string                  // Global command history (cross-directory)
+	commandCursorPos     int                 // Cursor position in command input (0 = start, len = end)
+	commandHistory       []string            // Combined history (directory + global) for navigation
+	commandHistoryByDir  map[string][]string // Per-directory command history
+	commandHistoryGlobal []string            // Global command history (cross-directory)
 	historyPos           int
 	commandFocused       bool // Whether command prompt has input focus
 	// Loading spinner
@@ -231,11 +243,11 @@ type model struct {
 	// Prompts system
 	showPromptsOnly bool // Filter to show only prompt files (.yaml, .md, .txt)
 	// Git repositories filter
-	showGitReposOnly  bool        // Filter to show only git repositories
-	gitReposList      []fileItem  // Cached list of discovered git repos (recursive scan)
-	gitReposLastScan  time.Time   // When we last scanned for git repos
-	gitReposScanRoot  string      // Root directory of last scan
-	gitReposScanDepth int         // Max depth to scan (default: 5)
+	showGitReposOnly  bool       // Filter to show only git repositories
+	gitReposList      []fileItem // Cached list of discovered git repos (recursive scan)
+	gitReposLastScan  time.Time  // When we last scanned for git repos
+	gitReposScanRoot  string     // Root directory of last scan
+	gitReposScanDepth int        // Max depth to scan (default: 5)
 	// Git changes filter (working set: modified/untracked files across project)
 	showChangesOnly       bool              // Filter to show only git-changed/untracked files
 	changedFiles          []fileItem        // Cached list of changed files from git status
@@ -250,20 +262,20 @@ type model struct {
 	agentViewRestoreAsc  bool        // Sort direction to restore when exiting agent view
 	agentViewRestoreMode displayMode // Display mode to restore when exiting agent view
 	// Trash/Recycle bin system
-	showTrashOnly     bool        // Filter to show trash contents
-	trashItems        []trashItem // Cached trash items when viewing trash
-	trashRestorePath  string      // Path to restore when exiting trash view
+	showTrashOnly    bool        // Filter to show trash contents
+	trashItems       []trashItem // Cached trash items when viewing trash
+	trashRestorePath string      // Path to restore when exiting trash view
 	// Prompt inline editing (fillable variables)
-	promptEditMode         bool              // Whether prompt edit mode is active (Tab to activate)
-	focusedVariableIndex   int               // Index of currently focused variable in template
-	filledVariables        map[string]string // Map of variable name -> filled value
-	filePickerMode         bool              // Whether file picker mode is active (F3)
-	filePickerRestorePath  string            // Path to restore preview after file picker
-	filePickerRestorePrompts bool            // Whether to restore prompts filter after file picker
-	filePickerCopySource   string            // Source path when picking copy destination (context menu)
+	promptEditMode           bool              // Whether prompt edit mode is active (Tab to activate)
+	focusedVariableIndex     int               // Index of currently focused variable in template
+	filledVariables          map[string]string // Map of variable name -> filled value
+	filePickerMode           bool              // Whether file picker mode is active (F3)
+	filePickerRestorePath    string            // Path to restore preview after file picker
+	filePickerRestorePrompts bool              // Whether to restore prompts filter after file picker
+	filePickerCopySource     string            // Source path when picking copy destination (context menu)
 	// Tree view expansion
 	expandedDirs map[string]bool // Path -> expanded state
-	treeItems    []treeItem       // Cached tree items for tree view
+	treeItems    []treeItem      // Cached tree items for tree view
 	// Context menu (right-click menu)
 	contextMenuOpen   bool
 	contextMenuX      int
@@ -279,9 +291,9 @@ type model struct {
 	// Fuzzy search
 	fuzzySearchActive bool // Whether fuzzy search is active
 	// Directory search (/ key)
-	searchMode       bool   // Whether search mode is active
-	searchQuery      string // Current search query
-	filteredIndices  []int  // Indices of files matching search
+	searchMode      bool   // Whether search mode is active
+	searchQuery     string // Current search query
+	filteredIndices []int  // Indices of files matching search
 	// Menu system (dropdown menus in title bar)
 	startupTime      time.Time // When app started (for 5s GitHub link display)
 	menuOpen         bool      // Whether any menu is currently open
@@ -290,9 +302,9 @@ type model struct {
 	menuBarFocused   bool      // Whether menu bar has keyboard focus (Alt/F9 pressed)
 	highlightedMenu  string    // Which menu is highlighted in menu bar ("file", "edit", etc.)
 	// Menu caching (performance optimization - avoids repeated filesystem checks)
-	cachedMenus       map[string]Menu  // Cached menu structure (built once)
-	toolsAvailable    map[string]bool // Cached tool availability (lazygit, htop, etc.)
-	tuiClassicsPath   string          // Cached path to TUIClassics launcher (empty if not found)
+	cachedMenus     map[string]Menu // Cached menu structure (built once)
+	toolsAvailable  map[string]bool // Cached tool availability (lazygit, htop, etc.)
+	tuiClassicsPath string          // Cached path to TUIClassics launcher (empty if not found)
 	// Performance: Cache for directoryContainsPrompts() to avoid repeated file I/O
 	promptDirsCache map[string]bool // Path -> contains prompts (cleared on loadFiles)
 	// Update notification
@@ -309,18 +321,18 @@ type model struct {
 	tabs      []openTab // Open file tabs for review
 	activeTab int       // Index of the currently active tab
 	// File watcher (fsnotify)
-	watcher       *fsnotify.Watcher        // fsnotify watcher instance
-	watcherChan   chan fileChangedMsg       // Bridge channel for watcher events
-	watcherActive bool                      // Whether the watcher is currently running
-	watchedPath   string                    // Currently watched directory path
+	watcher       *fsnotify.Watcher   // fsnotify watcher instance
+	watcherChan   chan fileChangedMsg // Bridge channel for watcher events
+	watcherActive bool                // Whether the watcher is currently running
+	watchedPath   string              // Currently watched directory path
 	// Agent auto-watch (auto-open changes mode when agent finishes)
-	agentAutoWatch          bool              // Whether auto-watch is enabled (TFE_AUTO_CHANGES=1)
-	lastKnownAgentSessions  map[string]string // session_id -> status (for detecting completions)
+	agentAutoWatch         bool              // Whether auto-watch is enabled (TFE_AUTO_CHANGES=1)
+	lastKnownAgentSessions map[string]string // session_id -> status (for detecting completions)
 	// Unified configuration (loaded from ~/.config/tfe/config.toml)
 	config Config
 	// Settings panel state (Ctrl+,)
-	settingsCategory int // Active category tab (0=General, 1=Appearance, 2=File Watcher)
-	settingsCursor   int // Selected setting within category
+	settingsCategory int    // Active category tab (0=General, 1=Appearance, 2=File Watcher)
+	settingsCursor   int    // Selected setting within category
 	settingsEditing  bool   // Whether currently editing a string field
 	settingsInput    string // Buffer for string input editing
 	// Ghost text (AI-powered command suggestions via ? prefix)
@@ -367,10 +379,9 @@ type updateAvailableMsg struct {
 
 // fileChangedMsg is sent when fsnotify detects a file system change in the watched directory
 type fileChangedMsg struct {
-	path string         // Path of the changed file/directory
-	op   fsnotify.Op    // Type of operation (Create, Write, Remove, Rename, Chmod)
+	path string      // Path of the changed file/directory
+	op   fsnotify.Op // Type of operation (Create, Write, Remove, Rename, Chmod)
 }
-
 
 // agentCheckTickMsg is sent periodically to poll agent session state for completions
 type agentCheckTickMsg struct{}
@@ -379,11 +390,11 @@ type agentCheckTickMsg struct{}
 type dialogType int
 
 const (
-	dialogNone dialogType = iota
-	dialogInput    // Text input dialog (F7 directory name)
-	dialogConfirm  // Yes/No confirmation (F8 delete)
-	dialogMessage  // Status messages (success/error)
-	dialogSettings // Settings panel (Ctrl+,)
+	dialogNone     dialogType = iota
+	dialogInput               // Text input dialog (F7 directory name)
+	dialogConfirm             // Yes/No confirmation (F8 delete)
+	dialogMessage             // Status messages (success/error)
+	dialogSettings            // Settings panel (Ctrl+,)
 )
 
 // dialogModel holds dialog state
@@ -415,9 +426,9 @@ type Menu struct {
 
 // Profile represents a launchable terminal session profile (shown in the Profiles menu)
 type Profile struct {
-	Name    string `toml:"name"`              // Display name in the menu
-	Dir     string `toml:"dir,omitempty"`     // Optional working directory (empty = use current browsing dir)
-	Command string `toml:"command"`           // Command to execute after exiting TFE
+	Name    string `toml:"name"`          // Display name in the menu
+	Dir     string `toml:"dir,omitempty"` // Optional working directory (empty = use current browsing dir)
+	Command string `toml:"command"`       // Command to execute after exiting TFE
 }
 
 // ThemeColor represents a single adaptive color with light and dark variants
@@ -430,28 +441,28 @@ type ThemeColor struct {
 // Colors are specified as hex strings (e.g., "#5fd7ff") and adapt to light/dark terminals
 type Theme struct {
 	// Core UI colors
-	Title          ThemeColor `toml:"title"`           // Title bar text (titleStyle fg, spinner fg)
-	Path           ThemeColor `toml:"path"`            // Path display text
-	Status         ThemeColor `toml:"status"`          // Status bar text
+	Title  ThemeColor `toml:"title"`  // Title bar text (titleStyle fg, spinner fg)
+	Path   ThemeColor `toml:"path"`   // Path display text
+	Status ThemeColor `toml:"status"` // Status bar text
 	// Selection colors
-	SelectionBg    ThemeColor `toml:"selection_bg"`    // Selected item background
-	SelectionFg    ThemeColor `toml:"selection_fg"`    // Selected item foreground
-	NarrowSelect   ThemeColor `toml:"narrow_select"`   // Narrow terminal selection (matrix green)
+	SelectionBg  ThemeColor `toml:"selection_bg"`  // Selected item background
+	SelectionFg  ThemeColor `toml:"selection_fg"`  // Selected item foreground
+	NarrowSelect ThemeColor `toml:"narrow_select"` // Narrow terminal selection (matrix green)
 	// File type colors
-	Folder         ThemeColor `toml:"folder"`          // Directory names
-	File           ThemeColor `toml:"file"`            // Regular file names
+	Folder ThemeColor `toml:"folder"` // Directory names
+	File   ThemeColor `toml:"file"`   // Regular file names
 	// Special file colors
-	ClaudeContext  ThemeColor `toml:"claude_context"`  // CLAUDE.md and similar files (orange)
-	Agents         ThemeColor `toml:"agents"`          // Agent files (purple)
-	PromptsFolder  ThemeColor `toml:"prompts_folder"`  // Prompts folder (magenta/pink)
-	ObsidianVault  ThemeColor `toml:"obsidian_vault"`  // Obsidian vault folders (teal)
+	ClaudeContext ThemeColor `toml:"claude_context"` // CLAUDE.md and similar files (orange)
+	Agents        ThemeColor `toml:"agents"`         // Agent files (purple)
+	PromptsFolder ThemeColor `toml:"prompts_folder"` // Prompts folder (magenta/pink)
+	ObsidianVault ThemeColor `toml:"obsidian_vault"` // Obsidian vault folders (teal)
 	// Border colors (used for pane borders, preview borders)
-	BorderFocused  ThemeColor `toml:"border_focused"`  // Focused pane border
+	BorderFocused   ThemeColor `toml:"border_focused"`   // Focused pane border
 	BorderUnfocused ThemeColor `toml:"border_unfocused"` // Unfocused pane border
 	// Alternating row background
-	AlternateRow   ThemeColor `toml:"alternate_row"`   // Even-row background in file lists
+	AlternateRow ThemeColor `toml:"alternate_row"` // Even-row background in file lists
 	// Diff colors (git diff preview in changes mode)
-	DiffAdded      ThemeColor `toml:"diff_added"`      // Added lines (green)
+	DiffAdded      ThemeColor `toml:"diff_added"`       // Added lines (green)
 	DiffRemoved    ThemeColor `toml:"diff_removed"`     // Removed lines (red)
 	DiffHunkHeader ThemeColor `toml:"diff_hunk_header"` // @@ hunk headers (cyan)
 	DiffMeta       ThemeColor `toml:"diff_meta"`        // diff/index/--- /+++ header lines (dim)

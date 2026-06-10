@@ -283,42 +283,140 @@ func (m model) renderPreview(maxVisible int) string {
 	return s.String()
 }
 
+// previewDiffStatusCode returns the git status code for the current preview
+// file by matching its path against changedFiles.
+func (m *model) previewDiffStatusCode() string {
+	for _, cf := range m.changedFiles {
+		if cf.path == m.preview.filePath {
+			return extractGitStatusCode(cf.name)
+		}
+	}
+	return ""
+}
+
+// invalidateDiffPreviewCache drops both the raw diff text and the wrapped+styled
+// lines. Call whenever the diff content may have changed: file-watcher events,
+// changedFiles refreshes, and git operations.
+func (m *model) invalidateDiffPreviewCache() {
+	m.preview.diffLoaded = false
+	m.preview.diffCacheValid = false
+	m.preview.diffForPath = ""
+	m.preview.diffForStatus = ""
+	m.preview.diffContent = ""
+	m.preview.diffErrMsg = ""
+	m.preview.cachedDiffLines = nil
+}
+
+// refreshDiffPreviewCacheIfStale computes the git diff (subprocess spawns) and
+// the wrapped+styled lines for the current diff-preview target if missing or
+// stale. The diff text is keyed on (filePath, gitStatusCode); the styled lines
+// are keyed on diffPreviewAvailableWidth(), mirroring the
+// cachedWrappedLines/cachedWidth/cacheValid pattern. Called from
+// refreshPreviewCacheIfStale() after keyboard/mouse dispatch and explicitly
+// after watcher/git-operation refreshes, so renderDiffPreview() never has to
+// exec git or re-wrap on a View() frame.
+func (m *model) refreshDiffPreviewCacheIfStale() {
+	if !m.showChangesOnly || !m.showDiffPreview {
+		return
+	}
+	if m.preview.filePath == "" {
+		return
+	}
+
+	// Refresh the raw diff when the target (path, status) changed
+	statusCode := m.previewDiffStatusCode()
+	if !m.preview.diffLoaded || m.preview.diffForPath != m.preview.filePath ||
+		m.preview.diffForStatus != statusCode {
+		diff, err := m.getFileDiff(m.preview.filePath, statusCode)
+		m.preview.diffForPath = m.preview.filePath
+		m.preview.diffForStatus = statusCode
+		m.preview.diffContent = diff
+		if err != nil {
+			m.preview.diffErrMsg = err.Error()
+		} else {
+			m.preview.diffErrMsg = ""
+		}
+		m.preview.diffLoaded = true
+		m.preview.diffCacheValid = false
+	}
+
+	// Refresh the wrapped+styled lines when the content or width changed
+	availableWidth := m.diffPreviewAvailableWidth()
+	if m.preview.diffCacheValid && m.preview.cachedDiffWidth == availableWidth {
+		return
+	}
+	if m.preview.diffErrMsg != "" {
+		m.preview.cachedDiffLines = nil
+	} else {
+		m.preview.cachedDiffLines = wrapAndStyleDiffLines(m.preview.diffContent, availableWidth)
+	}
+	m.preview.cachedDiffWidth = availableWidth
+	m.preview.diffCacheValid = true
+}
+
+// wrapAndStyleDiffLines splits a raw diff into lines, wraps each to
+// availableWidth, and applies the per-line diff style (added/removed/hunk/meta),
+// returning render-ready lines that only need scrollbar prefixing.
+func wrapAndStyleDiffLines(diffOutput string, availableWidth int) []string {
+	rawLines := strings.Split(strings.TrimRight(diffOutput, "\n"), "\n")
+	var styledLines []string
+	for _, line := range rawLines {
+		style := classifyDiffLine(line)
+		for _, wrapped := range wrapLine(line, availableWidth) {
+			// Truncate to available width using ANSI-aware truncation
+			if visualWidth(wrapped) > availableWidth {
+				wrapped = truncateToWidth(wrapped, availableWidth)
+			}
+			switch style {
+			case 1: // Added
+				wrapped = diffAddedStyle.Render(wrapped)
+			case 2: // Removed
+				wrapped = diffRemovedStyle.Render(wrapped)
+			case 3: // Hunk header
+				wrapped = diffHunkHeaderStyle.Render(wrapped)
+			case 4: // Meta/header
+				wrapped = diffMetaStyle.Render(wrapped)
+			}
+			styledLines = append(styledLines, wrapped)
+		}
+	}
+	return styledLines
+}
+
 // renderDiffPreview renders a colorized git diff in the preview pane.
 // Used when in changes mode with showDiffPreview enabled.
+// The diff text and wrapped+styled lines come from the cache populated by
+// refreshDiffPreviewCacheIfStale(); the fallback below only runs on a cache
+// miss (value receiver, so it cannot store the result back).
 func (m model) renderDiffPreview(maxVisible int) string {
 	var s strings.Builder
 
-	// Calculate widths (same logic as normal preview)
-	var boxContentWidth int
-	if m.viewMode == viewFullPreview {
-		boxContentWidth = m.width - 6
+	availableWidth := m.diffPreviewAvailableWidth()
+
+	var wrappedLines []string
+	var diffErrMsg string
+	if m.preview.diffLoaded && m.preview.diffForPath == m.preview.filePath &&
+		m.preview.diffCacheValid && m.preview.cachedDiffWidth == availableWidth {
+		// Cache hit: lines are already wrapped and styled
+		wrappedLines = m.preview.cachedDiffLines
+		diffErrMsg = m.preview.diffErrMsg
 	} else {
-		boxContentWidth = m.rightWidth - 2
-	}
-
-	// Diff lines: scrollbar (1) + space (1) = 2 chars overhead (no line numbers for diff)
-	availableWidth := boxContentWidth - 2
-	if availableWidth < 20 {
-		availableWidth = 20
-	}
-
-	// Get the current file's git status code by matching preview path against changedFiles
-	var gitStatusCode string
-	for _, cf := range m.changedFiles {
-		if cf.path == m.preview.filePath {
-			gitStatusCode = extractGitStatusCode(cf.name)
-			break
+		// Cache miss fallback: compute inline (slow path, execs git)
+		gitStatusCode := m.previewDiffStatusCode()
+		diffOutput, err := m.getFileDiff(m.preview.filePath, gitStatusCode)
+		if err != nil {
+			diffErrMsg = err.Error()
+		} else {
+			wrappedLines = wrapAndStyleDiffLines(diffOutput, availableWidth)
 		}
 	}
 
-	// Get diff content
-	diffOutput, err := m.getFileDiff(m.preview.filePath, gitStatusCode)
-	if err != nil {
+	if diffErrMsg != "" {
 		// Show error message with fallback hint
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(uiSubtleText()).
 			Italic(true)
-		s.WriteString(emptyStyle.Render(fmt.Sprintf("No diff available: %s", err.Error())))
+		s.WriteString(emptyStyle.Render(fmt.Sprintf("No diff available: %s", diffErrMsg)))
 		s.WriteString("\n")
 		s.WriteString(emptyStyle.Render("Press 'd' to switch to file view"))
 
@@ -329,25 +427,6 @@ func (m model) renderDiffPreview(maxVisible int) string {
 			linesWritten++
 		}
 		return s.String()
-	}
-
-	// Split diff into lines and wrap
-	rawLines := strings.Split(strings.TrimRight(diffOutput, "\n"), "\n")
-	var wrappedLines []string
-	// Track which style applies to each wrapped line (inherit from source line)
-	var lineStyles []int // 0=normal, 1=added, 2=removed, 3=hunk, 4=meta
-	for _, line := range rawLines {
-		style := classifyDiffLine(line)
-		wrapped := wrapLine(line, availableWidth)
-		for range wrapped {
-			wrappedLines = append(wrappedLines, "")
-			lineStyles = append(lineStyles, style)
-		}
-		// Replace empty placeholders with actual wrapped content
-		startIdx := len(wrappedLines) - len(wrapped)
-		for j, w := range wrapped {
-			wrappedLines[startIdx+j] = w
-		}
 	}
 
 	// Calculate visible range based on scroll position
@@ -386,27 +465,9 @@ func (m model) renderDiffPreview(maxVisible int) string {
 		// Scrollbar
 		scrollbar := m.renderScrollbar(i-start, maxVisible, totalLines)
 
-		// Space after scrollbar
-		renderedLine := scrollbar + " "
-
-		// Colorize the diff line based on its type
-		contentLine := wrappedLines[i]
-		if visualWidth(contentLine) > availableWidth {
-			contentLine = truncateToWidth(contentLine, availableWidth)
-		}
-
-		switch lineStyles[i] {
-		case 1: // Added
-			contentLine = diffAddedStyle.Render(contentLine)
-		case 2: // Removed
-			contentLine = diffRemovedStyle.Render(contentLine)
-		case 3: // Hunk header
-			contentLine = diffHunkHeaderStyle.Render(contentLine)
-		case 4: // Meta/header
-			contentLine = diffMetaStyle.Render(contentLine)
-		}
-
-		renderedLine += contentLine
+		// Space after scrollbar, then the cached line (already wrapped,
+		// truncated, and styled by wrapAndStyleDiffLines)
+		renderedLine := scrollbar + " " + wrappedLines[i]
 		renderedLine += "\033[0m"
 		writeLine(renderedLine)
 	}
