@@ -420,10 +420,8 @@ git pull
 							m.agentSessions = getAgentSessions()
 							m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
 							m.changesRestoreDisplay = m.displayMode
-							m.displayMode = modeDetail
-							m.detailScrollX = 0
 							m.showDiffPreview = true
-							m.calculateLayout()
+							m.setDisplayMode(modeDetail)
 							m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
 						}
 					} else {

@@ -2495,8 +2495,7 @@ func (m model) handleMainKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		m.toggleTrash()
 		if !wasInTrash {
 			// Default to detail view for trash
-			m.displayMode = modeDetail
-			m.calculateLayout()
+			m.setDisplayMode(modeDetail)
 		}
 
 	case "f1":

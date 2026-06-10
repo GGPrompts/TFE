@@ -198,10 +198,8 @@ func (m *model) toggleChangesMode() {
 			m.agentSessions = getAgentSessions()
 			m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
 			m.changesRestoreDisplay = m.displayMode
-			m.displayMode = modeDetail
-			m.detailScrollX = 0
 			m.showDiffPreview = true
-			m.calculateLayout()
+			m.setDisplayMode(modeDetail)
 			m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
 		}
 	} else {
@@ -223,9 +221,7 @@ func (m *model) toggleGitRepos() {
 	m.showGitReposOnly = !m.showGitReposOnly
 
 	if m.showGitReposOnly {
-		m.displayMode = modeDetail
-		m.detailScrollX = 0
-		m.calculateLayout()
+		m.setDisplayMode(modeDetail)
 
 		m.setStatusMessage("🔍 Scanning for git repositories (depth 3, max 50)...", false)
 		m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)

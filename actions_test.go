@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -170,7 +171,7 @@ func TestScrollPreviewBy(t *testing.T) {
 		{"down-one", 0, 1, 1},
 		{"up-one-from-mid", 10, -1, 9},
 		{"down-three-wheel", 0, 3, 3},
-		{"up-three-wheel", 2, -3, 0},     // clamps at lower bound
+		{"up-three-wheel", 2, -3, 0}, // clamps at lower bound
 		{"page-down", 0, 20, 20},
 		{"down-past-end-clamps", 70, 20, 80},
 		{"up-below-zero-clamps", 5, -20, 0},
@@ -311,5 +312,112 @@ func TestSetDisplayMode_ExpandedDirsResetOnLeavingTree(t *testing.T) {
 	m2.setDisplayMode(modeTree)
 	if !m2.expandedDirs["/tmp/baz"] {
 		t.Errorf("tree -> tree: expandedDirs was reset, want preserved")
+	}
+}
+
+// initTestGitRepo creates a git repo with one tracked-then-modified file so
+// getChangedFiles returns a non-error result, exercising the changes-mode
+// entry branch. Skips the test if the git binary is unavailable.
+func initTestGitRepo(t *testing.T) string {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init")
+	run("config", "user.email", "test@example.com")
+	run("config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("hello\n"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	run("add", ".")
+	run("commit", "-m", "init")
+	// Modify so `git status --porcelain` reports a change.
+	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("changed\n"), 0644); err != nil {
+		t.Fatalf("modify file: %v", err)
+	}
+	return dir
+}
+
+// newToggleTestModel returns a dual-pane model rooted at dir with a stale
+// horizontal scroll offset, so a toggle that forces detail view via
+// setDisplayMode must reset detailScrollX to 0.
+func newToggleTestModel(dir string) model {
+	return model{
+		width:             120,
+		height:            40,
+		currentPath:       dir,
+		displayMode:       modeList,
+		viewMode:          viewDualPane,
+		expandedDirs:      make(map[string]bool),
+		detailScrollX:     99,
+		gitReposScanDepth: 1,
+	}
+}
+
+// TestToggleChangesModeResetsDetailScrollX verifies the changes-mode toggle
+// (tfe-ojy) routes its forced switch to detail view through setDisplayMode,
+// which resets the stale horizontal scroll offset in dual-pane mode.
+func TestToggleChangesModeResetsDetailScrollX(t *testing.T) {
+	dir := initTestGitRepo(t)
+	m := newToggleTestModel(dir)
+	m.toggleChangesMode()
+	if !m.showChangesOnly {
+		t.Fatal("expected showChangesOnly true after toggle (changed file present)")
+	}
+	if m.displayMode != modeDetail {
+		t.Errorf("displayMode = %v, want modeDetail", m.displayMode)
+	}
+	if m.detailScrollX != 0 {
+		t.Errorf("detailScrollX = %d, want 0 (entering detail must reset)", m.detailScrollX)
+	}
+}
+
+// TestToggleGitReposResetsDetailScrollX verifies the git-repos toggle (tfe-ojy)
+// routes its forced switch to detail view through setDisplayMode.
+func TestToggleGitReposResetsDetailScrollX(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	dir := t.TempDir()
+	m := newToggleTestModel(dir)
+	m.toggleGitRepos()
+	if !m.showGitReposOnly {
+		t.Fatal("expected showGitReposOnly true after toggle")
+	}
+	if m.displayMode != modeDetail {
+		t.Errorf("displayMode = %v, want modeDetail", m.displayMode)
+	}
+	if m.detailScrollX != 0 {
+		t.Errorf("detailScrollX = %d, want 0 (entering detail must reset)", m.detailScrollX)
+	}
+}
+
+// TestToggleTrashResetsDetailScrollX verifies the F12 trash-view path (tfe-ojy)
+// routes its default-to-detail switch through setDisplayMode. This mirrors the
+// keyboard handler: toggleTrash() followed by setDisplayMode(modeDetail).
+func TestToggleTrashResetsDetailScrollX(t *testing.T) {
+	dir := t.TempDir()
+	m := newToggleTestModel(dir)
+	wasInTrash := m.showTrashOnly
+	m.toggleTrash()
+	if !wasInTrash {
+		m.setDisplayMode(modeDetail)
+	}
+	if !m.showTrashOnly {
+		t.Fatal("expected showTrashOnly true after toggle")
+	}
+	if m.displayMode != modeDetail {
+		t.Errorf("displayMode = %v, want modeDetail", m.displayMode)
+	}
+	if m.detailScrollX != 0 {
+		t.Errorf("detailScrollX = %d, want 0 (entering detail must reset)", m.detailScrollX)
 	}
 }
