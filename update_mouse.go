@@ -39,14 +39,9 @@ func (m model) isClickInFileListArea(mouseX, mouseY int) bool {
 
 	if useVerticalSplit {
 		// VERTICAL split: top pane is file list, bottom pane is preview
-		// ACCORDION: Calculate based on current focus (matches render_preview.go)
+		// Uses accordion (2/3 focused) or locked ratio via verticalSplitHeights (matches render_layout.go)
 		maxVisible := m.height - headerLines - footerLines
-		var topHeight int
-		if m.focusedPane == leftPane {
-			topHeight = (maxVisible * 2) / 3  // Top pane focused = 2/3
-		} else {
-			topHeight = maxVisible - ((maxVisible * 2) / 3)  // Top pane unfocused = 1/3
-		}
+		topHeight, _ := m.verticalSplitHeights(maxVisible)
 		paneY := mouseY - headerLines
 
 		return paneY < topHeight // Top pane is file list
@@ -716,13 +711,8 @@ git pull
 			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
 
 			if useVerticalSplit {
-				// VERTICAL split with accordion - top pane height varies by focus
-				var topHeight int
-				if m.focusedPane == leftPane {
-					topHeight = (totalAvailable * 2) / 3  // Top focused = 2/3
-				} else {
-					topHeight = totalAvailable - ((totalAvailable * 2) / 3)  // Top unfocused = 1/3
-				}
+				// VERTICAL split - top pane height from accordion or locked ratio (matches render_layout.go)
+				topHeight, _ := m.verticalSplitHeights(totalAvailable)
 				maxVisible = topHeight - 2  // Content height inside borders
 			} else {
 				// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
@@ -961,13 +951,8 @@ git pull
 			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
 
 			if useVerticalSplit {
-				// VERTICAL split with accordion - top pane height varies by focus
-				var topHeight int
-				if m.focusedPane == leftPane {
-					topHeight = (totalAvailable * 2) / 3  // Top focused = 2/3
-				} else {
-					topHeight = totalAvailable - ((totalAvailable * 2) / 3)  // Top unfocused = 1/3
-				}
+				// VERTICAL split - top pane height from accordion or locked ratio (matches render_layout.go)
+				topHeight, _ := m.verticalSplitHeights(totalAvailable)
 				maxVisible = topHeight - 2  // Content height inside borders
 			} else {
 				// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
