@@ -935,22 +935,6 @@ func termuxNewSessionCmd(command string, workDir string) string {
 	)
 }
 
-// max returns the maximum of two integers
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // renderScrollingFooter renders footer text with horizontal scrolling if enabled
 // If text fits within width, returns as-is. If scrolling is enabled and text is too long,
 // creates a looping marquee effect. Otherwise truncates with "..."
