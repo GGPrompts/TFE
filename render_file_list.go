@@ -484,9 +484,7 @@ func (m model) renderDetailView(maxVisible int) string {
 		if maxNameTextLen < 10 {
 			maxNameTextLen = 10
 		}
-		if visualWidth(displayName) > maxNameTextLen {
-			displayName = truncateToWidth(displayName, maxNameTextLen-2) + ".."
-		}
+		displayName = truncateNameWithEllipsis(displayName, maxNameTextLen)
 
 		// Extract leading emoji for global virtual folders to preserve color
 		var nameLeadingEmoji string
@@ -1003,6 +1001,18 @@ func (m model) truncateToWidthFromEnd(s string, targetWidth int) string {
 	return ellipsis + string(runes[start:])
 }
 
+// truncateNameWithEllipsis truncates displayName to fit within maxWidth visual
+// cells, appending ".." when truncation occurs. Visual-width-aware: never
+// splits multibyte runes and counts emoji/CJK as their rendered width
+// (unlike len()/byte slicing). Names that already fit are returned unchanged.
+// Callers must ensure maxWidth >= 4 so there is room for content plus "..".
+func truncateNameWithEllipsis(displayName string, maxWidth int) string {
+	if visualWidth(displayName) > maxWidth {
+		return truncateToWidth(displayName, maxWidth-2) + ".."
+	}
+	return displayName
+}
+
 // runeWidth returns the visual width of a rune (1 for most, 2 for emojis/wide chars)
 // Terminal-aware: Treats variation selectors correctly for Windows Terminal
 // Delegates to runewidth library for consistent width calculations
@@ -1256,13 +1266,9 @@ func (m model) renderTreeView(maxVisible int) string {
 			maxNameLen = 100 // Reasonable maximum
 		}
 
-		if len(displayName) > maxNameLen {
-			if maxNameLen > 2 {
-				displayName = displayName[:maxNameLen-2] + ".."
-			} else {
-				displayName = displayName[:maxNameLen] // Very narrow, no room for ".."
-			}
-		}
+		// Truncate by visual width (rune/emoji safe), mirroring the detail view.
+		// maxNameLen is clamped to >= 5 above, so there is always room for "..".
+		displayName = truncateNameWithEllipsis(displayName, maxNameLen)
 
 		// Build the line with special handling for global virtual folders to preserve emoji color
 		var line string
