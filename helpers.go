@@ -7,9 +7,22 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+// deleteLastRune returns s with its final UTF-8 rune removed. It is rune-aware
+// to avoid splitting a multibyte (CJK/emoji) character into invalid UTF-8.
+// The empty string is returned unchanged (DecodeLastRuneInString("") yields
+// size 0, so the slice would be a no-op anyway; the guard is explicit for clarity).
+func deleteLastRune(s string) string {
+	if s == "" {
+		return s
+	}
+	_, size := utf8.DecodeLastRuneInString(s)
+	return s[:len(s)-size]
+}
 
 // Module: helpers.go
 // Purpose: Helper functions for the model

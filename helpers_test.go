@@ -794,3 +794,27 @@ func TestAtomicWriteFile_EmptyData(t *testing.T) {
 		t.Errorf("expected empty file, got size %d", info.Size())
 	}
 }
+
+// TestDeleteLastRune verifies rune-aware deletion across byte widths and edge cases.
+func TestDeleteLastRune(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty", "", ""},
+		{"single ASCII", "a", ""},
+		{"trailing ASCII", "abc", "ab"},
+		{"2-byte rune (é)", "café", "caf"},
+		{"3-byte rune (CJK 中)", "中文", "中"},
+		{"4-byte rune (emoji 🗑)", "x🗑", "x"},
+		{"trailing combining char", "é", "e"}, // decomposed: 'e' + U+0301 combining acute; only the mark is removed
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := deleteLastRune(tt.in); got != tt.want {
+				t.Errorf("deleteLastRune(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
