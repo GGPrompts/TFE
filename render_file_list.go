@@ -9,19 +9,24 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-// getVisibleRange calculates the start and end indices for visible items in the file list
-func (m model) getVisibleRange(maxVisible int) (start, end int) {
+// getVisibleRange calculates the start and end indices for the visible scroll
+// window over a list of totalItems entries, centered on m.cursor. Callers must
+// pass the length of the ACTUALLY DISPLAYED list (e.g. getMaxCursor()+1), not
+// len(m.files): the displayed list diverges from m.files whenever a search
+// filter, changes/git-repos/prompts mode, or tree expansion is active, and the
+// scroll offset must match what the renderer drew.
+func (m model) getVisibleRange(maxVisible, totalItems int) (start, end int) {
 	start = 0
-	end = len(m.files)
+	end = totalItems
 
-	if len(m.files) > maxVisible {
+	if totalItems > maxVisible {
 		start = m.cursor - maxVisible/2
 		if start < 0 {
 			start = 0
 		}
 		end = start + maxVisible
-		if end > len(m.files) {
-			end = len(m.files)
+		if end > totalItems {
+			end = totalItems
 			start = end - maxVisible
 			if start < 0 {
 				start = 0

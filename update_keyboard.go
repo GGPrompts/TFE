@@ -2540,7 +2540,9 @@ func (m model) handleMainKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			if m.displayMode == modeDetail {
 				maxVisible -= 1 // Account for detail header only (separator removed)
 			}
-			start, _ := m.getVisibleRange(maxVisible)
+			// Use the displayed-list count (filtered/changes/git-repos/prompts/tree),
+			// not len(m.files), so start matches the rendered scroll offset.
+			start, _ := m.getVisibleRange(maxVisible, m.getMaxCursor()+1)
 
 			// Calculate Y position relative to visible cursor position
 			menuY := headerOffset + (m.cursor - start)

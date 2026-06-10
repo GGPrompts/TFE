@@ -503,3 +503,90 @@ func TestRenderDetailViewChangesModeGitRootRelative(t *testing.T) {
 		t.Errorf("output should not contain the absolute location %q; expected it relativized to git root:\n%s", subDir, out)
 	}
 }
+
+// renderListStart mirrors the scroll-window math inside renderListView, so the
+// test can assert getVisibleRange agrees with what the renderer actually draws.
+func renderListStart(cursor, maxVisible, total int) int {
+	start := 0
+	if total > maxVisible {
+		start = cursor - maxVisible/2
+		if start < 0 {
+			start = 0
+		}
+		end := start + maxVisible
+		if end > total {
+			start = total - maxVisible
+			if start < 0 {
+				start = 0
+			}
+		}
+	}
+	return start
+}
+
+// TestGetVisibleRangeMatchesFilteredRenderOffset is the regression test for
+// tfe-d45: the F2 context menu placed itself using getVisibleRange computed
+// from len(m.files), but the list view scrolls over the FILTERED list. When a
+// search filter shrinks the displayed list, the displayed-count window must
+// match the renderer's offset (and differ from the len(m.files) window).
+func TestGetVisibleRangeMatchesFilteredRenderOffset(t *testing.T) {
+	// 100 files on disk; an active search filter shows only a contiguous slice
+	// of 10 of them. The cursor sits at the END of the filtered list, where the
+	// short displayed list clamps the window but the full 100-file list would
+	// not — so the buggy len(m.files) window and the correct window diverge.
+	files := make([]fileItem, 100)
+	for i := range files {
+		files[i] = fileItem{name: "f"}
+	}
+	filtered := []int{40, 41, 42, 43, 44, 45, 46, 47, 48, 49} // displayed list len 10
+
+	const maxVisible = 6
+	m := model{
+		files:           files,
+		filteredIndices: filtered,
+		cursor:          9, // last index within the filtered (displayed) list
+	}
+
+	displayedCount := m.getMaxCursor() + 1
+	if displayedCount != len(filtered) {
+		t.Fatalf("getMaxCursor()+1 = %d, want displayed count %d", displayedCount, len(filtered))
+	}
+
+	start, _ := m.getVisibleRange(maxVisible, displayedCount)
+
+	wantStart := renderListStart(m.cursor, maxVisible, len(filtered))
+	if start != wantStart {
+		t.Errorf("getVisibleRange start = %d, want renderer offset %d", start, wantStart)
+	}
+
+	// Guard against regressing to the old len(m.files) behavior: with 100 files
+	// the window would scroll far past the 10-item filtered list.
+	buggyStart, _ := m.getVisibleRange(maxVisible, len(m.files))
+	if buggyStart == start {
+		t.Fatalf("len(m.files)-based start (%d) unexpectedly equals filtered start (%d); test would not catch the bug", buggyStart, start)
+	}
+}
+
+// TestGetVisibleRangeTreeModeUsesTreeItemCount confirms the displayed-count
+// source is correct in tree mode, where the window scrolls over tree items
+// (expanded folders) rather than files.
+func TestGetVisibleRangeTreeModeUsesTreeItemCount(t *testing.T) {
+	const maxVisible = 6
+	treeItems := make([]treeItem, 20)
+	m := model{
+		displayMode: modeTree,
+		treeItems:   treeItems,
+		cursor:      15,
+	}
+
+	displayedCount := m.getMaxCursor() + 1
+	if displayedCount != len(treeItems) {
+		t.Fatalf("tree getMaxCursor()+1 = %d, want %d", displayedCount, len(treeItems))
+	}
+
+	start, _ := m.getVisibleRange(maxVisible, displayedCount)
+	wantStart := renderListStart(m.cursor, maxVisible, len(treeItems))
+	if start != wantStart {
+		t.Errorf("tree getVisibleRange start = %d, want %d", start, wantStart)
+	}
+}

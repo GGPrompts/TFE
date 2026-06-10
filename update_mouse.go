@@ -721,32 +721,13 @@ git pull
 			var clickedIndex int
 			var clickedLine int
 
-			// List, Detail, and Tree modes: one item per line
-			// In tree mode, use tree items instead of files
-			var totalItems int
-			if m.displayMode == modeTree {
-				totalItems = len(m.treeItems)
-			} else {
-				totalItems = len(displayedFiles)
-			}
+			// List, Detail, and Tree modes: one item per line.
+			// totalItems is the displayed-list length (tree items or filtered
+			// files); getMaxCursor()+1 yields the same count for every mode.
+			totalItems := m.getMaxCursor() + 1
 
 			// Calculate visible range based on cursor and totalItems
-			start := 0
-			end := totalItems
-			if totalItems > maxVisible {
-				start = m.cursor - maxVisible/2
-				if start < 0 {
-					start = 0
-				}
-				end = start + maxVisible
-				if end > totalItems {
-					end = totalItems
-					start = end - maxVisible
-					if start < 0 {
-						start = 0
-					}
-				}
-			}
+			start, end := m.getVisibleRange(maxVisible, totalItems)
 
 			clickedLine = msg.Y - headerOffset
 			clickedIndex = start + clickedLine
@@ -970,32 +951,13 @@ git pull
 
 			var clickedIndex int
 
-			// List, Detail, Tree modes: one item per line
-			// In tree mode, use tree items instead of files
-			var totalItems int
-			if m.displayMode == modeTree {
-				totalItems = len(m.treeItems)
-			} else {
-				totalItems = len(displayedFiles)
-			}
+			// List, Detail, Tree modes: one item per line.
+			// totalItems is the displayed-list length (tree items or filtered
+			// files); getMaxCursor()+1 yields the same count for every mode.
+			totalItems := m.getMaxCursor() + 1
 
 			// Calculate visible range based on cursor and totalItems
-			start := 0
-			end := totalItems
-			if totalItems > maxVisible {
-				start = m.cursor - maxVisible/2
-				if start < 0 {
-					start = 0
-				}
-				end = start + maxVisible
-				if end > totalItems {
-					end = totalItems
-					start = end - maxVisible
-					if start < 0 {
-						start = 0
-					}
-				}
-			}
+			start, end := m.getVisibleRange(maxVisible, totalItems)
 
 			clickedLine := msg.Y - headerOffset
 			clickedIndex = start + clickedLine
