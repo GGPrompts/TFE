@@ -139,6 +139,89 @@ func (m model) cachedDirItemCount(path string) int {
 	return count
 }
 
+// fileIconByExt maps file extensions to emoji icons. Package-level (rather
+// than a literal inside getFileIcon) because getFileIcon runs per visible row
+// per frame; rebuilding ~70 map entries on every call is pure GC pressure.
+var fileIconByExt = map[string]string{
+	// Programming languages
+	".go":   "🐹", // Gopher
+	".py":   "🐍", // Python snake
+	".js":   "🟨", // JavaScript yellow
+	".ts":   "🔷", // TypeScript blue diamond
+	".jsx":  "⚛", // React atom
+	".tsx":  "⚛", // React atom
+	".rs":   "🦀", // Rust crab
+	".c":    "©", // C copyright symbol
+	".cpp":  "➕", // C++ plus
+	".h":    "📋", // Header clipboard
+	".java": "☕", // Java coffee
+	".rb":   "💎", // Ruby gem
+	".php":  "🐘", // PHP elephant
+	".sh":   "🐚", // Shell
+	".bash": "🐚", // Shell
+	".lua":  "🌙", // Lua moon
+	".r":    "📊", // R statistics
+
+	// Web
+	".html":   "🌐", // HTML globe
+	".css":    "🎨", // CSS art palette
+	".scss":   "🎨", // SCSS art palette
+	".sass":   "🎨", // Sass art palette
+	".vue":    "💚", // Vue green heart
+	".svelte": "🧡", // Svelte orange heart
+
+	// Data/Config
+	".json": "📊", // JSON chart
+	".yaml": "📄", // YAML document
+	".yml":  "📄", // YAML document
+	".toml": "📄", // TOML document
+	".xml":  "📰", // XML newspaper
+	".csv":  "📈", // CSV chart
+	".sql":  "🗄", // SQL database
+
+	// Documents
+	".md":   "📝", // Markdown memo
+	".txt":  "📄", // Text document
+	".pdf":  "📕", // PDF red book
+	".doc":  "📘", // DOC blue book
+	".docx": "📘", // DOCX blue book
+
+	// Archives
+	".zip": "🗜", // ZIP compression
+	".tar": "📦", // TAR package
+	".gz":  "🗜", // GZ compression
+	".7z":  "🗜", // 7Z compression
+	".rar": "🗜", // RAR compression
+
+	// Images
+	".png":  "󰋩", // PNG frame
+	".jpg":  "󰋩", // JPG frame
+	".jpeg": "󰋩", // JPEG frame
+	".gif":  "🎞", // GIF film
+	".svg":  "🎨", // SVG palette
+	".ico":  "󰋩", // ICO frame
+	".webp": "󰋩", // WebP frame
+
+	// Audio/Video
+	".mp3": "🎵", // MP3 music
+	".mp4": "🎬", // MP4 movie
+	".wav": "🎵", // WAV music
+	".avi": "🎬", // AVI movie
+	".mkv": "🎬", // MKV movie
+
+	// System/Config
+	".env":  "🔐", // ENV lock
+	".ini":  "⚙", // INI gear
+	".conf": "⚙", // CONF gear
+	".cfg":  "⚙", // CFG gear
+	".lock": "🔒", // LOCK locked
+
+	// Build/Package
+	".gradle": "🐘", // Gradle elephant
+	".maven":  "📦", // Maven package
+	".npm":    "📦", // NPM package
+}
+
 // getFileIcon returns the appropriate emoji icon based on file type
 func getFileIcon(item fileItem) string {
 	// Check for symlinks first (takes priority over other icons)
@@ -246,89 +329,8 @@ func getFileIcon(item fileItem) string {
 		// If not cached (showPromptsOnly is false), fall through to default icons
 	}
 
-	// Map extensions to emoji icons
-	iconMap := map[string]string{
-		// Programming languages
-		".go":   "🐹", // Gopher
-		".py":   "🐍", // Python snake
-		".js":   "🟨", // JavaScript yellow
-		".ts":   "🔷", // TypeScript blue diamond
-		".jsx":  "⚛", // React atom
-		".tsx":  "⚛", // React atom
-		".rs":   "🦀", // Rust crab
-		".c":    "©", // C copyright symbol
-		".cpp":  "➕", // C++ plus
-		".h":    "📋", // Header clipboard
-		".java": "☕", // Java coffee
-		".rb":   "💎", // Ruby gem
-		".php":  "🐘", // PHP elephant
-		".sh":   "🐚", // Shell
-		".bash": "🐚", // Shell
-		".lua":  "🌙", // Lua moon
-		".r":    "📊", // R statistics
-
-		// Web
-		".html":   "🌐", // HTML globe
-		".css":    "🎨", // CSS art palette
-		".scss":   "🎨", // SCSS art palette
-		".sass":   "🎨", // Sass art palette
-		".vue":    "💚", // Vue green heart
-		".svelte": "🧡", // Svelte orange heart
-
-		// Data/Config
-		".json": "📊", // JSON chart
-		".yaml": "📄", // YAML document
-		".yml":  "📄", // YAML document
-		".toml": "📄", // TOML document
-		".xml":  "📰", // XML newspaper
-		".csv":  "📈", // CSV chart
-		".sql":  "🗄", // SQL database
-
-		// Documents
-		".md":   "📝", // Markdown memo
-		".txt":  "📄", // Text document
-		".pdf":  "📕", // PDF red book
-		".doc":  "📘", // DOC blue book
-		".docx": "📘", // DOCX blue book
-
-		// Archives
-		".zip": "🗜", // ZIP compression
-		".tar": "📦", // TAR package
-		".gz":  "🗜", // GZ compression
-		".7z":  "🗜", // 7Z compression
-		".rar": "🗜", // RAR compression
-
-		// Images
-		".png":  "󰋩", // PNG frame
-		".jpg":  "󰋩", // JPG frame
-		".jpeg": "󰋩", // JPEG frame
-		".gif":  "🎞", // GIF film
-		".svg":  "🎨", // SVG palette
-		".ico":  "󰋩", // ICO frame
-		".webp": "󰋩", // WebP frame
-
-		// Audio/Video
-		".mp3": "🎵", // MP3 music
-		".mp4": "🎬", // MP4 movie
-		".wav": "🎵", // WAV music
-		".avi": "🎬", // AVI movie
-		".mkv": "🎬", // MKV movie
-
-		// System/Config
-		".env":  "🔐", // ENV lock
-		".ini":  "⚙", // INI gear
-		".conf": "⚙", // CONF gear
-		".cfg":  "⚙", // CFG gear
-		".lock": "🔒", // LOCK locked
-
-		// Build/Package
-		".gradle": "🐘", // Gradle elephant
-		".maven":  "📦", // Maven package
-		".npm":    "📦", // NPM package
-	}
-
 	// Check for icon mapping
-	if icon, ok := iconMap[ext]; ok {
+	if icon, ok := fileIconByExt[ext]; ok {
 		return icon
 	}
 
@@ -512,6 +514,133 @@ func highlightCode(content, filepath string) (string, bool) {
 	return buf.String(), true
 }
 
+// fileTypeByExt maps file extensions to descriptive type strings. Package-level
+// (rather than a literal inside getFileType) because getFileType runs per
+// visible row per frame and inside the type-sort comparator; rebuilding ~110
+// map entries on every call is pure GC pressure.
+var fileTypeByExt = map[string]string{
+	// Programming languages
+	".go":    "Go Source",
+	".py":    "Python",
+	".js":    "JavaScript",
+	".ts":    "TypeScript",
+	".jsx":   "React (JSX)",
+	".tsx":   "React (TSX)",
+	".rs":    "Rust",
+	".c":     "C Source",
+	".cpp":   "C++",
+	".cc":    "C++",
+	".cxx":   "C++",
+	".h":     "C Header",
+	".hpp":   "C++ Header",
+	".java":  "Java",
+	".rb":    "Ruby",
+	".php":   "PHP",
+	".sh":    "Shell Script",
+	".bash":  "Bash Script",
+	".zsh":   "ZSH Script",
+	".fish":  "Fish Script",
+	".lua":   "Lua",
+	".r":     "R Script",
+	".swift": "Swift",
+	".kt":    "Kotlin",
+	".scala": "Scala",
+	".cs":    "C#",
+	".vb":    "Visual Basic",
+	".pl":    "Perl",
+
+	// Web
+	".html":   "HTML",
+	".htm":    "HTML",
+	".css":    "CSS",
+	".scss":   "SCSS",
+	".sass":   "Sass",
+	".less":   "Less",
+	".vue":    "Vue Component",
+	".svelte": "Svelte",
+
+	// Data/Config
+	".json":       "JSON",
+	".yaml":       "YAML",
+	".yml":        "YAML",
+	".toml":       "TOML",
+	".xml":        "XML",
+	".csv":        "CSV",
+	".sql":        "SQL",
+	".env":        "Environment",
+	".ini":        "INI Config",
+	".conf":       "Config",
+	".cfg":        "Config",
+	".properties": "Properties",
+
+	// Documents
+	".md":       "Markdown",
+	".markdown": "Markdown",
+	".txt":      "Text",
+	".pdf":      "PDF Document",
+	".doc":      "Word Doc",
+	".docx":     "Word Doc",
+	".rtf":      "Rich Text",
+	".odt":      "OpenDocument",
+
+	// Archives
+	".zip": "ZIP Archive",
+	".tar": "TAR Archive",
+	".gz":  "GZip Archive",
+	".bz2": "BZip2 Archive",
+	".xz":  "XZ Archive",
+	".7z":  "7-Zip Archive",
+	".rar": "RAR Archive",
+	".tgz": "TAR.GZ Archive",
+
+	// Images
+	".png":  "PNG Image",
+	".jpg":  "JPEG Image",
+	".jpeg": "JPEG Image",
+	".gif":  "GIF Image",
+	".svg":  "SVG Image",
+	".ico":  "Icon",
+	".webp": "WebP Image",
+	".bmp":  "Bitmap Image",
+	".tiff": "TIFF Image",
+	".tif":  "TIFF Image",
+
+	// Audio/Video
+	".mp3":  "MP3 Audio",
+	".mp4":  "MP4 Video",
+	".wav":  "WAV Audio",
+	".flac": "FLAC Audio",
+	".ogg":  "OGG Audio",
+	".avi":  "AVI Video",
+	".mkv":  "MKV Video",
+	".mov":  "MOV Video",
+	".wmv":  "WMV Video",
+
+	// System/Build
+	".exe":   "Executable",
+	".dll":   "DLL Library",
+	".so":    "Shared Library",
+	".dylib": "Dynamic Library",
+	".a":     "Static Library",
+	".o":     "Object File",
+	".lock":  "Lock File",
+	".log":   "Log File",
+	".tmp":   "Temporary",
+	".bak":   "Backup",
+	".swp":   "Swap File",
+
+	// Build/Package files
+	".gradle": "Gradle",
+	".maven":  "Maven",
+	".npm":    "NPM",
+	".mod":    "Go Module",
+	".sum":    "Go Checksum",
+	".gem":    "Ruby Gem",
+	".whl":    "Python Wheel",
+	".deb":    "Debian Package",
+	".rpm":    "RPM Package",
+}
+
 // getFileType returns a descriptive file type string based on file extension
 func getFileType(item fileItem) string {
 	// Check for symlinks first
@@ -530,132 +659,8 @@ func getFileType(item fileItem) string {
 	// Get file extension
 	ext := strings.ToLower(filepath.Ext(item.name))
 
-	// Map extensions to descriptive types
-	typeMap := map[string]string{
-		// Programming languages
-		".go":    "Go Source",
-		".py":    "Python",
-		".js":    "JavaScript",
-		".ts":    "TypeScript",
-		".jsx":   "React (JSX)",
-		".tsx":   "React (TSX)",
-		".rs":    "Rust",
-		".c":     "C Source",
-		".cpp":   "C++",
-		".cc":    "C++",
-		".cxx":   "C++",
-		".h":     "C Header",
-		".hpp":   "C++ Header",
-		".java":  "Java",
-		".rb":    "Ruby",
-		".php":   "PHP",
-		".sh":    "Shell Script",
-		".bash":  "Bash Script",
-		".zsh":   "ZSH Script",
-		".fish":  "Fish Script",
-		".lua":   "Lua",
-		".r":     "R Script",
-		".swift": "Swift",
-		".kt":    "Kotlin",
-		".scala": "Scala",
-		".cs":    "C#",
-		".vb":    "Visual Basic",
-		".pl":    "Perl",
-
-		// Web
-		".html":   "HTML",
-		".htm":    "HTML",
-		".css":    "CSS",
-		".scss":   "SCSS",
-		".sass":   "Sass",
-		".less":   "Less",
-		".vue":    "Vue Component",
-		".svelte": "Svelte",
-
-		// Data/Config
-		".json":       "JSON",
-		".yaml":       "YAML",
-		".yml":        "YAML",
-		".toml":       "TOML",
-		".xml":        "XML",
-		".csv":        "CSV",
-		".sql":        "SQL",
-		".env":        "Environment",
-		".ini":        "INI Config",
-		".conf":       "Config",
-		".cfg":        "Config",
-		".properties": "Properties",
-
-		// Documents
-		".md":       "Markdown",
-		".markdown": "Markdown",
-		".txt":      "Text",
-		".pdf":      "PDF Document",
-		".doc":      "Word Doc",
-		".docx":     "Word Doc",
-		".rtf":      "Rich Text",
-		".odt":      "OpenDocument",
-
-		// Archives
-		".zip": "ZIP Archive",
-		".tar": "TAR Archive",
-		".gz":  "GZip Archive",
-		".bz2": "BZip2 Archive",
-		".xz":  "XZ Archive",
-		".7z":  "7-Zip Archive",
-		".rar": "RAR Archive",
-		".tgz": "TAR.GZ Archive",
-
-		// Images
-		".png":  "PNG Image",
-		".jpg":  "JPEG Image",
-		".jpeg": "JPEG Image",
-		".gif":  "GIF Image",
-		".svg":  "SVG Image",
-		".ico":  "Icon",
-		".webp": "WebP Image",
-		".bmp":  "Bitmap Image",
-		".tiff": "TIFF Image",
-		".tif":  "TIFF Image",
-
-		// Audio/Video
-		".mp3":  "MP3 Audio",
-		".mp4":  "MP4 Video",
-		".wav":  "WAV Audio",
-		".flac": "FLAC Audio",
-		".ogg":  "OGG Audio",
-		".avi":  "AVI Video",
-		".mkv":  "MKV Video",
-		".mov":  "MOV Video",
-		".wmv":  "WMV Video",
-
-		// System/Build
-		".exe":   "Executable",
-		".dll":   "DLL Library",
-		".so":    "Shared Library",
-		".dylib": "Dynamic Library",
-		".a":     "Static Library",
-		".o":     "Object File",
-		".lock":  "Lock File",
-		".log":   "Log File",
-		".tmp":   "Temporary",
-		".bak":   "Backup",
-		".swp":   "Swap File",
-
-		// Build/Package files
-		".gradle": "Gradle",
-		".maven":  "Maven",
-		".npm":    "NPM",
-		".mod":    "Go Module",
-		".sum":    "Go Checksum",
-		".gem":    "Ruby Gem",
-		".whl":    "Python Wheel",
-		".deb":    "Debian Package",
-		".rpm":    "RPM Package",
-	}
-
 	// Check for extension mapping
-	if fileType, ok := typeMap[ext]; ok {
+	if fileType, ok := fileTypeByExt[ext]; ok {
 		return fileType
 	}
 
