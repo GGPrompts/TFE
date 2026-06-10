@@ -141,3 +141,61 @@ func TestCommandInput_EnterResetsCursor(t *testing.T) {
 		t.Error("commandFocused should be false after executing a command")
 	}
 }
+
+// TestF5Copy_StalePreviewFallsBackToPath is a regression test for tfe-spg:
+// the browser-mode F5 handler used to copy m.preview.content whenever a
+// preview was loaded, without checking it belonged to the selected file. So
+// previewing file A, pressing Esc, moving the cursor to file B, then F5 copied
+// A's content while reporting success. The handler now guards the content-copy
+// branch with m.preview.filePath == currentFile.path and falls back to copying
+// the selected file's path on a mismatch.
+func TestF5Copy_StalePreviewFallsBackToPath(t *testing.T) {
+	m := model{
+		files: []fileItem{
+			{name: "a.txt", path: "/tmp/a.txt"},
+			{name: "b.txt", path: "/tmp/b.txt"},
+		},
+		cursor: 1, // selected file is b.txt
+		// Stale preview left over from viewing a.txt
+		preview: previewModel{
+			loaded:   true,
+			filePath: "/tmp/a.txt",
+			content:  []string{"contents of A"},
+		},
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyF5})
+	result := newModel.(model)
+
+	// Because the loaded preview belongs to a.txt (not the selected b.txt),
+	// F5 must fall through to the path-copy branch.
+	if result.statusMessage != "Path copied to clipboard" {
+		t.Errorf("statusMessage = %q, expected %q (stale preview must not copy content)",
+			result.statusMessage, "Path copied to clipboard")
+	}
+}
+
+// TestF5Copy_FreshPreviewCopiesContent verifies the complementary case: when
+// the loaded preview matches the selected file, F5 still copies its content
+// (tfe-spg).
+func TestF5Copy_FreshPreviewCopiesContent(t *testing.T) {
+	m := model{
+		files: []fileItem{
+			{name: "b.txt", path: "/tmp/b.txt"},
+		},
+		cursor: 0,
+		preview: previewModel{
+			loaded:   true,
+			filePath: "/tmp/b.txt", // matches selected file
+			content:  []string{"contents of B"},
+		},
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyF5})
+	result := newModel.(model)
+
+	if result.statusMessage != "✓ File content copied to clipboard" {
+		t.Errorf("statusMessage = %q, expected %q (fresh preview should copy content)",
+			result.statusMessage, "✓ File content copied to clipboard")
+	}
+}

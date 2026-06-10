@@ -2375,8 +2375,11 @@ rm -f "$0"
 				}
 			}
 
-			// If preview is loaded and it's a text file: copy full content
-			if m.preview.loaded && !m.preview.isBinary && len(m.preview.content) > 0 {
+			// If the loaded preview belongs to the currently selected file and it's
+			// a text file: copy full content. The filePath guard prevents copying a
+			// previously previewed file's content (e.g. preview A, Esc, move to B,
+			// F5) since exiting full preview / navigating doesn't clear m.preview.
+			if m.preview.loaded && m.preview.filePath == currentFile.path && !m.preview.isBinary && len(m.preview.content) > 0 {
 				fullContent := strings.Join(m.preview.content, "\n")
 				if err := copyToClipboard(fullContent); err != nil {
 					m.setStatusMessage(fmt.Sprintf("Failed to copy content: %s", err), true)
