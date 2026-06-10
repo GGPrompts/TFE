@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // jsonlMessage represents a single line from a Claude Code JSONL file.
@@ -119,8 +120,10 @@ func renderJSONLUserMessage(msg jsonlMessage, width int) []string {
 			resultText := extractToolResultText(block)
 			if resultText != "" {
 				maxLen := width - 4
-				if len(resultText) > maxLen {
-					resultText = resultText[:maxLen] + "..."
+				if visualWidth(resultText) > maxLen {
+					// truncateToWidth appends "..." when there is room,
+					// keeping the total within maxLen columns
+					resultText = truncateToWidth(resultText, maxLen)
 				}
 				lines = append(lines, jsonlToolResultStyle.Render("  "+resultText))
 			}
@@ -217,7 +220,7 @@ func renderToolUseSummary(block jsonlContentBlock, width int) []string {
 
 	// Allow detail to use full width, wrapping naturally
 	detailIndent := "    " // Indent continuation lines under tool name
-	maxDetail := width - len(detailIndent)
+	maxDetail := width - visualWidth(detailIndent)
 	if maxDetail < 20 {
 		maxDetail = 20
 	}
@@ -228,25 +231,56 @@ func renderToolUseSummary(block jsonlContentBlock, width int) []string {
 		firstLineMax = 10
 	}
 
-	if len(detail) <= firstLineMax {
+	if visualWidth(detail) <= firstLineMax {
 		return []string{prefix + " " + jsonlToolInputStyle.Render(detail)}
 	}
 
-	// Detail wraps: first chunk on name line, rest indented
+	// Detail wraps: first chunk on name line, rest indented.
+	// Chunk by visual width (never mid-rune): byte-offset slicing splits
+	// multibyte runes (CJK, emoji) into � pairs across consecutive lines.
+	chunks := chunkByVisualWidth(detail, firstLineMax, maxDetail)
 	var lines []string
-	lines = append(lines, prefix+" "+jsonlToolInputStyle.Render(detail[:firstLineMax]))
-	remaining := detail[firstLineMax:]
-	for len(remaining) > 0 {
-		chunk := remaining
-		if len(chunk) > maxDetail {
-			chunk = remaining[:maxDetail]
-			remaining = remaining[maxDetail:]
-		} else {
-			remaining = ""
-		}
+	lines = append(lines, prefix+" "+jsonlToolInputStyle.Render(chunks[0]))
+	for _, chunk := range chunks[1:] {
 		lines = append(lines, jsonlToolInputStyle.Render(detailIndent+chunk))
 	}
 	return lines
+}
+
+// chunkByVisualWidth hard-splits s into chunks at visual-width boundaries:
+// the first chunk is at most firstWidth columns, all following chunks at most
+// restWidth columns. Splits between runes only — never inside a multibyte
+// rune — so arbitrary UTF-8 (CJK, emoji) renders cleanly on every line.
+func chunkByVisualWidth(s string, firstWidth, restWidth int) []string {
+	if firstWidth < 1 {
+		firstWidth = 1
+	}
+	if restWidth < 1 {
+		restWidth = 1
+	}
+
+	var chunks []string
+	var b strings.Builder
+	colWidth := 0
+	limit := firstWidth
+	for _, r := range s {
+		rw := runewidth.RuneWidth(r)
+		if colWidth+rw > limit && b.Len() > 0 {
+			chunks = append(chunks, b.String())
+			b.Reset()
+			colWidth = 0
+			limit = restWidth
+		}
+		b.WriteRune(r)
+		colWidth += rw
+	}
+	if b.Len() > 0 {
+		chunks = append(chunks, b.String())
+	}
+	if len(chunks) == 0 {
+		chunks = []string{""}
+	}
+	return chunks
 }
 
 // extractToolDetail extracts a readable summary from tool_use input parameters.
@@ -298,8 +332,8 @@ func extractToolDetail(block jsonlContentBlock) string {
 			return desc
 		}
 		if prompt, ok := input["prompt"].(string); ok {
-			if len(prompt) > 80 {
-				prompt = prompt[:80]
+			if visualWidth(prompt) > 80 {
+				prompt = truncateToWidth(prompt, 80)
 			}
 			return prompt
 		}
