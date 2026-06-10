@@ -261,6 +261,9 @@ type model struct {
 	agentSessions         []AgentSession    // Cached agent sessions (populated on changes mode entry)
 	agentFileMap          map[string]string // File path -> agent label (built from agentSessions + changedFiles)
 	changesRestoreDisplay displayMode       // Display mode to restore when exiting changes mode
+	// Tree expansion snapshot saved on changes-mode entry from tree view, restored
+	// on exit. nil when the pre-switch mode was not modeTree (no restore needed).
+	changesRestoreExpandedDirs map[string]bool
 	// Agent conversation viewer (Ctrl+A / robot emoji)
 	showAgentView        bool        // Filter mode: browsing agent JSONL conversation files
 	agentViewRestore     string      // Path to restore when exiting agent view

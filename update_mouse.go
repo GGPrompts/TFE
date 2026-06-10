@@ -413,7 +413,7 @@ git pull
 							// Load agent sessions and build file-to-agent map
 							m.agentSessions = getAgentSessions()
 							m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
-							m.changesRestoreDisplay = m.displayMode
+							m.saveChangesRestoreState()
 							m.showDiffPreview = true
 							m.setDisplayMode(modeDetail)
 							m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)

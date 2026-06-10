@@ -315,6 +315,68 @@ func TestSetDisplayMode_ExpandedDirsResetOnLeavingTree(t *testing.T) {
 	}
 }
 
+// TestChangesModeRoundTripPreservesTreeExpansion is the tfe-23h regression guard.
+// Entering changes mode from tree view (which routes through setDisplayMode and so
+// wipes the live expandedDirs map) must not lose the user's expansion state: the
+// snapshot taken on entry is restored when exitChangesMode returns to tree view.
+func TestChangesModeRoundTripPreservesTreeExpansion(t *testing.T) {
+	m := newDisplayModeModel(modeTree)
+	m.currentPath = "/tmp"
+	m.expandedDirs["/foo"] = true
+
+	// Enter changes mode the way toggleChangesMode/the mouse toggle/agent auto-entry do:
+	// snapshot first, then switch to detail.
+	m.saveChangesRestoreState()
+	m.showChangesOnly = true
+	m.showDiffPreview = true
+	m.setDisplayMode(modeDetail)
+
+	// While in detail/changes view the live expansion map must be wiped (uniform
+	// setDisplayMode leave-tree behavior from tfe-gib).
+	if len(m.expandedDirs) != 0 {
+		t.Fatalf("after entering changes mode: expandedDirs not wiped (len=%d), want 0", len(m.expandedDirs))
+	}
+	// The snapshot must be an independent copy, not an alias of the live map.
+	m.expandedDirs["/scratch"] = true // simulate edits in detail view
+	if m.changesRestoreExpandedDirs["/scratch"] {
+		t.Fatal("snapshot aliased the live map; detail-view edits leaked into the snapshot")
+	}
+
+	m.exitChangesMode()
+
+	if m.displayMode != modeTree {
+		t.Errorf("after exit: displayMode = %v, want modeTree (changesRestoreDisplay)", m.displayMode)
+	}
+	if !m.expandedDirs["/foo"] {
+		t.Errorf("after exit: expandedDirs missing /foo, want restored expansion state")
+	}
+	if m.expandedDirs["/scratch"] {
+		t.Errorf("after exit: stale detail-view edit /scratch leaked into restored map")
+	}
+	if m.changesRestoreExpandedDirs != nil {
+		t.Errorf("after exit: changesRestoreExpandedDirs not cleared, want nil")
+	}
+}
+
+// TestChangesModeRoundTripFromNonTreeMode verifies that entering changes mode from
+// a non-tree mode takes no snapshot and exit does not clobber expandedDirs.
+func TestChangesModeRoundTripFromNonTreeMode(t *testing.T) {
+	m := newDisplayModeModel(modeList)
+	m.currentPath = "/tmp"
+
+	m.saveChangesRestoreState()
+	if m.changesRestoreExpandedDirs != nil {
+		t.Fatalf("non-tree entry took a snapshot, want nil")
+	}
+	m.showChangesOnly = true
+	m.setDisplayMode(modeDetail)
+	m.exitChangesMode()
+
+	if m.displayMode != modeList {
+		t.Errorf("after exit: displayMode = %v, want modeList", m.displayMode)
+	}
+}
+
 // initTestGitRepo creates a git repo with one tracked-then-modified file so
 // getChangedFiles returns a non-error result, exercising the changes-mode
 // entry branch. Skips the test if the git binary is unavailable.

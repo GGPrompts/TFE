@@ -562,6 +562,13 @@ func (m *model) exitChangesMode() {
 	m.agentSessions = nil
 	m.agentFileMap = nil
 	m.displayMode = m.changesRestoreDisplay
+	// Restore the tree expansion snapshot taken on entry (setDisplayMode wiped the
+	// live map when leaving tree on the way in). Only applies when returning to
+	// tree view with a saved snapshot; otherwise leave expandedDirs untouched.
+	if m.displayMode == modeTree && m.changesRestoreExpandedDirs != nil {
+		m.expandedDirs = m.changesRestoreExpandedDirs
+	}
+	m.changesRestoreExpandedDirs = nil
 	m.markTreeItemsDirty() // changes filter (and possibly display mode) changed
 	m.calculateLayout()
 }

@@ -247,7 +247,7 @@ func (m *model) checkAgentCompletions() tea.Cmd {
 	m.invalidateDiffPreviewCache() // changedFiles refreshed: cached diff may be stale
 	m.agentSessions = currentSessions
 	m.agentFileMap = buildAgentFileMap(changed, currentSessions)
-	m.changesRestoreDisplay = m.displayMode
+	m.saveChangesRestoreState()
 	m.displayMode = modeDetail
 	m.detailScrollX = 0
 	m.showDiffPreview = true

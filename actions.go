@@ -197,7 +197,7 @@ func (m *model) toggleChangesMode() {
 			m.invalidateDiffPreviewCache() // changedFiles refreshed: cached diff may be stale
 			m.agentSessions = getAgentSessions()
 			m.agentFileMap = buildAgentFileMap(changed, m.agentSessions)
-			m.changesRestoreDisplay = m.displayMode
+			m.saveChangesRestoreState()
 			m.showDiffPreview = true
 			m.setDisplayMode(modeDetail)
 			m.setStatusMessage(fmt.Sprintf("Git changes: %d files (d: toggle diff)", len(changed)), false)
@@ -320,6 +320,26 @@ func (m *model) setDisplayMode(mode displayMode) {
 	// Refresh preview cache if in dual-pane mode
 	if m.viewMode == viewDualPane {
 		m.populatePreviewCache()
+	}
+}
+
+// saveChangesRestoreState records the display mode (and, when leaving tree view,
+// a copy of the tree expansion map) so exitChangesMode can faithfully restore the
+// pre-changes-mode view. setDisplayMode wipes expandedDirs on a genuine leave-tree
+// (the uniform behavior from tfe-gib), so the snapshot taken here is what lets the
+// changes-mode round-trip return the user to their prior expansion state.
+// Callers MUST invoke this BEFORE switching displayMode away from tree.
+func (m *model) saveChangesRestoreState() {
+	m.changesRestoreDisplay = m.displayMode
+	if m.displayMode == modeTree {
+		// Copy the map (don't alias) so edits in detail view don't mutate the snapshot.
+		snapshot := make(map[string]bool, len(m.expandedDirs))
+		for k, v := range m.expandedDirs {
+			snapshot[k] = v
+		}
+		m.changesRestoreExpandedDirs = snapshot
+	} else {
+		m.changesRestoreExpandedDirs = nil
 	}
 }
 
