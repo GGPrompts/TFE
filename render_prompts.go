@@ -81,7 +81,7 @@ func (m model) renderPromptPreview(maxVisible int) string {
 		sourceIcon = "🌐"
 		sourceLabel = "Global Prompt (~/.prompts/)"
 	case "command":
-		sourceIcon = "⚙️"
+		sourceIcon = "⚙"
 		sourceLabel = "Project Command (.claude/commands/)"
 	case "agent":
 		sourceIcon = "🤖"

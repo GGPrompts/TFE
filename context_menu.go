@@ -148,7 +148,7 @@ func (m model) getContextMenuItems() []contextMenuItem {
 
 		// Add image-specific options
 		if isImageFile(m.contextMenuFile.path) {
-			items = append(items, contextMenuItem{"🖼️  View Image", "viewimage"})
+			items = append(items, contextMenuItem{"🖼  View Image", "viewimage"})
 			items = append(items, contextMenuItem{"🎨 Edit Image", "editimage"})
 			items = append(items, contextMenuItem{"🌐 Open in Browser", "browser"})
 		} else if isHTMLFile(m.contextMenuFile.path) {

@@ -944,13 +944,13 @@ func TestGetIconForExtension(t *testing.T) {
 		{"test.go", "🐹"},
 		{"script.py", "🐍"},
 		{"app.js", "🟨"},
-		{"component.tsx", "⚛️"},
+		{"component.tsx", "⚛"},
 		{"style.css", "🎨"},
 		{"data.json", "🔶"},
-		{"config.yaml", "⚙️"},
+		{"config.yaml", "⚙"},
 		{"README.md", "📝"},
 		{"archive.zip", "📦"},
-		{"photo.png", "🖼️"},
+		{"photo.png", "🖼"},
 		{"document.pdf", "📕"},
 		{"unknown.xyz", "📄"}, // Generic file
 	}
