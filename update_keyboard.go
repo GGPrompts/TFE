@@ -825,7 +825,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 			case "enter":
 				// Confirm input
-				if m.dialog.title == "Create Directory" {
+				if m.dialog.action == dialogActionCreateDir {
 					// Handle F7 directory creation
 					if err := m.createDirectory(m.dialog.input); err != nil {
 						m.setStatusMessage(fmt.Sprintf("Error: %s", err), true)
@@ -840,7 +840,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
-				} else if m.dialog.title == "Create File" {
+				} else if m.dialog.action == dialogActionCreateFile {
 					// Handle file creation
 					filepath := filepath.Join(m.currentPath, m.dialog.input)
 					file, err := os.Create(filepath)
@@ -875,7 +875,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
-				} else if m.dialog.title == "Rename" {
+				} else if m.dialog.action == dialogActionRename {
 					// Handle rename
 					newName := m.dialog.input
 
@@ -947,7 +947,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 			case "y", "Y":
 				// Confirm action
-				if m.dialog.title == "Permanently Delete" {
+				if m.dialog.action == dialogActionPermanentDelete {
 					// Permanently delete item from trash
 					if m.contextMenuFile != nil {
 						if err := permanentlyDeleteFromTrash(m.contextMenuFile.path); err != nil {
@@ -959,7 +959,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.contextMenuFile = nil
 						m.contextMenuOpen = false
 					}
-				} else if m.dialog.title == "Empty Trash" {
+				} else if m.dialog.action == dialogActionEmptyTrash {
 					// Empty entire trash
 					if err := emptyTrash(); err != nil {
 						m.setStatusMessage(fmt.Sprintf("Error emptying trash: %s", err), true)
@@ -967,7 +967,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.setStatusMessage("Trash emptied successfully", false)
 						m.loadFiles() // Refresh trash view
 					}
-				} else if m.dialog.title == "Move to Trash" {
+				} else if m.dialog.action == dialogActionMoveToTrash {
 					// Move item to trash (from context menu)
 					if m.contextMenuFile != nil {
 						if err := m.deleteFileOrDir(m.contextMenuFile.path, m.contextMenuFile.isDir); err != nil {
@@ -979,7 +979,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.contextMenuFile = nil
 						m.contextMenuOpen = false
 					}
-				} else if m.dialog.title == "Delete file" || m.dialog.title == "Delete directory" {
+				} else if m.dialog.action == dialogActionDeleteEntry {
 					// Handle F8 deletion
 					if m.contextMenuFile != nil {
 						// Delete from context menu
@@ -1022,7 +1022,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
-				} else if m.dialog.title == "Pull & Rebuild TFE" {
+				} else if m.dialog.action == dialogActionPullRebuild {
 					// Find TFE repository
 					tfeRepoPath := findTFERepository()
 
@@ -2498,6 +2498,7 @@ rm -f "$0"
 		// F7: Create directory
 		m.dialog = dialogModel{
 			dialogType: dialogInput,
+			action:     dialogActionCreateDir,
 			title:      "Create Directory",
 			message:    "Enter directory name:",
 			input:      "",
@@ -2523,6 +2524,7 @@ rm -f "$0"
 		}
 		m.dialog = dialogModel{
 			dialogType: dialogConfirm,
+			action:     dialogActionDeleteEntry,
 			title:      "Delete " + fileType,
 			message:    fmt.Sprintf("Delete '%s'?\nThis cannot be undone.", currentFile.name),
 		}

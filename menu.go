@@ -695,6 +695,7 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		// Create new folder in current directory
 		m.dialog = dialogModel{
 			dialogType: dialogInput,
+			action:     dialogActionCreateDir,
 			title:      "Create Directory",
 			message:    "Enter directory name:",
 			input:      "",
@@ -705,6 +706,7 @@ func (m model) executeMenuAction(action string) (tea.Model, tea.Cmd) {
 		// Create new file in current directory
 		m.dialog = dialogModel{
 			dialogType: dialogInput,
+			action:     dialogActionCreateFile,
 			title:      "Create File",
 			message:    "Enter filename:",
 			input:      "",
@@ -817,6 +819,7 @@ Additional context: {{variable2}}
 		if file != nil && file.name != ".." {
 			m.dialog = dialogModel{
 				dialogType: dialogConfirm,
+				action:     dialogActionMoveToTrash,
 				title:      "Move to Trash",
 				message:    fmt.Sprintf("Move '%s' to trash?", file.name),
 			}
@@ -868,6 +871,7 @@ Additional context: {{variable2}}
 		// Show confirmation dialog
 		m.dialog = dialogModel{
 			dialogType: dialogConfirm,
+			action:     dialogActionPullRebuild,
 			title:      "Pull & Rebuild TFE",
 			message:    fmt.Sprintf("This will:\n• Run 'git pull' in %s\n• Rebuild and install TFE\n• Exit TFE (you'll need to restart)\n\nContinue?", tfeRepoPath),
 		}

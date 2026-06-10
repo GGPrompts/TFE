@@ -406,9 +406,27 @@ const (
 	dialogSettings            // Settings panel (Ctrl+,)
 )
 
+// dialogAction identifies the behavior a dialog's confirm handler should run.
+// It decouples dispatch from the user-facing title string, so wording can change
+// without silently breaking the action.
+type dialogAction int
+
+const (
+	dialogActionNone           dialogAction = iota // Plain message/settings dialogs (no confirm behavior)
+	dialogActionCreateDir                          // Create a new directory
+	dialogActionCreateFile                         // Create a new file
+	dialogActionRename                             // Rename a file or directory
+	dialogActionMoveToTrash                        // Move entry to trash
+	dialogActionPermanentDelete                    // Permanently delete from trash
+	dialogActionEmptyTrash                         // Empty the trash
+	dialogActionDeleteEntry                        // Hard-delete a file or directory
+	dialogActionPullRebuild                        // Pull & rebuild TFE
+)
+
 // dialogModel holds dialog state
 type dialogModel struct {
 	dialogType dialogType
+	action     dialogAction // What the confirm handler should do (dispatch key)
 	title      string
 	message    string
 	input      string // For text input dialogs

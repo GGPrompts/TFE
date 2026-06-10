@@ -427,6 +427,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			// Show input dialog for folder name
 			m.dialog = dialogModel{
 				dialogType: dialogInput,
+				action:     dialogActionCreateDir,
 				title:      "Create Directory",
 				message:    "Enter directory name:",
 				input:      "",
@@ -446,6 +447,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 			// Show input dialog for file name
 			m.dialog = dialogModel{
 				dialogType: dialogInput,
+				action:     dialogActionCreateFile,
 				title:      "Create File",
 				message:    "Enter filename:",
 				input:      "",
@@ -468,6 +470,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Permanently delete item from trash
 		m.dialog = dialogModel{
 			dialogType: dialogConfirm,
+			action:     dialogActionPermanentDelete,
 			title:      "Permanently Delete",
 			message:    fmt.Sprintf("Permanently delete '%s'?\nThis CANNOT be undone!", m.contextMenuFile.name),
 		}
@@ -478,6 +481,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Empty entire trash
 		m.dialog = dialogModel{
 			dialogType: dialogConfirm,
+			action:     dialogActionEmptyTrash,
 			title:      "Empty Trash",
 			message:    "Permanently delete ALL items in trash?\nThis CANNOT be undone!",
 		}
@@ -525,6 +529,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Rename the selected file or folder
 		m.dialog = dialogModel{
 			dialogType: dialogInput,
+			action:     dialogActionRename,
 			title:      "Rename",
 			message:    "New name:",
 			input:      m.contextMenuFile.name, // Pre-fill current name
@@ -536,6 +541,7 @@ func (m model) executeContextMenuAction() (tea.Model, tea.Cmd) {
 		// Delete the selected file or folder (move to trash)
 		m.dialog = dialogModel{
 			dialogType: dialogConfirm,
+			action:     dialogActionMoveToTrash,
 			title:      "Move to Trash",
 			message:    fmt.Sprintf("Move '%s' to trash?", m.contextMenuFile.name),
 		}

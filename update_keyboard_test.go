@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"unicode/utf8"
 
@@ -328,4 +330,70 @@ func TestF5Copy_FreshPreviewCopiesContent(t *testing.T) {
 		t.Errorf("statusMessage = %q, expected %q (fresh preview should copy content)",
 			result.statusMessage, "✓ File content copied to clipboard")
 	}
+}
+
+// TestDialogConfirm_DispatchesByActionNotTitle is a regression test for
+// tfe-cqe: dialog-confirm behavior must be routed by the typed
+// dialogModel.action field, NOT by string-matching the user-facing title.
+// We deliberately give each dialog a bogus title that does not match any
+// former magic string, and assert the action still fires.
+func TestDialogConfirm_DispatchesByActionNotTitle(t *testing.T) {
+	t.Run("create directory input dialog", func(t *testing.T) {
+		dir := t.TempDir()
+		m := model{
+			currentPath: dir,
+			showDialog:  true,
+			dialog: dialogModel{
+				dialogType: dialogInput,
+				action:     dialogActionCreateDir,
+				title:      "totally different wording", // would have broken old title dispatch
+				input:      "newdir",
+			},
+		}
+
+		newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyEnter})
+		result := newModel.(model)
+
+		if _, err := os.Stat(filepath.Join(dir, "newdir")); err != nil {
+			t.Errorf("expected directory to be created via action dispatch, stat err: %v", err)
+		}
+		if result.showDialog {
+			t.Errorf("dialog should be dismissed after confirm")
+		}
+	})
+
+	t.Run("delete-entry confirm dialog", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "victim.txt")
+		if err := os.WriteFile(target, []byte("bye"), 0644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+
+		m := model{
+			currentPath: dir,
+			showDialog:  true,
+			files: []fileItem{
+				{name: "victim.txt", path: target, isDir: false},
+			},
+			cursor: 0,
+			dialog: dialogModel{
+				dialogType: dialogConfirm,
+				action:     dialogActionDeleteEntry,
+				// Bogus title proves the old "Delete file" || "Delete directory"
+				// compound title match is no longer the dispatch key.
+				title: "Remove this thing",
+			},
+		}
+
+		newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+		result := newModel.(model)
+
+		// deleteFileOrDir moves the entry to trash; assert it left its original path.
+		if _, err := os.Stat(target); !os.IsNotExist(err) {
+			t.Errorf("expected file to be removed from original path via action dispatch, stat err: %v", err)
+		}
+		if result.showDialog {
+			t.Errorf("dialog should be dismissed after confirm")
+		}
+	})
 }
