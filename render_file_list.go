@@ -544,14 +544,14 @@ func (m model) renderDetailView(maxVisible int) string {
 					location = "~" + strings.TrimPrefix(location, homeDir)
 				}
 				// Truncate long paths based on dynamic width
-				if len(location) > extraWidth {
-					location = "..." + location[len(location)-(extraWidth-3):]
+				if visualWidth(location) > extraWidth {
+					location = m.truncateToWidthFromEnd(location, extraWidth)
 				}
 			}
 
-			// Use visual-width padding for name column (contains emojis), regular padding for others
+			// Use visual-width padding for all columns (handles emojis and multibyte characters)
 			paddedName := m.padToVisualWidth(name, nameWidth)
-			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, deleted, extraWidth, location)
+			line = fmt.Sprintf("%s  %s  %s  %s", paddedName, m.padToVisualWidth(size, sizeWidth), m.padToVisualWidth(deleted, modifiedWidth), m.padToVisualWidth(location, extraWidth))
 		} else if m.showFavoritesOnly {
 			// Favorites mode: Name, Size, Modified, Location
 			// Get parent directory path for location
@@ -562,12 +562,12 @@ func (m model) renderDetailView(maxVisible int) string {
 				location = "~" + strings.TrimPrefix(location, homeDir)
 			}
 			// Truncate long paths based on dynamic width
-			if len(location) > extraWidth {
-				location = "..." + location[len(location)-(extraWidth-3):]
+			if visualWidth(location) > extraWidth {
+				location = m.truncateToWidthFromEnd(location, extraWidth)
 			}
-			// Use visual-width padding for name column (contains emojis), regular padding for others
+			// Use visual-width padding for all columns (handles emojis and multibyte characters)
 			paddedName := m.padToVisualWidth(name, nameWidth)
-			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
+			line = fmt.Sprintf("%s  %s  %s  %s", paddedName, m.padToVisualWidth(size, sizeWidth), m.padToVisualWidth(modified, modifiedWidth), m.padToVisualWidth(location, extraWidth))
 		} else if m.showGitReposOnly {
 			// Git repos mode: Name (with path), Branch, Status, Last Commit
 			// Get parent directory path for location
@@ -591,9 +591,9 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 
 			// Truncate long paths if needed
-			if len(repoDisplayName) > maxNameTextLen {
+			if visualWidth(repoDisplayName) > maxNameTextLen {
 				// For paths, show trailing end
-				repoDisplayName = "..." + repoDisplayName[len(repoDisplayName)-(maxNameTextLen-3):]
+				repoDisplayName = m.truncateToWidthFromEnd(repoDisplayName, maxNameTextLen)
 			}
 
 			// Pad icon to 2 cells for consistent alignment across different emoji widths
@@ -638,19 +638,19 @@ func (m model) renderDetailView(maxVisible int) string {
 			}
 
 			// Truncate if needed
-			if len(branch) > branchWidth {
-				branch = branch[:branchWidth-2] + ".."
+			if visualWidth(branch) > branchWidth {
+				branch = truncateToWidth(branch, branchWidth-2) + ".."
 			}
 			if visualWidth(status) > statusWidth {
 				status = truncateToWidth(status, statusWidth-2) + ".."
 			}
-			if len(lastCommit) > commitWidth {
-				lastCommit = lastCommit[:commitWidth-2] + ".."
+			if visualWidth(lastCommit) > commitWidth {
+				lastCommit = truncateToWidth(lastCommit, commitWidth-2) + ".."
 			}
 
-			// Use visual-width padding for name column (contains emojis), regular padding for others
+			// Use visual-width padding for all columns (handles emojis and multibyte characters)
 			paddedName := m.padToVisualWidth(name, nameWidth)
-			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, branchWidth, branch, statusWidth, status, commitWidth, lastCommit)
+			line = fmt.Sprintf("%s  %s  %s  %s", paddedName, m.padToVisualWidth(branch, branchWidth), m.padToVisualWidth(status, statusWidth), m.padToVisualWidth(lastCommit, commitWidth))
 		} else if m.showAgentView {
 			// Agent view: Name, Modified, Description
 			desc := file.agentDescription
@@ -662,11 +662,11 @@ func (m model) renderDetailView(maxVisible int) string {
 					desc = fmt.Sprintf("%d conversations", count)
 				}
 			}
-			if len(desc) > extraWidth {
-				desc = desc[:extraWidth-2] + ".."
+			if visualWidth(desc) > extraWidth {
+				desc = truncateToWidth(desc, extraWidth-2) + ".."
 			}
 			paddedName := m.padToVisualWidth(name, nameWidth)
-			line = fmt.Sprintf("%s  %-*s  %-*s", paddedName, modifiedWidth, modified, extraWidth, desc)
+			line = fmt.Sprintf("%s  %s  %s", paddedName, m.padToVisualWidth(modified, modifiedWidth), m.padToVisualWidth(desc, extraWidth))
 		} else if m.showChangesOnly {
 			// Changes mode: Name (includes status prefix), Size, Modified, Location
 			location := filepath.Dir(file.path)
@@ -687,28 +687,28 @@ func (m model) renderDetailView(maxVisible int) string {
 					location = location + " [" + label + "]"
 				}
 			}
-			if len(location) > extraWidth {
-				location = "..." + location[len(location)-(extraWidth-3):]
+			if visualWidth(location) > extraWidth {
+				location = m.truncateToWidthFromEnd(location, extraWidth)
 			}
 			paddedName := m.padToVisualWidth(name, nameWidth)
-			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, location)
+			line = fmt.Sprintf("%s  %s  %s  %s", paddedName, m.padToVisualWidth(size, sizeWidth), m.padToVisualWidth(modified, modifiedWidth), m.padToVisualWidth(location, extraWidth))
 		} else {
 			// Regular mode: Name, Size, Modified, Type
 			fileType := getFileType(file)
 			// Truncate file type if needed (show trailing end for long paths)
-			if len(fileType) > extraWidth {
+			if visualWidth(fileType) > extraWidth {
 				// For symlinks showing paths, show the end (filename) rather than beginning
 				if strings.HasPrefix(fileType, "Link → ") {
 					// Show "...filename" instead of "Link → /very/long/pa..."
-					fileType = "..." + fileType[len(fileType)-(extraWidth-3):]
+					fileType = m.truncateToWidthFromEnd(fileType, extraWidth)
 				} else {
 					// For regular types, truncate normally
-					fileType = fileType[:extraWidth-2] + ".."
+					fileType = truncateToWidth(fileType, extraWidth-2) + ".."
 				}
 			}
-			// Use visual-width padding for name column (contains emojis), regular padding for others
+			// Use visual-width padding for all columns (handles emojis and multibyte characters)
 			paddedName := m.padToVisualWidth(name, nameWidth)
-			line = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedName, sizeWidth, size, modifiedWidth, modified, extraWidth, fileType)
+			line = fmt.Sprintf("%s  %s  %s  %s", paddedName, m.padToVisualWidth(size, sizeWidth), m.padToVisualWidth(modified, modifiedWidth), m.padToVisualWidth(fileType, extraWidth))
 		}
 
 		style := fileStyle
@@ -974,6 +974,33 @@ func (m model) truncateToVisualWidth(s string, targetWidth int) string {
 	}
 
 	return result.String()
+}
+
+// truncateToWidthFromEnd keeps the trailing portion of s that fits within
+// targetWidth visual cells, prefixing "..." when truncation occurs.
+// Rune-aware: never splits multibyte characters (unlike byte slicing).
+// Used for tail-truncating paths so the most specific part stays visible.
+func (m model) truncateToWidthFromEnd(s string, targetWidth int) string {
+	if visualWidth(s) <= targetWidth {
+		return s
+	}
+	const ellipsis = "..."
+	avail := targetWidth - 3 // visual width of "..."
+	if avail <= 0 {
+		return truncateToWidth(ellipsis, targetWidth)
+	}
+	runes := []rune(s)
+	width := 0
+	start := len(runes)
+	for i := len(runes) - 1; i >= 0; i-- {
+		w := m.runeWidth(runes[i])
+		if width+w > avail {
+			break
+		}
+		width += w
+		start = i
+	}
+	return ellipsis + string(runes[start:])
 }
 
 // runeWidth returns the visual width of a rune (1 for most, 2 for emojis/wide chars)
