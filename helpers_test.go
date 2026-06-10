@@ -558,6 +558,66 @@ func TestNavigateToPathClearsSearchFilter(t *testing.T) {
 	}
 }
 
+// TestNavigateToPathExitsChangesMode verifies that navigating into a directory
+// exits git changes mode and restores the previous display mode (regression for
+// tfe-u8e). Both keyboard Enter (update_keyboard.go) and the mouse double-click
+// directory branch (update_mouse.go) route directory navigation through
+// navigateToPath, so this guards the shared exit path: previously the mouse
+// path assigned currentPath directly without calling exitChangesMode, leaving
+// showChangesOnly true so getFilteredFiles kept returning the stale changed-file
+// list while currentPath silently moved.
+func TestNavigateToPathExitsChangesMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	subDir := filepath.Join(tmpDir, "subdir")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("Failed to create subdir: %v", err)
+	}
+
+	m := &model{
+		currentPath:           tmpDir,
+		showChangesOnly:       true,
+		showDiffPreview:       true,
+		changedFiles:          []fileItem{{name: "[ M] foo.txt", path: filepath.Join(tmpDir, "foo.txt")}},
+		displayMode:           modeTree,
+		changesRestoreDisplay: modeList,
+	}
+
+	m.navigateToPath(subDir)
+
+	if m.showChangesOnly {
+		t.Error("Expected showChangesOnly to be false after navigating into a directory")
+	}
+	if m.showDiffPreview {
+		t.Error("Expected showDiffPreview to be false after exiting changes mode")
+	}
+	if m.displayMode != modeList {
+		t.Errorf("Expected displayMode restored to changesRestoreDisplay (modeList), got %v", m.displayMode)
+	}
+	if m.currentPath != subDir {
+		t.Errorf("Expected currentPath %q, got %q", subDir, m.currentPath)
+	}
+}
+
+// TestNavigateToPathDoesNotExitFavorites documents that navigateToPath does NOT
+// clear showFavoritesOnly despite its doc comment. The mouse double-click and
+// keyboard handlers therefore clear favorites mode themselves before calling it
+// (tfe-u8e caution 1); dropping that explicit exit would desync the favorites
+// global list against currentPath.
+func TestNavigateToPathDoesNotExitFavorites(t *testing.T) {
+	tmpDir := t.TempDir()
+	subDir := filepath.Join(tmpDir, "subdir")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("Failed to create subdir: %v", err)
+	}
+
+	m := &model{currentPath: tmpDir, showFavoritesOnly: true}
+	m.navigateToPath(subDir)
+
+	if !m.showFavoritesOnly {
+		t.Error("navigateToPath unexpectedly cleared showFavoritesOnly; callers rely on clearing it explicitly")
+	}
+}
+
 // TestClearSearchFilter verifies the shared helper resets all search state.
 func TestClearSearchFilter(t *testing.T) {
 	m := &model{

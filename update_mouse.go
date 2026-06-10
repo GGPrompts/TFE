@@ -855,30 +855,38 @@ git pull
 
 					// Double-click: navigate or full-screen preview
 					if clickedFile.isDir {
-						m.currentPath = clickedFile.path
-						m.cursor = 0
-
-						// Exit favorites mode when navigating into a folder
+						// Exit favorites mode when navigating into a folder.
+						// navigateToPath does NOT exit favorites mode, and favorites
+						// shows a global list, so we must clear this here or the path
+						// header and the listing would desync.
 						if m.showFavoritesOnly {
 							m.showFavoritesOnly = false
 						}
 
-						// Git repos mode: rescan if "..", exit if navigating to a repo
+						// Git repos mode: rescan if "..", exit if navigating to a repo.
+						// Handle this before navigateToPath so the rescan uses the new
+						// path and the filter is exited consistently with keyboard Enter.
 						if m.showGitReposOnly {
 							if clickedFile.name == ".." {
 								// Navigating up - rescan from parent
+								m.currentPath = clickedFile.path
+								m.cursor = 0
 								m.setStatusMessage("🔍 Re-scanning from parent directory...", false)
 								m.gitReposList = m.scanGitReposRecursive(m.currentPath, m.gitReposScanDepth, 50)
 								m.gitReposLastScan = time.Now()
 								m.gitReposScanRoot = m.currentPath
 								m.setStatusMessage(fmt.Sprintf("Found %d git repositories", len(m.gitReposList)), false)
+								m.loadFiles()
 							} else {
 								// Navigating to a repo - exit filter mode
 								m.showGitReposOnly = false
+								m.navigateToPath(clickedFile.path)
 							}
+						} else {
+							// Route through navigateToPath so changes mode is exited via
+							// the shared exitChangesMode path, just like keyboard Enter.
+							m.navigateToPath(clickedFile.path)
 						}
-
-						m.loadFiles()
 					} else if !m.filePickerMode {
 						// Enter full-screen preview (only if NOT in file picker mode)
 						m.loadPreview(clickedFile.path)
