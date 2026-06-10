@@ -143,22 +143,31 @@ func checkForUpdates() tea.Cmd {
 	}
 }
 
-// stripANSI removes ANSI escape codes from a string
-// This prevents pasted styled text from corrupting the command line
-func stripANSI(s string) string {
+// Package-level compiled regexes for stripANSI. Compiled once at init
+// (stripANSI is called per line per frame in narrow-terminal detail view,
+// so compiling per call was a significant hot-path cost). Compiled regexps
+// are safe for concurrent use.
+var (
 	// Match all common ANSI escape sequences:
 	// - CSI sequences: ESC [ ... (letter or @)
 	// - OSC sequences: ESC ] ... (BEL or ST)
 	// - Other escape sequences: ESC followed by various characters
-	ansiRegex := regexp.MustCompile(`\x1b(\[[0-9;?]*[a-zA-Z@]|\][^\x07\x1b]*(\x07|\x1b\\)|[>=<>()#])`)
-	cleaned := ansiRegex.ReplaceAllString(s, "")
+	ansiStripRegex = regexp.MustCompile(`\x1b(\[[0-9;?]*[a-zA-Z@]|\][^\x07\x1b]*(\x07|\x1b\\)|[>=<>()#])`)
 
-	// Also strip terminal response sequences that may appear without ESC prefix
+	// Terminal response sequences that may appear without ESC prefix.
 	// These can leak in when terminal responds to queries (e.g., color capability checks)
 	// Patterns: ";rgb:xxxx/xxxx", "1;rgb:xxxx/xxxx/xxxx", "0;rgb:...", numeric response codes
+	terminalResponseRegex = regexp.MustCompile(`;?rgb:[0-9a-fA-F/]+|\d+;rgb:[0-9a-fA-F/]+|\d+;\d+(?:;\d+)*`)
+)
+
+// stripANSI removes ANSI escape codes from a string
+// This prevents pasted styled text from corrupting the command line
+func stripANSI(s string) string {
+	cleaned := ansiStripRegex.ReplaceAllString(s, "")
+
+	// Also strip terminal response sequences that may appear without ESC prefix
 	// Match anywhere in the string, not just exact matches
-	responseRegex := regexp.MustCompile(`;?rgb:[0-9a-fA-F/]+|\d+;rgb:[0-9a-fA-F/]+|\d+;\d+(?:;\d+)*`)
-	cleaned = responseRegex.ReplaceAllString(cleaned, "")
+	cleaned = terminalResponseRegex.ReplaceAllString(cleaned, "")
 
 	return cleaned
 }
