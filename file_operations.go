@@ -1293,10 +1293,26 @@ func (m *model) refreshPreviewCacheIfStale() {
 	m.populatePreviewCache()
 }
 
-// renderMarkdownWithTimeout renders markdown with a timeout to prevent hangs
-// Returns rendered content and any error (including timeout)
+// renderMarkdownWithTimeout renders markdown with a timeout to prevent hangs.
+// Returns rendered content and any error (including timeout).
+//
+// Concurrency contract (see tfe-5pv): glamour.TermRenderer is NOT goroutine-safe,
+// and m.glamourRenderer/m.glamourRendererWidth are owned by the main Bubbletea
+// goroutine. The render goroutine spawned below must therefore be fully
+// self-contained: it captures its inputs by value, takes sole ownership of any
+// cached renderer it reuses, and never reads or writes model fields. ONLY this
+// caller (the main goroutine) assigns m.glamourRenderer/m.glamourRendererWidth,
+// and only when it actually receives a result.
+//
+// Ownership handoff: before spawning, we move the cached renderer out of the
+// model (clearing the fields) and hand it to the goroutine by value. On a
+// successful receive we reinstall the renderer the goroutine returns. On the
+// timeout path we return with the fields left cleared, so a still-running
+// orphaned goroutine can keep using its private renderer without that renderer
+// being visible to (and concurrently Render()ed by) any subsequent call.
 func (m *model) renderMarkdownWithTimeout(content string, width int, timeout time.Duration) (string, error) {
 	type renderResult struct {
+		renderer *glamour.TermRenderer
 		rendered string
 		err      error
 	}
@@ -1304,26 +1320,32 @@ func (m *model) renderMarkdownWithTimeout(content string, width int, timeout tim
 	// Use buffered channel to prevent goroutine leak
 	resultChan := make(chan renderResult, 1)
 
+	// Take ownership of any reusable cached renderer by value, then clear the
+	// model fields. After this point the goroutine is the sole owner of
+	// cachedRenderer; the model holds no renderer until we reinstall one below.
+	var cachedRenderer *glamour.TermRenderer
+	if m.glamourRenderer != nil && m.glamourRendererWidth == width {
+		cachedRenderer, _ = m.glamourRenderer.(*glamour.TermRenderer)
+	}
+	m.glamourRenderer = nil
+	m.glamourRendererWidth = 0
+
 	go func() {
 		// Recover from panics in glamour rendering
 		defer func() {
 			if r := recover(); r != nil {
 				resultChan <- renderResult{
-					rendered: "",
-					err:      fmt.Errorf("markdown rendering panicked: %v", r),
+					err: fmt.Errorf("markdown rendering panicked: %v", r),
 				}
 			}
 		}()
 
-		// Check if we have a cached renderer for this width
-		var renderer *glamour.TermRenderer
-		var err error
-
-		if m.glamourRenderer != nil && m.glamourRendererWidth == width {
-			// Reuse cached renderer (avoids expensive terminal probing!)
-			renderer = m.glamourRenderer.(*glamour.TermRenderer)
-		} else {
-			// Create new renderer and cache it
+		// Reuse the renderer handed to us, or create a new one. Either way the
+		// renderer is local to this goroutine; we hand it back through the
+		// channel and let the caller decide whether to reinstall it.
+		renderer := cachedRenderer
+		if renderer == nil {
+			var err error
 			// First try custom style file, fall back to "dark" if not found
 			exePath, _ := os.Executable()
 			exeDir := filepath.Dir(exePath)
@@ -1348,34 +1370,30 @@ func (m *model) renderMarkdownWithTimeout(content string, width int, timeout tim
 				)
 			}
 			if err != nil {
-				resultChan <- renderResult{rendered: "", err: err}
+				resultChan <- renderResult{err: err}
 				return
 			}
-
-			// Cache the renderer for future use
-			m.glamourRenderer = renderer
-			m.glamourRendererWidth = width
 		}
 
 		rendered, err := renderer.Render(content)
-		resultChan <- renderResult{rendered: rendered, err: err}
+		resultChan <- renderResult{renderer: renderer, rendered: rendered, err: err}
 	}()
 
 	// Wait for result or timeout
 	select {
 	case result := <-resultChan:
+		// Reinstall the renderer for reuse only on a clean render. On error we
+		// drop it (the next call rebuilds), keeping the fields cleared.
+		if result.err == nil && result.renderer != nil {
+			m.glamourRenderer = result.renderer
+			m.glamourRendererWidth = width
+		}
 		return result.rendered, result.err
 	case <-time.After(timeout):
+		// Fields are already cleared (set to nil/0 before spawning). The
+		// orphaned goroutine owns its renderer privately, so it can finish
+		// without racing any later call. Do NOT touch the fields here.
 		return "", fmt.Errorf("markdown rendering timeout after %v", timeout)
-	}
-}
-
-// renderMarkdownAsync renders markdown in a background goroutine
-func renderMarkdownAsync(m *model) tea.Cmd {
-	return func() tea.Msg {
-		// Populate cache (includes Glamour rendering)
-		m.populatePreviewCache()
-		return markdownRenderedMsg{}
 	}
 }
 

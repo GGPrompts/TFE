@@ -707,6 +707,69 @@ func TestRenderMarkdownWithTimeout_ActualTimeout(t *testing.T) {
 	}
 }
 
+// TestRenderMarkdownWithTimeout_ClearsRendererOnTimeout verifies the
+// concurrency contract from tfe-5pv: when a render times out, the caller must
+// leave m.glamourRenderer/m.glamourRendererWidth cleared so the orphaned
+// goroutine's renderer is never reinstalled (and thus never concurrently
+// Render()ed by a later call). With a 1ns timeout the select almost always
+// takes the timeout branch.
+func TestRenderMarkdownWithTimeout_ClearsRendererOnTimeout(t *testing.T) {
+	m := &model{}
+
+	for i := 0; i < 50; i++ {
+		rendered, err := m.renderMarkdownWithTimeout("# Test\n\nbody", 80, 1*time.Nanosecond)
+		if err == nil {
+			// Render won the race against the 1ns timeout; on success the
+			// renderer should be installed for the width we asked for.
+			if m.glamourRenderer == nil {
+				t.Fatalf("iter %d: successful render did not install renderer", i)
+			}
+			if m.glamourRendererWidth != 80 {
+				t.Fatalf("iter %d: installed renderer width = %d, want 80", i, m.glamourRendererWidth)
+			}
+			continue
+		}
+		// On timeout (the path the test is designed to hit) the fields must be
+		// cleared so no later call shares the orphaned goroutine's renderer.
+		if !strings.Contains(err.Error(), "timeout") {
+			t.Fatalf("iter %d: unexpected error: %v", i, err)
+		}
+		if m.glamourRenderer != nil {
+			t.Fatalf("iter %d: renderer left installed after timeout (would race orphaned goroutine)", i)
+		}
+		if rendered != "" {
+			t.Fatalf("iter %d: expected empty render on timeout, got %q", i, rendered)
+		}
+	}
+}
+
+// TestRenderMarkdownWithTimeout_RaceWithRendererNil reproduces the tfe-5pv
+// scenario under -race: renders that may time out (orphaning a goroutine that
+// could still be calling renderer.Render) interleaved with the renderer being
+// nil'd from the same owning goroutine, exactly as menu.go does on a theme
+// toggle. After the fix, the render goroutine never touches model fields, so
+// the only accessor of m.glamourRenderer/Width is this single owning goroutine
+// and `go test -race` must stay clean.
+func TestRenderMarkdownWithTimeout_RaceWithRendererNil(t *testing.T) {
+	m := &model{}
+
+	timeouts := []time.Duration{1 * time.Nanosecond, 5 * time.Second}
+	for i := 0; i < 200; i++ {
+		_, _ = m.renderMarkdownWithTimeout("# Heading\n\n- a\n- b", 80, timeouts[i%len(timeouts)])
+
+		// Simulate the menu.go theme-toggle invalidation that nils the cached
+		// renderer from the Update loop.
+		if i%3 == 0 {
+			m.glamourRenderer = nil
+			m.glamourRendererWidth = 0
+		}
+		// Vary the width so the reuse/recreate branches both get exercised.
+		if i%2 == 0 {
+			_, _ = m.renderMarkdownWithTimeout("# Other", 100, 5*time.Second)
+		}
+	}
+}
+
 // BenchmarkIsBinaryFile benchmarks binary file detection
 func BenchmarkIsBinaryFile(b *testing.B) {
 	tmpDir := b.TempDir()
