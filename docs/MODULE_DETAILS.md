@@ -85,14 +85,34 @@ TFE follows a modular architecture with 27+ specialized modules, each handling a
 **Purpose**: All keyboard input processing
 
 **Contents**:
-- `handleKeyEvent()` - Main keyboard event handler
-- Preview mode keys (F10, F4, F5, arrow keys, pageup/pagedown)
-- Dialog input handling (input/confirm dialogs)
-- Context menu keyboard navigation
-- Command prompt input (enter, backspace, history)
-- All file browser keyboard shortcuts (F1-F10, navigation, display modes)
+- `handleKeyEvent()` - Short dispatcher. Runs the inline preamble (terminal-response
+  filter, fuzzy-search/preview-only guards, menu-bar-focused block), then calls the
+  per-mode handlers below **in a fixed order**, returning early on the first one that
+  reports `handled=true`. The file-picker block stays inline between
+  `handlePreviewSearchKeys` and `handlePromptEditKeys` (it deliberately falls through
+  for unhandled keys).
+- Per-mode handlers, each `func (m model) handleXxxKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)`
+  where the bool is `handled`. Dispatch order: `handleMenuKeys` → `handlePreviewSearchKeys` →
+  (inline file picker) → `handlePromptEditKeys` → `handleFullPreviewKeys` →
+  `handleDialogKeys` → `handleContextMenuKeys` → `handleSearchKeys` → `handleMainKeys`.
+- `handleMainKeys()` - Terminal handler (always returns `handled=true`). Contains command-prompt
+  input (cursor clamp, the special-keys switch, the text-insertion block) **and** the large
+  file-browser key switch. Command-mode handling is intentionally interleaved here via ~20
+  scattered `if m.commandFocused` checks — do NOT pull these out into a separate handler.
+- All file browser keyboard shortcuts (F1-F10, navigation, display modes).
 
-**When to extend**: Add new keyboard shortcuts or key bindings here
+**Gotchas**:
+- **Order is load-bearing.** The same key (e.g. `tab`) is handled in several distant
+  handlers; they must be dispatched in the order above so the right one wins.
+- **Fall-through = `handled=false`.** A guard handler returns `false` wherever the original
+  block fell through. Two non-obvious cases: `handleDialogKeys` falls through (returns
+  `false`) for an unknown `dialogType` (its `switch` had no trailing return), and the
+  command-mode special-keys/text-insertion code in `handleMainKeys` falls through for
+  special keys and empty-input space.
+
+**When to extend**: Add new keyboard shortcuts in the matching mode handler (or `handleMainKeys`
+for global file-browser keys). When adding a new mode block, append a `handleXxxKeys` handler
+and wire it into the dispatcher at the correct position.
 
 ---
 

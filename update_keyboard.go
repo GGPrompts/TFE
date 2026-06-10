@@ -31,7 +31,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	if len(msg.Runes) < 20 && // Only apply filter to short inputs (terminal responses are brief)
 		(strings.Contains(key, "rgb:") ||
-		 (strings.Contains(key, ":") && strings.Contains(key, "/"))) {
+			(strings.Contains(key, ":") && strings.Contains(key, "/"))) {
 		// Ignore terminal response sequences
 		return m, nil
 	}
@@ -77,132 +77,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Handle menu keyboard navigation (when menu is open)
-	if m.menuOpen {
-		switch msg.String() {
-		case "esc":
-			// Close dropdown and return to menu bar focus
-			m.menuOpen = false
-			m.selectedMenuItem = -1
-			m.menuBarFocused = true
-			m.highlightedMenu = m.activeMenu
-			return m, nil
-
-		case "left", "shift+tab":
-			// Close current menu and open previous menu
-			m.activeMenu = getPreviousMenu(m.activeMenu)
-			m.highlightedMenu = m.activeMenu
-			m.selectedMenuItem = m.getFirstSelectableMenuItem(m.activeMenu)
-			return m, nil
-
-		case "right", "tab":
-			// Close current menu and open next menu
-			m.activeMenu = getNextMenu(m.activeMenu)
-			m.highlightedMenu = m.activeMenu
-			m.selectedMenuItem = m.getFirstSelectableMenuItem(m.activeMenu)
-			return m, nil
-
-		case "up":
-			// Navigate up in menu items (skip separators)
-			menus := m.getMenus()
-			menu := menus[m.activeMenu]
-			if m.selectedMenuItem <= 0 {
-				// Find last non-separator item
-				for i := len(menu.Items) - 1; i >= 0; i-- {
-					if !menu.Items[i].IsSeparator {
-						m.selectedMenuItem = i
-						break
-					}
-				}
-			} else {
-				// Move up to previous non-separator
-				for i := m.selectedMenuItem - 1; i >= 0; i-- {
-					if !menu.Items[i].IsSeparator {
-						m.selectedMenuItem = i
-						break
-					}
-				}
-			}
-			return m, nil
-
-		case "down":
-			// Navigate down in menu items (skip separators)
-			menus := m.getMenus()
-			menu := menus[m.activeMenu]
-			// Find next non-separator item
-			found := false
-			for i := m.selectedMenuItem + 1; i < len(menu.Items); i++ {
-				if !menu.Items[i].IsSeparator {
-					m.selectedMenuItem = i
-					found = true
-					break
-				}
-			}
-			if !found {
-				// Wrap to first non-separator
-				for i := 0; i < len(menu.Items); i++ {
-					if !menu.Items[i].IsSeparator {
-						m.selectedMenuItem = i
-						break
-					}
-				}
-			}
-			return m, nil
-
-		case "enter":
-			// Execute selected menu item
-			if m.selectedMenuItem >= 0 {
-				menus := m.getMenus()
-				menu := menus[m.activeMenu]
-				if m.selectedMenuItem < len(menu.Items) {
-					item := menu.Items[m.selectedMenuItem]
-					if !item.IsSeparator && !item.Disabled {
-						return m.executeMenuAction(item.Action)
-					}
-				}
-			}
-			return m, nil
-		}
+	if nm, nc, handled := m.handleMenuKeys(msg); handled {
+		return nm, nc
 	}
 
-	// Handle preview search mode input
-	if m.viewMode == viewFullPreview && m.preview.searchActive {
-		switch msg.String() {
-		case "esc":
-			// Exit search mode
-			m.preview.searchActive = false
-			m.preview.searchQuery = ""
-			m.preview.searchMatches = nil
-			m.preview.currentMatch = -1
-			return m, nil
-
-		case "enter", "n":
-			// Find next match
-			m.findNextSearchMatch()
-			return m, nil
-
-		case "shift+n":
-			// Find previous match
-			m.findPreviousSearchMatch()
-			return m, nil
-
-		case "backspace":
-			// Delete last character from search query
-			if len(m.preview.searchQuery) > 0 {
-				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-1]
-				m.performPreviewSearch()
-			}
-			return m, nil
-
-		default:
-			// Add printable characters to search query
-			keyStr := msg.String()
-			if !isSpecialKey(keyStr) && len(keyStr) > 0 {
-				m.preview.searchQuery += keyStr
-				m.performPreviewSearch()
-			}
-			return m, nil
-		}
+	if nm, nc, handled := m.handlePreviewSearchKeys(msg); handled {
+		return nm, nc
 	}
 
 	// PRIORITY 1: Handle file picker mode (F3 from edit mode)
@@ -339,16 +219,174 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// For all other keys in file picker mode, fall through to normal navigation
 	}
 
-	// PRIORITY 2: Handle prompt edit mode input (works in ALL view modes)
-	// This prevents hotkeys like F, M, V, D, E from interfering with text input
-	// Must be checked AFTER file picker mode (so Esc closes picker first)
+	if nm, nc, handled := m.handlePromptEditKeys(msg); handled {
+		return nm, nc
+	}
+
+	if nm, nc, handled := m.handleFullPreviewKeys(msg); handled {
+		return nm, nc
+	}
+
+	if nm, nc, handled := m.handleDialogKeys(msg); handled {
+		return nm, nc
+	}
+
+	if nm, nc, handled := m.handleContextMenuKeys(msg); handled {
+		return nm, nc
+	}
+
+	if nm, nc, handled := m.handleSearchKeys(msg); handled {
+		return nm, nc
+	}
+
+	nm, nc, _ := m.handleMainKeys(msg)
+	return nm, nc
+}
+
+// handleMenuKeys handles keyboard navigation when a menu dropdown is open.
+func (m model) handleMenuKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if m.menuOpen {
+		switch msg.String() {
+		case "esc":
+			// Close dropdown and return to menu bar focus
+			m.menuOpen = false
+			m.selectedMenuItem = -1
+			m.menuBarFocused = true
+			m.highlightedMenu = m.activeMenu
+			return m, nil, true
+
+		case "left", "shift+tab":
+			// Close current menu and open previous menu
+			m.activeMenu = getPreviousMenu(m.activeMenu)
+			m.highlightedMenu = m.activeMenu
+			m.selectedMenuItem = m.getFirstSelectableMenuItem(m.activeMenu)
+			return m, nil, true
+
+		case "right", "tab":
+			// Close current menu and open next menu
+			m.activeMenu = getNextMenu(m.activeMenu)
+			m.highlightedMenu = m.activeMenu
+			m.selectedMenuItem = m.getFirstSelectableMenuItem(m.activeMenu)
+			return m, nil, true
+
+		case "up":
+			// Navigate up in menu items (skip separators)
+			menus := m.getMenus()
+			menu := menus[m.activeMenu]
+			if m.selectedMenuItem <= 0 {
+				// Find last non-separator item
+				for i := len(menu.Items) - 1; i >= 0; i-- {
+					if !menu.Items[i].IsSeparator {
+						m.selectedMenuItem = i
+						break
+					}
+				}
+			} else {
+				// Move up to previous non-separator
+				for i := m.selectedMenuItem - 1; i >= 0; i-- {
+					if !menu.Items[i].IsSeparator {
+						m.selectedMenuItem = i
+						break
+					}
+				}
+			}
+			return m, nil, true
+
+		case "down":
+			// Navigate down in menu items (skip separators)
+			menus := m.getMenus()
+			menu := menus[m.activeMenu]
+			// Find next non-separator item
+			found := false
+			for i := m.selectedMenuItem + 1; i < len(menu.Items); i++ {
+				if !menu.Items[i].IsSeparator {
+					m.selectedMenuItem = i
+					found = true
+					break
+				}
+			}
+			if !found {
+				// Wrap to first non-separator
+				for i := 0; i < len(menu.Items); i++ {
+					if !menu.Items[i].IsSeparator {
+						m.selectedMenuItem = i
+						break
+					}
+				}
+			}
+			return m, nil, true
+
+		case "enter":
+			// Execute selected menu item
+			if m.selectedMenuItem >= 0 {
+				menus := m.getMenus()
+				menu := menus[m.activeMenu]
+				if m.selectedMenuItem < len(menu.Items) {
+					item := menu.Items[m.selectedMenuItem]
+					if !item.IsSeparator && !item.Disabled {
+						nm, nc := m.executeMenuAction(item.Action)
+						return nm, nc, true
+					}
+				}
+			}
+			return m, nil, true
+		}
+	}
+	return m, nil, false
+}
+
+// handlePreviewSearchKeys handles input while searching within the full-screen preview.
+func (m model) handlePreviewSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if m.viewMode == viewFullPreview && m.preview.searchActive {
+		switch msg.String() {
+		case "esc":
+			// Exit search mode
+			m.preview.searchActive = false
+			m.preview.searchQuery = ""
+			m.preview.searchMatches = nil
+			m.preview.currentMatch = -1
+			return m, nil, true
+
+		case "enter", "n":
+			// Find next match
+			m.findNextSearchMatch()
+			return m, nil, true
+
+		case "shift+n":
+			// Find previous match
+			m.findPreviousSearchMatch()
+			return m, nil, true
+
+		case "backspace":
+			// Delete last character from search query
+			if len(m.preview.searchQuery) > 0 {
+				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-1]
+				m.performPreviewSearch()
+			}
+			return m, nil, true
+
+		default:
+			// Add printable characters to search query
+			keyStr := msg.String()
+			if !isSpecialKey(keyStr) && len(keyStr) > 0 {
+				m.preview.searchQuery += keyStr
+				m.performPreviewSearch()
+			}
+			return m, nil, true
+		}
+	}
+	return m, nil, false
+}
+
+// handlePromptEditKeys handles inline prompt-variable editing in any view mode.
+func (m model) handlePromptEditKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	if m.promptEditMode && m.preview.isPrompt && m.preview.promptTemplate != nil {
 		switch msg.String() {
 		case "esc":
 			// Exit prompt edit mode
 			m.promptEditMode = false
 			m.setStatusMessage("Exited edit mode", false)
-			return m, nil
+			return m, nil, true
 
 		case "tab":
 			// Navigate to next variable
@@ -360,7 +398,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Auto-scroll to show the focused variable
 				m.scrollToFocusedVariable()
 			}
-			return m, nil
+			return m, nil, true
 
 		case "shift+tab":
 			// Navigate to previous variable
@@ -372,7 +410,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Auto-scroll to show the focused variable
 				m.scrollToFocusedVariable()
 			}
-			return m, nil
+			return m, nil, true
 
 		case "backspace":
 			// Delete last character from focused variable
@@ -387,7 +425,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.populatePreviewCache()
 				}
 			}
-			return m, nil
+			return m, nil, true
 
 		case "ctrl+u":
 			// Clear focused variable
@@ -399,7 +437,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.preview.cacheValid = false
 				m.populatePreviewCache()
 			}
-			return m, nil
+			return m, nil, true
 
 		case "f3":
 			// File picker for focused variable
@@ -407,12 +445,12 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.filePickerMode = true
 				m.filePickerRestorePath = m.preview.filePath
 				m.filePickerRestorePrompts = m.showPromptsOnly
-				m.showPromptsOnly = false // Show all files
+				m.showPromptsOnly = false   // Show all files
 				m.viewMode = viewSinglePane // Exit preview mode
 				m.loadFiles()
 				m.setStatusMessage("📁 File Picker: Arrows/double-click to navigate, Enter to select file, Esc to cancel", false)
 			}
-			return m, nil
+			return m, nil, true
 
 		case "f5":
 			// Copy rendered prompt
@@ -437,29 +475,29 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.setStatusMessage("✓ Prompt copied to clipboard", false)
 				}
 			}
-			return m, nil
+			return m, nil, true
 
 		case "up":
 			// Scroll preview up (allow scrolling while editing)
 			// Note: "k" intentionally not bound here — it must insert into the variable
 			m.scrollPreviewBy(-1)
-			return m, nil
+			return m, nil, true
 
 		case "down":
 			// Scroll preview down (allow scrolling while editing)
 			// Note: "j" intentionally not bound here — it must insert into the variable
 			m.scrollPreviewBy(1)
-			return m, nil
+			return m, nil, true
 
 		case "pageup", "pgup":
 			// Page up (allow scrolling while editing)
 			m.scrollPreviewByPage(-1)
-			return m, nil
+			return m, nil, true
 
 		case "pagedown", "pgdn", "pgdown":
 			// Page down (allow scrolling while editing)
 			m.scrollPreviewByPage(1)
-			return m, nil
+			return m, nil, true
 
 		default:
 			// Handle regular character input for focused variable
@@ -500,16 +538,19 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							lineCount := strings.Count(cleanText, "\n") + 1
 							m.setStatusMessage(fmt.Sprintf("✓ Pasted %d chars (%d lines)", len(cleanText), lineCount), false)
 						}
-						return m, nil
+						return m, nil, true
 					}
 				}
 			}
 		}
 		// If we got here, the key wasn't handled - return early to prevent hotkey processing
-		return m, nil
+		return m, nil, true
 	}
+	return m, nil, false
+}
 
-	// Handle preview mode keys
+// handleFullPreviewKeys handles keys in full-screen preview mode.
+func (m model) handleFullPreviewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	if m.viewMode == viewFullPreview {
 		// Normal preview mode keyboard handling
 		switch msg.String() {
@@ -524,7 +565,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.commandFocused = false
 			// Reset mouse mode when exiting preview
 			m.previewMouseEnabled = true
-			return m, tea.EnableMouseCellMotion
+			return m, tea.EnableMouseCellMotion, true
 
 		case "esc":
 			// Exit preview mode (edit mode ESC is handled in universal section above)
@@ -535,7 +576,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.commandCursorPos = 0
 			m.commandFocused = false
 			m.previewMouseEnabled = true
-			return m, tea.EnableMouseCellMotion
+			return m, tea.EnableMouseCellMotion, true
 
 		case "ctrl+w":
 			// Close active tab in full preview mode
@@ -549,24 +590,24 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.populatePreviewCache()
 					m.previewMouseEnabled = true
 					m.setStatusMessage(fmt.Sprintf("Closed tab: %s", closedName), false)
-					return m, tea.EnableMouseCellMotion
+					return m, tea.EnableMouseCellMotion, true
 				}
 				m.setStatusMessage(fmt.Sprintf("Closed tab: %s (%d remaining)", closedName, len(m.tabs)), false)
-				return m, nil
+				return m, nil, true
 			}
 
 		case "alt+right":
 			// Next tab in full preview mode
 			if len(m.tabs) > 1 {
 				m.nextTab()
-				return m, nil
+				return m, nil, true
 			}
 
 		case "alt+left":
 			// Previous tab in full preview mode
 			if len(m.tabs) > 1 {
 				m.prevTab()
-				return m, nil
+				return m, nil, true
 			}
 
 		case "tab":
@@ -579,25 +620,25 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Auto-fill defaults for DATE/TIME
 				m.autofillDefaults()
 				m.setStatusMessage("Edit mode: Tab/Shift+Tab to navigate, Esc to exit, F5 to copy", false)
-				return m, nil
+				return m, nil, true
 			}
 
 		case "f3":
 			// F3: Open in external browser (images/HTML/PDF)
 			if m.preview.loaded && m.preview.filePath != "" && isBrowserFile(m.preview.filePath) {
-				return m, openInBrowser(m.preview.filePath)
+				return m, openInBrowser(m.preview.filePath), true
 			}
 
 		case "f4":
 			// Open file with appropriate viewer/editor from preview (F4)
 			if m.preview.loaded && m.preview.filePath != "" {
-				return m, m.openFileWithBestTool(m.preview.filePath)
+				return m, m.openFileWithBestTool(m.preview.filePath), true
 			}
 
 		case "n", "N":
 			// Edit file in nano from preview
 			if m.preview.loaded && m.preview.filePath != "" && editorAvailable("nano") {
-				return m, openEditor("nano", m.preview.filePath)
+				return m, openEditor("nano", m.preview.filePath), true
 			}
 
 		case "f5":
@@ -648,16 +689,16 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 			if m.previewMouseEnabled {
 				m.setStatusMessage("🖱  Mouse scrolling enabled (press 'm' to enable text selection)", false)
-				return m, tea.Batch(tea.EnableMouseCellMotion, statusTimeoutCmd())
+				return m, tea.Batch(tea.EnableMouseCellMotion, statusTimeoutCmd()), true
 			} else {
 				m.setStatusMessage("📄 Text selection enabled - Use mouse to select & copy text (Ctrl+Shift+C)", false)
-				return m, tea.Batch(tea.DisableMouse, statusTimeoutCmd())
+				return m, tea.Batch(tea.DisableMouse, statusTimeoutCmd()), true
 			}
 
 		case "v", "V":
 			// View image in terminal viewer (for binary image files)
 			if m.preview.loaded && m.preview.isBinary && isImageFile(m.preview.filePath) {
-				return m, openImageViewer(m.preview.filePath)
+				return m, openImageViewer(m.preview.filePath), true
 			}
 
 		case "f", "F":
@@ -670,7 +711,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.loadJSONLPreview(m.preview.filePath, info.Size())
 					m.setStatusMessage(fmt.Sprintf("Loaded full transcript (%d messages)", len(m.preview.cachedJSONLMessages)), false)
 				}
-				return m, statusTimeoutCmd()
+				return m, statusTimeoutCmd(), true
 			}
 
 			// Follow symlink - load target's actual content
@@ -682,7 +723,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					targetInfo, err := os.Stat(m.preview.filePath) // Stat follows the link
 					if err != nil {
 						m.setStatusMessage("Cannot follow symlink: target does not exist", true)
-						return m, nil
+						return m, nil, true
 					}
 
 					if targetInfo.IsDir() {
@@ -696,14 +737,14 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.viewMode = viewSinglePane
 						m.loadFiles()
 						m.setStatusMessage("Navigated to symlink target directory", false)
-						return m, nil
+						return m, nil, true
 					} else {
 						// Target is a file - load its content by reading through the symlink
 						// Temporarily load the target by reading the symlink path (os.ReadFile follows symlinks)
 						content, err := os.ReadFile(m.preview.filePath)
 						if err != nil {
 							m.setStatusMessage(fmt.Sprintf("Cannot read target: %s", err), true)
-							return m, nil
+							return m, nil, true
 						}
 
 						// Get target path for display
@@ -741,11 +782,11 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.preview.loaded = true
 						m.preview.fileSize = int64(len(content))
 						m.populatePreviewCache()
-						return m, statusTimeoutCmd()
+						return m, statusTimeoutCmd(), true
 					}
 				} else {
 					m.setStatusMessage("Not a symlink (press 'f' only when viewing symlinks)", true)
-					return m, statusTimeoutCmd()
+					return m, statusTimeoutCmd(), true
 				}
 			}
 
@@ -757,7 +798,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.preview.searchMatches = nil
 				m.preview.currentMatch = -1
 			}
-			return m, nil
+			return m, nil, true
 
 		case "f1":
 			// F1: Show hotkeys reference from preview mode
@@ -791,7 +832,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 				m.calculateLayout()
 				m.populatePreviewCache()
-				return m, tea.ClearScreen
+				return m, tea.ClearScreen, true
 			}
 
 		case "up", "k":
@@ -808,10 +849,15 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "pagedown", "pgdn", "pgdown":
 			m.scrollPreviewByPage(1)
 		}
-		return m, nil
+		return m, nil, true
 	}
+	return m, nil, false
+}
 
-	// Handle dialog input if dialog is open
+// handleDialogKeys handles input while a modal dialog is open.
+// NOTE: an unknown dialogType falls through (handled=false), matching the
+// original switch which had no trailing return.
+func (m model) handleDialogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	if m.showDialog {
 		switch m.dialog.dialogType {
 		case dialogInput:
@@ -821,7 +867,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Cancel dialog
 				m.showDialog = false
 				m.dialog = dialogModel{}
-				return m, tea.ClearScreen
+				return m, tea.ClearScreen, true
 
 			case "enter":
 				// Confirm input
@@ -861,7 +907,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							} else {
 								m.showDialog = false
 								m.dialog = dialogModel{}
-								return m, openImageEditor(filepath)
+								return m, openImageEditor(filepath), true
 							}
 						} else {
 							// Open text file in text editor
@@ -871,7 +917,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							} else {
 								m.showDialog = false
 								m.dialog = dialogModel{}
-								return m, openEditor(editor, filepath)
+								return m, openEditor(editor, filepath), true
 							}
 						}
 					}
@@ -907,14 +953,14 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				m.showDialog = false
 				m.dialog = dialogModel{}
-				return m, tea.ClearScreen
+				return m, tea.ClearScreen, true
 
 			case "backspace":
 				// Delete last character
 				if len(m.dialog.input) > 0 {
 					m.dialog.input = m.dialog.input[:len(m.dialog.input)-1]
 				}
-				return m, nil
+				return m, nil, true
 
 			default:
 				// Add printable characters to input
@@ -933,7 +979,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.dialog.input += text
 					}
 				}
-				return m, nil
+				return m, nil, true
 			}
 
 		case dialogConfirm:
@@ -943,7 +989,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Cancel dialog
 				m.showDialog = false
 				m.dialog = dialogModel{}
-				return m, tea.ClearScreen
+				return m, tea.ClearScreen, true
 
 			case "y", "Y":
 				// Confirm action
@@ -1097,29 +1143,33 @@ rm -f "$0"
 							} else {
 								// Exit TFE immediately so the script can update the binary
 								// Note: tty will be closed when the script exits
-								return m, tea.Quit
+								return m, tea.Quit, true
 							}
 						}
 					}
 				}
 				m.showDialog = false
 				m.dialog = dialogModel{}
-				return m, tea.ClearScreen
+				return m, tea.ClearScreen, true
 			}
-			return m, nil
+			return m, nil, true
 
 		case dialogSettings:
-			return m.handleSettingsKeyEvent(msg)
+			nm, nc := m.handleSettingsKeyEvent(msg)
+			return nm, nc, true
 		}
 	}
+	return m, nil, false
+}
 
-	// Handle context menu input if menu is open
+// handleContextMenuKeys handles keyboard navigation when the right-click context menu is open.
+func (m model) handleContextMenuKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	if m.contextMenuOpen {
 		switch msg.String() {
 		case "esc", "q":
 			// Close context menu
 			m.contextMenuOpen = false
-			return m, nil
+			return m, nil, true
 
 		case "up", "k":
 			// Navigate up in menu, skipping separators
@@ -1135,7 +1185,7 @@ rm -f "$0"
 					break
 				}
 			}
-			return m, nil
+			return m, nil, true
 
 		case "down", "j":
 			// Navigate down in menu, skipping separators
@@ -1151,16 +1201,20 @@ rm -f "$0"
 					break
 				}
 			}
-			return m, nil
+			return m, nil, true
 
 		case "enter":
 			// Execute selected menu action
-			return m.executeContextMenuAction()
+			nm, nc := m.executeContextMenuAction()
+			return nm, nc, true
 		}
-		return m, nil
+		return m, nil, true
 	}
+	return m, nil, false
+}
 
-	// Handle search mode input (/ key for directory search)
+// handleSearchKeys handles the file-list directory search ("/") mode.
+func (m model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	if m.searchMode {
 		switch msg.String() {
 		case "esc":
@@ -1170,7 +1224,7 @@ rm -f "$0"
 			m.filteredIndices = nil
 			m.markTreeItemsDirty()
 			m.cursor = 0 // Reset cursor
-			return m, nil
+			return m, nil, true
 
 		case "backspace":
 			// Delete last character from search query
@@ -1184,12 +1238,12 @@ rm -f "$0"
 					m.cursor = 0
 				}
 			}
-			return m, nil
+			return m, nil, true
 
 		case "enter":
 			// Accept search and exit search mode (keep filter active)
 			m.searchMode = false
-			return m, nil
+			return m, nil, true
 
 		default:
 			// Add printable characters to search query
@@ -1214,10 +1268,15 @@ rm -f "$0"
 					}
 				}
 			}
-			return m, nil
+			return m, nil, true
 		}
 	}
+	return m, nil, false
+}
 
+// handleMainKeys handles command-prompt input and the main file-browser key switch.
+// This is the terminal handler in the dispatch chain and always reports handled=true.
+func (m model) handleMainKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	// Handle command prompt input (focus-based: only active when commandFocused)
 	// NOTE: File picker mode is now handled at top of function (PRIORITY 1)
 	// Defense in depth: clamp cursor position in case any code path cleared or
@@ -1245,7 +1304,7 @@ rm -f "$0"
 			cmdLower := strings.ToLower(strings.TrimSpace(cmd))
 			if cmdLower == "exit" || cmdLower == "quit" {
 				m.saveCommandHistory() // Save before quitting
-				return m, tea.Quit
+				return m, tea.Quit, true
 			}
 
 			// Check for ! prefix - run command and exit TFE
@@ -1253,7 +1312,7 @@ rm -f "$0"
 				actualCmd := strings.TrimPrefix(cmd, "!")
 				actualCmd = strings.TrimSpace(actualCmd)
 				if actualCmd != "" {
-					return m, runCommandAndExit(actualCmd, m.currentPath)
+					return m, runCommandAndExit(actualCmd, m.currentPath), true
 				}
 			}
 
@@ -1261,9 +1320,9 @@ rm -f "$0"
 			if handled, ghostCmd := m.handleQuestionPrefix(cmd); handled {
 				if ghostCmd != nil {
 					m.ghostTextLoading = true
-					return m, ghostCmd
+					return m, ghostCmd, true
 				}
-				return m, nil
+				return m, nil, true
 			}
 
 			// Handle cd command specially (change TFE's directory instead of subprocess)
@@ -1278,19 +1337,19 @@ rm -f "$0"
 					homeDir, err := os.UserHomeDir()
 					if err != nil {
 						m.setStatusMessage("Error: Could not find home directory", true)
-						return m, nil
+						return m, nil, true
 					}
 					newPath = homeDir
 				} else if pathArg == "-" {
 					// cd - goes to previous directory (if we had one saved)
 					m.setStatusMessage("cd -: Previous directory not implemented yet", true)
-					return m, nil
+					return m, nil, true
 				} else if strings.HasPrefix(pathArg, "~/") {
 					// Expand ~ in path
 					homeDir, err := os.UserHomeDir()
 					if err != nil {
 						m.setStatusMessage("Error: Could not find home directory", true)
-						return m, nil
+						return m, nil, true
 					}
 					newPath = filepath.Join(homeDir, pathArg[2:])
 				} else if filepath.IsAbs(pathArg) {
@@ -1319,11 +1378,11 @@ rm -f "$0"
 				} else {
 					m.setStatusMessage(fmt.Sprintf("cd: %s: No such directory", pathArg), true)
 				}
-				return m, nil
+				return m, nil, true
 			}
 
 			// Normal command - suspend TFE and return
-			return m, runCommand(cmd, m.currentPath)
+			return m, runCommand(cmd, m.currentPath), true
 		}
 		// If not in command mode or no input, handle Enter for file navigation (below)
 
@@ -1334,7 +1393,7 @@ rm -f "$0"
 			_, size := utf8.DecodeLastRuneInString(m.commandInput[:m.commandCursorPos])
 			m.commandInput = m.commandInput[:m.commandCursorPos-size] + m.commandInput[m.commandCursorPos:]
 			m.commandCursorPos -= size
-			return m, nil
+			return m, nil, true
 		}
 		// If no command input, backspace does nothing
 
@@ -1344,28 +1403,28 @@ rm -f "$0"
 			// Delete the rune at the cursor (rune-aware to avoid splitting multibyte UTF-8)
 			_, size := utf8.DecodeRuneInString(m.commandInput[m.commandCursorPos:])
 			m.commandInput = m.commandInput[:m.commandCursorPos] + m.commandInput[m.commandCursorPos+size:]
-			return m, nil
+			return m, nil, true
 		}
 
 	case "home", "ctrl+a":
 		// Move cursor to beginning of command input
 		if m.commandFocused {
 			m.commandCursorPos = 0
-			return m, nil
+			return m, nil, true
 		}
 
 	case "end", "ctrl+e":
 		// Move cursor to end of command input
 		if m.commandFocused {
 			m.commandCursorPos = len(m.commandInput)
-			return m, nil
+			return m, nil, true
 		}
 
 	case "ctrl+k":
 		// Delete from cursor to end of line
 		if m.commandFocused {
 			m.commandInput = m.commandInput[:m.commandCursorPos]
-			return m, nil
+			return m, nil, true
 		}
 
 	case "ctrl+u":
@@ -1373,7 +1432,7 @@ rm -f "$0"
 		if m.commandFocused {
 			m.commandInput = m.commandInput[m.commandCursorPos:]
 			m.commandCursorPos = 0
-			return m, nil
+			return m, nil, true
 		}
 
 	case "ctrl+left", "alt+left", "alt+b":
@@ -1394,7 +1453,7 @@ rm -f "$0"
 				pos++
 			}
 			m.commandCursorPos = pos
-			return m, nil
+			return m, nil, true
 		}
 
 	case "ctrl+right", "alt+right", "alt+f":
@@ -1411,7 +1470,7 @@ rm -f "$0"
 				pos++
 			}
 			m.commandCursorPos = pos
-			return m, nil
+			return m, nil, true
 		}
 
 	case "esc":
@@ -1420,19 +1479,19 @@ rm -f "$0"
 			// If ghost text is showing, dismiss it first (don't exit command mode)
 			if m.ghostText != "" {
 				m.clearGhostText()
-				return m, nil
+				return m, nil, true
 			}
 			m.commandInput = ""
 			m.commandCursorPos = 0
 			m.commandFocused = false
 			m.clearGhostText()
-			return m, nil
+			return m, nil, true
 		}
 		// If there's leftover command input (but not focused), clear it
 		if m.commandInput != "" {
 			m.commandInput = ""
 			m.commandCursorPos = 0
-			return m, nil
+			return m, nil, true
 		}
 		// If no command input, handle Esc for dual-pane exit (below)
 
@@ -1442,7 +1501,7 @@ rm -f "$0"
 			m.commandFocused = true
 			m.commandInput = ""
 			m.commandCursorPos = 0
-			return m, nil
+			return m, nil, true
 		}
 		// If already in command mode, add the colon to input
 	}
@@ -1461,14 +1520,14 @@ rm -f "$0"
 
 			// Only process if not a special key
 			if len(text) > 0 && !isSpecialKey(msg.String()) {
-			// Check if it's printable text
-			isPrintable := true
-			for _, r := range msg.Runes {
-				if r < 32 || r == 127 { // Control characters
-					isPrintable = false
-					break
+				// Check if it's printable text
+				isPrintable := true
+				for _, r := range msg.Runes {
+					if r < 32 || r == 127 { // Control characters
+						isPrintable = false
+						break
+					}
 				}
-			}
 				if isPrintable {
 					// Strip ANSI codes to prevent pasted styled text from corrupting command line
 					cleanText := stripANSI(text)
@@ -1476,7 +1535,7 @@ rm -f "$0"
 					m.commandInput = m.commandInput[:m.commandCursorPos] + cleanText + m.commandInput[m.commandCursorPos:]
 					m.commandCursorPos += len(cleanText)
 					m.historyPos = len(m.commandHistory)
-					return m, nil
+					return m, nil, true
 				}
 			}
 		}
@@ -1491,7 +1550,7 @@ rm -f "$0"
 		return m, tea.Sequence(
 			tea.ClearScreen,
 			m.launchFuzzySearch(),
-		)
+		), true
 
 	case "/":
 		// /: Enter directory search mode (filter files by name)
@@ -1502,39 +1561,39 @@ rm -f "$0"
 			m.filteredIndices = m.filterFilesBySearch("")
 			m.markTreeItemsDirty()
 		}
-		return m, nil
+		return m, nil, true
 
 	case "f10", "ctrl+c":
 		// F10: Quit (replaces q)
 		m.saveCommandHistory() // Save before quitting
 		m.closeWatcher()       // Stop file watcher
-		return m, tea.Quit
+		return m, tea.Quit, true
 
 	case "ctrl+z":
 		// Ctrl+Z: Suspend TFE and drop to shell
 		// User can check background processes, view logs, etc.
 		// Type 'fg' to resume TFE
-		return m, tea.Suspend
+		return m, tea.Suspend, true
 
 	case "ctrl+o":
 		// Ctrl+O: Open current directory in system file explorer
 		// WSL: Opens in Windows Explorer
 		// Linux: Opens in default file manager (via xdg-open)
 		// macOS: Opens in Finder
-		return m, openInFileExplorer(m.currentPath)
+		return m, openInFileExplorer(m.currentPath), true
 
 	case "alt+right":
 		// Alt+Right: Next tab (when tabs are open and command not focused)
 		if !m.commandFocused && len(m.tabs) > 1 {
 			m.nextTab()
-			return m, nil
+			return m, nil, true
 		}
 
 	case "alt+left":
 		// Alt+Left: Previous tab (when tabs are open and command not focused)
 		if !m.commandFocused && len(m.tabs) > 1 {
 			m.prevTab()
-			return m, nil
+			return m, nil, true
 		}
 
 	case "esc":
@@ -1558,14 +1617,14 @@ rm -f "$0"
 				m.commandInput = m.getPreviousCommand()
 				m.commandCursorPos = len(m.commandInput) // Move cursor to end
 			}
-			return m, nil
+			return m, nil, true
 		}
 		// Otherwise fall through to file navigation
 		fallthrough
 	case "k":
 		// Block vim navigation when command is focused
 		if m.commandFocused {
-			return m, nil
+			return m, nil, true
 		}
 		// Clear menu focus when navigating to files
 		if m.menuBarFocused || m.highlightedMenu != "" {
@@ -1603,14 +1662,14 @@ rm -f "$0"
 				m.commandInput = m.getNextCommand()
 				m.commandCursorPos = len(m.commandInput) // Move cursor to end
 			}
-			return m, nil
+			return m, nil, true
 		}
 		// Otherwise fall through to file navigation
 		fallthrough
 	case "j":
 		// Block vim navigation when command is focused
 		if m.commandFocused {
-			return m, nil
+			return m, nil, true
 		}
 		// Clear menu focus when navigating to files
 		if m.menuBarFocused || m.highlightedMenu != "" {
@@ -1654,7 +1713,7 @@ rm -f "$0"
 					// Reload files to show the new folder instead of the helper
 					m.loadFiles()
 				}
-				return m, nil
+				return m, nil, true
 			}
 
 			// If in favorites mode, check if we need to navigate to a different directory
@@ -1692,10 +1751,10 @@ rm -f "$0"
 					m.loadPreview(currentFile.path)
 					m.viewMode = viewFullPreview
 					m.searchMode = false // Disable search mode in preview
-					m.calculateLayout() // Update widths for full-screen
+					m.calculateLayout()  // Update widths for full-screen
 					// Populate cache synchronously for full preview (user expects instant display)
 					m.populatePreviewCache()
-					return m, nil
+					return m, nil, true
 				}
 			} else if m.showChangesOnly {
 				// Changes mode: open file as a tab for review
@@ -1715,7 +1774,7 @@ rm -f "$0"
 						m.focusedPane = rightPane
 						m.calculateLayout()
 					}
-					return m, nil
+					return m, nil, true
 				}
 			} else if m.showGitReposOnly {
 				if currentFile.name == ".." {
@@ -1759,7 +1818,7 @@ rm -f "$0"
 				m.calculateLayout() // Update widths for full-screen
 				// Populate cache synchronously for full preview (user expects instant display)
 				m.populatePreviewCache()
-				return m, nil
+				return m, nil, true
 			}
 		}
 
@@ -1767,7 +1826,7 @@ rm -f "$0"
 		// Priority -1: Accept ghost text suggestion in command mode
 		if m.commandFocused && m.ghostText != "" {
 			m.acceptGhostText()
-			return m, nil
+			return m, nil, true
 		}
 
 		// Priority 0: Prompt edit mode in dual-pane (when right pane focused on a prompt)
@@ -1787,7 +1846,7 @@ rm -f "$0"
 					}
 				}
 			}
-			return m, nil
+			return m, nil, true
 		}
 
 		// Priority 1: In dual-pane mode: cycle focus between left and right pane
@@ -1806,7 +1865,7 @@ rm -f "$0"
 			// Check if current display mode supports dual-pane
 			if !m.isDualPaneCompatible() {
 				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 3)", true)
-				return m, nil
+				return m, nil, true
 			}
 			// Enter dual-pane mode
 			m.viewMode = viewDualPane
@@ -1825,7 +1884,7 @@ rm -f "$0"
 			// Check if current display mode supports dual-pane
 			if !m.isDualPaneCompatible() {
 				m.setStatusMessage("Dual-pane mode requires List or Tree view (press 1 or 3)", true)
-				return m, nil
+				return m, nil, true
 			}
 			m.viewMode = viewDualPane
 			m.focusedPane = leftPane
@@ -1847,7 +1906,7 @@ rm -f "$0"
 			// Check if this is an image or HTML file
 			if isBrowserFile(currentFile.path) {
 				// Open in browser
-				return m, openInBrowser(currentFile.path)
+				return m, openInBrowser(currentFile.path), true
 			} else {
 				// Open in full-screen preview
 				m.loadPreview(currentFile.path)
@@ -1857,17 +1916,17 @@ rm -f "$0"
 				m.searchQuery = ""
 				m.filteredIndices = nil
 				m.markTreeItemsDirty()
-				m.calculateLayout() // Update widths for full-screen
+				m.calculateLayout()      // Update widths for full-screen
 				m.populatePreviewCache() // Repopulate cache with correct width
 				// Clear screen for clean rendering
-				return m, tea.ClearScreen
+				return m, tea.ClearScreen, true
 			}
 		}
 
 	case "pageup", "pgup":
 		// If command prompt is focused, don't navigate
 		if m.commandFocused {
-			return m, nil
+			return m, nil, true
 		}
 		if m.viewMode == viewDualPane {
 			// In dual-pane mode, check which pane is focused
@@ -1899,7 +1958,7 @@ rm -f "$0"
 	case "pagedown", "pgdn", "pgdown":
 		// If command prompt is focused, don't navigate
 		if m.commandFocused {
-			return m, nil
+			return m, nil, true
 		}
 		if m.viewMode == viewDualPane {
 			// In dual-pane mode, check which pane is focused
@@ -1946,7 +2005,7 @@ rm -f "$0"
 				_, size := utf8.DecodeLastRuneInString(m.commandInput[:m.commandCursorPos])
 				m.commandCursorPos -= size
 			}
-			return m, nil
+			return m, nil, true
 		}
 		// PRIORITY: In detail mode on narrow terminals, scroll left (most important use case)
 		// On narrow terminals (phones), horizontal scrolling is more useful than tree navigation
@@ -1958,7 +2017,7 @@ rm -f "$0"
 					m.detailScrollX = 0
 				}
 			}
-			return m, nil
+			return m, nil, true
 		}
 		// In tree mode: collapse folder or go to parent
 		// In other modes: go to parent directory
@@ -1997,7 +2056,7 @@ rm -f "$0"
 			m.activeMenu = "help"
 			m.highlightedMenu = "help"
 			m.selectedMenuItem = m.getFirstSelectableMenuItem("help")
-			return m, nil
+			return m, nil, true
 		}
 
 	case "right":
@@ -2011,7 +2070,7 @@ rm -f "$0"
 				// At end of input with ghost text: accept the suggestion
 				m.acceptGhostText()
 			}
-			return m, nil
+			return m, nil, true
 		}
 		// PRIORITY: In detail mode on narrow terminals, scroll right (most important use case)
 		// On narrow terminals (phones), horizontal scrolling is more useful than navigation
@@ -2054,7 +2113,7 @@ rm -f "$0"
 				m.detailScrollX = maxScroll
 			}
 
-			return m, nil
+			return m, nil, true
 		}
 		// In tree mode: expand folder or navigate into it
 		// In other modes: navigate into selected directory
@@ -2119,7 +2178,7 @@ rm -f "$0"
 			m.activeMenu = "file"
 			m.highlightedMenu = "file"
 			m.selectedMenuItem = m.getFirstSelectableMenuItem("file")
-			return m, nil
+			return m, nil, true
 		}
 
 	case "e", "E":
@@ -2130,7 +2189,7 @@ rm -f "$0"
 			m.activeMenu = "edit"
 			m.highlightedMenu = "edit"
 			m.selectedMenuItem = m.getFirstSelectableMenuItem("edit")
-			return m, nil
+			return m, nil, true
 		}
 
 	case "v", "V":
@@ -2141,7 +2200,7 @@ rm -f "$0"
 			m.activeMenu = "view"
 			m.highlightedMenu = "view"
 			m.selectedMenuItem = m.getFirstSelectableMenuItem("view")
-			return m, nil
+			return m, nil, true
 		}
 
 	case "t":
@@ -2156,7 +2215,7 @@ rm -f "$0"
 					m.focusedPane = rightPane
 					m.calculateLayout()
 				}
-				return m, nil
+				return m, nil, true
 			}
 		}
 		// Fall through to open Tools menu
@@ -2166,7 +2225,7 @@ rm -f "$0"
 			m.activeMenu = "tools"
 			m.highlightedMenu = "tools"
 			m.selectedMenuItem = m.getFirstSelectableMenuItem("tools")
-			return m, nil
+			return m, nil, true
 		}
 
 	case "T":
@@ -2189,7 +2248,7 @@ rm -f "$0"
 				}
 				m.setStatusMessage(fmt.Sprintf("Opened %d files as tabs", opened), false)
 			}
-			return m, nil
+			return m, nil, true
 		}
 		// Fall through to open Tools menu
 		if !m.menuBarFocused && !m.menuOpen {
@@ -2198,7 +2257,7 @@ rm -f "$0"
 			m.activeMenu = "tools"
 			m.highlightedMenu = "tools"
 			m.selectedMenuItem = m.getFirstSelectableMenuItem("tools")
-			return m, nil
+			return m, nil, true
 		}
 
 	case "1":
@@ -2248,14 +2307,14 @@ rm -f "$0"
 	case "f4":
 		// F4: Open file with appropriate viewer/editor
 		if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
-			return m, m.openFileWithBestTool(currentFile.path)
+			return m, m.openFileWithBestTool(currentFile.path), true
 		}
 
 	case "n", "N":
 		// Edit file in nano specifically
 		if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
 			if editorAvailable("nano") {
-				return m, openEditor("nano", currentFile.path)
+				return m, openEditor("nano", currentFile.path), true
 			}
 		}
 
@@ -2266,7 +2325,7 @@ rm -f "$0"
 			if f := m.getCurrentFile(); f != nil && f.isDir {
 				dir = f.path
 			}
-			return m, tmuxSmartSplit("", dir)
+			return m, tmuxSmartSplit("", dir), true
 		}
 
 	case "W":
@@ -2277,7 +2336,7 @@ rm -f "$0"
 				if editor == "" {
 					editor = "micro"
 				}
-				return m, tmuxSmartSplit(fmt.Sprintf("%s %s", editor, shellQuote(f.path)), filepath.Dir(f.path))
+				return m, tmuxSmartSplit(fmt.Sprintf("%s %s", editor, shellQuote(f.path)), filepath.Dir(f.path)), true
 			}
 		}
 
@@ -2298,7 +2357,7 @@ rm -f "$0"
 					} else {
 						m.setStatusMessage("✓ Prompt copied to clipboard", false)
 					}
-					return m, nil
+					return m, nil, true
 				}
 			}
 
@@ -2333,7 +2392,7 @@ rm -f "$0"
 	case "ctrl+a":
 		// Ctrl+A: Toggle agent conversation viewer
 		m.toggleAgentView()
-		return m, nil
+		return m, nil, true
 
 	case "ctrl+g":
 		// Ctrl+G: Toggle git changes filter (show modified/untracked files)
@@ -2351,7 +2410,7 @@ rm -f "$0"
 			} else {
 				m.setStatusMessage("File preview enabled", false)
 			}
-			return m, nil
+			return m, nil, true
 		}
 
 	case "y":
@@ -2362,7 +2421,7 @@ rm -f "$0"
 				diff, err := m.getFileDiff(currentFile.path, statusCode)
 				if err != nil {
 					m.setStatusMessage(fmt.Sprintf("Failed to get diff: %s", err), true)
-					return m, nil
+					return m, nil, true
 				}
 				// Format as markdown with file path header and diff code fence
 				gitRoot := m.resolveGitRoot()
@@ -2378,7 +2437,7 @@ rm -f "$0"
 				} else {
 					m.setStatusMessage(fmt.Sprintf("Copied diff for %s to clipboard", filepath.Base(relPath)), false)
 				}
-				return m, nil
+				return m, nil, true
 			}
 		}
 
@@ -2411,14 +2470,14 @@ rm -f "$0"
 			}
 			if copied == 0 {
 				m.setStatusMessage("No diffs available to copy", true)
-				return m, nil
+				return m, nil, true
 			}
 			if err := copyToClipboard(allDiffs.String()); err != nil {
 				m.setStatusMessage(fmt.Sprintf("Failed to copy diffs: %s", err), true)
 			} else {
 				m.setStatusMessage(fmt.Sprintf("Copied diffs for %d files to clipboard", copied), false)
 			}
-			return m, nil
+			return m, nil, true
 		}
 
 	case "f11":
@@ -2459,11 +2518,11 @@ rm -f "$0"
 			if m.viewMode != viewDualPane {
 				m.viewMode = viewFullPreview
 			}
-			m.searchMode = false // Disable search mode in preview
-			m.calculateLayout() // Update widths for appropriate view mode
+			m.searchMode = false     // Disable search mode in preview
+			m.calculateLayout()      // Update widths for appropriate view mode
 			m.populatePreviewCache() // Repopulate cache with correct width
 			// Clear screen for clean rendering
-			return m, tea.ClearScreen
+			return m, tea.ClearScreen, true
 		}
 
 	case "f2":
@@ -2504,17 +2563,17 @@ rm -f "$0"
 			input:      "",
 		}
 		m.showDialog = true
-		return m, tea.ClearScreen
+		return m, tea.ClearScreen, true
 
 	case "f8":
 		// F8: Delete file/folder
 		if len(m.files) == 0 || m.cursor >= len(m.files) {
-			return m, nil
+			return m, nil, true
 		}
 
 		currentFile := m.getCurrentFile()
 		if currentFile == nil || currentFile.name == ".." {
-			return m, nil // Can't delete parent
+			return m, nil, true // Can't delete parent
 		}
 
 		// Show confirmation dialog
@@ -2529,7 +2588,7 @@ rm -f "$0"
 			message:    fmt.Sprintf("Delete '%s'?\nThis cannot be undone.", currentFile.name),
 		}
 		m.showDialog = true
-		return m, tea.ClearScreen
+		return m, tea.ClearScreen, true
 
 	case "ctrl+,":
 		// Ctrl+,: Open settings panel
@@ -2542,13 +2601,13 @@ rm -f "$0"
 		m.settingsCursor = 0
 		m.settingsEditing = false
 		m.settingsInput = ""
-		return m, tea.ClearScreen
+		return m, tea.ClearScreen, true
 
-	// Default case removed - command input is now focus-based (press : to enter command mode)
-	// This prevents stray characters (including terminal response sequences) from leaking into command prompt
+		// Default case removed - command input is now focus-based (press : to enter command mode)
+		// This prevents stray characters (including terminal response sequences) from leaking into command prompt
 	}
 
-	return m, nil
+	return m, nil, true
 }
 
 // handlePreviewOnlyKeyEvent handles keyboard input in standalone preview mode
