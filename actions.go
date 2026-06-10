@@ -238,6 +238,50 @@ func (m *model) toggleGitRepos() {
 	m.loadFiles()
 }
 
+// maxPreviewScroll returns the maximum valid preview scroll position, i.e. the
+// largest scrollPos that still keeps content on screen. It is the single source
+// of truth for preview scroll bounds (e.g. any scroll-indicator line
+// reservation belongs here). Always >= 0.
+// Used by: keyboard/mouse preview scrolling helpers below.
+func (m *model) maxPreviewScroll() int {
+	maxScroll := m.getWrappedLineCount() - m.getPreviewVisibleLines()
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	return maxScroll
+}
+
+// scrollPreviewBy adjusts the preview scroll position by delta (negative scrolls
+// up, positive scrolls down), clamping the result to [0, maxPreviewScroll()].
+// Used by: keyboard up/down/pageup/pagedown and mouse wheel handlers.
+func (m *model) scrollPreviewBy(delta int) {
+	pos := m.preview.scrollPos + delta
+	if pos < 0 {
+		pos = 0
+	}
+	if max := m.maxPreviewScroll(); pos > max {
+		pos = max
+	}
+	m.preview.scrollPos = pos
+}
+
+// scrollPreviewByPage scrolls the preview by one visible page. direction < 0
+// scrolls up, direction >= 0 scrolls down. Result is clamped to valid bounds.
+// Used by: keyboard pageup/pagedown handlers.
+func (m *model) scrollPreviewByPage(direction int) {
+	page := m.getPreviewVisibleLines()
+	if direction < 0 {
+		page = -page
+	}
+	m.scrollPreviewBy(page)
+}
+
+// scrollPreviewToBottom scrolls the preview to its last valid position.
+// Used by: keyboard end/G in full-preview mode.
+func (m *model) scrollPreviewToBottom() {
+	m.preview.scrollPos = m.maxPreviewScroll()
+}
+
 // toggleDualPane toggles between single-pane and dual-pane view modes.
 // Used by: menu (toggle-dual-pane).
 func (m *model) toggleDualPane() {

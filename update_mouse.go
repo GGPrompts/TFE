@@ -91,22 +91,10 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
 			// Scroll 3 lines per wheel tick for smoother scrolling
-			m.preview.scrollPos -= 3
-			if m.preview.scrollPos < 0 {
-				m.preview.scrollPos = 0
-			}
+			m.scrollPreviewBy(-3)
 		case tea.MouseButtonWheelDown:
-			totalLines := m.getWrappedLineCount()
-			visibleLines := m.getPreviewVisibleLines()
-			maxScroll := totalLines - visibleLines
-			if maxScroll < 0 {
-				maxScroll = 0
-			}
 			// Scroll 3 lines per wheel tick for smoother scrolling
-			m.preview.scrollPos += 3
-			if m.preview.scrollPos > maxScroll {
-				m.preview.scrollPos = maxScroll
-			}
+			m.scrollPreviewBy(3)
 		}
 		return m, nil
 	}
@@ -1085,10 +1073,7 @@ git pull
 
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 			// Scroll preview up when right pane focused (3 lines per tick)
-			m.preview.scrollPos -= 3
-			if m.preview.scrollPos < 0 {
-				m.preview.scrollPos = 0
-			}
+			m.scrollPreviewBy(-3)
 		} else {
 			// Scroll file list
 			if m.cursor > 0 {
@@ -1129,16 +1114,7 @@ git pull
 
 		if m.viewMode == viewDualPane && m.focusedPane == rightPane {
 			// Scroll preview down when right pane focused (3 lines per tick)
-			visibleLines := m.getPreviewVisibleLines()
-			totalLines := m.getWrappedLineCount()
-			maxScroll := totalLines - visibleLines
-			if maxScroll < 0 {
-				maxScroll = 0
-			}
-			m.preview.scrollPos += 3
-			if m.preview.scrollPos > maxScroll {
-				m.preview.scrollPos = maxScroll
-			}
+			m.scrollPreviewBy(3)
 		} else {
 			// Scroll file list
 			maxCursor := m.getMaxCursor()

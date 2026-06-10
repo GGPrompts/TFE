@@ -441,46 +441,23 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "up":
 			// Scroll preview up (allow scrolling while editing)
 			// Note: "k" intentionally not bound here — it must insert into the variable
-			if m.preview.scrollPos > 0 {
-				m.preview.scrollPos--
-			}
+			m.scrollPreviewBy(-1)
 			return m, nil
 
 		case "down":
 			// Scroll preview down (allow scrolling while editing)
 			// Note: "j" intentionally not bound here — it must insert into the variable
-			totalLines := m.getWrappedLineCount()
-			visibleLines := m.getPreviewVisibleLines()
-			maxScroll := totalLines - visibleLines
-			if maxScroll < 0 {
-				maxScroll = 0
-			}
-			if m.preview.scrollPos < maxScroll {
-				m.preview.scrollPos++
-			}
+			m.scrollPreviewBy(1)
 			return m, nil
 
 		case "pageup", "pgup":
 			// Page up (allow scrolling while editing)
-			visibleLines := m.getPreviewVisibleLines()
-			m.preview.scrollPos -= visibleLines
-			if m.preview.scrollPos < 0 {
-				m.preview.scrollPos = 0
-			}
+			m.scrollPreviewByPage(-1)
 			return m, nil
 
 		case "pagedown", "pgdn", "pgdown":
 			// Page down (allow scrolling while editing)
-			totalLines := m.getWrappedLineCount()
-			visibleLines := m.getPreviewVisibleLines()
-			maxScroll := totalLines - visibleLines
-			if maxScroll < 0 {
-				maxScroll = 0
-			}
-			m.preview.scrollPos += visibleLines
-			if m.preview.scrollPos > maxScroll {
-				m.preview.scrollPos = maxScroll
-			}
+			m.scrollPreviewByPage(1)
 			return m, nil
 
 		default:
@@ -818,40 +795,17 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		case "up", "k":
 			// Scroll preview up
-			if m.preview.scrollPos > 0 {
-				m.preview.scrollPos--
-			}
+			m.scrollPreviewBy(-1)
 
 		case "down", "j":
 			// Scroll preview down
-			totalLines := m.getWrappedLineCount()
-			visibleLines := m.getPreviewVisibleLines()
-			maxScroll := totalLines - visibleLines
-			if maxScroll < 0 {
-				maxScroll = 0
-			}
-			if m.preview.scrollPos < maxScroll {
-				m.preview.scrollPos++
-			}
+			m.scrollPreviewBy(1)
 
 		case "pageup", "pgup":
-			visibleLines := m.getPreviewVisibleLines()
-			m.preview.scrollPos -= visibleLines
-			if m.preview.scrollPos < 0 {
-				m.preview.scrollPos = 0
-			}
+			m.scrollPreviewByPage(-1)
 
 		case "pagedown", "pgdn", "pgdown":
-			totalLines := m.getWrappedLineCount()
-			visibleLines := m.getPreviewVisibleLines()
-			maxScroll := totalLines - visibleLines
-			if maxScroll < 0 {
-				maxScroll = 0
-			}
-			m.preview.scrollPos += visibleLines
-			if m.preview.scrollPos > maxScroll {
-				m.preview.scrollPos = maxScroll
-			}
+			m.scrollPreviewByPage(1)
 		}
 		return m, nil
 	}
@@ -1628,9 +1582,7 @@ rm -f "$0"
 				}
 			} else {
 				// Scroll preview up
-				if m.preview.scrollPos > 0 {
-					m.preview.scrollPos--
-				}
+				m.scrollPreviewBy(-1)
 			}
 		} else {
 			// Single-pane mode: just move cursor
@@ -1676,15 +1628,7 @@ rm -f "$0"
 				}
 			} else {
 				// Scroll preview down
-				visibleLines := m.getPreviewVisibleLines()
-				totalLines := m.getWrappedLineCount()
-				maxScroll := totalLines - visibleLines
-				if maxScroll < 0 {
-					maxScroll = 0
-				}
-				if m.preview.scrollPos < maxScroll {
-					m.preview.scrollPos++
-				}
+				m.scrollPreviewBy(1)
 			}
 		} else {
 			// Single-pane mode: just move cursor
@@ -1937,11 +1881,7 @@ rm -f "$0"
 				}
 			} else {
 				// Page up in preview pane
-				visibleLines := m.getPreviewVisibleLines()
-				m.preview.scrollPos -= visibleLines
-				if m.preview.scrollPos < 0 {
-					m.preview.scrollPos = 0
-				}
+				m.scrollPreviewByPage(-1)
 			}
 		} else if m.viewMode != viewFullPreview {
 			// Single-pane mode: page up in file list
@@ -1978,16 +1918,7 @@ rm -f "$0"
 				}
 			} else {
 				// Page down in preview pane
-				visibleLines := m.getPreviewVisibleLines()
-				totalLines := m.getWrappedLineCount()
-				maxScroll := totalLines - visibleLines
-				if maxScroll < 0 {
-					maxScroll = 0
-				}
-				m.preview.scrollPos += visibleLines
-				if m.preview.scrollPos > maxScroll {
-					m.preview.scrollPos = maxScroll
-				}
+				m.scrollPreviewByPage(1)
 			}
 		} else if m.viewMode != viewFullPreview {
 			// Single-pane mode: page down in file list
@@ -2660,40 +2591,17 @@ func (m model) handlePreviewOnlyKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "up", "k":
 		// Scroll preview up
-		if m.preview.scrollPos > 0 {
-			m.preview.scrollPos--
-		}
+		m.scrollPreviewBy(-1)
 
 	case "down", "j":
 		// Scroll preview down
-		totalLines := m.getWrappedLineCount()
-		visibleLines := m.getPreviewVisibleLines()
-		maxScroll := totalLines - visibleLines
-		if maxScroll < 0 {
-			maxScroll = 0
-		}
-		if m.preview.scrollPos < maxScroll {
-			m.preview.scrollPos++
-		}
+		m.scrollPreviewBy(1)
 
 	case "pageup", "pgup":
-		visibleLines := m.getPreviewVisibleLines()
-		m.preview.scrollPos -= visibleLines
-		if m.preview.scrollPos < 0 {
-			m.preview.scrollPos = 0
-		}
+		m.scrollPreviewByPage(-1)
 
 	case "pagedown", "pgdn", "pgdown":
-		totalLines := m.getWrappedLineCount()
-		visibleLines := m.getPreviewVisibleLines()
-		maxScroll := totalLines - visibleLines
-		if maxScroll < 0 {
-			maxScroll = 0
-		}
-		m.preview.scrollPos += visibleLines
-		if m.preview.scrollPos > maxScroll {
-			m.preview.scrollPos = maxScroll
-		}
+		m.scrollPreviewByPage(1)
 
 	case "home", "g":
 		// Scroll to top
@@ -2701,13 +2609,7 @@ func (m model) handlePreviewOnlyKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "end", "G":
 		// Scroll to bottom
-		totalLines := m.getWrappedLineCount()
-		visibleLines := m.getPreviewVisibleLines()
-		maxScroll := totalLines - visibleLines
-		if maxScroll < 0 {
-			maxScroll = 0
-		}
-		m.preview.scrollPos = maxScroll
+		m.scrollPreviewToBottom()
 
 	case "ctrl+f", "/":
 		// Activate search mode in preview

@@ -95,3 +95,147 @@ func TestOpenFileWithBestTool_TextEditor(t *testing.T) {
 		t.Errorf("statusMessage = %q, expected none", m.statusMessage)
 	}
 }
+
+// newPreviewScrollModel builds a model in standalone-preview mode whose
+// getWrappedLineCount() and getPreviewVisibleLines() return deterministic
+// values, so the scroll-clamp helpers (tfe-o5f) can be tested in isolation.
+//
+// Content is numLines short single-character lines; with a wide width each
+// wraps to exactly one display line, so getWrappedLineCount() == numLines.
+// In previewOnly mode getPreviewVisibleLines() == max(3, height-4).
+func newPreviewScrollModel(numLines, height int) model {
+	content := make([]string, numLines)
+	for i := range content {
+		content[i] = "x"
+	}
+	m := model{
+		previewOnly: true,
+		width:       200,
+		height:      height,
+	}
+	m.preview.loaded = true
+	m.preview.content = content
+	return m
+}
+
+// TestMaxPreviewScroll verifies maxPreviewScroll() == max(0, total-visible)
+// and never returns a negative value.
+func TestMaxPreviewScroll(t *testing.T) {
+	cases := []struct {
+		name      string
+		numLines  int
+		height    int
+		wantTotal int
+		wantVis   int
+		want      int
+	}{
+		// height-4 visible lines (>=3); content overflows the viewport.
+		{"overflow", 100, 24, 100, 20, 80},
+		// Exactly fills the viewport: no scrolling possible.
+		{"exact", 20, 24, 20, 20, 0},
+		// Fewer lines than the viewport: clamps to 0, never negative.
+		{"underflow", 5, 24, 5, 20, 0},
+		// visibleLines floors at 3 in previewOnly mode.
+		{"min-visible", 10, 5, 10, 3, 7},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newPreviewScrollModel(tc.numLines, tc.height)
+			if got := m.getWrappedLineCount(); got != tc.wantTotal {
+				t.Fatalf("getWrappedLineCount() = %d, want %d (setup invalid)", got, tc.wantTotal)
+			}
+			if got := m.getPreviewVisibleLines(); got != tc.wantVis {
+				t.Fatalf("getPreviewVisibleLines() = %d, want %d (setup invalid)", got, tc.wantVis)
+			}
+			if got := m.maxPreviewScroll(); got != tc.want {
+				t.Errorf("maxPreviewScroll() = %d, want %d", got, tc.want)
+			}
+			if m.maxPreviewScroll() < 0 {
+				t.Errorf("maxPreviewScroll() = %d, must never be negative", m.maxPreviewScroll())
+			}
+		})
+	}
+}
+
+// TestScrollPreviewBy verifies add-then-clamp behavior: the result is always
+// clamped into [0, maxPreviewScroll()], matching every call site it replaced.
+func TestScrollPreviewBy(t *testing.T) {
+	// 100 lines, height 24 => maxScroll 80.
+	cases := []struct {
+		name  string
+		start int
+		delta int
+		want  int
+	}{
+		{"down-one", 0, 1, 1},
+		{"up-one-from-mid", 10, -1, 9},
+		{"down-three-wheel", 0, 3, 3},
+		{"up-three-wheel", 2, -3, 0},     // clamps at lower bound
+		{"page-down", 0, 20, 20},
+		{"down-past-end-clamps", 70, 20, 80},
+		{"up-below-zero-clamps", 5, -20, 0},
+		{"at-max-stays", 80, 5, 80},
+		{"at-zero-up-stays", 0, -1, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newPreviewScrollModel(100, 24)
+			m.preview.scrollPos = tc.start
+			m.scrollPreviewBy(tc.delta)
+			if m.preview.scrollPos != tc.want {
+				t.Errorf("scrollPreviewBy(%d) from %d = %d, want %d", tc.delta, tc.start, m.preview.scrollPos, tc.want)
+			}
+		})
+	}
+}
+
+// TestScrollPreviewByPage verifies page scrolling moves by getPreviewVisibleLines()
+// in the requested direction, clamped to bounds.
+func TestScrollPreviewByPage(t *testing.T) {
+	m := newPreviewScrollModel(100, 24) // visible 20, maxScroll 80
+	if v := m.getPreviewVisibleLines(); v != 20 {
+		t.Fatalf("setup: getPreviewVisibleLines() = %d, want 20", v)
+	}
+
+	m.preview.scrollPos = 0
+	m.scrollPreviewByPage(1)
+	if m.preview.scrollPos != 20 {
+		t.Errorf("page down from 0 = %d, want 20", m.preview.scrollPos)
+	}
+
+	m.scrollPreviewByPage(-1)
+	if m.preview.scrollPos != 0 {
+		t.Errorf("page up back to 0 = %d, want 0", m.preview.scrollPos)
+	}
+
+	// Page up at the top stays at 0.
+	m.scrollPreviewByPage(-1)
+	if m.preview.scrollPos != 0 {
+		t.Errorf("page up at top = %d, want 0", m.preview.scrollPos)
+	}
+
+	// Page down near the end clamps to maxScroll.
+	m.preview.scrollPos = 75
+	m.scrollPreviewByPage(1)
+	if m.preview.scrollPos != 80 {
+		t.Errorf("page down near end = %d, want 80 (clamped)", m.preview.scrollPos)
+	}
+}
+
+// TestScrollPreviewToBottom verifies it lands exactly on maxPreviewScroll().
+func TestScrollPreviewToBottom(t *testing.T) {
+	m := newPreviewScrollModel(100, 24)
+	m.preview.scrollPos = 0
+	m.scrollPreviewToBottom()
+	if want := m.maxPreviewScroll(); m.preview.scrollPos != want {
+		t.Errorf("scrollPreviewToBottom() = %d, want %d", m.preview.scrollPos, want)
+	}
+
+	// When content fits entirely, bottom is 0.
+	m2 := newPreviewScrollModel(5, 24)
+	m2.preview.scrollPos = 3
+	m2.scrollPreviewToBottom()
+	if m2.preview.scrollPos != 0 {
+		t.Errorf("scrollPreviewToBottom() with fitting content = %d, want 0", m2.preview.scrollPos)
+	}
+}

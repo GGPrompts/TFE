@@ -77,11 +77,23 @@ func TestCommandInput_NegativeCursorClamped(t *testing.T) {
 // mode, plain letters must insert; arrows still scroll.
 func TestPromptEditMode_JKInsertIntoVariable(t *testing.T) {
 	newEditModel := func() model {
+		// Loaded preview with ample content and height so the consolidated
+		// scroll helper (tfe-o5f) has headroom: maxPreviewScroll() well above
+		// the starting scrollPos of 5, so the up-arrow decrement is not
+		// clamped away. (In real usage scrollPos never exceeds maxScroll.)
+		content := make([]string, 100)
+		for i := range content {
+			content[i] = "line"
+		}
 		return model{
 			promptEditMode:       true,
 			focusedVariableIndex: 0,
 			filledVariables:      make(map[string]string),
+			width:                120,
+			height:               40,
 			preview: previewModel{
+				loaded:   true,
+				content:  content,
 				isPrompt: true,
 				promptTemplate: &promptTemplate{
 					name:      "test",
