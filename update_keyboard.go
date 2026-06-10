@@ -438,15 +438,17 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "up", "k":
+		case "up":
 			// Scroll preview up (allow scrolling while editing)
+			// Note: "k" intentionally not bound here — it must insert into the variable
 			if m.preview.scrollPos > 0 {
 				m.preview.scrollPos--
 			}
 			return m, nil
 
-		case "down", "j":
+		case "down":
 			// Scroll preview down (allow scrolling while editing)
+			// Note: "j" intentionally not bound here — it must insert into the variable
 			totalLines := m.getWrappedLineCount()
 			visibleLines := m.getPreviewVisibleLines()
 			maxScroll := totalLines - visibleLines

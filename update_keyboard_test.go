@@ -70,6 +70,54 @@ func TestCommandInput_NegativeCursorClamped(t *testing.T) {
 	}
 }
 
+// TestPromptEditMode_JKInsertIntoVariable is a regression test for tfe-36e:
+// the prompt edit mode block bound "j"/"k" to preview scrolling, so those
+// letters never reached the default rune-insertion handler and values like
+// "json" or "kitchen" could not be typed into template variables. In edit
+// mode, plain letters must insert; arrows still scroll.
+func TestPromptEditMode_JKInsertIntoVariable(t *testing.T) {
+	newEditModel := func() model {
+		return model{
+			promptEditMode:       true,
+			focusedVariableIndex: 0,
+			filledVariables:      make(map[string]string),
+			preview: previewModel{
+				isPrompt: true,
+				promptTemplate: &promptTemplate{
+					name:      "test",
+					variables: []string{"TOPIC"},
+					template:  "Write about {{TOPIC}}",
+				},
+				scrollPos: 5,
+			},
+		}
+	}
+
+	for _, r := range []rune{'j', 'k'} {
+		m := newEditModel()
+		newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		result := newModel.(model)
+
+		if got := result.filledVariables["TOPIC"]; got != string(r) {
+			t.Errorf("typing %q: filledVariables[TOPIC] = %q, expected %q", r, got, string(r))
+		}
+		if result.preview.scrollPos != 5 {
+			t.Errorf("typing %q: scrollPos = %d, expected 5 (must not scroll in edit mode)", r, result.preview.scrollPos)
+		}
+	}
+
+	// Arrow keys must still scroll while editing
+	m := newEditModel()
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyUp})
+	result := newModel.(model)
+	if result.preview.scrollPos != 4 {
+		t.Errorf("up arrow: scrollPos = %d, expected 4", result.preview.scrollPos)
+	}
+	if got := result.filledVariables["TOPIC"]; got != "" {
+		t.Errorf("up arrow: filledVariables[TOPIC] = %q, expected empty", got)
+	}
+}
+
 // TestCommandInput_EnterResetsCursor verifies that executing a command via
 // Enter resets the cursor position along with the input (tfe-r3s).
 func TestCommandInput_EnterResetsCursor(t *testing.T) {
