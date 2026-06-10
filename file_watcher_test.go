@@ -409,6 +409,56 @@ func TestWatcherBridgeAtomicWrite(t *testing.T) {
 	m.closeWatcher()
 }
 
+// TestWatcherRemoveDebounceAfterClose is a regression test for tfe-36x: a
+// Remove event spawns a debounce goroutine that sleeps 100ms before calling
+// acceptEvent. If the watcher closes during that window, the bridge closes the
+// output channel; the late acceptEvent must not arm a batch timer whose
+// callback would then panic with "send on closed channel". Before the fix,
+// this test crashed the binary once the timer fired. Run with -race.
+func TestWatcherRemoveDebounceAfterClose(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create the file BEFORE the watcher exists so the Remove below is the
+	// only event the bridge sees (no batch in flight at shutdown).
+	testFile := filepath.Join(tmpDir, "doomed.txt")
+	if err := os.WriteFile(testFile, []byte("x"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatalf("Failed to create watcher: %v", err)
+	}
+	if err := watcher.Add(tmpDir); err != nil {
+		t.Fatalf("Failed to watch %q: %v", tmpDir, err)
+	}
+
+	out := make(chan fileChangedMsg, watcherChanSize)
+	const batchWindow = 50 * time.Millisecond
+	go runWatcherBridgeWithConfig(watcher, out,
+		10*time.Millisecond, // perFileDedup
+		batchWindow,
+		500*time.Millisecond, // maxBatchDelay
+	)
+
+	// Delete the file, then give the bridge a moment to read the Remove event
+	// and spawn the 100ms (watcherDebounceInterval) debounce goroutine.
+	if err := os.Remove(testFile); err != nil {
+		t.Fatalf("Failed to remove test file: %v", err)
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	// Close the watcher inside the debounce window. The bridge shuts down and
+	// closes out while the remove-debounce goroutine is still sleeping.
+	watcher.Close()
+	if !waitForChannelClose(out, 2*time.Second) {
+		t.Fatal("Bridge never closed the output channel after watcher.Close()")
+	}
+
+	// Let the debounce goroutine wake and call acceptEvent, then wait past the
+	// batch window so any wrongly-armed timer would fire and panic.
+	time.Sleep(watcherDebounceInterval + batchWindow + 100*time.Millisecond)
+}
+
 // TestWatcherPerFileDedup verifies that rapid events for the same file are deduplicated
 func TestWatcherPerFileDedup(t *testing.T) {
 	m := model{}

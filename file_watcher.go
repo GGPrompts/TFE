@@ -161,6 +161,7 @@ func runWatcherBridgeWithConfig(
 ) {
 	var (
 		mu             sync.Mutex
+		closed         bool                         // set on shutdown; guards sends to out
 		lastChangeTime = make(map[string]time.Time) // per-file dedup timestamps
 		batchTimer     *time.Timer                  // fires to flush the current batch
 		batchStartTime time.Time                    // when the current batch started
@@ -176,6 +177,14 @@ func runWatcherBridgeWithConfig(
 	acceptEvent := func(path string, op fsnotify.Op) {
 		mu.Lock()
 		defer mu.Unlock()
+
+		// The bridge may already have shut down (out is closed). This happens
+		// when a remove-debounce goroutine wakes after watcher.Close(): without
+		// this guard it would arm a fresh batch timer whose callback sends on
+		// the closed channel and panics.
+		if closed {
+			return
+		}
 
 		now := time.Now()
 
@@ -197,17 +206,22 @@ func runWatcherBridgeWithConfig(
 			batchStartTime = now
 			batchTimer = time.AfterFunc(batchWindow, func() {
 				mu.Lock()
-				p := batchPath
-				o := batchOp
+				defer mu.Unlock()
+				if closed {
+					// Shutdown already closed out -- sending would panic.
+					return
+				}
 				batchTimer = nil
 				// Clear per-file map to allow future events for these files
 				// after the batch is flushed (prevents permanent suppression)
 				for k := range lastChangeTime {
 					delete(lastChangeTime, k)
 				}
-				mu.Unlock()
+				// Send while holding mu so shutdown (which sets closed and
+				// closes out under mu) cannot close the channel mid-send.
+				// The send is non-blocking, so holding the mutex is safe.
 				select {
-				case out <- fileChangedMsg{path: p, op: o}:
+				case out <- fileChangedMsg{path: batchPath, op: batchOp}:
 				default:
 					// Channel full -- drop (next batch will pick up changes)
 				}
@@ -224,17 +238,29 @@ func runWatcherBridgeWithConfig(
 		}
 	}
 
+	// shutdown stops the batch timer, marks the bridge closed, and closes out --
+	// all while holding mu. Any in-flight timer callback or late remove-debounce
+	// goroutine serializes on mu and sees closed=true, so nothing can send on
+	// (or re-arm a timer that would send on) the closed channel. Nilling
+	// batchTimer also prevents a late acceptEvent Reset from re-arming the
+	// stopped timer.
+	shutdown := func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if batchTimer != nil {
+			batchTimer.Stop()
+			batchTimer = nil
+		}
+		closed = true
+		close(out)
+	}
+
 	for {
 		select {
 		case event, ok := <-watcher.Events:
 			if !ok {
 				// Watcher closed -- clean up and exit
-				mu.Lock()
-				if batchTimer != nil {
-					batchTimer.Stop()
-				}
-				mu.Unlock()
-				close(out)
+				shutdown()
 				return
 			}
 
@@ -276,12 +302,7 @@ func runWatcherBridgeWithConfig(
 				// must perform the same cleanup as the Events branch above --
 				// in particular close(out), or pending waitForWatcherEvent
 				// readers would block forever (goroutine leak).
-				mu.Lock()
-				if batchTimer != nil {
-					batchTimer.Stop()
-				}
-				mu.Unlock()
-				close(out)
+				shutdown()
 				return
 			}
 			// Errors are non-fatal for a file explorer; silently continue.
