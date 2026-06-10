@@ -1346,6 +1346,50 @@ func TestCopyDirectoryValidDestination(t *testing.T) {
 	}
 }
 
+// TestCopyFileContentPreservesMode verifies copyFileContent applies the
+// supplied FileInfo's permission bits to the destination, and that passing
+// pre-statted FileInfo (rather than re-statting inside) still produces a
+// correct copy on the happy path.
+func TestCopyFileContentPreservesMode(t *testing.T) {
+	tmpDir, cleanup := setupTestDir(t)
+	defer cleanup()
+
+	content := []byte("preserve my bits")
+	srcPath := filepath.Join(tmpDir, "src.sh")
+	dstPath := filepath.Join(tmpDir, "dst.sh")
+	createTestFileWithContent(t, srcPath, content)
+
+	// Give the source a distinctive executable mode.
+	if err := os.Chmod(srcPath, 0o755); err != nil {
+		t.Fatalf("Failed to chmod source: %v", err)
+	}
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		t.Fatalf("Failed to stat source: %v", err)
+	}
+
+	if err := copyFileContent(srcPath, dstPath, srcInfo); err != nil {
+		t.Fatalf("copyFileContent failed: %v", err)
+	}
+
+	got, err := os.ReadFile(dstPath)
+	if err != nil {
+		t.Fatalf("Failed to read destination: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("Copied content mismatch: got %q, want %q", got, content)
+	}
+
+	dstInfo, err := os.Stat(dstPath)
+	if err != nil {
+		t.Fatalf("Failed to stat destination: %v", err)
+	}
+	if dstInfo.Mode().Perm() != srcInfo.Mode().Perm() {
+		t.Errorf("Permission bits not preserved: got %v, want %v",
+			dstInfo.Mode().Perm(), srcInfo.Mode().Perm())
+	}
+}
+
 // TestLoadFilesReappliesSearchFilter verifies that loadFiles re-applies an
 // active search filter against the freshly loaded listing, so filteredIndices
 // can never reference a stale file list after an in-place reload such as a

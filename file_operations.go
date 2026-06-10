@@ -1551,7 +1551,7 @@ func (m *model) copyFile(src, dst string) error {
 		return copyDirectory(src, dst)
 	}
 
-	return copyFileContent(src, dst)
+	return copyFileContent(src, dst, srcInfo)
 }
 
 // resolveCopyPaths resolves src and dst to absolute, symlink-free paths so
@@ -1580,8 +1580,10 @@ func resolveCopyPaths(src, dst string) (string, string, error) {
 	return resolvedSrc, resolvedDst, nil
 }
 
-// copyFileContent copies a single file
-func copyFileContent(src, dst string) error {
+// copyFileContent copies a single file. srcInfo is the already-statted
+// metadata for src (its permission bits are applied to dst), avoiding a
+// re-stat that could race if src disappears mid-copy.
+func copyFileContent(src, dst string, srcInfo os.FileInfo) (err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source: %w", err)
@@ -1592,14 +1594,31 @@ func copyFileContent(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination: %w", err)
 	}
-	defer dstFile.Close()
+	// Close explicitly below so buffered-write errors (e.g. ENOSPC, NFS) are
+	// surfaced. The deferred Close is a safety net for early returns; once
+	// dstFile has been closed explicitly, closed is set so it does not run
+	// again and clobber the real error with os.ErrClosed.
+	closed := false
+	defer func() {
+		if closed {
+			return
+		}
+		if cerr := dstFile.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close destination: %w", cerr)
+		}
+	}()
 
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
+	if _, err = io.Copy(dstFile, srcFile); err != nil {
 		return fmt.Errorf("failed to copy: %w", err)
 	}
 
+	// Surface write errors that only manifest at Close (buffered/NFS writes).
+	if cerr := dstFile.Close(); cerr != nil {
+		return fmt.Errorf("failed to close destination: %w", cerr)
+	}
+	closed = true
+
 	// Preserve permissions
-	srcInfo, _ := os.Stat(src)
 	return os.Chmod(dst, srcInfo.Mode())
 }
 
@@ -1629,7 +1648,11 @@ func copyDirectory(src, dst string) error {
 				return err
 			}
 		} else {
-			if err := copyFileContent(srcPath, dstPath); err != nil {
+			entryInfo, err := entry.Info()
+			if err != nil {
+				return fmt.Errorf("failed to stat source: %w", err)
+			}
+			if err := copyFileContent(srcPath, dstPath, entryInfo); err != nil {
 				return err
 			}
 		}
