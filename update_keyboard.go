@@ -358,9 +358,10 @@ func (m model) handlePreviewSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 			return m, nil, true
 
 		case "backspace":
-			// Delete last character from search query
+			// Delete last character from search query (rune-aware to avoid splitting multibyte UTF-8)
 			if len(m.preview.searchQuery) > 0 {
-				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-1]
+				_, size := utf8.DecodeLastRuneInString(m.preview.searchQuery)
+				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-size]
 				m.performPreviewSearch()
 			}
 			return m, nil, true
@@ -418,7 +419,9 @@ func (m model) handlePromptEditKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 				varName := m.preview.promptTemplate.variables[m.focusedVariableIndex]
 				currentValue := m.filledVariables[varName]
 				if len(currentValue) > 0 {
-					m.filledVariables[varName] = currentValue[:len(currentValue)-1]
+					// Delete the last rune (rune-aware to avoid splitting multibyte UTF-8)
+					_, size := utf8.DecodeLastRuneInString(currentValue)
+					m.filledVariables[varName] = currentValue[:len(currentValue)-size]
 
 					// Invalidate cache to force header re-render with updated variable colors
 					m.preview.cacheValid = false
@@ -956,9 +959,10 @@ func (m model) handleDialogKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 				return m, tea.ClearScreen, true
 
 			case "backspace":
-				// Delete last character
+				// Delete last character (rune-aware to avoid splitting multibyte UTF-8)
 				if len(m.dialog.input) > 0 {
-					m.dialog.input = m.dialog.input[:len(m.dialog.input)-1]
+					_, size := utf8.DecodeLastRuneInString(m.dialog.input)
+					m.dialog.input = m.dialog.input[:len(m.dialog.input)-size]
 				}
 				return m, nil, true
 
@@ -1227,9 +1231,10 @@ func (m model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			return m, nil, true
 
 		case "backspace":
-			// Delete last character from search query
+			// Delete last character from search query (rune-aware to avoid splitting multibyte UTF-8)
 			if len(m.searchQuery) > 0 {
-				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+				_, size := utf8.DecodeLastRuneInString(m.searchQuery)
+				m.searchQuery = m.searchQuery[:len(m.searchQuery)-size]
 				// Update filtered results
 				m.filteredIndices = m.filterFilesBySearch(m.searchQuery)
 				m.markTreeItemsDirty()
@@ -2628,7 +2633,9 @@ func (m model) handlePreviewOnlyKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "backspace":
 			if len(m.preview.searchQuery) > 0 {
-				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-1]
+				// Rune-aware to avoid splitting multibyte UTF-8
+				_, size := utf8.DecodeLastRuneInString(m.preview.searchQuery)
+				m.preview.searchQuery = m.preview.searchQuery[:len(m.preview.searchQuery)-size]
 				m.performPreviewSearch()
 			}
 			return m, nil

@@ -274,6 +274,118 @@ func TestCommandInput_LeftThenBackspaceMultibyte(t *testing.T) {
 	}
 }
 
+// The following tests are regression tests for tfe-5gt: the byte-slice
+// backspace bug (s = s[:len(s)-1]) fixed for the command line in tfe-7la also
+// existed in five other live input fields. Backspace at the end of a multibyte
+// UTF-8 rune must remove the whole rune and leave a valid UTF-8 string, not a
+// single trailing byte. Each test exercises a different rune width (2/3/4 byte).
+
+// TestPreviewSearch_BackspaceRuneAware covers the full-preview search query
+// (m.preview.searchQuery) with a 2-byte rune (é = U+00E9).
+func TestPreviewSearch_BackspaceRuneAware(t *testing.T) {
+	m := model{
+		viewMode: viewFullPreview,
+	}
+	m.preview.searchActive = true
+	m.preview.searchQuery = "aé" // 'a' (1 byte) + 'é' (2 bytes)
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyBackspace})
+	result := newModel.(model)
+
+	if result.preview.searchQuery != "a" {
+		t.Errorf("preview.searchQuery = %q, expected %q", result.preview.searchQuery, "a")
+	}
+	if !utf8.ValidString(result.preview.searchQuery) {
+		t.Errorf("preview.searchQuery %q is not valid UTF-8", result.preview.searchQuery)
+	}
+}
+
+// TestPreviewOnlySearch_BackspaceRuneAware covers the standalone preview-only
+// search query (the second m.preview.searchQuery handler) with a 4-byte rune.
+func TestPreviewOnlySearch_BackspaceRuneAware(t *testing.T) {
+	m := model{
+		previewOnly: true,
+	}
+	m.preview.searchActive = true
+	m.preview.searchQuery = "a😀" // 'a' (1 byte) + '😀' (4 bytes)
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyBackspace})
+	result := newModel.(model)
+
+	if result.preview.searchQuery != "a" {
+		t.Errorf("preview.searchQuery = %q, expected %q", result.preview.searchQuery, "a")
+	}
+	if !utf8.ValidString(result.preview.searchQuery) {
+		t.Errorf("preview.searchQuery %q is not valid UTF-8", result.preview.searchQuery)
+	}
+}
+
+// TestFileListSearch_BackspaceRuneAware covers the file-list directory search
+// query (m.searchQuery) with a 3-byte rune (你 = U+4F60).
+func TestFileListSearch_BackspaceRuneAware(t *testing.T) {
+	m := model{
+		searchMode:  true,
+		searchQuery: "a你", // 'a' (1 byte) + '你' (3 bytes)
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyBackspace})
+	result := newModel.(model)
+
+	if result.searchQuery != "a" {
+		t.Errorf("searchQuery = %q, expected %q", result.searchQuery, "a")
+	}
+	if !utf8.ValidString(result.searchQuery) {
+		t.Errorf("searchQuery %q is not valid UTF-8", result.searchQuery)
+	}
+}
+
+// TestPromptVariable_BackspaceRuneAware covers the prompt-template variable
+// value (m.filledVariables[varName]) with a 4-byte rune (😀 = U+1F600).
+func TestPromptVariable_BackspaceRuneAware(t *testing.T) {
+	m := model{
+		promptEditMode:       true,
+		focusedVariableIndex: 0,
+		filledVariables:      map[string]string{"NAME": "a😀"}, // 'a' (1 byte) + '😀' (4 bytes)
+	}
+	m.preview.isPrompt = true
+	m.preview.promptTemplate = &promptTemplate{
+		variables: []string{"NAME"},
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyBackspace})
+	result := newModel.(model)
+
+	if result.filledVariables["NAME"] != "a" {
+		t.Errorf("filledVariables[NAME] = %q, expected %q", result.filledVariables["NAME"], "a")
+	}
+	if !utf8.ValidString(result.filledVariables["NAME"]) {
+		t.Errorf("filledVariables[NAME] %q is not valid UTF-8", result.filledVariables["NAME"])
+	}
+}
+
+// TestDialogInput_BackspaceRuneAware covers the dialog text input
+// (m.dialog.input) with a 3-byte rune. This is the highest-impact field
+// because it feeds os.Mkdir/Create/Rename.
+func TestDialogInput_BackspaceRuneAware(t *testing.T) {
+	m := model{
+		showDialog: true,
+		dialog: dialogModel{
+			dialogType: dialogInput,
+			input:      "a好", // 'a' (1 byte) + '好' (3 bytes)
+		},
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyBackspace})
+	result := newModel.(model)
+
+	if result.dialog.input != "a" {
+		t.Errorf("dialog.input = %q, expected %q", result.dialog.input, "a")
+	}
+	if !utf8.ValidString(result.dialog.input) {
+		t.Errorf("dialog.input %q is not valid UTF-8", result.dialog.input)
+	}
+}
+
 // TestF5Copy_StalePreviewFallsBackToPath is a regression test for tfe-spg:
 // the browser-mode F5 handler used to copy m.preview.content whenever a
 // preview was loaded, without checking it belonged to the selected file. So
