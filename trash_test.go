@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -732,6 +733,201 @@ func TestTrashMetadataJSON(t *testing.T) {
 
 	if decoded[0].OriginalPath != items[0].OriginalPath {
 		t.Error("Decoded OriginalPath mismatch")
+	}
+}
+
+// TestRollbackTrashMove_Rename tests the fast path: rename back succeeds
+func TestRollbackTrashMove_Rename(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	trashDir, _ := getTrashDir()
+	trashedPath := filepath.Join(trashDir, "20240101_120000_test.txt")
+	createTestFile(t, trashedPath, "rollback content")
+
+	originalPath := filepath.Join(tmpHome, "test.txt")
+	if err := rollbackTrashMove(trashedPath, originalPath); err != nil {
+		t.Fatalf("rollbackTrashMove failed: %v", err)
+	}
+
+	content, err := os.ReadFile(originalPath)
+	if err != nil {
+		t.Fatalf("File not restored to original path: %v", err)
+	}
+	if string(content) != "rollback content" {
+		t.Errorf("Restored content mismatch: got %s", string(content))
+	}
+
+	if _, err := os.Stat(trashedPath); !os.IsNotExist(err) {
+		t.Error("Trashed file still exists after rollback")
+	}
+}
+
+// TestRollbackTrashMove_CopyFallback tests rollback when rename fails
+// (simulating EXDEV for cross-device moves) and the copy+delete fallback runs
+func TestRollbackTrashMove_CopyFallback(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	// Simulate cross-device rename failure
+	originalRename := rollbackRename
+	rollbackRename = func(oldpath, newpath string) error {
+		return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+	}
+	defer func() { rollbackRename = originalRename }()
+
+	trashDir, _ := getTrashDir()
+	trashedPath := filepath.Join(trashDir, "20240101_120000_test.txt")
+	createTestFile(t, trashedPath, "cross-device content")
+
+	originalPath := filepath.Join(tmpHome, "test.txt")
+	if err := rollbackTrashMove(trashedPath, originalPath); err != nil {
+		t.Fatalf("rollbackTrashMove failed: %v", err)
+	}
+
+	content, err := os.ReadFile(originalPath)
+	if err != nil {
+		t.Fatalf("File not restored to original path: %v", err)
+	}
+	if string(content) != "cross-device content" {
+		t.Errorf("Restored content mismatch: got %s", string(content))
+	}
+
+	if _, err := os.Stat(trashedPath); !os.IsNotExist(err) {
+		t.Error("Trashed copy still exists after copy fallback rollback")
+	}
+}
+
+// TestRollbackTrashMove_ParentDirMissing tests rollback when the original
+// parent directory was removed while the file was being trashed
+func TestRollbackTrashMove_ParentDirMissing(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	trashDir, _ := getTrashDir()
+	trashedPath := filepath.Join(trashDir, "20240101_120000_test.txt")
+	createTestFile(t, trashedPath, "content")
+
+	// Original path in a directory that no longer exists
+	originalPath := filepath.Join(tmpHome, "gone", "test.txt")
+	if err := rollbackTrashMove(trashedPath, originalPath); err != nil {
+		t.Fatalf("rollbackTrashMove failed: %v", err)
+	}
+
+	if _, err := os.Stat(originalPath); err != nil {
+		t.Errorf("File not restored after parent dir recreation: %v", err)
+	}
+}
+
+// TestRollbackTrashMove_Failure tests that an error is returned when both
+// rename and copy fail, leaving the file at the trashed path
+func TestRollbackTrashMove_Failure(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	// Force rename to fail so the copy fallback runs
+	originalRename := rollbackRename
+	rollbackRename = func(oldpath, newpath string) error {
+		return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+	}
+	defer func() { rollbackRename = originalRename }()
+
+	// Source does not exist, so the copy fallback fails too
+	trashDir, _ := getTrashDir()
+	trashedPath := filepath.Join(trashDir, "nonexistent.txt")
+	originalPath := filepath.Join(tmpHome, "test.txt")
+
+	if err := rollbackTrashMove(trashedPath, originalPath); err == nil {
+		t.Error("Expected rollbackTrashMove to fail when rename and copy both fail")
+	}
+}
+
+// TestMoveToTrash_MetadataLoadFailureRollsBack tests that moveToTrash
+// restores the file when trash metadata cannot be loaded
+func TestMoveToTrash_MetadataLoadFailureRollsBack(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	// Corrupt the metadata file so loadTrashMetadata fails
+	metadataPath, err := getTrashMetadataPath()
+	if err != nil {
+		t.Fatalf("getTrashMetadataPath failed: %v", err)
+	}
+	createTestFile(t, metadataPath, "not valid json {{{")
+
+	testFile := filepath.Join(tmpHome, "test.txt")
+	createTestFile(t, testFile, "important data")
+
+	err = moveToTrash(testFile)
+	if err == nil {
+		t.Fatal("Expected moveToTrash to fail with corrupt metadata")
+	}
+
+	// The file must have been rolled back to its original location
+	content, readErr := os.ReadFile(testFile)
+	if readErr != nil {
+		t.Fatalf("File was not rolled back to original location: %v", readErr)
+	}
+	if string(content) != "important data" {
+		t.Errorf("Rolled-back content mismatch: got %s", string(content))
+	}
+}
+
+// TestMoveToTrash_MetadataLoadFailureRollbackFails tests that when both the
+// metadata operation and the rollback fail, the error reports the trashed
+// path so the user can recover the file manually
+func TestMoveToTrash_MetadataLoadFailureRollbackFails(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	// Corrupt the metadata file so loadTrashMetadata fails
+	metadataPath, err := getTrashMetadataPath()
+	if err != nil {
+		t.Fatalf("getTrashMetadataPath failed: %v", err)
+	}
+	createTestFile(t, metadataPath, "not valid json {{{")
+
+	// Make the rollback rename fail, and block the copy fallback by
+	// creating a directory at the original path so copyFile cannot
+	// recreate the file there
+	originalRename := rollbackRename
+	rollbackRename = func(oldpath, newpath string) error {
+		os.MkdirAll(newpath, 0755)
+		return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+	}
+	defer func() { rollbackRename = originalRename }()
+
+	testFile := filepath.Join(tmpHome, "test.txt")
+	createTestFile(t, testFile, "important data")
+
+	err = moveToTrash(testFile)
+	if err == nil {
+		t.Fatal("Expected moveToTrash to fail with corrupt metadata and failed rollback")
+	}
+
+	// The error must include the trashed path so the user can recover
+	if !contains(err.Error(), "file preserved at") {
+		t.Errorf("Error should report the preserved trash path, got: %v", err)
+	}
+
+	// The file data must still exist in the trash directory
+	trashDir, _ := getTrashDir()
+	entries, readErr := os.ReadDir(trashDir)
+	if readErr != nil {
+		t.Fatalf("Failed to read trash dir: %v", readErr)
+	}
+	found := false
+	for _, entry := range entries {
+		if contains(entry.Name(), "test.txt") {
+			found = true
+			content, _ := os.ReadFile(filepath.Join(trashDir, entry.Name()))
+			if string(content) != "important data" {
+				t.Errorf("Preserved file content mismatch: got %s", string(content))
+			}
+		}
+	}
+	if !found {
+		t.Error("File data not preserved in trash directory after failed rollback")
 	}
 }
 

@@ -165,7 +165,9 @@ func moveToTrash(path string) error {
 	items, err := loadTrashMetadata()
 	if err != nil {
 		// If metadata load fails, try to restore the file
-		os.Rename(trashedPath, path)
+		if rbErr := rollbackTrashMove(trashedPath, path); rbErr != nil {
+			return fmt.Errorf("failed to load trash metadata: %v; rollback also failed: %v; file preserved at %s", err, rbErr, trashedPath)
+		}
 		return fmt.Errorf("failed to load trash metadata: %w", err)
 	}
 
@@ -183,10 +185,45 @@ func moveToTrash(path string) error {
 	// Save updated metadata
 	if err := saveTrashMetadata(items); err != nil {
 		// If metadata save fails, try to restore the file
-		os.Rename(trashedPath, path)
+		if rbErr := rollbackTrashMove(trashedPath, path); rbErr != nil {
+			return fmt.Errorf("failed to save trash metadata: %v; rollback also failed: %v; file preserved at %s", err, rbErr, trashedPath)
+		}
 		return fmt.Errorf("failed to save trash metadata: %w", err)
 	}
 
+	return nil
+}
+
+// rollbackRename is os.Rename, indirected so tests can simulate rename
+// failures (e.g. cross-device EXDEV) when exercising the rollback fallback.
+var rollbackRename = os.Rename
+
+// rollbackTrashMove moves a file back from trash to its original location
+// after a metadata failure. os.Rename alone is not enough: if the original
+// move used the copy+delete fallback (cross-device), the reverse rename
+// fails with EXDEV too, so on rename failure this falls back to copy+delete.
+// Returns an error only if the file could not be restored — in that case
+// the file still exists at trashedPath.
+func rollbackTrashMove(trashedPath, originalPath string) error {
+	// Ensure the original parent directory still exists (it may have been
+	// removed while the file was being trashed)
+	if err := os.MkdirAll(filepath.Dir(originalPath), 0755); err != nil {
+		return fmt.Errorf("failed to recreate parent directory: %w", err)
+	}
+
+	// Try rename first (fast, atomic)
+	if err := rollbackRename(trashedPath, originalPath); err == nil {
+		return nil
+	}
+
+	// Rename failed (e.g. cross-device EXDEV) — fall back to copy+delete
+	if err := copyRecursive(trashedPath, originalPath); err != nil {
+		return fmt.Errorf("failed to copy back from trash: %w", err)
+	}
+
+	// Original restored; remove the trash copy. Best effort: the restore
+	// itself succeeded even if this cleanup fails.
+	os.RemoveAll(trashedPath)
 	return nil
 }
 
