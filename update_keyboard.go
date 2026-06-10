@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -1329,9 +1330,10 @@ rm -f "$0"
 	case "backspace":
 		// Delete character at cursor position from command if focused and has input
 		if m.commandFocused && len(m.commandInput) > 0 && m.commandCursorPos > 0 {
-			// Delete character before cursor
-			m.commandInput = m.commandInput[:m.commandCursorPos-1] + m.commandInput[m.commandCursorPos:]
-			m.commandCursorPos--
+			// Delete the rune before the cursor (rune-aware to avoid splitting multibyte UTF-8)
+			_, size := utf8.DecodeLastRuneInString(m.commandInput[:m.commandCursorPos])
+			m.commandInput = m.commandInput[:m.commandCursorPos-size] + m.commandInput[m.commandCursorPos:]
+			m.commandCursorPos -= size
 			return m, nil
 		}
 		// If no command input, backspace does nothing
@@ -1339,7 +1341,9 @@ rm -f "$0"
 	case "delete":
 		// Delete character at cursor position (forward delete)
 		if m.commandFocused && m.commandCursorPos < len(m.commandInput) {
-			m.commandInput = m.commandInput[:m.commandCursorPos] + m.commandInput[m.commandCursorPos+1:]
+			// Delete the rune at the cursor (rune-aware to avoid splitting multibyte UTF-8)
+			_, size := utf8.DecodeRuneInString(m.commandInput[m.commandCursorPos:])
+			m.commandInput = m.commandInput[:m.commandCursorPos] + m.commandInput[m.commandCursorPos+size:]
 			return m, nil
 		}
 
@@ -1938,7 +1942,9 @@ rm -f "$0"
 		// If command prompt is focused, move cursor left in command input
 		if m.commandFocused {
 			if m.commandCursorPos > 0 {
-				m.commandCursorPos--
+				// Step back by a full rune (rune-aware to stay on a UTF-8 boundary)
+				_, size := utf8.DecodeLastRuneInString(m.commandInput[:m.commandCursorPos])
+				m.commandCursorPos -= size
 			}
 			return m, nil
 		}
@@ -1998,7 +2004,9 @@ rm -f "$0"
 		// If command prompt is focused, move cursor right in command input
 		if m.commandFocused {
 			if m.commandCursorPos < len(m.commandInput) {
-				m.commandCursorPos++
+				// Step forward by a full rune (rune-aware to stay on a UTF-8 boundary)
+				_, size := utf8.DecodeRuneInString(m.commandInput[m.commandCursorPos:])
+				m.commandCursorPos += size
 			} else if m.ghostText != "" {
 				// At end of input with ghost text: accept the suggestion
 				m.acceptGhostText()

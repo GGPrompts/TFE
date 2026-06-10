@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -151,6 +152,123 @@ func TestCommandInput_EnterResetsCursor(t *testing.T) {
 	}
 	if result.commandFocused {
 		t.Error("commandFocused should be false after executing a command")
+	}
+}
+
+// The following tests are regression tests for tfe-7la: the command-line
+// cursor was moved/edited one byte at a time, so after a multibyte UTF-8
+// character one left-arrow put the cursor mid-rune. Render-time slicing then
+// emitted invalid UTF-8 and backspace/delete corrupted the string. Cursor
+// movement and editing are now rune-aware.
+
+// "é" is U+00E9 (2 bytes in UTF-8); "你" is U+4F60 (3 bytes); "😀" is
+// U+1F600 (4 bytes). These exercise 2-, 3- and 4-byte rune steps.
+
+func TestCommandInput_LeftArrowRuneAware(t *testing.T) {
+	// Cursor at end of a 2-byte rune; one left-arrow must land on the
+	// rune boundary (byte 0), not mid-rune (byte 1).
+	m := model{
+		commandFocused:   true,
+		commandInput:     "é",
+		commandCursorPos: 2,
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyLeft})
+	result := newModel.(model)
+
+	if result.commandCursorPos != 0 {
+		t.Errorf("commandCursorPos = %d, expected 0 (start of rune)", result.commandCursorPos)
+	}
+}
+
+func TestCommandInput_RightArrowRuneAware(t *testing.T) {
+	// Cursor at start of a 3-byte rune; one right-arrow must land at byte 3,
+	// the boundary after the rune.
+	m := model{
+		commandFocused:   true,
+		commandInput:     "你",
+		commandCursorPos: 0,
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyRight})
+	result := newModel.(model)
+
+	if result.commandCursorPos != 3 {
+		t.Errorf("commandCursorPos = %d, expected 3 (end of rune)", result.commandCursorPos)
+	}
+}
+
+func TestCommandInput_BackspaceRuneAware(t *testing.T) {
+	// Backspace at the end of a 4-byte rune must remove the whole rune and
+	// leave a valid UTF-8 string, not a single trailing byte.
+	m := model{
+		commandFocused:   true,
+		commandInput:     "a😀",
+		commandCursorPos: 5, // 1 (a) + 4 (😀)
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyBackspace})
+	result := newModel.(model)
+
+	if result.commandInput != "a" {
+		t.Errorf("commandInput = %q, expected %q", result.commandInput, "a")
+	}
+	if result.commandCursorPos != 1 {
+		t.Errorf("commandCursorPos = %d, expected 1", result.commandCursorPos)
+	}
+	if !utf8.ValidString(result.commandInput) {
+		t.Errorf("commandInput %q is not valid UTF-8", result.commandInput)
+	}
+}
+
+func TestCommandInput_DeleteRuneAware(t *testing.T) {
+	// Forward-delete at the start of a 3-byte rune must remove the whole rune.
+	m := model{
+		commandFocused:   true,
+		commandInput:     "你b",
+		commandCursorPos: 0,
+	}
+
+	newModel, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyDelete})
+	result := newModel.(model)
+
+	if result.commandInput != "b" {
+		t.Errorf("commandInput = %q, expected %q", result.commandInput, "b")
+	}
+	if !utf8.ValidString(result.commandInput) {
+		t.Errorf("commandInput %q is not valid UTF-8", result.commandInput)
+	}
+}
+
+// TestCommandInput_LeftThenBackspaceMultibyte exercises the full corruption
+// scenario from the bug report: type a multibyte char, arrow left over it,
+// then backspace. With byte-wise handling this left the cursor mid-rune and
+// corrupted the string; rune-aware handling keeps everything valid.
+func TestCommandInput_LeftThenBackspaceMultibyte(t *testing.T) {
+	m := model{
+		commandFocused:   true,
+		commandInput:     "你好",
+		commandCursorPos: 6, // end (two 3-byte runes)
+	}
+
+	// Left over "好" -> boundary at byte 3
+	nm, _ := m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyLeft})
+	m = nm.(model)
+	if m.commandCursorPos != 3 {
+		t.Fatalf("after left: commandCursorPos = %d, expected 3", m.commandCursorPos)
+	}
+
+	// Backspace removes "你" entirely
+	nm, _ = m.handleKeyEvent(tea.KeyMsg{Type: tea.KeyBackspace})
+	m = nm.(model)
+	if m.commandInput != "好" {
+		t.Errorf("commandInput = %q, expected %q", m.commandInput, "好")
+	}
+	if m.commandCursorPos != 0 {
+		t.Errorf("commandCursorPos = %d, expected 0", m.commandCursorPos)
+	}
+	if !utf8.ValidString(m.commandInput) {
+		t.Errorf("commandInput %q is not valid UTF-8", m.commandInput)
 	}
 }
 
