@@ -463,7 +463,11 @@ func (m model) renderHeader(titleSuffix string) string {
 		}
 
 		// Calculate spacing to right-align
-		availableWidth := m.width - len(titleText) - len(displayText) - 2
+		// Use visualWidthCompensated, not len(): titleText/displayText can carry
+		// emoji (📋/📁/🎉) that are 4 bytes but 2 columns. Measure displayText
+		// rather than rightLink — the OSC 8 wrapper is zero-width and would
+		// confuse the ANSI stripper.
+		availableWidth := m.width - m.visualWidthCompensated(titleText) - m.visualWidthCompensated(displayText) - 2
 		if availableWidth < 1 {
 			availableWidth = 1
 		}

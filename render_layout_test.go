@@ -54,6 +54,43 @@ func TestRenderHeader_ModeIndicators(t *testing.T) {
 	}
 }
 
+// TestRenderHeader_EmojiRightAlignment is a regression test for tfe-ifj: the
+// right-align spacer was computed with byte len() on titleText/displayText.
+// Emoji like 📋/📁/🎉 are 4 bytes but 2 visual columns, so len() over-counted
+// by 2 per emoji and the right-side link landed short of the right edge. The
+// spacer must be sized from visual width so the title row fills m.width.
+func TestRenderHeader_EmojiRightAlignment(t *testing.T) {
+	m := newChromeTestModel()
+	m.filePickerMode = true // titleText gains " [📁 File Picker]"
+	m.updateAvailable = true
+	m.updateVersion = "v9.9.9" // displayText gains "🎉 Update Available: ..."
+
+	titleText := "(T)erminal (F)ile (E)xplorer [📁 File Picker]"
+	displayText := "🎉 Update Available: v9.9.9 (click for details)"
+	wantSpacing := m.width - m.visualWidthCompensated(titleText) - m.visualWidthCompensated(displayText) - 2
+
+	out := m.renderHeader("")
+	firstLine := strings.SplitN(out, "\n", 2)[0]
+
+	// The spacer is the longest run of spaces on the title row.
+	gotSpacing := 0
+	run := 0
+	for _, ch := range firstLine {
+		if ch == ' ' {
+			run++
+			if run > gotSpacing {
+				gotSpacing = run
+			}
+		} else {
+			run = 0
+		}
+	}
+
+	if gotSpacing != wantSpacing {
+		t.Errorf("right-align spacer = %d spaces, want %d (byte len() vs visual width regression)", gotSpacing, wantSpacing)
+	}
+}
+
 func TestRenderHeader_MenuBarAfterStartupWindow(t *testing.T) {
 	m := newChromeTestModel()
 	m.startupTime = time.Now().Add(-10 * time.Second) // past the 5s window
