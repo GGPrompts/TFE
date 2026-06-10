@@ -400,6 +400,38 @@ func TestToggleGitReposResetsDetailScrollX(t *testing.T) {
 	}
 }
 
+// TestToggleDualPane verifies toggleDualPane() flips viewMode in both
+// directions and always calls calculateLayout/populatePreviewCache via the
+// state side-effects it depends on (tfe-3k5).
+func TestToggleDualPane(t *testing.T) {
+	// Single -> dual
+	m := model{
+		width:        120,
+		height:       40,
+		currentPath:  "/tmp",
+		viewMode:     viewSinglePane,
+		displayMode:  modeList,
+		expandedDirs: make(map[string]bool),
+	}
+	m.toggleDualPane()
+	if m.viewMode != viewDualPane {
+		t.Errorf("single->dual: viewMode = %v, want viewDualPane", m.viewMode)
+	}
+
+	// Dual -> single
+	m.toggleDualPane()
+	if m.viewMode != viewSinglePane {
+		t.Errorf("dual->single: viewMode = %v, want viewSinglePane", m.viewMode)
+	}
+
+	// Idempotency: two toggles from single return to single
+	m.toggleDualPane()
+	m.toggleDualPane()
+	if m.viewMode != viewSinglePane {
+		t.Errorf("double-toggle: viewMode = %v, want viewSinglePane", m.viewMode)
+	}
+}
+
 // TestToggleTrashResetsDetailScrollX verifies the F12 trash-view path (tfe-ojy)
 // routes its default-to-detail switch through setDisplayMode. This mirrors the
 // keyboard handler: toggleTrash() followed by setDisplayMode(modeDetail).

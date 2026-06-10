@@ -333,13 +333,7 @@ git pull
 				// Pane toggle button [⬜/⬌] (X=15-19)
 				if msg.X >= 15 && msg.X <= 19 {
 					// Toggle between single and dual-pane (like Tab or Space)
-					if m.viewMode == viewDualPane {
-						m.viewMode = viewSinglePane
-					} else {
-						m.viewMode = viewDualPane
-					}
-					m.calculateLayout()
-					m.populatePreviewCache() // Refresh cache with new layout
+					m.toggleDualPane()
 					return m, nil
 				}
 				// Terminal button [>_] (X=20-24)
