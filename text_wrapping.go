@@ -46,10 +46,12 @@ func wrapLine(line string, width int) []string {
 				currentLine = word
 				currentWidth = wordWidth
 			} else {
-				// Word is too long, force break it using visual width
-				wrapped = append(wrapped, truncateToWidth(word, width))
-				currentLine = ""
-				currentWidth = 0
+				// Word is too long, hard-break it across lines without
+				// dropping content; the last chunk seeds the current line
+				chunks := breakLongWord(word, width)
+				wrapped = append(wrapped, chunks[:len(chunks)-1]...)
+				currentLine = chunks[len(chunks)-1]
+				currentWidth = visualWidth(currentLine)
 			}
 		} else if currentWidth+spaceWidth+wordWidth <= width {
 			// Word fits on current line
@@ -62,10 +64,12 @@ func wrapLine(line string, width int) []string {
 				currentLine = word
 				currentWidth = wordWidth
 			} else {
-				// Word is too long, force break it using visual width
-				wrapped = append(wrapped, truncateToWidth(word, width))
-				currentLine = ""
-				currentWidth = 0
+				// Word is too long, hard-break it across lines without
+				// dropping content; the last chunk seeds the current line
+				chunks := breakLongWord(word, width)
+				wrapped = append(wrapped, chunks[:len(chunks)-1]...)
+				currentLine = chunks[len(chunks)-1]
+				currentWidth = visualWidth(currentLine)
 			}
 		}
 
@@ -80,6 +84,58 @@ func wrapLine(line string, width int) []string {
 	}
 
 	return wrapped
+}
+
+// breakLongWord hard-breaks a word that is wider than width into visual-width-
+// limited chunks. Unlike truncateToWidth it never appends "..." and never
+// drops content: every rune of the word appears in exactly one chunk, in
+// order. ANSI escape sequences pass through without counting toward width
+// (mirroring truncateToWidth). Always returns at least one chunk; each chunk
+// contains at least one visible rune even if that rune alone exceeds width
+// (e.g. a wide CJK rune at width 1), which guarantees forward progress.
+func breakLongWord(word string, width int) []string {
+	if width <= 0 || word == "" {
+		return []string{word}
+	}
+
+	var chunks []string
+	var current strings.Builder
+	currentWidth := 0
+	inAnsi := false
+
+	for _, ch := range word {
+		// Handle ANSI escape sequences (don't count toward width)
+		if ch == '\033' {
+			inAnsi = true
+			current.WriteRune(ch)
+			continue
+		}
+		if inAnsi {
+			current.WriteRune(ch)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+
+		// Use runewidth to properly handle wide characters (emojis, CJK)
+		charWidth := runewidth.RuneWidth(ch)
+		if currentWidth+charWidth > width && currentWidth > 0 {
+			chunks = append(chunks, current.String())
+			current.Reset()
+			currentWidth = 0
+		}
+		current.WriteRune(ch)
+		currentWidth += charWidth
+	}
+
+	if current.Len() > 0 {
+		chunks = append(chunks, current.String())
+	}
+	if len(chunks) == 0 {
+		return []string{word}
+	}
+	return chunks
 }
 
 // previewBoxContentWidth returns the inner content width of the preview box

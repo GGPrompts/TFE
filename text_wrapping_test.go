@@ -170,3 +170,150 @@ func TestRefreshPreviewCacheIfStale(t *testing.T) {
 		t.Error("refreshPreviewCacheIfStale repopulated the cache even though the width already matched")
 	}
 }
+
+// joinWrappedContent concatenates wrapped lines and strips spaces so the
+// result can be compared against the original line's non-whitespace content.
+// wrapLine collapses whitespace (strings.Fields), so this is the invariant a
+// lossless wrap must preserve: no visible character may vanish.
+func joinWrappedContent(wrapped []string) string {
+	return strings.ReplaceAll(strings.Join(wrapped, ""), " ", "")
+}
+
+// TestWrapLine_HardBreaksLongWords is a regression test for tfe-esu: wrapLine
+// used truncateToWidth on words wider than the wrap width, which kept only the
+// first `width` columns and silently discarded the rest of the word (long
+// URLs, file paths, base64 blobs lost everything past the first line).
+func TestWrapLine_HardBreaksLongWords(t *testing.T) {
+	tests := []struct {
+		name  string
+		line  string
+		width int
+	}{
+		{
+			name:  "long URL",
+			line:  "https://example.com/some/very/long/path?query=abcdefghijklmnopqrstuvwxyz0123456789&token=ZYXWVUTSRQPONMLKJIHGFEDCBA9876543210",
+			width: 30,
+		},
+		{
+			name:  "long file path",
+			line:  "/home/marci/projects/TFE/node_modules/@scope/very-long-package-name/dist/esm/internal/generated/index.min.js",
+			width: 24,
+		},
+		{
+			name:  "long word mid-sentence",
+			line:  "see https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa for details",
+			width: 20,
+		},
+		{
+			name:  "wide CJK run",
+			line:  "日本語のとても長い単語をハードブレークするテストです漢字漢字漢字漢字漢字漢字",
+			width: 10,
+		},
+		{
+			name:  "CJK run at odd width",
+			line:  "漢字漢字漢字漢字漢字漢字漢字",
+			width: 7, // wide runes (2 cols) never fit evenly; lines must stay <= 7
+		},
+		{
+			name:  "base64 blob",
+			line:  strings.Repeat("QmFzZTY0", 25),
+			width: 16,
+		},
+		{
+			name:  "single wide rune wider than width",
+			line:  "漢",
+			width: 1, // rune width 2 > wrap width; must still be emitted, not dropped
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			wrapped := wrapLine(tc.line, tc.width)
+
+			// No content may be lost
+			want := strings.Join(strings.Fields(tc.line), "")
+			got := joinWrappedContent(wrapped)
+			if got != want {
+				t.Errorf("wrapLine dropped content:\n got %q\nwant %q", got, want)
+			}
+
+			// No line may exceed the wrap width (except a single rune wider
+			// than the width itself, which cannot be split further)
+			for i, l := range wrapped {
+				w := visualWidth(l)
+				if w > tc.width && len([]rune(l)) > 1 {
+					t.Errorf("line %d %q has visual width %d > %d", i, l, w, tc.width)
+				}
+			}
+		})
+	}
+}
+
+// TestWrapLine_LongWordRemainderJoinsNextWords verifies that after
+// hard-breaking an overlong word, the remainder seeds the current line so
+// following short words pack onto it instead of starting a fresh line.
+func TestWrapLine_LongWordRemainderJoinsNextWords(t *testing.T) {
+	// "aaaaaaaaaab" (11 wide) at width 10 breaks into "aaaaaaaaaa" + "b";
+	// "cc dd" should join the "b" remainder on one line.
+	wrapped := wrapLine("aaaaaaaaaab cc dd", 10)
+	expected := []string{"aaaaaaaaaa", "b cc dd"}
+	if len(wrapped) != len(expected) {
+		t.Fatalf("wrapLine returned %d lines %q, expected %d %q", len(wrapped), wrapped, len(expected), expected)
+	}
+	for i := range expected {
+		if wrapped[i] != expected[i] {
+			t.Errorf("line %d = %q, expected %q", i, wrapped[i], expected[i])
+		}
+	}
+}
+
+// TestBreakLongWord covers the visual-width chunking helper directly.
+func TestBreakLongWord(t *testing.T) {
+	t.Run("ascii exact chunks", func(t *testing.T) {
+		chunks := breakLongWord("abcdefghij", 4)
+		expected := []string{"abcd", "efgh", "ij"}
+		if len(chunks) != len(expected) {
+			t.Fatalf("got %q, expected %q", chunks, expected)
+		}
+		for i := range expected {
+			if chunks[i] != expected[i] {
+				t.Errorf("chunk %d = %q, expected %q", i, chunks[i], expected[i])
+			}
+		}
+	})
+
+	t.Run("cjk never splits a wide rune across the boundary", func(t *testing.T) {
+		// Each rune is 2 columns; at width 5 only 2 runes (4 cols) fit per chunk
+		chunks := breakLongWord("漢字漢字漢", 5)
+		expected := []string{"漢字", "漢字", "漢"}
+		if len(chunks) != len(expected) {
+			t.Fatalf("got %q, expected %q", chunks, expected)
+		}
+		for i := range expected {
+			if chunks[i] != expected[i] {
+				t.Errorf("chunk %d = %q, expected %q", i, chunks[i], expected[i])
+			}
+		}
+	})
+
+	t.Run("ansi codes pass through without counting", func(t *testing.T) {
+		word := "\033[38;5;220mabcd\033[0mef"
+		chunks := breakLongWord(word, 4)
+		if strings.Join(chunks, "") != word {
+			t.Errorf("ANSI content lost: %q", chunks)
+		}
+		if len(chunks) != 2 {
+			t.Fatalf("expected 2 chunks, got %q", chunks)
+		}
+		if visualWidth(chunks[0]) != 4 || visualWidth(chunks[1]) != 2 {
+			t.Errorf("chunk visual widths = %d,%d, expected 4,2", visualWidth(chunks[0]), visualWidth(chunks[1]))
+		}
+	})
+
+	t.Run("zero width returns word unchanged", func(t *testing.T) {
+		chunks := breakLongWord("abc", 0)
+		if len(chunks) != 1 || chunks[0] != "abc" {
+			t.Errorf("got %q, expected [abc]", chunks)
+		}
+	})
+}
