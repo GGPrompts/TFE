@@ -12,7 +12,43 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
+
+// openFileWithBestTool opens a file with the most appropriate viewer/editor
+// based on its type: CSV viewer, video/audio player, PDF viewer, database
+// viewer, hex viewer for binaries, or a text editor (preferring micro).
+// Returns nil (after setting a status message) if no editor is available.
+// Used by: keyboard (F4 in full-preview mode, F4 in file list).
+func (m *model) openFileWithBestTool(path string) tea.Cmd {
+	// Context-aware file opening based on file type
+	if isCSVFile(path) {
+		return openCSVViewer(path)
+	} else if isVideoFile(path) {
+		return openVideoPlayer(path)
+	} else if isAudioFile(path) {
+		return openAudioPlayer(path)
+	} else if isPDFFile(path) {
+		return openPDFViewer(path)
+	} else if isDatabaseFile(path) {
+		return openDatabaseViewer(path)
+	} else if isBinaryFile(path) && !isImageFile(path) {
+		return openHexViewer(path)
+	}
+
+	// Text files - use editor
+	editor := getAvailableEditor()
+	if editor == "" {
+		m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
+		return nil
+	}
+	// Prefer micro if available, otherwise use whatever was found
+	if editorAvailable("micro") {
+		editor = "micro"
+	}
+	return openEditor(editor, path)
+}
 
 // toggleFavorites toggles the favorites-only filter.
 // Used by: menu (toggle-favorites, go-favorites), keyboard (F6).

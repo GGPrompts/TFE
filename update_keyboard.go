@@ -613,33 +613,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "f4":
 			// Open file with appropriate viewer/editor from preview (F4)
 			if m.preview.loaded && m.preview.filePath != "" {
-				path := m.preview.filePath
-
-				// Context-aware file opening based on file type
-				if isCSVFile(path) {
-					return m, openCSVViewer(path)
-				} else if isVideoFile(path) {
-					return m, openVideoPlayer(path)
-				} else if isAudioFile(path) {
-					return m, openAudioPlayer(path)
-				} else if isPDFFile(path) {
-					return m, openPDFViewer(path)
-				} else if isDatabaseFile(path) {
-					return m, openDatabaseViewer(path)
-				} else if isBinaryFile(path) && !isImageFile(path) {
-					return m, openHexViewer(path)
-				} else {
-					// Text files - use editor
-					editor := getAvailableEditor()
-					if editor == "" {
-						m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
-						return m, nil
-					}
-					if editorAvailable("micro") {
-						editor = "micro"
-					}
-					return m, openEditor(editor, path)
-				}
+				return m, m.openFileWithBestTool(m.preview.filePath)
 			}
 
 		case "n", "N":
@@ -2332,34 +2306,7 @@ rm -f "$0"
 	case "f4":
 		// F4: Open file with appropriate viewer/editor
 		if currentFile := m.getCurrentFile(); currentFile != nil && !currentFile.isDir {
-			path := currentFile.path
-
-			// Context-aware file opening based on file type
-			if isCSVFile(path) {
-				return m, openCSVViewer(path)
-			} else if isVideoFile(path) {
-				return m, openVideoPlayer(path)
-			} else if isAudioFile(path) {
-				return m, openAudioPlayer(path)
-			} else if isPDFFile(path) {
-				return m, openPDFViewer(path)
-			} else if isDatabaseFile(path) {
-				return m, openDatabaseViewer(path)
-			} else if isBinaryFile(path) && !isImageFile(path) {
-				return m, openHexViewer(path)
-			} else {
-				// Text files - use editor
-				editor := getAvailableEditor()
-				if editor == "" {
-					m.setStatusMessage("No editor available (tried micro, nano, vim, vi)", true)
-					return m, nil
-				}
-				// Prefer micro if available, otherwise use whatever was found
-				if editorAvailable("micro") {
-					editor = "micro"
-				}
-				return m, openEditor(editor, path)
-			}
+			return m, m.openFileWithBestTool(currentFile.path)
 		}
 
 	case "n", "N":
