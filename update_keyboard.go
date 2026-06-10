@@ -1963,8 +1963,10 @@ rm -f "$0"
 				// Page down in file list
 				visibleLines := m.getFileListVisibleLines()
 				m.cursor += visibleLines
-				if m.cursor >= len(m.files) {
-					m.cursor = len(m.files) - 1
+				// Clamp against the displayed list (filtered/tree), not len(m.files),
+				// matching the down-arrow/wheel logic (tfe-978)
+				if maxCursor := m.getMaxCursor(); m.cursor > maxCursor {
+					m.cursor = maxCursor
 				}
 				if m.cursor < 0 {
 					m.cursor = 0
@@ -1991,8 +1993,10 @@ rm -f "$0"
 			// Single-pane mode: page down in file list
 			visibleLines := m.getFileListVisibleLines()
 			m.cursor += visibleLines
-			if m.cursor >= len(m.files) {
-				m.cursor = len(m.files) - 1
+			// Clamp against the displayed list (filtered/tree), not len(m.files),
+			// matching the down-arrow/wheel logic (tfe-978)
+			if maxCursor := m.getMaxCursor(); m.cursor > maxCursor {
+				m.cursor = maxCursor
 			}
 			if m.cursor < 0 {
 				m.cursor = 0

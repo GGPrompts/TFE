@@ -507,6 +507,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				m.changedFiles = changed
+				// The changes list may have shrunk below the cursor; clamp
+				// against the displayed list so the selection stays in
+				// bounds instead of vanishing (tfe-978)
+				if max := m.getMaxCursor(); m.cursor > max {
+					m.cursor = max
+				}
+				if m.cursor < 0 {
+					m.cursor = 0
+				}
 			}
 		}
 

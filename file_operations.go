@@ -533,13 +533,19 @@ func (m *model) loadFiles() {
 	m.files = append(m.files, dirs...)
 	m.files = append(m.files, files...)
 
-	// Reset cursor if out of bounds
-	if m.cursor >= len(m.files) {
-		m.cursor = 0
-	}
-
 	// Apply sorting based on sortBy and sortAsc settings
 	m.sortFiles()
+
+	// Clamp cursor against the displayed list (filtered/tree), preserving
+	// position instead of jumping to top (tfe-978). This runs after
+	// sortFiles() so the tree cache is marked dirty and getMaxCursor
+	// rebuilds from the fresh listing.
+	if max := m.getMaxCursor(); m.cursor > max {
+		m.cursor = max
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
 
 	// Populate agent metadata for agent view
 	if m.showAgentView {
