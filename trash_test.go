@@ -393,6 +393,114 @@ func TestRestoreFromTrash_Conflict(t *testing.T) {
 	}
 }
 
+// TestRestoreFromTrash_CrossDevice tests restore when the trash dir is on a
+// different filesystem than the original location (rename fails with EXDEV),
+// exercising the copy+delete fallback that mirrors moveToTrash.
+func TestRestoreFromTrash_CrossDevice(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	// Create and trash a file
+	testFile := filepath.Join(tmpHome, "test.txt")
+	createTestFile(t, testFile, "cross-device restore")
+
+	if err := moveToTrash(testFile); err != nil {
+		t.Fatalf("moveToTrash failed: %v", err)
+	}
+
+	items, err := loadTrashMetadata()
+	if err != nil {
+		t.Fatalf("Failed to load metadata: %v", err)
+	}
+	trashedPath := items[0].TrashedPath
+
+	// Simulate cross-device rename failure so the copy+delete fallback runs
+	originalRename := restoreRename
+	restoreRename = func(oldpath, newpath string) error {
+		return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+	}
+	defer func() { restoreRename = originalRename }()
+
+	if err := restoreFromTrash(trashedPath); err != nil {
+		t.Fatalf("restoreFromTrash failed: %v", err)
+	}
+
+	// Verify file is restored with correct content
+	content, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("Restored file does not exist: %v", err)
+	}
+	if string(content) != "cross-device restore" {
+		t.Errorf("Restored file content mismatch: got %s", string(content))
+	}
+
+	// Verify trashed copy is removed after successful copy
+	if _, err := os.Stat(trashedPath); !os.IsNotExist(err) {
+		t.Error("Trashed copy still exists after cross-device restore")
+	}
+
+	// Verify metadata entry was removed
+	items, err = loadTrashMetadata()
+	if err != nil {
+		t.Fatalf("Failed to load metadata: %v", err)
+	}
+	if len(items) != 0 {
+		t.Errorf("Expected empty trash after restore, got %d items", len(items))
+	}
+}
+
+// TestRestoreFromTrash_CrossDeviceCopyFailure tests that when the cross-device
+// copy fallback fails, the partial copy at the original location is cleaned up
+// and an error is returned.
+func TestRestoreFromTrash_CrossDeviceCopyFailure(t *testing.T) {
+	tmpHome, cleanup := setupTestTrash(t)
+	defer cleanup()
+
+	// Create and trash a file
+	testFile := filepath.Join(tmpHome, "test.txt")
+	createTestFile(t, testFile, "content")
+
+	if err := moveToTrash(testFile); err != nil {
+		t.Fatalf("moveToTrash failed: %v", err)
+	}
+
+	items, err := loadTrashMetadata()
+	if err != nil {
+		t.Fatalf("Failed to load metadata: %v", err)
+	}
+	trashedPath := items[0].TrashedPath
+
+	// Simulate cross-device rename failure, then make the copy fail too by
+	// removing the trashed source so copyRecursive has nothing to read.
+	originalRename := restoreRename
+	restoreRename = func(oldpath, newpath string) error {
+		return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+	}
+	defer func() { restoreRename = originalRename }()
+
+	if err := os.Remove(trashedPath); err != nil {
+		t.Fatalf("Failed to remove trashed file: %v", err)
+	}
+
+	if err := restoreFromTrash(trashedPath); err == nil {
+		t.Error("Expected restore to fail when cross-device copy fails")
+	}
+
+	// Verify no partial copy is left at the original location
+	if _, err := os.Stat(testFile); !os.IsNotExist(err) {
+		t.Error("Partial copy left at original location after failed restore")
+	}
+
+	// Metadata should be unchanged (item still present)
+	items, err = loadTrashMetadata()
+	if err != nil {
+		t.Fatalf("Failed to load metadata: %v", err)
+	}
+	if len(items) != 1 {
+		t.Errorf("Expected trash item to remain after failed restore, got %d items", len(items))
+	}
+}
+
 // TestEmptyTrash tests permanently deleting all trash
 func TestEmptyTrash(t *testing.T) {
 	tmpHome, cleanup := setupTestTrash(t)

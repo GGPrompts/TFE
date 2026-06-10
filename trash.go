@@ -201,6 +201,11 @@ func moveToTrash(path string) error {
 // failures (e.g. cross-device EXDEV) when exercising the rollback fallback.
 var rollbackRename = os.Rename
 
+// restoreRename is os.Rename, indirected so tests can simulate rename
+// failures (e.g. cross-device EXDEV) when exercising the copy+delete fallback
+// in restoreFromTrash.
+var restoreRename = os.Rename
+
 // rollbackTrashMove moves a file back from trash to its original location
 // after a metadata failure. os.Rename alone is not enough: if the original
 // move used the copy+delete fallback (cross-device), the reverse rename
@@ -264,9 +269,35 @@ func restoreFromTrash(trashedPath string) error {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
+	// Re-stat the original path immediately before the rename to narrow the
+	// TOCTOU window from the existence check above: os.Rename would silently
+	// overwrite a file created at OriginalPath between the check and the move.
+	if _, err := os.Stat(item.OriginalPath); err == nil {
+		return fmt.Errorf("cannot restore: file already exists at original location")
+	}
+
 	// Restore the file
-	if err := os.Rename(trashedPath, item.OriginalPath); err != nil {
-		return fmt.Errorf("failed to restore file: %w", err)
+	// Try rename first (fast, atomic)
+	if err := restoreRename(trashedPath, item.OriginalPath); err != nil {
+		// Check if this is a cross-device error (different mount points).
+		// Exactly the files that needed the copy fallback when trashed
+		// (e.g. anything deleted from /tmp or another mount) hit this on
+		// restore too, so mirror moveToTrash's cross-device handling.
+		if errors.Is(err, syscall.EXDEV) {
+			// Fallback to copy+delete for cross-device moves
+			if err := copyRecursive(trashedPath, item.OriginalPath); err != nil {
+				// Clean up the partial copy so a failed restore doesn't
+				// leave a half-written file at the original location.
+				os.RemoveAll(item.OriginalPath)
+				return fmt.Errorf("failed to restore file: %w", err)
+			}
+
+			// Only delete the trash copy after a successful copy
+			os.RemoveAll(trashedPath)
+		} else {
+			// Some other error (permissions, etc.)
+			return fmt.Errorf("failed to restore file: %w", err)
+		}
 	}
 
 	// Remove from metadata
