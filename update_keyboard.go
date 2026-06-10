@@ -540,6 +540,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.populatePreviewCache() // Refresh cache with new width
 			// Clear any stray command input that might have captured terminal responses
 			m.commandInput = ""
+			m.commandCursorPos = 0
 			m.commandFocused = false
 			// Reset mouse mode when exiting preview
 			m.previewMouseEnabled = true
@@ -551,6 +552,7 @@ func (m model) handleKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.calculateLayout()
 			m.populatePreviewCache() // Refresh cache with new width
 			m.commandInput = ""
+			m.commandCursorPos = 0
 			m.commandFocused = false
 			m.previewMouseEnabled = true
 			return m, tea.EnableMouseCellMotion
@@ -1284,6 +1286,15 @@ rm -f "$0"
 
 	// Handle command prompt input (focus-based: only active when commandFocused)
 	// NOTE: File picker mode is now handled at top of function (PRIORITY 1)
+	// Defense in depth: clamp cursor position in case any code path cleared or
+	// shortened m.commandInput without resetting m.commandCursorPos (prevents
+	// out-of-range slicing in the insertion/backspace/ctrl+k handlers below)
+	if m.commandCursorPos > len(m.commandInput) {
+		m.commandCursorPos = len(m.commandInput)
+	}
+	if m.commandCursorPos < 0 {
+		m.commandCursorPos = 0
+	}
 	// Special keys that interact with command prompt
 	switch msg.String() {
 	case "enter":
@@ -1292,6 +1303,7 @@ rm -f "$0"
 			cmd := m.commandInput
 			m.addToHistory(cmd)
 			m.commandInput = ""
+			m.commandCursorPos = 0
 			m.commandFocused = false // Exit command mode after executing
 			m.clearGhostText()
 

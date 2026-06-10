@@ -367,6 +367,7 @@ git pull
 					if !m.commandFocused {
 						// Clear command input when exiting command mode via click
 						m.commandInput = ""
+						m.commandCursorPos = 0
 					}
 					return m, nil
 				}
@@ -1044,6 +1045,7 @@ git pull
 				// Clear command input to remove any unwanted paste from terminal's right-click paste
 				// (Many terminals paste clipboard on right-click before sending the click event)
 				m.commandInput = ""
+				m.commandCursorPos = 0
 
 				// Get the file item based on display mode
 				// We explicitly allocate on heap to ensure the pointer remains valid

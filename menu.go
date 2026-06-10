@@ -889,6 +889,7 @@ Additional context: {{variable2}}
 		m.commandFocused = !m.commandFocused
 		if !m.commandFocused {
 			m.commandInput = ""
+			m.commandCursorPos = 0
 		}
 
 	case "toggle-search":
