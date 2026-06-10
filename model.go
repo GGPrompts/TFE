@@ -124,8 +124,13 @@ func initialModel() model {
 		cachedMenus:     nil,                  // Will be built on first access
 		// Performance caching
 		promptDirsCache: make(map[string]bool), // Cache for prompts filter performance
-		// Agent auto-watch: enable via config or TFE_AUTO_CHANGES=1
+		// Agent auto-watch: enable via config or TFE_AUTO_CHANGES=1.
+		// agentTickRunning mirrors agentAutoWatch here because Init() starts
+		// agentCheckTick() when auto-watch is on at startup; the flag must
+		// reflect that live loop so a mid-session toggle doesn't start a
+		// second concurrent tick (Init has a value receiver and cannot set it).
 		agentAutoWatch:         cfg.AutoChanges,
+		agentTickRunning:       cfg.AutoChanges,
 		lastKnownAgentSessions: make(map[string]string),
 		// Unified configuration
 		config: cfg,

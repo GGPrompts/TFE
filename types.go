@@ -343,6 +343,7 @@ type model struct {
 	watchedPath   string              // Currently watched directory path
 	// Agent auto-watch (auto-open changes mode when agent finishes)
 	agentAutoWatch         bool              // Whether auto-watch is enabled (TFE_AUTO_CHANGES=1)
+	agentTickRunning       bool              // True while an agentCheckTick is scheduled (prevents stacking ticks)
 	lastKnownAgentSessions map[string]string // session_id -> status (for detecting completions)
 	// Unified configuration (loaded from ~/.config/tfe/config.toml)
 	config Config

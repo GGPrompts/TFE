@@ -136,6 +136,21 @@ func (m *model) settingsToggleCmd(key string, newVal bool) tea.Cmd {
 	if key == "file_watcher_enabled" && newVal && !m.watcherActive {
 		return m.startWatcher(m.currentPath)
 	}
+	// Enabling Auto Changes mid-session must start the agent poll loop, which
+	// otherwise is only created in Init at startup. The agentTickRunning guard
+	// prevents stacking a second concurrent loop if one is already live (e.g.
+	// a stale loop that has not yet observed agentAutoWatch=false). Seed
+	// lastKnownAgentSessions so the first poll diffs against the current state
+	// rather than an empty map (which would falsely flag every session).
+	if key == "auto_changes" && newVal && !m.agentTickRunning {
+		for _, s := range getAgentSessions() {
+			if s.ParentSessionID == "" { // Only track top-level sessions
+				m.lastKnownAgentSessions[s.SessionID] = s.Status
+			}
+		}
+		m.agentTickRunning = true
+		return agentCheckTick()
+	}
 	return nil
 }
 

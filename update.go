@@ -45,6 +45,8 @@ func (m model) Init() tea.Cmd {
 				m.lastKnownAgentSessions[s.SessionID] = s.Status
 			}
 		}
+		// agentTickRunning is seeded to match in initialModel (Init has a value
+		// receiver, so setting it here would not persist to the running model).
 		cmds = append(cmds, agentCheckTick())
 	}
 
@@ -503,11 +505,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case agentCheckTickMsg:
-		// Periodic poll: detect agent session completions
-		if m.agentAutoWatch {
-			if cmd := m.checkAgentCompletions(); cmd != nil {
-				return m, tea.Batch(cmd, agentCheckTick())
-			}
+		// Periodic poll: detect agent session completions. This tick is only
+		// scheduled while auto-watch is enabled; re-arm only while it stays
+		// enabled so disabling Auto Changes lets the loop self-terminate.
+		if !m.agentAutoWatch {
+			m.agentTickRunning = false
+			return m, nil
+		}
+		if cmd := m.checkAgentCompletions(); cmd != nil {
+			return m, tea.Batch(cmd, agentCheckTick())
 		}
 		return m, agentCheckTick() // Re-schedule next check
 
