@@ -296,7 +296,9 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
-		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, deletedHeader, extraWidth, locationHeader)
+		// Last text column (location) uses visual-width padding to match data rows
+		// exactly (LESSONS_LEARNED: headers and data rows must use identical formatting).
+		header = fmt.Sprintf("%s  %-*s  %-*s  %s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, deletedHeader, m.padToVisualWidth(locationHeader, extraWidth))
 	} else if m.showFavoritesOnly {
 		// Favorites mode: Name, Size, Modified, Location
 		nameHeader := "Name"
@@ -315,7 +317,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
-		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
+		// Last text column (location) uses visual-width padding to match data rows.
+		header = fmt.Sprintf("%s  %-*s  %-*s  %s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, m.padToVisualWidth(locationHeader, extraWidth))
 	} else if m.showGitReposOnly {
 		// Git repos mode: Name, Branch, Status, Last Commit
 		nameHeader := "Name"
@@ -356,7 +359,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		nameWidth = usableWidth - branchWidth - statusWidth - commitWidth
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
-		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, branchWidth, branchHeader, statusWidth, statusHeader, commitWidth, commitHeader)
+		// Last text column (last commit) uses visual-width padding to match data rows.
+		header = fmt.Sprintf("%s  %-*s  %-*s  %s", paddedNameHeader, branchWidth, branchHeader, statusWidth, statusHeader, m.padToVisualWidth(commitHeader, commitWidth))
 	} else if m.showAgentView {
 		// Agent view: Name, Modified, Description
 		nameHeader := "Agent"
@@ -372,7 +376,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
-		header = fmt.Sprintf("%s  %-*s  %-*s", paddedNameHeader, modifiedWidth, modifiedHeader, extraWidth, descHeader)
+		// Last text column (description) uses visual-width padding to match data rows.
+		header = fmt.Sprintf("%s  %-*s  %s", paddedNameHeader, modifiedWidth, modifiedHeader, m.padToVisualWidth(descHeader, extraWidth))
 	} else if m.showChangesOnly {
 		// Changes mode: Name (with status), Size, Modified, Location
 		nameHeader := "Name"
@@ -391,7 +396,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
-		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, locationHeader)
+		// Last text column (location) uses visual-width padding to match data rows.
+		header = fmt.Sprintf("%s  %-*s  %-*s  %s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, m.padToVisualWidth(locationHeader, extraWidth))
 	} else {
 		// Regular mode: Name, Size, Modified, Type
 		nameHeader := "Name"
@@ -412,7 +418,8 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 
 		paddedNameHeader := m.padToVisualWidth(nameHeader, nameWidth)
-		header = fmt.Sprintf("%s  %-*s  %-*s  %-*s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, extraWidth, typeHeader)
+		// Last text column (type) uses visual-width padding to match data rows.
+		header = fmt.Sprintf("%s  %-*s  %-*s  %s", paddedNameHeader, sizeWidth, sizeHeader, modifiedWidth, modifiedHeader, m.padToVisualWidth(typeHeader, extraWidth))
 	}
 
 	// Add "  " prefix to header to match data row padding

@@ -377,6 +377,91 @@ func TestExpandCollapseMarksTreeDirty(t *testing.T) {
 	}
 }
 
+// TestDetailRowLastColumnVisualWidthPadding verifies that the last detail-view
+// text column (location/desc/type) is padded by visual width, not bytes: a row
+// whose location contains multibyte (CJK / accented) characters must produce a
+// location column of the SAME visual width as an ASCII one. Byte padding
+// (fmt.Sprintf %-*s) would over-count multibyte bytes and produce a shorter
+// visual column, misaligning anything that follows (tfe-15n).
+func TestDetailRowLastColumnVisualWidthPadding(t *testing.T) {
+	m := model{terminalType: terminalUnknown}
+
+	const width = 40
+
+	// ASCII baseline and several multibyte values that all fit inside `width`.
+	cases := map[string]string{
+		"ascii":    "abc",
+		"accented": "żółw", // Polish: 4 runes, >4 bytes
+		"cjk":      "路径",   // 2 CJK runes = 4 cells
+		"mixed":    "a路b",  // ASCII + CJK
+	}
+
+	baseline := visualWidth(m.padToVisualWidth(cases["ascii"], width))
+	if baseline != width {
+		t.Fatalf("ascii padToVisualWidth visual width = %d, want %d", baseline, width)
+	}
+
+	for name, val := range cases {
+		got := visualWidth(m.padToVisualWidth(val, width))
+		if got != width {
+			t.Errorf("%s: padToVisualWidth(%q, %d) visual width = %d, want %d",
+				name, val, width, got, width)
+		}
+	}
+}
+
+// TestRenderDetailViewFavoritesMultibyteLocationAligned renders the favorites
+// detail view with two files whose location dirs differ only by ASCII vs
+// multibyte content, and asserts both data rows render to the same visual
+// width — i.e. the location column is padded by visual width, keeping the
+// header/data columns aligned (tfe-15n).
+func TestRenderDetailViewFavoritesMultibyteLocationAligned(t *testing.T) {
+	asciiDir := t.TempDir()
+	asciiFile := filepath.Join(asciiDir, "note.txt")
+	if err := os.WriteFile(asciiFile, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write ascii file: %v", err)
+	}
+
+	// Parent dir name with accented + CJK characters (multibyte, wide).
+	mbParent := filepath.Join(t.TempDir(), "żółw路径")
+	if err := os.MkdirAll(mbParent, 0o755); err != nil {
+		t.Fatalf("mkdir multibyte: %v", err)
+	}
+	mbFile := filepath.Join(mbParent, "note.txt")
+	if err := os.WriteFile(mbFile, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write multibyte file: %v", err)
+	}
+
+	m := &model{
+		width:             120,
+		showFavoritesOnly: true,
+		favorites:         map[string]bool{asciiFile: true, mbFile: true},
+		files: []fileItem{
+			{name: "note.txt", path: asciiFile, size: 1},
+			{name: "note.txt", path: mbFile, size: 1},
+		},
+	}
+
+	out := m.renderDetailView(20)
+	lines := strings.Split(out, "\n")
+
+	// Collect the visual widths of the two data rows (skip the header line).
+	var dataWidths []int
+	for _, line := range lines[1:] {
+		if strings.TrimSpace(stripANSI(line)) == "" {
+			continue
+		}
+		dataWidths = append(dataWidths, visualWidth(stripANSI(line)))
+	}
+	if len(dataWidths) != 2 {
+		t.Fatalf("expected 2 data rows, got %d (output:\n%s)", len(dataWidths), out)
+	}
+	if dataWidths[0] != dataWidths[1] {
+		t.Errorf("data rows have differing visual widths %d vs %d; multibyte location "+
+			"column not padded by visual width:\n%s", dataWidths[0], dataWidths[1], out)
+	}
+}
+
 // TestRenderDetailViewChangesModeGitRootRelative verifies that changes-mode
 // detail rendering shortens each row's location to a path relative to the git
 // root. The git root and home dir are computed once above the row loop (see
