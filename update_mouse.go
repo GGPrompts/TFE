@@ -105,7 +105,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Check if click is in panes (not in header or status bar)
 		// Header is 4 lines total (title, toolbar, command, separator)
 		headerLines := 4
-		footerLines := 4  // blank + 2 status lines + optional message/search
+		footerLines := 4 // blank + 2 status lines + optional message/search
 
 		if msg.Y >= headerLines && msg.Y < m.height-footerLines {
 			oldFocus := m.focusedPane
@@ -122,7 +122,7 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				paneY := msg.Y - headerLines
 
 				if paneY < topHeight {
-					m.focusedPane = leftPane  // Top pane (file list)
+					m.focusedPane = leftPane // Top pane (file list)
 				} else {
 					m.focusedPane = rightPane // Bottom pane (preview)
 				}
@@ -153,9 +153,13 @@ func (m model) handleMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				// Toggle footer scrolling
 				m.footerScrolling = !m.footerScrolling
 				if m.footerScrolling {
-					// Start scrolling animation
+					// Start scrolling animation. Bump the generation so any
+					// still-in-flight tick from a previous chain becomes stale
+					// and self-collapses on its next fire, leaving exactly one
+					// live chain regardless of rapid off/on toggling.
+					m.footerTickGen++
 					m.footerOffset = 0 // Reset offset when starting
-					return m, footerTick()
+					return m, footerTick(m.footerTickGen)
 				}
 				// If stopping, just return without scheduling tick
 				return m, nil
@@ -674,39 +678,39 @@ git pull
 				headerOffset += 1 // Add 1 for detail view's header only (separator removed)
 			}
 
-		// Calculate visible range to account for scrolling
-		// Must match view.go and render_preview.go calculations
-		var maxVisible int
-		var contentHeight int
+			// Calculate visible range to account for scrolling
+			// Must match view.go and render_preview.go calculations
+			var maxVisible int
+			var contentHeight int
 
-		if m.viewMode == viewDualPane {
-			// Dual-pane: calculate based on current accordion state
-			headerLines := 4
-			footerLines := 4
-			totalAvailable := m.height - headerLines - footerLines
+			if m.viewMode == viewDualPane {
+				// Dual-pane: calculate based on current accordion state
+				headerLines := 4
+				footerLines := 4
+				totalAvailable := m.height - headerLines - footerLines
 
-			// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
-			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+				// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
+				useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
 
-			if useVerticalSplit {
-				// VERTICAL split - top pane height from accordion or locked ratio (matches render_layout.go)
-				topHeight, _ := m.verticalSplitHeights(totalAvailable)
-				maxVisible = topHeight - 2  // Content height inside borders
+				if useVerticalSplit {
+					// VERTICAL split - top pane height from accordion or locked ratio (matches render_layout.go)
+					topHeight, _ := m.verticalSplitHeights(totalAvailable)
+					maxVisible = topHeight - 2 // Content height inside borders
+				} else {
+					// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
+					maxVisible = totalAvailable - 2 // Content area inside borders
+				}
+				contentHeight = maxVisible
 			} else {
-				// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
-				maxVisible = totalAvailable - 2  // Content area inside borders
+				// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
+				maxVisible = m.height - 9
+				contentHeight = maxVisible - 2 // Content area inside borders
+				maxVisible = contentHeight
 			}
-			contentHeight = maxVisible
-		} else {
-			// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
-			maxVisible = m.height - 9
-			contentHeight = maxVisible - 2 // Content area inside borders
-			maxVisible = contentHeight
-		}
 
-		if m.displayMode == modeDetail {
-			maxVisible -= 1 // Account for detail header line
-		}
+			if m.displayMode == modeDetail {
+				maxVisible -= 1 // Account for detail header line
+			}
 
 			// Get filtered files for click detection (respects favorites filter)
 			// This must match what's actually rendered on screen
@@ -778,7 +782,7 @@ git pull
 						// Return to preview mode
 						m.filePickerMode = false
 						m.showPromptsOnly = m.filePickerRestorePrompts // Restore prompts filter
-						m.loadFiles()                                   // Reload files with restored filter
+						m.loadFiles()                                  // Reload files with restored filter
 						m.viewMode = viewFullPreview
 
 						// Reload the original preview
@@ -854,7 +858,7 @@ git pull
 						// Enter full-screen preview (only if NOT in file picker mode)
 						m.loadPreview(clickedFile.path)
 						m.viewMode = viewFullPreview
-						m.calculateLayout() // Update widths for full-screen
+						m.calculateLayout()      // Update widths for full-screen
 						m.populatePreviewCache() // Repopulate cache with correct width
 						// Reset click tracking after double-click
 						m.lastClickIndex = -1
@@ -907,39 +911,39 @@ git pull
 			}
 
 			// Must match view.go and render_preview.go calculations (same as left-click handler)
-		// Calculate visible range to account for scrolling
-		// Must match view.go and render_preview.go calculations
-		var maxVisible int
-		var contentHeight int
+			// Calculate visible range to account for scrolling
+			// Must match view.go and render_preview.go calculations
+			var maxVisible int
+			var contentHeight int
 
-		if m.viewMode == viewDualPane {
-			// Dual-pane: calculate based on current accordion state
-			headerLines := 4
-			footerLines := 4
-			totalAvailable := m.height - headerLines - footerLines
+			if m.viewMode == viewDualPane {
+				// Dual-pane: calculate based on current accordion state
+				headerLines := 4
+				footerLines := 4
+				totalAvailable := m.height - headerLines - footerLines
 
-			// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
-			useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
+				// Check if using VERTICAL split (Detail mode always uses vertical, List/Tree on narrow terminals)
+				useVerticalSplit := m.displayMode == modeDetail || m.isNarrowTerminal()
 
-			if useVerticalSplit {
-				// VERTICAL split - top pane height from accordion or locked ratio (matches render_layout.go)
-				topHeight, _ := m.verticalSplitHeights(totalAvailable)
-				maxVisible = topHeight - 2  // Content height inside borders
+				if useVerticalSplit {
+					// VERTICAL split - top pane height from accordion or locked ratio (matches render_layout.go)
+					topHeight, _ := m.verticalSplitHeights(totalAvailable)
+					maxVisible = topHeight - 2 // Content height inside borders
+				} else {
+					// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
+					maxVisible = totalAvailable - 2 // Content area inside borders
+				}
+				contentHeight = maxVisible
 			} else {
-				// HORIZONTAL split (List/Tree on wide terminals) - height is fixed
-				maxVisible = totalAvailable - 2  // Content area inside borders
+				// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
+				maxVisible = m.height - 9
+				contentHeight = maxVisible - 2 // Content area inside borders
+				maxVisible = contentHeight
 			}
-			contentHeight = maxVisible
-		} else {
-			// Single-pane: maxVisible = m.height - 9 (total box height INCLUDING borders)
-			maxVisible = m.height - 9
-			contentHeight = maxVisible - 2 // Content area inside borders
-			maxVisible = contentHeight
-		}
 
-		if m.displayMode == modeDetail {
-			maxVisible -= 1 // Account for detail header line
-		}
+			if m.displayMode == modeDetail {
+				maxVisible -= 1 // Account for detail header line
+			}
 
 			// Get filtered files for right-click detection (respects favorites filter)
 			var displayedFiles []fileItem

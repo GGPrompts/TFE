@@ -248,12 +248,12 @@ type model struct {
 	// Prompts system
 	showPromptsOnly bool // Filter to show only prompt files (.yaml, .md, .txt)
 	// Git repositories filter
-	showGitReposOnly  bool       // Filter to show only git repositories
-	gitReposList      []fileItem // Cached list of discovered git repos (recursive scan)
-	gitReposLastScan  time.Time  // When we last scanned for git repos
-	gitReposScanRoot  string     // Root directory of last scan
-	gitReposScanDepth int        // Max depth to scan (default: 5)
-	gitReposTickActive bool      // True while a gitReposTick is scheduled (prevents stacking ticks)
+	showGitReposOnly   bool       // Filter to show only git repositories
+	gitReposList       []fileItem // Cached list of discovered git repos (recursive scan)
+	gitReposLastScan   time.Time  // When we last scanned for git repos
+	gitReposScanRoot   string     // Root directory of last scan
+	gitReposScanDepth  int        // Max depth to scan (default: 5)
+	gitReposTickActive bool       // True while a gitReposTick is scheduled (prevents stacking ticks)
 	// Git changes filter (working set: modified/untracked files across project)
 	showChangesOnly       bool              // Filter to show only git-changed/untracked files
 	changedFiles          []fileItem        // Cached list of changed files from git status
@@ -331,6 +331,7 @@ type model struct {
 	// Footer scrolling (click to activate)
 	footerScrolling bool // Whether footer is currently scrolling
 	footerOffset    int  // Horizontal scroll offset for footer text
+	footerTickGen   int  // Generation counter for footer tick chains (bumped each time scrolling starts; stale ticks self-collapse)
 	// Standalone preview mode (tfe --preview /path/to/file)
 	previewOnly bool // When true, only show file preview with minimal UI (for tmux splits)
 	// Tab-based review system (for changes mode)
@@ -375,8 +376,10 @@ type treeItem struct {
 // editorFinishedMsg is sent when external editor exits
 type editorFinishedMsg struct{ err error }
 
-// footerTickMsg is sent periodically to animate footer scrolling
-type footerTickMsg struct{}
+// footerTickMsg is sent periodically to animate footer scrolling.
+// It carries the generation of the tick chain that scheduled it so the
+// handler can drop ticks from stale chains (see footerTickGen).
+type footerTickMsg struct{ gen int }
 
 // fuzzySearchResultMsg is sent when fuzzy search completes
 type fuzzySearchResultMsg struct {
@@ -417,15 +420,15 @@ const (
 type dialogAction int
 
 const (
-	dialogActionNone           dialogAction = iota // Plain message/settings dialogs (no confirm behavior)
-	dialogActionCreateDir                          // Create a new directory
-	dialogActionCreateFile                         // Create a new file
-	dialogActionRename                             // Rename a file or directory
-	dialogActionMoveToTrash                        // Move entry to trash
-	dialogActionPermanentDelete                    // Permanently delete from trash
-	dialogActionEmptyTrash                         // Empty the trash
-	dialogActionDeleteEntry                        // Hard-delete a file or directory
-	dialogActionPullRebuild                        // Pull & rebuild TFE
+	dialogActionNone            dialogAction = iota // Plain message/settings dialogs (no confirm behavior)
+	dialogActionCreateDir                           // Create a new directory
+	dialogActionCreateFile                          // Create a new file
+	dialogActionRename                              // Rename a file or directory
+	dialogActionMoveToTrash                         // Move entry to trash
+	dialogActionPermanentDelete                     // Permanently delete from trash
+	dialogActionEmptyTrash                          // Empty the trash
+	dialogActionDeleteEntry                         // Hard-delete a file or directory
+	dialogActionPullRebuild                         // Pull & rebuild TFE
 )
 
 // dialogModel holds dialog state

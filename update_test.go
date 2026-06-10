@@ -114,3 +114,39 @@ func BenchmarkStripANSI(b *testing.B) {
 		stripANSI(line)
 	}
 }
+
+// TestFooterTickGeneration verifies that footer scroll ticks carry a
+// generation stamp and that the Update handler drops ticks belonging to a
+// stale chain (gen mismatch) while re-arming only the current generation.
+// This guards against overlapping in-flight tick chains accumulating when
+// the user rapidly toggles footer scrolling off and back on (tfe-pjx).
+func TestFooterTickGeneration(t *testing.T) {
+	// Current generation, scrolling active: should advance offset and re-arm.
+	m := model{footerScrolling: true, footerTickGen: 3, footerOffset: 0}
+	updated, cmd := m.Update(footerTickMsg{gen: 3})
+	um := updated.(model)
+	if cmd == nil {
+		t.Fatalf("current-gen tick while scrolling must re-arm (non-nil cmd)")
+	}
+	if um.footerOffset != 1 {
+		t.Errorf("current-gen tick should advance footerOffset: got %d, want 1", um.footerOffset)
+	}
+
+	// Stale generation: must be dropped with no re-arm, even while scrolling.
+	m2 := model{footerScrolling: true, footerTickGen: 5, footerOffset: 7}
+	updated2, cmd2 := m2.Update(footerTickMsg{gen: 4})
+	um2 := updated2.(model)
+	if cmd2 != nil {
+		t.Errorf("stale-gen tick must not re-arm (expected nil cmd)")
+	}
+	if um2.footerOffset != 7 {
+		t.Errorf("stale-gen tick must not advance footerOffset: got %d, want 7", um2.footerOffset)
+	}
+
+	// Current generation but scrolling stopped: no re-arm.
+	m3 := model{footerScrolling: false, footerTickGen: 2}
+	_, cmd3 := m3.Update(footerTickMsg{gen: 2})
+	if cmd3 != nil {
+		t.Errorf("current-gen tick with scrolling off must not re-arm (expected nil cmd)")
+	}
+}

@@ -28,8 +28,8 @@ import (
 func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.spinner.Tick,
-		tickCmd(),          // Start landing page animation
-		checkForUpdates(),  // Check for new releases on GitHub
+		tickCmd(),         // Start landing page animation
+		checkForUpdates(), // Check for new releases on GitHub
 	}
 
 	// Start file watcher for the initial directory
@@ -83,10 +83,13 @@ func gitReposTick() tea.Cmd {
 	})
 }
 
-// footerTick sends periodic messages to animate footer scrolling
-func footerTick() tea.Cmd {
+// footerTick sends periodic messages to animate footer scrolling.
+// The supplied gen is captured in the closure (at scheduling time) and
+// stamped onto the emitted footerTickMsg so the handler can detect and
+// drop ticks belonging to a stale (superseded) scroll chain.
+func footerTick(gen int) tea.Cmd {
 	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
-		return footerTickMsg{}
+		return footerTickMsg{gen: gen}
 	})
 }
 
@@ -304,10 +307,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, gitReposTick()
 
 	case footerTickMsg:
+		// Drop ticks from a stale chain: only the current generation re-arms.
+		// This collapses overlapping chains (from rapid off/on toggling) to one.
+		if msg.gen != m.footerTickGen {
+			return m, nil
+		}
 		// Animate footer scrolling if active
 		if m.footerScrolling {
 			m.footerOffset++
-			return m, footerTick() // Continue scrolling
+			return m, footerTick(m.footerTickGen) // Continue scrolling
 		}
 		// If scrolling was stopped, don't schedule next tick
 
@@ -330,7 +338,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Re-entering alt screen is crucial for image viewers (viu, timg, chafa)
 		// to prevent "Press any key to continue..." text from bleeding through
 		return m, tea.Batch(
-			tea.EnterAltScreen,       // Re-enter alternate screen (prevents text bleed)
+			tea.EnterAltScreen, // Re-enter alternate screen (prevents text bleed)
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)
@@ -341,7 +349,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadFiles()
 		// Force a refresh and restore terminal state (alt screen + mouse support)
 		return m, tea.Batch(
-			tea.EnterAltScreen,       // Re-enter alternate screen (required!)
+			tea.EnterAltScreen, // Re-enter alternate screen (required!)
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)
@@ -435,7 +443,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Force a refresh and restore terminal state (alt screen + mouse support)
 		return m, tea.Batch(
-			tea.EnterAltScreen,       // Re-enter alternate screen (required!)
+			tea.EnterAltScreen, // Re-enter alternate screen (required!)
 			tea.ClearScreen,
 			tea.EnableMouseCellMotion,
 		)
