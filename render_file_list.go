@@ -448,6 +448,16 @@ func (m model) renderDetailView(maxVisible int) string {
 		}
 	}
 
+	// Hoist loop-invariant lookups out of the row loop. homeDir is used by
+	// several view modes to shorten paths to ~; gitRoot is only needed in
+	// changes mode, where findGitRoot walks the directory tree (os.Stat per
+	// ancestor) and would otherwise run once per visible row.
+	homeDir, _ := os.UserHomeDir()
+	gitRoot := ""
+	if m.showChangesOnly {
+		gitRoot = m.findGitRoot(m.currentPath)
+	}
+
 	// Render rows
 	for i := start; i < end; i++ {
 		file := files[i]
@@ -537,7 +547,6 @@ func (m model) renderDetailView(maxVisible int) string {
 			if trashItem, found := getTrashItemByPath(m.trashItems, file.path); found {
 				location = filepath.Dir(trashItem.OriginalPath)
 				// Shorten home directory to ~
-				homeDir, _ := os.UserHomeDir()
 				if homeDir != "" && strings.HasPrefix(location, homeDir) {
 					location = "~" + strings.TrimPrefix(location, homeDir)
 				}
@@ -555,7 +564,6 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Get parent directory path for location
 			location := filepath.Dir(file.path)
 			// Shorten home directory to ~
-			homeDir, _ := os.UserHomeDir()
 			if homeDir != "" && strings.HasPrefix(location, homeDir) {
 				location = "~" + strings.TrimPrefix(location, homeDir)
 			}
@@ -571,7 +579,6 @@ func (m model) renderDetailView(maxVisible int) string {
 			// Get parent directory path for location
 			location := filepath.Dir(file.path)
 			// Shorten home directory to ~
-			homeDir, _ := os.UserHomeDir()
 			if homeDir != "" && strings.HasPrefix(location, homeDir) {
 				location = "~" + strings.TrimPrefix(location, homeDir)
 			}
@@ -668,12 +675,10 @@ func (m model) renderDetailView(maxVisible int) string {
 		} else if m.showChangesOnly {
 			// Changes mode: Name (includes status prefix), Size, Modified, Location
 			location := filepath.Dir(file.path)
-			homeDir, _ := os.UserHomeDir()
 			if homeDir != "" && strings.HasPrefix(location, homeDir) {
 				location = "~" + strings.TrimPrefix(location, homeDir)
 			}
-			// Show relative to git root if possible
-			gitRoot := m.findGitRoot(m.currentPath)
+			// Show relative to git root if possible (gitRoot hoisted above loop)
 			if gitRoot != "" {
 				if relLoc, err := filepath.Rel(gitRoot, location); err == nil {
 					location = relLoc

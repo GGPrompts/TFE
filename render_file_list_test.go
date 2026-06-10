@@ -5,6 +5,7 @@ package main
 // (location/branch/commit/description/type) — see tfe-mda.
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -373,5 +374,47 @@ func TestExpandCollapseMarksTreeDirty(t *testing.T) {
 	m.updateTreeItems()
 	if len(m.treeItems) != baseCount {
 		t.Errorf("Expected %d items after collapsing sub/, got %d", baseCount, len(m.treeItems))
+	}
+}
+
+// TestRenderDetailViewChangesModeGitRootRelative verifies that changes-mode
+// detail rendering shortens each row's location to a path relative to the git
+// root. The git root and home dir are computed once above the row loop (see
+// tfe-1fd, hoisting loop-invariant findGitRoot/os.UserHomeDir out of the
+// per-row loop); this exercises that path so a regression in the hoist would
+// show up as absolute paths in the output.
+func TestRenderDetailViewChangesModeGitRootRelative(t *testing.T) {
+	repo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatalf("failed to create .git: %v", err)
+	}
+	subDir := filepath.Join(repo, "pkg", "deep")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatalf("failed to create subdir: %v", err)
+	}
+	changed := filepath.Join(subDir, "changed.go")
+	if err := os.WriteFile(changed, []byte("package deep\n"), 0o644); err != nil {
+		t.Fatalf("failed to write changed file: %v", err)
+	}
+
+	m := &model{
+		width:           120,
+		showChangesOnly: true,
+		currentPath:     repo,
+		changedFiles: []fileItem{
+			{name: "changed.go", path: changed, size: 12},
+		},
+	}
+
+	out := m.renderDetailView(20)
+
+	// Location column should be the git-root-relative dir (pkg/deep), not the
+	// absolute path of its parent.
+	wantRel := filepath.Join("pkg", "deep")
+	if !strings.Contains(out, wantRel) {
+		t.Errorf("expected git-root-relative location %q in output, got:\n%s", wantRel, out)
+	}
+	if strings.Contains(out, subDir) {
+		t.Errorf("output should not contain the absolute location %q; expected it relativized to git root:\n%s", subDir, out)
 	}
 }
