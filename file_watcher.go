@@ -60,6 +60,13 @@ const watcherChanSize = 4
 // initWatcher creates a new fsnotify watcher, the bridge channel, and stores
 // them on the model. Does not start watching any path yet -- call startWatcher().
 func (m *model) initWatcher() {
+	// Close any existing watcher before overwriting it. Closing makes the old
+	// bridge goroutine exit (its watcher.Events channel closes), which in turn
+	// closes the old watcherChan and unblocks any pending waitForWatcherEvent
+	// cmd. Without this, every re-init leaks an inotify fd plus the bridge and
+	// subscription goroutines blocked on the abandoned watcher/channel.
+	m.closeWatcher()
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		// Non-fatal: TFE works fine without live watching
@@ -96,7 +103,13 @@ func (m *model) startWatcher(path string) tea.Cmd {
 	m.watcherActive = true
 
 	// Start the bridge goroutine that reads fsnotify events and writes
-	// coalesced fileChangedMsg values to the channel
+	// coalesced fileChangedMsg values to the channel.
+	//
+	// Invariant: exactly one bridge per watcher. Every enable path creates a
+	// fresh watcher via initWatcher() before calling startWatcher() (Init runs
+	// once on the freshly initialized watcher; menu and settings-panel toggles
+	// go through setConfigBool -> initWatcher first). Two bridges sharing one
+	// watcher/channel would race and double-close the out channel.
 	go runWatcherBridge(m.watcher, m.watcherChan)
 
 	// Return a tea.Cmd that blocks until the next event arrives
@@ -258,7 +271,18 @@ func runWatcherBridgeWithConfig(
 
 		case _, ok := <-watcher.Errors:
 			if !ok {
-				return // Watcher closed
+				// Watcher closed. fsnotify's Close() closes both Events and
+				// Errors; the select may observe either first, so this branch
+				// must perform the same cleanup as the Events branch above --
+				// in particular close(out), or pending waitForWatcherEvent
+				// readers would block forever (goroutine leak).
+				mu.Lock()
+				if batchTimer != nil {
+					batchTimer.Stop()
+				}
+				mu.Unlock()
+				close(out)
+				return
 			}
 			// Errors are non-fatal for a file explorer; silently continue.
 			// Common errors: too many open files, permission denied on inotify.
@@ -282,7 +306,8 @@ func (m *model) stopWatcher() {
 }
 
 // closeWatcher fully shuts down the fsnotify watcher and releases resources.
-// Call this on application quit.
+// Called on application quit, when the watcher is disabled, and by initWatcher
+// before creating a replacement watcher.
 func (m *model) closeWatcher() {
 	if m.watcher == nil {
 		return
@@ -291,6 +316,12 @@ func (m *model) closeWatcher() {
 	m.stopWatcher()
 	m.watcher.Close()
 	m.watcher = nil
+	// Drop our reference to the bridge channel. If a bridge goroutine was
+	// running, it closes the channel itself when watcher.Events closes
+	// (unblocking any pending waitForWatcherEvent, which holds its own
+	// reference). Nil here prevents update.go from re-subscribing to a
+	// stale channel after the watcher is gone.
+	m.watcherChan = nil
 }
 
 // switchWatchPath swaps the fsnotify watch from the current path to a new path

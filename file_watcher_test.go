@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -58,6 +59,208 @@ func TestCloseWatcher(t *testing.T) {
 
 	if m.watcher != nil {
 		t.Error("Expected watcher to be nil after close")
+	}
+}
+
+// waitForChannelClose blocks until ch is closed (draining any buffered events)
+// or the timeout expires. Returns true if the channel closed in time.
+func waitForChannelClose(ch <-chan fileChangedMsg, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	for {
+		select {
+		case _, ok := <-ch:
+			if !ok {
+				return true
+			}
+			// Buffered event -- keep draining until close
+		case <-deadline:
+			return false
+		}
+	}
+}
+
+// TestCloseWatcherClearsChannel verifies closeWatcher drops the channel
+// reference so update.go won't re-subscribe to a stale channel
+func TestCloseWatcherClearsChannel(t *testing.T) {
+	m := model{}
+	m.initWatcher()
+
+	m.closeWatcher()
+
+	if m.watcherChan != nil {
+		t.Error("Expected watcherChan to be nil after close")
+	}
+}
+
+// TestInitWatcherClosesPreviousWatcher is a leak-regression test: re-running
+// initWatcher (e.g., repeated enables from the settings panel) must close the
+// previous watcher so its bridge goroutine exits and closes the old channel.
+// Before the fix, initWatcher overwrote m.watcher/m.watcherChan, leaking an
+// inotify fd and a bridge goroutine blocked forever on the old Events channel.
+func TestInitWatcherClosesPreviousWatcher(t *testing.T) {
+	m := model{}
+	m.initWatcher()
+
+	tmpDir := t.TempDir()
+	if cmd := m.startWatcher(tmpDir); cmd == nil {
+		t.Fatal("Expected startWatcher to return a subscription cmd")
+	}
+	oldChan := m.watcherChan
+
+	// Re-init: must fully shut down the previous watcher + bridge
+	m.initWatcher()
+
+	if !waitForChannelClose(oldChan, 2*time.Second) {
+		t.Fatal("Old watcherChan never closed after re-init -- bridge goroutine leaked")
+	}
+	if m.watcherActive {
+		t.Error("Expected watcherActive to be reset by re-init")
+	}
+	if m.watcher == nil || m.watcherChan == nil {
+		t.Error("Expected re-init to create a fresh watcher and channel")
+	}
+
+	// Cleanup
+	m.closeWatcher()
+}
+
+// TestWatcherDisableUnblocksPendingSubscription is a leak-regression test for
+// the toggle path: disabling the watcher via setConfigBool must close the
+// fsnotify watcher (not just remove the path), so the bridge goroutine exits,
+// closes watcherChan, and the pending waitForWatcherEvent cmd unblocks.
+// Before the fix, setConfigBool called stopWatcher, leaking the inotify fd,
+// the bridge goroutine, and the blocked subscription goroutine per cycle.
+func TestWatcherDisableUnblocksPendingSubscription(t *testing.T) {
+	m := model{}
+	m.initWatcher()
+
+	tmpDir := t.TempDir()
+	cmd := m.startWatcher(tmpDir)
+	if cmd == nil {
+		t.Fatal("Expected startWatcher to return a subscription cmd")
+	}
+
+	// Simulate Bubbletea running the pending waitForWatcherEvent cmd
+	done := make(chan tea.Msg, 1)
+	go func() { done <- cmd() }()
+
+	// Disable via the settings toggle path
+	m.setConfigBool("file_watcher_enabled", false)
+
+	if m.watcher != nil {
+		t.Error("Expected watcher to be nil after disable (closeWatcher, not stopWatcher)")
+	}
+	if m.watcherChan != nil {
+		t.Error("Expected watcherChan to be nil after disable")
+	}
+	if m.watcherActive {
+		t.Error("Expected watcherActive to be false after disable")
+	}
+
+	// The pending subscription must unblock with a nil msg (channel closed)
+	select {
+	case msg := <-done:
+		if msg != nil {
+			t.Errorf("Expected nil msg from closed channel, got %v", msg)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Pending waitForWatcherEvent never unblocked -- watcherChan never closed (goroutine leak)")
+	}
+}
+
+// TestWatcherToggleCycles verifies that repeated disable->enable cycles via
+// setConfigBool + startWatcher (the menu/settings toggle flow) leave exactly
+// one live watcher and close every superseded channel.
+func TestWatcherToggleCycles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	m := model{currentPath: tmpDir} // settingsToggleCmd watches m.currentPath
+	m.initWatcher()
+	if cmd := m.startWatcher(tmpDir); cmd == nil {
+		t.Fatal("Expected initial startWatcher to succeed")
+	}
+
+	for i := 0; i < 3; i++ {
+		oldChan := m.watcherChan
+
+		// Disable (settings/menu path)
+		m.setConfigBool("file_watcher_enabled", false)
+		if !waitForChannelClose(oldChan, 2*time.Second) {
+			t.Fatalf("Cycle %d: old watcherChan never closed on disable", i)
+		}
+
+		// Enable (settings/menu path: setConfigBool inits, then startWatcher)
+		m.setConfigBool("file_watcher_enabled", true)
+		if cmd := m.settingsToggleCmd("file_watcher_enabled", true); cmd == nil {
+			t.Fatalf("Cycle %d: expected settingsToggleCmd to start watching and return a cmd", i)
+		}
+		if !m.watcherActive {
+			t.Fatalf("Cycle %d: expected watcherActive after enable", i)
+		}
+		if m.watchedPath != tmpDir {
+			t.Fatalf("Cycle %d: expected watchedPath %q, got %q", i, tmpDir, m.watchedPath)
+		}
+	}
+
+	// The surviving watcher must still deliver events
+	testFile := filepath.Join(tmpDir, "after-cycles.txt")
+	if err := os.WriteFile(testFile, []byte("x"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+	select {
+	case <-m.watcherChan:
+		// Good -- watcher still functional after toggle cycles
+	case <-time.After(3 * time.Second):
+		t.Fatal("Watcher stopped delivering events after toggle cycles")
+	}
+
+	// Cleanup
+	m.closeWatcher()
+}
+
+// TestSettingsPanelTogglesWatcher verifies the settings-panel keyboard handler
+// actually starts and stops watching (regression: it used to call only
+// setConfigBool, leaving an idle watcher that watched nothing on enable and
+// leaking a watcher per click).
+func TestSettingsPanelTogglesWatcher(t *testing.T) {
+	// Redirect saveConfig away from the real ~/.config/tfe/config.toml
+	t.Setenv("HOME", t.TempDir())
+
+	tmpDir := t.TempDir()
+	m := model{
+		currentPath:      tmpDir,
+		settingsCategory: 2, // "File Watcher" category
+		settingsCursor:   0, // "File Watcher Enabled" toggle
+	}
+
+	// Enable via Enter in the settings panel
+	res, cmd := m.handleSettingsKeyEvent(tea.KeyMsg{Type: tea.KeyEnter})
+	m2 := res.(model)
+	if !m2.config.FileWatcherEnabled {
+		t.Error("Expected config.FileWatcherEnabled true after enable")
+	}
+	if !m2.watcherActive {
+		t.Error("Expected watcherActive true: settings-panel enable must start watching")
+	}
+	if m2.watchedPath != tmpDir {
+		t.Errorf("Expected watchedPath %q, got %q", tmpDir, m2.watchedPath)
+	}
+	if cmd == nil {
+		t.Error("Expected a waitForWatcherEvent cmd from settings-panel enable")
+	}
+	oldChan := m2.watcherChan
+
+	// Disable via Enter again
+	res2, _ := m2.handleSettingsKeyEvent(tea.KeyMsg{Type: tea.KeyEnter})
+	m3 := res2.(model)
+	if m3.config.FileWatcherEnabled {
+		t.Error("Expected config.FileWatcherEnabled false after disable")
+	}
+	if m3.watcher != nil || m3.watcherActive {
+		t.Error("Expected watcher fully closed after settings-panel disable")
+	}
+	if !waitForChannelClose(oldChan, 2*time.Second) {
+		t.Fatal("Bridge channel never closed after settings-panel disable (leak)")
 	}
 }
 

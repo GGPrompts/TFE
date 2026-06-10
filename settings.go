@@ -94,9 +94,18 @@ func (m *model) setConfigBool(key string, val bool) {
 	case "file_watcher_enabled":
 		m.config.FileWatcherEnabled = val
 		if val && !m.watcherActive {
+			// initWatcher closes any leftover watcher before creating a new
+			// one. Callers must follow up with startWatcher(m.currentPath)
+			// and dispatch the returned tea.Cmd (see settingsToggleCmd and
+			// the menu "settings-file-watcher" case) or the new watcher sits
+			// idle watching nothing.
 			m.initWatcher()
-		} else if !val && m.watcherActive {
-			m.stopWatcher()
+		} else if !val {
+			// Fully close (not just stop): closing the fsnotify watcher makes
+			// the bridge goroutine exit and close watcherChan, which unblocks
+			// the pending waitForWatcherEvent cmd. stopWatcher alone would
+			// leak the inotify fd and both goroutines on every toggle cycle.
+			m.closeWatcher()
 		}
 	case "show_hidden":
 		m.config.ShowHidden = val
@@ -112,6 +121,22 @@ func (m *model) setConfigBool(key string, val bool) {
 		m.config.AutoChanges = val
 		m.agentAutoWatch = val
 	}
+}
+
+// settingsToggleCmd returns any follow-up tea.Cmd required after toggling a
+// boolean setting from the settings panel. Enabling the file watcher must
+// actually start watching the current directory and subscribe to its events
+// (mirroring the menu path in menu.go "settings-file-watcher"); setConfigBool
+// alone only creates an idle watcher.
+func (m *model) settingsToggleCmd(key string, newVal bool) tea.Cmd {
+	// !watcherActive guards against spawning a second bridge goroutine on a
+	// watcher that is already running (two bridges sharing one channel would
+	// double-close it). In the normal enable flow setConfigBool just created
+	// a fresh, inactive watcher, so this always passes.
+	if key == "file_watcher_enabled" && newVal && !m.watcherActive {
+		return m.startWatcher(m.currentPath)
+	}
+	return nil
 }
 
 // getConfigString returns a string config value by key
@@ -428,6 +453,11 @@ func (m model) handleSettingsMouseEvent(msg tea.MouseMsg) (tea.Model, tea.Cmd, b
 				if err := saveConfig(m.config); err != nil {
 					m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
 				}
+				// Some toggles need a follow-up command (e.g. file watcher
+				// must start watching and subscribe to events)
+				if cmd := m.settingsToggleCmd(item.key, !current); cmd != nil {
+					return m, cmd, true
+				}
 			case settingsSelect:
 				current := m.getConfigString(item.key)
 				for idx, opt := range item.options {
@@ -540,6 +570,11 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setConfigBool(item.key, !current)
 			if err := saveConfig(m.config); err != nil {
 				m.statusMessage = fmt.Sprintf("Failed to save: %v", err)
+			}
+			// Some toggles need a follow-up command (e.g. file watcher
+			// must start watching and subscribe to events)
+			if cmd := m.settingsToggleCmd(item.key, !current); cmd != nil {
+				return m, cmd
 			}
 
 		case settingsSelect:
