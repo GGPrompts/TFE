@@ -287,4 +287,32 @@ func initStyles() {
 	diffMetaStyle = lipgloss.NewStyle().
 		Foreground(currentTheme.DiffMeta.adaptiveColor()).
 		Italic(true)
+
+	// JSONL conversation preview styles
+	jsonlUserStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.Title.adaptiveColor()).
+		Bold(true)
+
+	jsonlAssistantStyle = lipgloss.NewStyle().
+		Foreground(uiBodyText())
+
+	jsonlToolNameStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.DiffHunkHeader.adaptiveColor()).
+		Bold(true)
+
+	jsonlToolInputStyle = lipgloss.NewStyle().
+		Foreground(uiMutedText())
+
+	jsonlThinkingStyle = lipgloss.NewStyle().
+		Foreground(uiSubtleText()).
+		Italic(true)
+
+	jsonlSystemStyle = lipgloss.NewStyle().
+		Foreground(uiMutedText())
+
+	jsonlSeparatorStyle = lipgloss.NewStyle().
+		Foreground(uiSubtleText())
+
+	jsonlToolResultStyle = lipgloss.NewStyle().
+		Foreground(uiMutedText())
 }

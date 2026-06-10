@@ -45,4 +45,14 @@ var (
 	diffRemovedStyle    lipgloss.Style // Red for removed lines (-)
 	diffHunkHeaderStyle lipgloss.Style // Cyan for @@ hunk headers
 	diffMetaStyle       lipgloss.Style // Dim for diff/index/---/+++ headers
+
+	// JSONL conversation preview styles (render_jsonl.go)
+	jsonlUserStyle       lipgloss.Style // Bold title color for USER messages
+	jsonlAssistantStyle  lipgloss.Style // Body text for ASSISTANT messages
+	jsonlToolNameStyle   lipgloss.Style // Bold accent for tool names
+	jsonlToolInputStyle  lipgloss.Style // Muted text for tool input summaries
+	jsonlThinkingStyle   lipgloss.Style // Dim italic for thinking blocks
+	jsonlSystemStyle     lipgloss.Style // Muted text for system messages
+	jsonlSeparatorStyle  lipgloss.Style // Subtle separator lines
+	jsonlToolResultStyle lipgloss.Style // Muted text for tool results
 )

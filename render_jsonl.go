@@ -42,43 +42,9 @@ type jsonlContentBlock struct {
 	Input json.RawMessage `json:"input"` // tool_use: input parameters
 }
 
-func jsonlUserStyle() lipgloss.Style {
-	return lipgloss.NewStyle().
-		Foreground(currentTheme.Title.adaptiveColor()).
-		Bold(true)
-}
-
-func jsonlAssistantStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(uiBodyText())
-}
-
-func jsonlToolNameStyle() lipgloss.Style {
-	return lipgloss.NewStyle().
-		Foreground(currentTheme.DiffHunkHeader.adaptiveColor()).
-		Bold(true)
-}
-
-func jsonlToolInputStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(uiMutedText())
-}
-
-func jsonlThinkingStyle() lipgloss.Style {
-	return lipgloss.NewStyle().
-		Foreground(uiSubtleText()).
-		Italic(true)
-}
-
-func jsonlSystemStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(uiMutedText())
-}
-
-func jsonlSeparatorStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(uiSubtleText())
-}
-
-func jsonlToolResultStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(uiMutedText())
-}
+// The jsonl*Style package-level vars are declared in styles.go and assigned in
+// initStyles() (theme.go), so theme reloads refresh them without constructing
+// a new lipgloss.Style per rendered message.
 
 // renderJSONLEntry renders a single JSONL entry into display lines.
 func renderJSONLEntry(msg jsonlMessage, width int) []string {
@@ -115,13 +81,13 @@ func renderJSONLUserMessage(msg jsonlMessage, width int) []string {
 		if contentStr == "" {
 			return nil
 		}
-		sep := jsonlSeparatorStyle().Render(strings.Repeat("─", min(width, 40)))
+		sep := jsonlSeparatorStyle.Render(strings.Repeat("─", min(width, 40)))
 		lines = append(lines, sep)
-		header := jsonlUserStyle().Render("USER")
+		header := jsonlUserStyle.Render("USER")
 		lines = append(lines, header)
 
 		for _, textLine := range wrapLine(contentStr, width) {
-			lines = append(lines, jsonlUserStyle().Render(textLine))
+			lines = append(lines, jsonlUserStyle.Render(textLine))
 		}
 		lines = append(lines, "")
 		return lines
@@ -139,12 +105,12 @@ func renderJSONLUserMessage(msg jsonlMessage, width int) []string {
 			if block.Text == "" {
 				continue
 			}
-			sep := jsonlSeparatorStyle().Render(strings.Repeat("─", min(width, 40)))
+			sep := jsonlSeparatorStyle.Render(strings.Repeat("─", min(width, 40)))
 			lines = append(lines, sep)
-			header := jsonlUserStyle().Render("USER")
+			header := jsonlUserStyle.Render("USER")
 			lines = append(lines, header)
 			for _, textLine := range wrapLine(block.Text, width) {
-				lines = append(lines, jsonlUserStyle().Render(textLine))
+				lines = append(lines, jsonlUserStyle.Render(textLine))
 			}
 			lines = append(lines, "")
 
@@ -156,7 +122,7 @@ func renderJSONLUserMessage(msg jsonlMessage, width int) []string {
 				if len(resultText) > maxLen {
 					resultText = resultText[:maxLen] + "..."
 				}
-				lines = append(lines, jsonlToolResultStyle().Render("  "+resultText))
+				lines = append(lines, jsonlToolResultStyle.Render("  "+resultText))
 			}
 		}
 	}
@@ -190,18 +156,18 @@ func renderJSONLAssistantMessage(msg jsonlMessage, width int) []string {
 				continue
 			}
 			if !hasContent {
-				header := jsonlAssistantStyle().Render("ASSISTANT")
+				header := jsonlAssistantStyle.Render("ASSISTANT")
 				lines = append(lines, header)
 				hasContent = true
 			}
 			for _, textLine := range wrapLine(block.Text, width) {
-				lines = append(lines, jsonlAssistantStyle().Render(textLine))
+				lines = append(lines, jsonlAssistantStyle.Render(textLine))
 			}
 			lines = append(lines, "")
 
 		case "tool_use":
 			if !hasContent {
-				header := jsonlAssistantStyle().Render("ASSISTANT")
+				header := jsonlAssistantStyle.Render("ASSISTANT")
 				lines = append(lines, header)
 				hasContent = true
 			}
@@ -217,7 +183,7 @@ func renderJSONLAssistantMessage(msg jsonlMessage, width int) []string {
 			if visualWidth(firstLine) > width-12 {
 				firstLine = truncateToWidth(firstLine, width-12)
 			}
-			lines = append(lines, jsonlThinkingStyle().Render("  thinking: "+firstLine))
+			lines = append(lines, jsonlThinkingStyle.Render("  thinking: "+firstLine))
 		}
 	}
 
@@ -229,7 +195,7 @@ func renderJSONLSystemMessage(msg jsonlMessage, width int) []string {
 	if msg.Subtype == "" {
 		return nil // Skip generic system messages
 	}
-	line := jsonlSystemStyle().Render(fmt.Sprintf("  [system: %s]", msg.Subtype))
+	line := jsonlSystemStyle.Render(fmt.Sprintf("  [system: %s]", msg.Subtype))
 	return []string{line}
 }
 
@@ -244,7 +210,7 @@ func renderToolUseSummary(block jsonlContentBlock, width int) []string {
 	// Extract key parameter for context
 	detail := extractToolDetail(block)
 
-	prefix := jsonlToolNameStyle().Render("  " + name)
+	prefix := jsonlToolNameStyle.Render("  " + name)
 	if detail == "" {
 		return []string{prefix}
 	}
@@ -263,12 +229,12 @@ func renderToolUseSummary(block jsonlContentBlock, width int) []string {
 	}
 
 	if len(detail) <= firstLineMax {
-		return []string{prefix + " " + jsonlToolInputStyle().Render(detail)}
+		return []string{prefix + " " + jsonlToolInputStyle.Render(detail)}
 	}
 
 	// Detail wraps: first chunk on name line, rest indented
 	var lines []string
-	lines = append(lines, prefix+" "+jsonlToolInputStyle().Render(detail[:firstLineMax]))
+	lines = append(lines, prefix+" "+jsonlToolInputStyle.Render(detail[:firstLineMax]))
 	remaining := detail[firstLineMax:]
 	for len(remaining) > 0 {
 		chunk := remaining
@@ -278,7 +244,7 @@ func renderToolUseSummary(block jsonlContentBlock, width int) []string {
 		} else {
 			remaining = ""
 		}
-		lines = append(lines, jsonlToolInputStyle().Render(detailIndent+chunk))
+		lines = append(lines, jsonlToolInputStyle.Render(detailIndent+chunk))
 	}
 	return lines
 }
@@ -442,13 +408,55 @@ func (m *model) loadJSONLPreview(path string, fileSize int64) {
 	m.preview.cachedJSONLIsTailed = isTailed
 	m.preview.fileSize = fileSize
 	m.preview.loaded = true
+
+	// Pre-render the conversation at the current width so the View path
+	// (renderJSONLPreview / getWrappedLineCount) can read cached lines instead
+	// of re-rendering the whole transcript every frame
+	m.populateJSONLRenderCache()
+}
+
+// jsonlPreviewWidth returns the text width JSONL conversation lines render at:
+// the preview box content width minus scrollbar (1) + space (1). Derived from
+// previewBoxContentWidth() — never compute this ad hoc, or the rendered-line
+// cache silently misses and every frame re-renders the full transcript.
+func (m model) jsonlPreviewWidth() int {
+	availableWidth := m.previewBoxContentWidth() - 2
+	if availableWidth < 20 {
+		availableWidth = 20
+	}
+	return availableWidth
+}
+
+// populateJSONLRenderCache renders all parsed JSONL messages at the current
+// preview width and caches the resulting styled lines. Called where the model
+// is mutable: loadJSONLPreview (including the F-key full-transcript reload),
+// populatePreviewCache (window resize, pane toggles), and
+// refreshPreviewCacheIfStale (post-dispatch width changes).
+func (m *model) populateJSONLRenderCache() {
+	width := m.jsonlPreviewWidth()
+	m.preview.cachedJSONLRenderedLines = renderJSONLFromMessages(
+		m.preview.cachedJSONLMessages, width, m.preview.cachedJSONLIsTailed, m.preview.fileSize)
+	m.preview.cachedJSONLRenderedWidth = width
+}
+
+// jsonlRenderedLines returns the rendered conversation lines for the current
+// width, preferring the cache. The fallback render only triggers when a View
+// happens before Update refreshed the cache (value receiver — cannot store
+// the result back).
+func (m model) jsonlRenderedLines() []string {
+	width := m.jsonlPreviewWidth()
+	if m.preview.cachedJSONLRenderedWidth == width {
+		return m.preview.cachedJSONLRenderedLines
+	}
+	return renderJSONLFromMessages(
+		m.preview.cachedJSONLMessages, width, m.preview.cachedJSONLIsTailed, m.preview.fileSize)
 }
 
 // renderJSONLFromMessages renders parsed JSONL messages at the given width.
 func renderJSONLFromMessages(messages []jsonlMessage, width int, isTailed bool, fileSize int64) []string {
 	var rendered []string
 	if isTailed {
-		header := jsonlSystemStyle().Render(fmt.Sprintf("... (showing tail of %s file)",
+		header := jsonlSystemStyle.Render(fmt.Sprintf("... (showing tail of %s file)",
 			formatFileSize(fileSize)))
 		rendered = append(rendered, header, "")
 	}
@@ -465,23 +473,9 @@ func renderJSONLFromMessages(messages []jsonlMessage, width int, isTailed bool, 
 func (m model) renderJSONLPreview(maxVisible int) string {
 	var s strings.Builder
 
-	var boxContentWidth int
-	if m.viewMode == viewFullPreview {
-		boxContentWidth = m.width - 6
-	} else if m.displayMode == modeDetail || m.isNarrowTerminal() {
-		// Vertical split: box is Width(m.width - 6)
-		boxContentWidth = m.width - 6
-	} else {
-		// Horizontal split: box is Width(m.rightWidth - 2)
-		boxContentWidth = m.rightWidth - 2
-	}
-	availableWidth := boxContentWidth - 2 // scrollbar + space
-	if availableWidth < 20 {
-		availableWidth = 20
-	}
-
-	// Render from cached parsed messages (JSON parsing already done)
-	renderedLines := renderJSONLFromMessages(m.preview.cachedJSONLMessages, availableWidth, m.preview.cachedJSONLIsTailed, m.preview.fileSize)
+	// Read pre-rendered lines from the cache (falls back to a fresh render
+	// only if the cache width doesn't match the current layout)
+	renderedLines := m.jsonlRenderedLines()
 	if len(renderedLines) == 0 {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(uiSubtleText()).
