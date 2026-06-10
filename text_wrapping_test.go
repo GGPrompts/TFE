@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
 // previewWidthTestModel builds a model with a loaded plain-text preview in the
@@ -411,6 +413,196 @@ func TestTruncateTailTinyWidth(t *testing.T) {
 		got := truncateTail("/some/long/path", width)
 		if vw := visualWidth(got); vw > width {
 			t.Errorf("width %d: visual width %d exceeds target: %q", width, vw, got)
+		}
+	}
+}
+
+// --- truncateANSIAware (shared core) ---------------------------------------
+
+// legacyTruncateToWidth is the pre-refactor implementation of truncateToWidth,
+// reproduced verbatim so the consolidated core can be proven byte-for-byte
+// identical against it across a matrix of inputs.
+func legacyTruncateToWidth(s string, targetWidth int, runeW func(rune) int) string {
+	width := 0
+	result := ""
+	inAnsi := false
+	for _, ch := range s {
+		if ch == '\033' {
+			inAnsi = true
+			result += string(ch)
+			continue
+		}
+		if inAnsi {
+			result += string(ch)
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inAnsi = false
+			}
+			continue
+		}
+		charWidth := 1
+		if ch == '\t' {
+			charWidth = 8 - (width % 8)
+		} else {
+			charWidth = runeW(ch)
+		}
+		if width+charWidth > targetWidth {
+			if targetWidth-width >= 3 {
+				return result + "..."
+			}
+			return result
+		}
+		width += charWidth
+		result += string(ch)
+	}
+	return result
+}
+
+// legacyTruncateToVisualWidth is the pre-refactor implementation of
+// truncateToVisualWidth (reset-on-overflow, no tab special-casing).
+func legacyTruncateToVisualWidth(s string, targetWidth int, runeW func(rune) int) string {
+	var result strings.Builder
+	visualWidth := 0
+	inEscape := false
+	escapeSeq := strings.Builder{}
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if r == '\x1b' {
+			inEscape = true
+			escapeSeq.Reset()
+			escapeSeq.WriteRune(r)
+			continue
+		}
+		if inEscape {
+			escapeSeq.WriteRune(r)
+			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+				inEscape = false
+				result.WriteString(escapeSeq.String())
+			}
+			continue
+		}
+		charWidth := runeW(r)
+		if visualWidth+charWidth > targetWidth {
+			result.WriteString("\033[0m")
+			break
+		}
+		result.WriteRune(r)
+		visualWidth += charWidth
+	}
+	return result.String()
+}
+
+func TestTruncateANSIAware(t *testing.T) {
+	plainRuneW := func(r rune) int { return runeWidthASCIIish(r) }
+
+	tests := []struct {
+		name        string
+		input       string
+		targetWidth int
+		ellipsis    string
+		expandTabs  bool
+		want        string
+	}{
+		{"empty", "", 5, "...", true, ""},
+		{"fits exactly no ellipsis", "hello", 5, "...", true, "hello"},
+		{"fits under", "hi", 5, "...", true, "hi"},
+		// Ellipsis is appended only when the overflowing rune leaves >= 3 free
+		// cells (visualWidth("...") == 3). With ASCII/CJK runes (width 1-2) an
+		// overflow never leaves 3+ free cells, so the "..." path is exercised
+		// via a wide-rune runeW in the ellipsisGuard sub-test below; here we
+		// assert the common cases where nothing is appended.
+		{"no ellipsis when budget exactly filled", "hello world", 8, "...", true, "hello wo"},
+		{"ellipsis dropped when under 3 cells remain", "hello", 4, "...", true, "hell"},
+		// Reset ellipsis (visual width 0) is appended on any overflow.
+		{"reset ellipsis appended on overflow", "hello", 4, "\033[0m", false, "hell\033[0m"},
+		{"reset ellipsis at zero width", "hi", 0, "\033[0m", false, "\033[0m"},
+		{"reset no ellipsis when whole string fits", "hi", 5, "\033[0m", false, "hi"},
+		// ANSI escapes are preserved verbatim and never counted toward width.
+		{"ansi preserved within budget", "\033[31mred\033[0m", 3, "...", true, "\033[31mred\033[0m"},
+		{"ansi preserved then truncated no ellipsis", "\033[31mredtext\033[0m", 4, "...", true, "\033[31mredt"},
+		// Multibyte / wide runes: a wide rune that would overflow is dropped whole.
+		{"wide rune fits", "中文", 4, "...", true, "中文"},
+		{"wide rune dropped at boundary", "中文x", 3, "...", true, "中"},
+		{"multibyte ascii-width", "café", 4, "...", true, "café"},
+		// Tab expansion: 8-col tab stop when expandTabs, else measured by runeW.
+		{"tab expands to stop then b overflows", "a\tb", 8, "...", true, "a\t"},
+		{"tab fits with following char", "a\tb", 9, "...", true, "a\tb"},
+		{"tab not expanded counts as runeW width 0", "a\tb", 2, "...", false, "a\tb"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := truncateANSIAware(tt.input, tt.targetWidth, plainRuneW, tt.ellipsis, tt.expandTabs)
+			if got != tt.want {
+				t.Errorf("truncateANSIAware(%q, %d, ellipsis=%q, expandTabs=%v) = %q, want %q",
+					tt.input, tt.targetWidth, tt.ellipsis, tt.expandTabs, got, tt.want)
+			}
+		})
+	}
+
+	// targetWidth boundary sweep: result visual width must never exceed target.
+	for _, in := range []string{"hello world", "\033[31mred\033[0m text", "中文字符串", "café résumé"} {
+		for w := 0; w <= 14; w++ {
+			got := truncateANSIAware(in, w, plainRuneW, "...", true)
+			if vw := visualWidth(got); vw > w {
+				t.Errorf("boundary: input %q width %d -> %q has visual width %d > %d", in, w, got, vw, w)
+			}
+		}
+	}
+
+	// ellipsisGuard: drive a runeW that reports width-4 runes so an overflow
+	// can leave >= 3 free cells, exercising the "append ellipsis" branch that
+	// ASCII/CJK widths can't reach.
+	t.Run("ellipsisGuard", func(t *testing.T) {
+		wideRuneW := func(r rune) int { return 4 } // every rune is 4 cells
+		// "ABC" at width 7: 'A' -> w=4, 'B' would make 8 > 7, remaining 7-4=3
+		// >= 3 so "..." is appended.
+		if got := truncateANSIAware("ABC", 7, wideRuneW, "...", false); got != "A..." {
+			t.Errorf("ellipsis append: got %q, want %q", got, "A...")
+		}
+		// At width 6: 'B' overflow leaves 6-4=2 < 3, so no ellipsis.
+		if got := truncateANSIAware("ABC", 6, wideRuneW, "...", false); got != "A" {
+			t.Errorf("ellipsis drop: got %q, want %q", got, "A")
+		}
+	})
+}
+
+// runeWidthASCIIish is a deterministic, model-free per-rune width used by the
+// core test so results don't depend on terminal detection. It delegates to the
+// runewidth library directly (control chars 0, wide CJK 2, everything else 1).
+func runeWidthASCIIish(r rune) int {
+	return runewidth.RuneWidth(r)
+}
+
+// TestTruncateWrappersMatchLegacy proves the three thin wrappers produce
+// byte-for-byte identical output to their pre-refactor implementations across a
+// matrix of well-formed inputs and target widths.
+func TestTruncateWrappersMatchLegacy(t *testing.T) {
+	m := model{terminalType: terminalWezTerm}
+
+	inputs := []string{
+		"",
+		"plain ascii string",
+		"\033[31mcolored\033[0m text",
+		"\033[1m\033[38;5;220mbold yellow\033[0m",
+		"中文字符串测试",
+		"café résumé naïve",
+		"a\tb\tc",
+		"emoji 🐹 and 📦 icons",
+		"mixed \033[32m中文\033[0m text",
+	}
+
+	for _, in := range inputs {
+		for w := 0; w <= 20; w++ {
+			if got, want := truncateToWidth(in, w), legacyTruncateToWidth(in, w, runewidth.RuneWidth); got != want {
+				t.Errorf("truncateToWidth(%q, %d) = %q, legacy = %q", in, w, got, want)
+			}
+			if got, want := m.truncateToWidthCompensated(in, w), legacyTruncateToWidth(in, w, m.runeWidth); got != want {
+				t.Errorf("truncateToWidthCompensated(%q, %d) = %q, legacy = %q", in, w, got, want)
+			}
+			if got, want := m.truncateToVisualWidth(in, w), legacyTruncateToVisualWidth(in, w, m.runeWidth); got != want {
+				t.Errorf("truncateToVisualWidth(%q, %d) = %q, legacy = %q", in, w, got, want)
+			}
 		}
 	}
 }

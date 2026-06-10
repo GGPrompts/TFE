@@ -925,54 +925,13 @@ func (m model) extractVisiblePortion(line string, viewWidth int) string {
 }
 
 // truncateToVisualWidth truncates a string (with ANSI codes) to a specific visual width
-// Preserves ANSI styling codes while ensuring visual width doesn't exceed target
-// Terminal-aware: applies WezTerm emoji compensation
+// Preserves ANSI styling codes while ensuring visual width doesn't exceed target.
+// Terminal-aware: uses m.runeWidth (so it applies the same emoji/VS compensation).
+// Unlike truncateToWidth/truncateToWidthCompensated, on overflow it appends a bare
+// ANSI reset ("\033[0m", visual width 0) instead of an "..." ellipsis, and it does
+// NOT special-case tabs (they are measured by m.runeWidth, which reports '\t' as 0).
 func (m model) truncateToVisualWidth(s string, targetWidth int) string {
-	var result strings.Builder
-	visualWidth := 0
-	inEscape := false
-	escapeSeq := strings.Builder{}
-
-	runes := []rune(s)
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-
-		// Detect ANSI escape sequence start
-		if r == '\x1b' {
-			inEscape = true
-			escapeSeq.Reset()
-			escapeSeq.WriteRune(r)
-			continue
-		}
-
-		// Inside ANSI escape sequence
-		if inEscape {
-			escapeSeq.WriteRune(r)
-			// ANSI sequences end with a letter
-			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
-				inEscape = false
-				// Write ANSI code to result (doesn't count toward visual width)
-				result.WriteString(escapeSeq.String())
-			}
-			continue
-		}
-
-		// Calculate visual width of this character using terminal-aware method
-		charWidth := m.runeWidth(r)
-
-		// Check if adding this character would exceed target width
-		if visualWidth+charWidth > targetWidth {
-			// Reached target width - add reset and stop
-			result.WriteString("\033[0m")
-			break
-		}
-
-		// Add character and increment visual width
-		result.WriteRune(r)
-		visualWidth += charWidth
-	}
-
-	return result.String()
+	return truncateANSIAware(s, targetWidth, m.runeWidth, "\033[0m", false)
 }
 
 // truncateToWidthFromEnd keeps the trailing portion of s that fits within

@@ -290,22 +290,37 @@ func (m model) visualWidthCompensated(s string) int {
 	return width
 }
 
-// truncateToWidth truncates a string to fit within a target visual width
-func truncateToWidth(s string, targetWidth int) string {
+// truncateANSIAware is the shared core for all ANSI-aware truncation. It walks
+// s rune by rune, never counting ANSI escape sequences toward visual width, and
+// accumulates visible runes until adding the next one would exceed targetWidth.
+// Per-rune visible width comes from runeW (so callers choose runewidth.RuneWidth
+// vs the terminal-aware m.runeWidth). When the string overflows, ellipsis is
+// appended IFF its own visual width still fits in the remaining cells
+// (targetWidth-width); the reset code "\033[0m" has visual width 0, so it is
+// always appended, while "..." (width 3) is appended only when >= 3 cells
+// remain — exactly matching the three legacy implementations.
+//
+// expandTabs controls whether '\t' is expanded to the next 8-column tab stop
+// (truncateToWidth / truncateToWidthCompensated) or treated as an ordinary rune
+// measured by runeW (truncateToVisualWidth, which historically did not special
+// case tabs — runeW reports '\t' as width 0). This flag is required to keep all
+// three wrappers byte-for-byte identical to their originals; it cannot be folded
+// into runeW because tab width depends on the running column.
+func truncateANSIAware(s string, targetWidth int, runeW func(rune) int, ellipsis string, expandTabs bool) string {
 	width := 0
-	result := ""
+	var result strings.Builder
 	inAnsi := false
 
 	for _, ch := range s {
 		// Handle ANSI escape sequences (don't count toward width)
 		if ch == '\033' {
 			inAnsi = true
-			result += string(ch)
+			result.WriteRune(ch)
 			continue
 		}
 
 		if inAnsi {
-			result += string(ch)
+			result.WriteRune(ch)
 			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
 				inAnsi = false
 			}
@@ -314,26 +329,31 @@ func truncateToWidth(s string, targetWidth int) string {
 
 		// Calculate character width
 		charWidth := 1
-		if ch == '\t' {
+		if expandTabs && ch == '\t' {
 			charWidth = 8 - (width % 8)
 		} else {
-			// Use runewidth to properly handle wide characters (emojis, CJK)
-			charWidth = runewidth.RuneWidth(ch)
+			charWidth = runeW(ch)
 		}
 
 		if width+charWidth > targetWidth {
-			// Can't fit this character
-			if targetWidth-width >= 3 {
-				return result + "..."
+			// Can't fit this character. Append ellipsis only if its visual
+			// width still fits in the remaining cells.
+			if targetWidth-width >= visualWidth(ellipsis) {
+				result.WriteString(ellipsis)
 			}
-			return result
+			return result.String()
 		}
 
 		width += charWidth
-		result += string(ch)
+		result.WriteString(string(ch))
 	}
 
-	return result
+	return result.String()
+}
+
+// truncateToWidth truncates a string to fit within a target visual width
+func truncateToWidth(s string, targetWidth int) string {
+	return truncateANSIAware(s, targetWidth, runewidth.RuneWidth, "...", true)
 }
 
 // truncateTail keeps the trailing portion of s that fits within targetWidth
@@ -368,48 +388,7 @@ func truncateTail(s string, targetWidth int) string {
 // truncateToWidthCompensated truncates a string to fit within a target visual width
 // with terminal-specific emoji width compensation (uses m.runeWidth for accurate widths)
 func (m model) truncateToWidthCompensated(s string, targetWidth int) string {
-	width := 0
-	result := ""
-	inAnsi := false
-
-	for _, ch := range s {
-		// Handle ANSI escape sequences (don't count toward width)
-		if ch == '\033' {
-			inAnsi = true
-			result += string(ch)
-			continue
-		}
-
-		if inAnsi {
-			result += string(ch)
-			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
-				inAnsi = false
-			}
-			continue
-		}
-
-		// Calculate character width using terminal-aware function
-		charWidth := 1
-		if ch == '\t' {
-			charWidth = 8 - (width % 8)
-		} else {
-			// Use terminal-aware runeWidth to properly handle wide characters
-			charWidth = m.runeWidth(ch)
-		}
-
-		if width+charWidth > targetWidth {
-			// Can't fit this character
-			if targetWidth-width >= 3 {
-				return result + "..."
-			}
-			return result
-		}
-
-		width += charWidth
-		result += string(ch)
-	}
-
-	return result
+	return truncateANSIAware(s, targetWidth, m.runeWidth, "...", true)
 }
 
 // padIconToWidth pads an icon emoji to a fixed width (2 cells) for consistent alignment
