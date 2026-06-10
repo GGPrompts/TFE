@@ -2203,27 +2203,15 @@ rm -f "$0"
 
 	case "1":
 		// Switch to list view
-		m.displayMode = modeList
-		// Reset tree expansion when leaving tree view
-		m.expandedDirs = make(map[string]bool)
-		m.markTreeItemsDirty()
+		m.setDisplayMode(modeList)
 
 	case "2":
 		// Switch to detail view
-		m.displayMode = modeDetail
-		// Reset tree expansion when leaving tree view
-		m.expandedDirs = make(map[string]bool)
-		m.markTreeItemsDirty()
-		// Recalculate layout to ensure correct width for detail view columns
-		m.calculateLayout()
-		// Refresh preview cache if in dual-pane mode
-		if m.viewMode == viewDualPane {
-			m.populatePreviewCache()
-		}
+		m.setDisplayMode(modeDetail)
 
 	case "3":
 		// Switch to tree view
-		m.displayMode = modeTree
+		m.setDisplayMode(modeTree)
 
 	case "ctrl+w":
 		// Ctrl+W: Close active tab (if tabs open), or collapse all in tree view

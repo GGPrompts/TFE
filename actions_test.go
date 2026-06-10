@@ -239,3 +239,77 @@ func TestScrollPreviewToBottom(t *testing.T) {
 		t.Errorf("scrollPreviewToBottom() with fitting content = %d, want 0", m2.preview.scrollPos)
 	}
 }
+
+// newDisplayModeModel returns a model with enough state for setDisplayMode
+// (calculateLayout needs width/height) starting in the given mode.
+func newDisplayModeModel(start displayMode) model {
+	return model{
+		width:        120,
+		height:       40,
+		currentPath:  "/tmp",
+		displayMode:  start,
+		expandedDirs: make(map[string]bool),
+	}
+}
+
+// TestSetDisplayMode_DetailScrollXReset verifies the drift fix at the heart of
+// tfe-gib: entering detail view (from any mode, including via the keyboard '2'
+// path that previously skipped it) always resets the horizontal scroll offset.
+func TestSetDisplayMode_DetailScrollXReset(t *testing.T) {
+	for _, start := range []displayMode{modeList, modeDetail, modeTree} {
+		m := newDisplayModeModel(start)
+		m.detailScrollX = 42 // stale offset left by detail-mode arrow keys
+		m.setDisplayMode(modeDetail)
+		if m.displayMode != modeDetail {
+			t.Errorf("from %v: displayMode = %v, want modeDetail", start, m.displayMode)
+		}
+		if m.detailScrollX != 0 {
+			t.Errorf("from %v: detailScrollX = %d, want 0 (entering detail must reset)", start, m.detailScrollX)
+		}
+	}
+}
+
+// TestSetDisplayMode_DetailScrollXPreservedWithinDetail verifies that switching
+// to a non-detail mode does not reset detailScrollX (only ENTERING detail does),
+// and that a stale offset on a non-detail mode is left untouched.
+func TestSetDisplayMode_NonDetailLeavesScrollUntouched(t *testing.T) {
+	m := newDisplayModeModel(modeList)
+	m.detailScrollX = 7
+	m.setDisplayMode(modeTree)
+	if m.detailScrollX != 7 {
+		t.Errorf("switching to tree changed detailScrollX to %d, want 7 (unchanged)", m.detailScrollX)
+	}
+}
+
+// TestSetDisplayMode_ExpandedDirsResetOnLeavingTree verifies tree expansion is
+// cleared only when LEAVING tree view, and preserved otherwise.
+func TestSetDisplayMode_ExpandedDirsResetOnLeavingTree(t *testing.T) {
+	// Leaving tree -> expansion reset.
+	for _, target := range []displayMode{modeList, modeDetail} {
+		m := newDisplayModeModel(modeTree)
+		m.expandedDirs["/tmp/foo"] = true
+		m.setDisplayMode(target)
+		if len(m.expandedDirs) != 0 {
+			t.Errorf("tree -> %v: expandedDirs not reset (len=%d)", target, len(m.expandedDirs))
+		}
+		if !m.treeItemsDirty {
+			t.Errorf("tree -> %v: treeItemsDirty not set after resetting expansion", target)
+		}
+	}
+
+	// Not leaving tree (list -> tree) -> expansion preserved.
+	m := newDisplayModeModel(modeList)
+	m.expandedDirs["/tmp/bar"] = true
+	m.setDisplayMode(modeTree)
+	if !m.expandedDirs["/tmp/bar"] {
+		t.Errorf("list -> tree: expandedDirs was reset, want preserved")
+	}
+
+	// Tree -> tree (no-op target) -> expansion preserved.
+	m2 := newDisplayModeModel(modeTree)
+	m2.expandedDirs["/tmp/baz"] = true
+	m2.setDisplayMode(modeTree)
+	if !m2.expandedDirs["/tmp/baz"] {
+		t.Errorf("tree -> tree: expandedDirs was reset, want preserved")
+	}
+}

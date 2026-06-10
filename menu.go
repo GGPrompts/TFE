@@ -825,21 +825,13 @@ Additional context: {{variable2}}
 
 	// View menu
 	case "display-list":
-		m.displayMode = modeList
-		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
-		m.markTreeItemsDirty()
-		m.calculateLayout() // Recalculate widths for new display mode
+		m.setDisplayMode(modeList)
 
 	case "display-detail":
-		m.displayMode = modeDetail
-		m.detailScrollX = 0                    // Reset scroll when switching to detail view
-		m.expandedDirs = make(map[string]bool) // Reset tree expansion when leaving tree view
-		m.markTreeItemsDirty()
-		m.calculateLayout() // Recalculate widths for detail view columns
+		m.setDisplayMode(modeDetail)
 
 	case "display-tree":
-		m.displayMode = modeTree
-		m.calculateLayout() // Recalculate widths for new display mode
+		m.setDisplayMode(modeTree)
 
 	case "collapse-all-tree":
 		// Collapse all expanded folders in tree view

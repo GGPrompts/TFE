@@ -282,6 +282,38 @@ func (m *model) scrollPreviewToBottom() {
 	m.preview.scrollPos = m.maxPreviewScroll()
 }
 
+// setDisplayMode switches the file-list display mode (list/detail/tree),
+// applying the side effects every entry point used to duplicate (and had
+// drifted on): it resets tree expansion when LEAVING tree view, resets the
+// detail horizontal scroll offset when ENTERING detail view, always
+// recalculates the layout, and refreshes the preview cache in dual-pane mode.
+// Used by: keyboard (1/2/3), menu (display-list/display-detail/display-tree),
+// mouse (toolbar view-mode cycle button).
+func (m *model) setDisplayMode(mode displayMode) {
+	leavingTree := m.displayMode == modeTree && mode != modeTree
+
+	m.displayMode = mode
+
+	if leavingTree {
+		// Reset tree expansion when leaving tree view
+		m.expandedDirs = make(map[string]bool)
+		m.markTreeItemsDirty()
+	}
+
+	if mode == modeDetail {
+		// Reset scroll when entering detail view
+		m.detailScrollX = 0
+	}
+
+	// Recalculate widths for the new display mode
+	m.calculateLayout()
+
+	// Refresh preview cache if in dual-pane mode
+	if m.viewMode == viewDualPane {
+		m.populatePreviewCache()
+	}
+}
+
 // toggleDualPane toggles between single-pane and dual-pane view modes.
 // Used by: menu (toggle-dual-pane).
 func (m *model) toggleDualPane() {

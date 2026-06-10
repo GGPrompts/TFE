@@ -290,18 +290,16 @@ git pull
 				// View mode toggle button [📊/📄/🌲] (X=5-9)
 				if msg.X >= 5 && msg.X <= 9 {
 					// Cycle through display modes: List → Detail → Tree → List
-					if m.displayMode == modeList {
-						m.displayMode = modeDetail
-						m.detailScrollX = 0 // Reset scroll when entering detail view
-					} else if m.displayMode == modeDetail {
-						m.displayMode = modeTree
-					} else {
-						m.displayMode = modeList
-						// Reset tree expansion when leaving tree view
-						m.expandedDirs = make(map[string]bool)
-						m.markTreeItemsDirty()
+					next := modeList
+					switch m.displayMode {
+					case modeList:
+						next = modeDetail
+					case modeDetail:
+						next = modeTree
+					default:
+						next = modeList
 					}
-					m.calculateLayout() // Recalculate widths for new display mode
+					m.setDisplayMode(next)
 					return m, nil
 				}
 				// Sort toggle button [🔃] (X=10-14)
