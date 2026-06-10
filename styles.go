@@ -55,4 +55,65 @@ var (
 	jsonlSystemStyle     lipgloss.Style // Muted text for system messages
 	jsonlSeparatorStyle  lipgloss.Style // Subtle separator lines
 	jsonlToolResultStyle lipgloss.Style // Muted text for tool results
+
+	// Preview pane styles (render_preview.go) — rebuilt per line before hoisting
+	lineNumStyle         lipgloss.Style // Subtle line-number gutter
+	scrollbarTrackStyle  lipgloss.Style // Dim scrollbar track (│)
+	scrollbarThumbStyle  lipgloss.Style // Bright scrollbar thumb (│)
+	scrollIndicatorStyle lipgloss.Style // Subtle italic scroll-position indicator
+
+	// File-list styles (render_file_list.go)
+	detailHeaderStyle lipgloss.Style // Bold title-colored detail-view column header
+
+	// Alternate-row background variants of each file-type style.
+	// Indexed by base style via alternateRowStyle(); built once in initStyles().
+	fileAltStyle          lipgloss.Style
+	folderAltStyle        lipgloss.Style
+	claudeContextAltStyle lipgloss.Style
+	agentsAltStyle        lipgloss.Style
+	promptsFolderAltStyle lipgloss.Style
+	obsidianVaultAltStyle lipgloss.Style
+
+	// Toolbar button styles (helpers.go) — hardcoded colors, rebuilt per frame
+	toolbarButtonStyle       lipgloss.Style // Inactive emoji button (blue, bold)
+	toolbarButtonActiveStyle lipgloss.Style // Active emoji button (blue, bold, gray bg)
+	toolbarTermStyle         lipgloss.Style // Command ">_" glyph (green, bold)
+	toolbarTermActiveStyle   lipgloss.Style // Active ">_" glyph (green, bold, gray bg)
+
+	// Tab bar styles (render_layout.go)
+	activeTabStyle    lipgloss.Style // Active tab (selection colors, bold)
+	inactiveTabStyle  lipgloss.Style // Inactive tab (body text on panel bg)
+	tabModifiedStyle  lipgloss.Style // Git "M"/"R" indicator
+	tabAddedStyle     lipgloss.Style // Git "+" indicator
+	tabDeletedStyle   lipgloss.Style // Git "-" indicator
+	tabUntrackedStyle lipgloss.Style // Git "?" indicator
+	tabCloseStyle     lipgloss.Style // "x" close glyph on active tab
+	tabOverflowStyle  lipgloss.Style // "+N more" overflow indicator
+
+	// Command-line styles (render_layout.go renderCommandLine)
+	cmdPromptStyle lipgloss.Style // "$ " prompt + path (title, bold)
+	cmdInputStyle  lipgloss.Style // Typed command text (body)
+	cmdHelperStyle lipgloss.Style // Contextual hint text (muted italic)
+	cmdCursorStyle lipgloss.Style // Block cursor (title, bold)
+	cmdBangStyle   lipgloss.Style // "!" run-and-exit prefix (red, bold)
+	cmdGhostStyle  lipgloss.Style // Ghost-text suggestion (muted italic)
 )
+
+// alternateRowStyle returns the alternate-row background variant for a given
+// file-type base style. Falls back to the file (default) variant.
+func alternateRowStyle(base lipgloss.Style) lipgloss.Style {
+	switch {
+	case base.GetForeground() == folderStyle.GetForeground():
+		return folderAltStyle
+	case base.GetForeground() == claudeContextStyle.GetForeground():
+		return claudeContextAltStyle
+	case base.GetForeground() == agentsStyle.GetForeground():
+		return agentsAltStyle
+	case base.GetForeground() == promptsFolderStyle.GetForeground():
+		return promptsFolderAltStyle
+	case base.GetForeground() == obsidianVaultStyle.GetForeground():
+		return obsidianVaultAltStyle
+	default:
+		return fileAltStyle
+	}
+}

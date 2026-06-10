@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -267,10 +266,7 @@ func (m model) renderDetailView(maxVisible int) string {
 	maxNameTextLen := nameWidth - 5
 
 	// Header with sort indicators
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(currentTheme.Title.adaptiveColor()).
-		PaddingLeft(2)
+	headerStyle := detailHeaderStyle
 
 	// Determine sort indicator (arrow)
 	sortIndicator := ""
@@ -752,7 +748,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				// Add alternating row background for easier reading on wide terminals
 				// Disabled on narrow terminals to prevent wrapping issues with horizontal scroll
 				if !m.isNarrowTerminal() && i%2 == 0 {
-					alternateStyle := style.Copy().Background(currentTheme.AlternateRow.adaptiveColor())
+					alternateStyle := alternateRowStyle(style)
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, alternateStyle.Render(nameWithoutEmoji)), 1)
 				} else {
 					line = strings.Replace(line, plainNameWithEmoji, fmt.Sprintf("%s%s %s%s", paddedIcon, favIndicator, nameLeadingEmoji, style.Render(nameWithoutEmoji)), 1)
@@ -773,7 +769,7 @@ func (m model) renderDetailView(maxVisible int) string {
 				// Add alternating row background for easier reading on wide terminals
 				// Disabled on narrow terminals to prevent wrapping issues with horizontal scroll
 				if !m.isNarrowTerminal() && i%2 == 0 {
-					alternateStyle := style.Copy().Background(currentTheme.AlternateRow.adaptiveColor())
+					alternateStyle := alternateRowStyle(style)
 					line = alternateStyle.Render(line)
 				} else {
 					line = style.Render(line)

@@ -325,8 +325,8 @@ func (m *model) scrollToFocusedVariable() {
 		// Calculate maxVisible the same way as renderDualPane/renderFullPreview
 		var maxVisible int
 		if m.viewMode == viewDualPane {
-			headerLines := 4  // title + toolbar + command + blank separator
-			footerLines := 4  // blank after panes + 2 status lines + optional message/search
+			headerLines := 4 // title + toolbar + command + blank separator
+			footerLines := 4 // blank after panes + 2 status lines + optional message/search
 			maxVisible = m.height - headerLines - footerLines
 			if maxVisible < 5 {
 				maxVisible = 5
@@ -334,7 +334,7 @@ func (m *model) scrollToFocusedVariable() {
 			// Account for borders
 			maxVisible = maxVisible - 2
 		} else if m.viewMode == viewFullPreview {
-			maxVisible = m.height - 4 - 0 // Reserve space for header (if shown), help, and borders
+			maxVisible = m.height - 4 - 0   // Reserve space for header (if shown), help, and borders
 			contentHeight := maxVisible - 2 // Content area accounting for borders
 			maxVisible = contentHeight
 		} else {
@@ -560,7 +560,7 @@ func (m model) getFileListVisibleLines() int {
 
 	if m.viewMode == viewDualPane {
 		// Dual-pane mode: account for header, borders, footer
-		visibleLines = m.height - 8  // Conservative estimate
+		visibleLines = m.height - 8 // Conservative estimate
 	} else {
 		// Single-pane mode: header (4) + footer (2-3)
 		visibleLines = m.height - 6
@@ -673,10 +673,7 @@ func (m model) renderToolbarRow() string {
 	var s strings.Builder
 
 	// Home button - navigate to home directory
-	homeButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(homeButtonStyle.Render("[🏠]"))
+	s.WriteString(toolbarButtonStyle.Render("[🏠]"))
 	s.WriteString(" ")
 
 	// View mode toggle button (cycles List → Detail → Tree)
@@ -690,18 +687,12 @@ func (m model) renderToolbarRow() string {
 	case modeTree:
 		viewIcon = "🌲" // Tree icon for hierarchical view
 	}
-	viewButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(viewButtonStyle.Render("[" + viewIcon + "]"))
+	s.WriteString(toolbarButtonStyle.Render("[" + viewIcon + "]"))
 	s.WriteString(" ")
 
 	// Sort toggle button (cycles Name → Size → Modified → Type)
 	sortIcon := "🔃"
-	sortButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(sortButtonStyle.Render("[" + sortIcon + "]"))
+	s.WriteString(toolbarButtonStyle.Render("[" + sortIcon + "]"))
 	s.WriteString(" ")
 
 	// Pane toggle button (toggles single ↔ dual-pane)
@@ -709,27 +700,20 @@ func (m model) renderToolbarRow() string {
 	if m.viewMode == viewDualPane {
 		paneIcon = "⬌"
 	}
-	paneButtonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Bold(true)
-	s.WriteString(paneButtonStyle.Render("[" + paneIcon + "]"))
+	s.WriteString(toolbarButtonStyle.Render("[" + paneIcon + "]"))
 	s.WriteString(" ")
 
 	// Command mode toggle button with green >_ and blue brackets
 	if m.commandFocused {
 		// Active: gray background
-		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true).Background(lipgloss.Color("237"))
-		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true).Background(lipgloss.Color("237"))
-		s.WriteString(bracketStyle.Render("["))
-		s.WriteString(termStyle.Render(">_"))
-		s.WriteString(bracketStyle.Render("]"))
+		s.WriteString(toolbarButtonActiveStyle.Render("["))
+		s.WriteString(toolbarTermActiveStyle.Render(">_"))
+		s.WriteString(toolbarButtonActiveStyle.Render("]"))
 	} else {
 		// Inactive: normal styling
-		bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-		termStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true)
-		s.WriteString(bracketStyle.Render("["))
-		s.WriteString(termStyle.Render(">_"))
-		s.WriteString(bracketStyle.Render("]"))
+		s.WriteString(toolbarButtonStyle.Render("["))
+		s.WriteString(toolbarTermStyle.Render(">_"))
+		s.WriteString(toolbarButtonStyle.Render("]"))
 	}
 	s.WriteString(" ")
 
@@ -738,33 +722,19 @@ func (m model) renderToolbarRow() string {
 	searchIcon := "🔍"
 	if m.preview.searchActive || m.searchMode {
 		// Active: gray background
-		activeSearchStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeSearchStyle.Render("[" + searchIcon + "]"))
+		s.WriteString(toolbarButtonActiveStyle.Render("[" + searchIcon + "]"))
 	} else {
 		// Inactive: normal styling
-		searchButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(searchButtonStyle.Render("[" + searchIcon + "]"))
+		s.WriteString(toolbarButtonStyle.Render("[" + searchIcon + "]"))
 	}
 	s.WriteString(" ")
 
 	// Agent conversations toggle button
 	agentIcon := "🤖"
 	if m.showAgentView {
-		activeAgentStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeAgentStyle.Render("[" + agentIcon + "]"))
+		s.WriteString(toolbarButtonActiveStyle.Render("[" + agentIcon + "]"))
 	} else {
-		agentButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(agentButtonStyle.Render("[" + agentIcon + "]"))
+		s.WriteString(toolbarButtonStyle.Render("[" + agentIcon + "]"))
 	}
 	s.WriteString(" ")
 
@@ -772,16 +742,9 @@ func (m model) renderToolbarRow() string {
 	changesIcon := "⚡"
 	if m.showChangesOnly {
 		// Active: gray background
-		activeChangesStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true).
-			Background(lipgloss.Color("237"))
-		s.WriteString(activeChangesStyle.Render("[" + changesIcon + "]"))
+		s.WriteString(toolbarButtonActiveStyle.Render("[" + changesIcon + "]"))
 	} else {
-		changesButtonStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Bold(true)
-		s.WriteString(changesButtonStyle.Render("[" + changesIcon + "]"))
+		s.WriteString(toolbarButtonStyle.Render("[" + changesIcon + "]"))
 	}
 	s.WriteString(" ")
 

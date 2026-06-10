@@ -210,7 +210,6 @@ func (m model) renderPreview(maxVisible int) string {
 	for i := start; i < end; i++ {
 		// Line number (5 chars)
 		lineNum := fmt.Sprintf("%5d ", i+1)
-		lineNumStyle := lipgloss.NewStyle().Foreground(uiSubtleText())
 		renderedLine := lineNumStyle.Render(lineNum)
 
 		// Scrollbar right after line number (replaces the │ separator)
@@ -257,9 +256,6 @@ func (m model) renderPreview(maxVisible int) string {
 		// end is already correctly clamped, so use it directly
 		lastVisibleLine := end
 		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) ", lastVisibleLine, totalLines, scrollPercent)
-		scrollStyle := lipgloss.NewStyle().
-			Foreground(uiSubtleText()).
-			Italic(true)
 
 		// Pad with empty lines to reach target
 		for linesRendered < targetLines {
@@ -270,7 +266,7 @@ func (m model) renderPreview(maxVisible int) string {
 		if linesRendered > 0 {
 			s.WriteString("\n")
 		}
-		s.WriteString(scrollStyle.Render(scrollIndicator))
+		s.WriteString(scrollIndicatorStyle.Render(scrollIndicator))
 		linesRendered++
 	} else {
 		// Pad with empty lines to reach exactly maxVisible lines
@@ -487,9 +483,6 @@ func (m model) renderDiffPreview(maxVisible int) string {
 
 		lastVisibleLine := end
 		scrollIndicator := fmt.Sprintf(" %d/%d (%d%%) [diff]", lastVisibleLine, totalLines, scrollPercent)
-		scrollStyle := lipgloss.NewStyle().
-			Foreground(uiSubtleText()).
-			Italic(true)
 
 		for linesRendered < targetLines {
 			writeLine("\033[0m")
@@ -498,7 +491,7 @@ func (m model) renderDiffPreview(maxVisible int) string {
 		if linesRendered > 0 {
 			s.WriteString("\n")
 		}
-		s.WriteString(scrollStyle.Render(scrollIndicator))
+		s.WriteString(scrollIndicatorStyle.Render(scrollIndicator))
 		linesRendered++
 	} else {
 		for linesRendered < maxVisible {
@@ -551,15 +544,12 @@ func (m model) renderScrollbar(lineIndex, visibleLines, totalLines int) string {
 	thumbSize := max(1, (visibleLines*scrollbarHeight)/totalLines)
 	thumbStart := (m.preview.scrollPos * scrollbarHeight) / totalLines
 
-	scrollbarStyle := lipgloss.NewStyle().Foreground(uiMutedText())
-	scrollbarThumbStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor())
-
 	// Determine what to render for this line
 	if lineIndex >= thumbStart && lineIndex < thumbStart+thumbSize {
 		// This line is part of the scrollbar thumb (bright blue)
 		return scrollbarThumbStyle.Render("│")
 	} else {
 		// This line is part of the scrollbar track (dim gray)
-		return scrollbarStyle.Render("│")
+		return scrollbarTrackStyle.Render("│")
 	}
 }

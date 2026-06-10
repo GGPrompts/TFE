@@ -315,4 +315,107 @@ func initStyles() {
 
 	jsonlToolResultStyle = lipgloss.NewStyle().
 		Foreground(uiMutedText())
+
+	// Preview pane styles (render_preview.go)
+	lineNumStyle = lipgloss.NewStyle().
+		Foreground(uiSubtleText())
+
+	scrollbarTrackStyle = lipgloss.NewStyle().
+		Foreground(uiMutedText())
+
+	scrollbarThumbStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.Title.adaptiveColor())
+
+	scrollIndicatorStyle = lipgloss.NewStyle().
+		Foreground(uiSubtleText()).
+		Italic(true)
+
+	// File-list detail-view header
+	detailHeaderStyle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(currentTheme.Title.adaptiveColor()).
+		PaddingLeft(2)
+
+	// Alternate-row background variants of each file-type style
+	altBg := currentTheme.AlternateRow.adaptiveColor()
+	fileAltStyle = fileStyle.Background(altBg)
+	folderAltStyle = folderStyle.Background(altBg)
+	claudeContextAltStyle = claudeContextStyle.Background(altBg)
+	agentsAltStyle = agentsStyle.Background(altBg)
+	promptsFolderAltStyle = promptsFolderStyle.Background(altBg)
+	obsidianVaultAltStyle = obsidianVaultStyle.Background(altBg)
+
+	// Toolbar button styles (hardcoded colors, matching original)
+	toolbarButtonStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+
+	toolbarButtonActiveStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true).
+		Background(lipgloss.Color("237"))
+
+	toolbarTermStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+
+	toolbarTermActiveStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true).
+		Background(lipgloss.Color("237"))
+
+	// Tab bar styles
+	activeTabStyle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(currentTheme.SelectionFg.adaptiveColor()).
+		Background(currentTheme.SelectionBg.adaptiveColor()).
+		Padding(0, 1)
+
+	inactiveTabStyle = lipgloss.NewStyle().
+		Foreground(uiBodyText()).
+		Background(uiPanelBackground()).
+		Padding(0, 1)
+
+	tabModifiedStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.DiffHunkHeader.adaptiveColor())
+
+	tabAddedStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.DiffAdded.adaptiveColor())
+
+	tabDeletedStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.DiffRemoved.adaptiveColor())
+
+	tabUntrackedStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.Title.adaptiveColor())
+
+	tabCloseStyle = lipgloss.NewStyle().
+		Foreground(uiSubtleText())
+
+	tabOverflowStyle = lipgloss.NewStyle().
+		Foreground(uiSubtleText()).
+		Italic(true)
+
+	// Command-line styles (renderCommandLine)
+	cmdPromptStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.Title.adaptiveColor()).
+		Bold(true)
+
+	cmdInputStyle = lipgloss.NewStyle().
+		Foreground(uiBodyText())
+
+	cmdHelperStyle = lipgloss.NewStyle().
+		Foreground(uiMutedText()).
+		Italic(true)
+
+	cmdCursorStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.Title.adaptiveColor()).
+		Bold(true)
+
+	cmdBangStyle = lipgloss.NewStyle().
+		Foreground(currentTheme.DiffRemoved.adaptiveColor()).
+		Bold(true)
+
+	cmdGhostStyle = lipgloss.NewStyle().
+		Foreground(uiMutedText()).
+		Italic(true)
 }

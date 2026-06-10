@@ -26,27 +26,14 @@ func (m model) renderTabBar(maxWidth int) string {
 
 	var s strings.Builder
 
-	// Style for active tab
-	activeTabStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(currentTheme.SelectionFg.adaptiveColor()).
-		Background(currentTheme.SelectionBg.adaptiveColor()).
-		Padding(0, 1)
-
-	// Style for inactive tabs
-	inactiveTabStyle := lipgloss.NewStyle().
-		Foreground(uiBodyText()).
-		Background(uiPanelBackground()).
-		Padding(0, 1)
-
-	// Style for git status indicators
-	modifiedStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffHunkHeader.adaptiveColor())
-	addedStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffAdded.adaptiveColor())
-	deletedStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor())
-	untrackedStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor())
-
-	// Style for the close indicator on active tab
-	closeStyle := lipgloss.NewStyle().Foreground(uiSubtleText())
+	// Tab styles (active/inactive, git indicators, close glyph) are
+	// pre-built in initStyles(); reference them via short local aliases
+	// to keep the rendering logic below readable.
+	modifiedStyle := tabModifiedStyle
+	addedStyle := tabAddedStyle
+	deletedStyle := tabDeletedStyle
+	untrackedStyle := tabUntrackedStyle
+	closeStyle := tabCloseStyle
 
 	// Build tab labels and track total width
 	usedWidth := 0
@@ -93,10 +80,7 @@ func (m model) renderTabBar(maxWidth int) string {
 			if usedWidth+tabWidth > maxWidth && i > 0 {
 				// Add overflow indicator
 				s.WriteString(tabSep)
-				overflow := lipgloss.NewStyle().
-					Foreground(uiSubtleText()).
-					Italic(true).
-					Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
+				overflow := tabOverflowStyle.Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
 				s.WriteString(overflow)
 				break
 			}
@@ -115,10 +99,7 @@ func (m model) renderTabBar(maxWidth int) string {
 			if usedWidth+tabWidth > maxWidth && i > 0 {
 				// Add overflow indicator
 				s.WriteString(tabSep)
-				overflow := lipgloss.NewStyle().
-					Foreground(uiSubtleText()).
-					Italic(true).
-					Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
+				overflow := tabOverflowStyle.Render(fmt.Sprintf("+%d more", len(m.tabs)-i))
 				s.WriteString(overflow)
 				break
 			}
@@ -502,16 +483,14 @@ func (m model) renderCommandLine() string {
 	var s strings.Builder
 
 	// Command prompt with path (terminal-style)
-	promptPrefix := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true).Render("$ ")
-	pathPromptStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
-	inputStyle := lipgloss.NewStyle().Foreground(uiBodyText())
+	inputStyle := cmdInputStyle
 
-	s.WriteString(promptPrefix)
-	s.WriteString(pathPromptStyle.Render(getDisplayPath(m.currentPath)))
+	s.WriteString(cmdPromptStyle.Render("$ "))
+	s.WriteString(cmdPromptStyle.Render(getDisplayPath(m.currentPath)))
 	s.WriteString(" ")
 
 	// Show helper text based on focus state
-	helperStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
+	helperStyle := cmdHelperStyle
 	if !m.commandFocused && m.commandInput == "" {
 		// Not focused - show contextual hints
 		if m.displayMode == modeDetail && m.isNarrowTerminal() {
@@ -524,8 +503,7 @@ func (m model) renderCommandLine() string {
 	} else if m.commandFocused && m.commandInput == "" {
 		// Focused but no input - show ! prefix hint and cursor
 		s.WriteString(helperStyle.Render("! prefix to run & exit"))
-		cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
-		s.WriteString(cursorStyle.Render("█"))
+		s.WriteString(cmdCursorStyle.Render("█"))
 	} else {
 		// Has input - show the command with cursor at correct position
 		if m.commandFocused {
@@ -535,16 +513,14 @@ func (m model) renderCommandLine() string {
 
 			// Handle ! prefix coloring
 			if strings.HasPrefix(beforeCursor, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
-				s.WriteString(prefixStyle.Render("!"))
+				s.WriteString(cmdBangStyle.Render("!"))
 				s.WriteString(inputStyle.Render(beforeCursor[1:]))
 			} else {
 				s.WriteString(inputStyle.Render(beforeCursor))
 			}
 
 			// Render cursor
-			cursorStyle := lipgloss.NewStyle().Foreground(currentTheme.Title.adaptiveColor()).Bold(true)
-			s.WriteString(cursorStyle.Render("█"))
+			s.WriteString(cmdCursorStyle.Render("█"))
 
 			// Render text after cursor
 			s.WriteString(inputStyle.Render(afterCursor))
@@ -553,15 +529,13 @@ func (m model) renderCommandLine() string {
 			if m.ghostText != "" && afterCursor == "" {
 				ghostSuffix := getGhostTextSuffix(m.commandInput, m.ghostText)
 				if ghostSuffix != "" {
-					ghostStyle := lipgloss.NewStyle().Foreground(uiMutedText()).Italic(true)
-					s.WriteString(ghostStyle.Render(ghostSuffix))
+					s.WriteString(cmdGhostStyle.Render(ghostSuffix))
 				}
 			}
 		} else {
 			// Not focused - just show the text
 			if strings.HasPrefix(m.commandInput, "!") {
-				prefixStyle := lipgloss.NewStyle().Foreground(currentTheme.DiffRemoved.adaptiveColor()).Bold(true)
-				s.WriteString(prefixStyle.Render("!"))
+				s.WriteString(cmdBangStyle.Render("!"))
 				s.WriteString(inputStyle.Render(m.commandInput[1:]))
 			} else {
 				s.WriteString(inputStyle.Render(m.commandInput))
