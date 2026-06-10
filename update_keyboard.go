@@ -1783,11 +1783,15 @@ func (m model) handleMainKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 				}
 			} else if m.showGitReposOnly {
 				if currentFile.name == ".." {
-					// Navigating up while git filter is active - rescan from parent
+					// Navigating up while git filter is active - rescan from parent.
+					// Clear any active search filter first: its indices reference the
+					// old listing and would be meaningless in the new one, matching
+					// the mouse double-click and navigateToPath paths.
 					if m.showTrashOnly {
 						m.showTrashOnly = false
 						m.trashRestorePath = ""
 					}
+					m.clearSearchFilter()
 					m.currentPath = currentFile.path
 					m.cursor = 0
 					m.setStatusMessage("🔍 Re-scanning from parent directory...", false)

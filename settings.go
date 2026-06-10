@@ -11,6 +11,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -515,7 +516,10 @@ func (m model) handleSettingsKeyEvent(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "backspace":
 			if len(m.settingsInput) > 0 {
-				m.settingsInput = m.settingsInput[:len(m.settingsInput)-1]
+				// Rune-aware: drop the last full rune, not the last byte, so
+				// multibyte (CJK/emoji) input is not corrupted into invalid UTF-8.
+				_, size := utf8.DecodeLastRuneInString(m.settingsInput)
+				m.settingsInput = m.settingsInput[:len(m.settingsInput)-size]
 			}
 			return m, nil
 		default:
