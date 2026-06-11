@@ -2,7 +2,37 @@
 
 All notable changes to the Terminal File Explorer (TFE) project.
 
-## [Unreleased]
+## [1.1.0] - 2026-06-10
+
+**The Big Quality Overhaul** — alongside the new features below, this release closes out a 124-issue tracker sweep (71 commits on release day alone) covering data-loss bugs, panics, security updates, performance, and Unicode-correctness fixes.
+
+### Quality Overhaul Highlights
+
+- **Data-loss fixes**
+  - Copying a file onto itself no longer truncates the source to zero bytes
+  - Cross-device trash moves no longer lose track of files when rollback fails
+  - Restoring from trash now works across filesystems (copy+delete fallback)
+  - Trash metadata, favorites, history, and config now written atomically (temp-file+rename); corrupted state files are backed up instead of silently wiped
+- **Panic & race fixes**
+  - Command-input cursor out-of-range panic, short-commit-hash panic, watcher shutdown send-on-closed-channel panic, markdown-render goroutine data race
+- **Security**
+  - Bumped `golang.org/x/image` and `golang.org/x/net` to fix reachable WEBP panic and HTML tokenizer vulnerabilities
+  - File paths are now shell-quoted in viewer launch scripts
+- **Performance**
+  - File icons, directory item counts, JSONL conversation rendering, diff previews, and wrapped-line counts are all cached instead of recomputed per frame (previously per-row disk I/O and git subprocess spawns on every render)
+  - Tree rebuilding is event-driven instead of per-message; permanent 50ms tick loop removed
+  - Package-level lipgloss styles, hoisted regexes and map literals out of hot loops
+- **Unicode & width correctness**
+  - Replaced byte-based slicing/padding with visual-width-aware helpers across tree view, detail view, status bar, title bar, JSONL transcripts, and dropdowns
+  - Backspace and cursor movement now handle multibyte input correctly in all text fields
+  - Removed all emoji variation selectors; upgraded go-runewidth to v0.0.24
+- **Refactoring & dead code**
+  - Split the 2,617-line `handleKeyEvent` into focused mode handlers
+  - Deduplicated pane headers, scroll indicators, dialog dispatch, display-mode switching, and F4 file-type dispatch
+  - Removed 12 confirmed-unreachable functions and the dead async markdown pipeline
+- **UX fixes**
+  - Stale search filters no longer survive directory navigation
+  - F2 context-menu position, panel-lock mouse hit-testing, double-click navigation mode desync, typing j/k in prompt variables, light-theme contrast — all fixed
 
 ### Added
 - **Agent Conversation Viewer (Ctrl+A / [🤖] toolbar button)**
@@ -55,42 +85,6 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Panels scale proportionally on terminal resize while locked
   - Lock auto-resets when exiting dual-pane mode
   - Files modified: `types.go`, `model.go`, `update_keyboard.go`, `menu.go`, `update_mouse.go`
-
-- **CLI File/Directory Arguments**
-  - Open TFE to a specific directory: `tfe ~/projects`
-  - Open with a file pre-selected: `tfe ~/projects/main.go`
-  - Supports `~` expansion and validates paths exist
-  - Shows helpful error messages for invalid paths
-  - Files modified: `main.go`, `model.go`
-
-- **--preview Flag for Auto-Opening Preview Pane**
-  - New `--preview` or `-p` flag opens preview pane automatically
-  - Preview pane is focused (60% width) when using this flag
-  - File content is loaded immediately
-  - Perfect for integration with other tools: `tmux split-window "tfe --preview file.go"`
-  - Files modified: `main.go`, `model.go`
-
-- **Cross-Platform Compatibility Improvements**
-  - **setsid fallback**: Uses `nohup` on macOS/Termux where `setsid` isn't available (tmux quad feature)
-  - **Dynamic Termux paths**: Uses PREFIX env var instead of hardcoded `/data/data/com.termux/...` paths
-  - **wl-copy clipboard support**: Added Wayland clipboard support (checked before xclip/xsel)
-  - **Better HOME detection**: Uses `os.UserHomeDir()` with fallback to HOME env var
-  - **Improved Termux detection**: Added TERMUX_VERSION and TERMUX_APP_PID checks
-  - **Better wslpath handling**: Validates converted Windows paths, helpful error messages
-  - **Multi-drive WezTerm detection**: Checks C:, D:, E: drives for WezTerm in WSL
-  - Files modified: `editor.go`, `helpers.go`, `model.go`, `terminal_graphics.go`
-
-### Fixed
-- **Terminal Resize Ghost Content**
-  - Added `tea.ClearScreen` to WindowSizeMsg handler
-  - Prevents duplicate footer text when resizing terminal
-  - Files modified: `update.go`
-
-- **Git Operations Display**
-  - Fixed git operations (pull, push, sync, fetch) rendering underneath TFE
-  - Now properly exits alt screen like other terminal operations
-  - Uses `tea.ExecProcess` instead of raw `exec.Command().Run()`
-  - Files modified: `git_operations.go`
 
 ### Changed
 - **Trash Bin Behavior - Navigation Instead of Toggle**
@@ -262,6 +256,17 @@ All notable changes to the Terminal File Explorer (TFE) project.
   - Prevents infinite loop when wrapper finds itself in PATH
   - Maintains cross-platform compatibility (macOS, Linux, WSL)
   - Files modified: `tfe-wrapper.sh`
+
+## [1.0.3] - 2025-12-20
+
+### Added
+- **CLI File/Directory Arguments** — open TFE to a directory (`tfe ~/projects`) or with a file pre-selected (`tfe ~/projects/main.go`); `~` expansion and path validation included
+- **--preview / -p flag** — auto-opens the preview pane focused at 60% width, ideal for tool integration (`tmux split-window "tfe --preview file.go"`)
+- **Cross-Platform Compatibility Improvements** — `setsid` fallback via `nohup` (macOS/Termux), dynamic Termux paths via PREFIX, `wl-copy` Wayland clipboard support, better HOME/wslpath handling, multi-drive WezTerm detection in WSL
+
+### Fixed
+- Terminal resize causing duplicate footer text (ghost content)
+- Git operations (pull, push, sync, fetch) rendering underneath TFE instead of exiting the alt screen properly
 
 ## [1.0.0] - 2025-10-23
 
